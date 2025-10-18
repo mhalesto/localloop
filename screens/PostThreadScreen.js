@@ -19,6 +19,7 @@ import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
+import { getAvatarConfig } from '../constants/avatars';
 
 /* Simple circular avatar (no arrow/tail) */
 function AvatarIcon({ tint, size = 32, style }) {
@@ -109,6 +110,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
   const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
   const authorLocation = authorLocationParts.join(', ');
+  const authorAvatar = getAvatarConfig(post.author?.avatarKey);
+  const authorAvatarBackground = authorAvatar.backgroundColor ?? badgeBackground;
 
   const showViewOriginal =
     post.sourceCity && post.sourcePostId && !(post.sourceCity === city && post.sourcePostId === post.id);
@@ -146,15 +149,31 @@ export default function PostThreadScreen({ route, navigation }) {
       <View style={[styles.postCard, { backgroundColor: headerColor }]}>
         <View style={styles.postHeaderRow}>
           <View style={styles.postHeader}>
-            <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
+            <View style={[styles.avatar, { backgroundColor: authorAvatarBackground }]}>
               <View style={styles.avatarRing} />
-              <Ionicons name="person" size={22} color="#fff" />
+              {authorAvatar.icon ? (
+                <Ionicons
+                  name={authorAvatar.icon.name}
+                  size={22}
+                  color={authorAvatar.icon.color ?? '#fff'}
+                />
+              ) : (
+                <Text style={[styles.avatarEmoji, { color: authorAvatar.foregroundColor ?? '#fff' }]}>
+                  {authorAvatar.emoji ?? '🙂'}
+                </Text>
+              )}
             </View>
 
             <View>
               <Text style={[styles.postBadge, { color: badgeTextColor }]}>{authorName}</Text>
               {authorLocation ? (
-                <Text style={[styles.postCity, { color: headerMetaColor }]}>{authorLocation}</Text>
+                <Text
+                  style={[styles.postCity, { color: headerMetaColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {authorLocation}
+                </Text>
               ) : null}
               {post.sourceCity && post.sourceCity !== city ? (
                 <Text style={[styles.postCity, { color: headerMetaColor }]}>{post.sourceCity} Room</Text>
@@ -345,10 +364,27 @@ const styles = StyleSheet.create({
   /* Header */
   postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' },
-  avatarRing: { ...StyleSheet.absoluteFillObject, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)' },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden'
+  },
+  avatarRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)'
+  },
+  avatarEmoji: {
+    fontSize: 20,
+    textAlign: 'center'
+  },
   postBadge: { fontSize: 16, fontWeight: '700' },
-  postCity: { fontSize: 12, marginTop: 4 },
+  postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
   sharedBanner: { fontSize: 12, marginTop: 6 },
   postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
   postMeta: { fontSize: 13, marginBottom: 12 },

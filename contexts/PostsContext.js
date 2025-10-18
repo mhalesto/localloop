@@ -11,13 +11,14 @@ function normalizeProfile(profile) {
       city: ''
     };
   }
-  return {
-    nickname: profile.nickname?.trim() ?? '',
-    country: profile.country ?? '',
-    province: profile.province ?? '',
-    city: profile.city ?? ''
-  };
-}
+    return {
+      nickname: profile.nickname?.trim() ?? '',
+      country: profile.country ?? '',
+      province: profile.province ?? '',
+      city: profile.city ?? '',
+      avatarKey: profile.avatarKey ?? 'default'
+    };
+  }
 
 export function PostsProvider({ children }) {
   const [postsByCity, setPostsByCity] = useState({});

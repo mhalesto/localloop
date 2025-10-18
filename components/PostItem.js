@@ -3,6 +3,7 @@ import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { accentPresets } from '../contexts/SettingsContext';
+import { getAvatarConfig } from '../constants/avatars';
 
 const presetMap = accentPresets.reduce((acc, p) => {
   acc[p.key] = p;
@@ -33,6 +34,8 @@ export default function PostItem({
   const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
   const locationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
   const authorLocation = locationParts.join(', ');
+  const avatarConfig = getAvatarConfig(post.author?.avatarKey);
+  const avatarBackground = avatarConfig.backgroundColor ?? badgeBg;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.touchable}>
@@ -41,16 +44,31 @@ export default function PostItem({
         <View style={styles.cardHeader}>
           {/* Avatar badge + author block */}
           <View style={styles.headerLeft}>
-            <View style={[styles.avatar, { backgroundColor: badgeBg }]}>
-              {/* subtle ring via overlay */}
+            <View style={[styles.avatar, { backgroundColor: avatarBackground }]}>
               <View style={styles.avatarRing} />
-              <Ionicons name="person" size={22} color="#fff" />
+              {avatarConfig.icon ? (
+                <Ionicons
+                  name={avatarConfig.icon.name}
+                  size={22}
+                  color={avatarConfig.icon.color ?? '#fff'}
+                />
+              ) : (
+                <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}>
+                  {avatarConfig.emoji ?? '🙂'}
+                </Text>
+              )}
             </View>
 
             <View style={styles.authorBlock}>
               <Text style={[styles.posterName, { color: primaryTextColor }]}>{authorName}</Text>
               {authorLocation ? (
-                <Text style={[styles.posterMeta, { color: metaColor }]}>{authorLocation}</Text>
+                <Text
+                  style={[styles.posterMeta, { color: metaColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {authorLocation}
+                </Text>
               ) : null}
               {sharedFrom?.city ? (
                 <Text style={[styles.posterMeta, { color: metaColor }]}>
@@ -175,6 +193,11 @@ const styles = StyleSheet.create({
   posterMeta: {
     fontSize: 12,
     marginTop: 4,
+    maxWidth: '80%',
+  },
+  avatarEmoji: {
+    fontSize: 18,
+    textAlign: 'center',
   },
 
   viewOriginal: {

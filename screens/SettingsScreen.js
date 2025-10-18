@@ -8,10 +8,12 @@ import {
   StyleSheet,
   TextInput
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
+import { avatarOptions, getAvatarConfig } from '../constants/avatars';
 
 export default function SettingsScreen({ navigation }) {
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -29,6 +31,7 @@ export default function SettingsScreen({ navigation }) {
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const avatarConfig = getAvatarConfig(userProfile.avatarKey);
 
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
@@ -211,6 +214,58 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.privacyNote}>
             We don&apos;t store or share this info—clearing the app resets it.
           </Text>
+          <View style={styles.profileField}>
+            <Text style={styles.itemTitle}>Avatar</Text>
+            <Text style={styles.profileSummary}>Choose a badge that appears on your posts.</Text>
+            <View style={styles.avatarPreviewWrapper}>
+              <View style={[styles.avatarPreviewCircle, { backgroundColor: avatarConfig.backgroundColor }]}>
+                {avatarConfig.icon ? (
+                  <Ionicons
+                    name={avatarConfig.icon.name}
+                    size={28}
+                    color={avatarConfig.icon.color ?? '#fff'}
+                  />
+                ) : (
+                  <Text style={[styles.avatarPreviewEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}>
+                    {avatarConfig.emoji ?? '🙂'}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.avatarGrid}>
+              {avatarOptions.map((option, index) => {
+                const isActive = option.key === userProfile.avatarKey;
+                const isLastInRow = (index + 1) % 3 === 0;
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.avatarOption,
+                      { borderColor: isActive ? accentSwitchColor : 'transparent' },
+                      !isLastInRow && styles.avatarOptionSpacing
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={() => updateUserProfile({ avatarKey: option.key })}
+                  >
+                    <View style={[styles.avatarOptionCircle, { backgroundColor: option.backgroundColor }]}>
+                      {option.icon ? (
+                        <Ionicons
+                          name={option.icon.name}
+                          size={20}
+                          color={option.icon.color ?? '#fff'}
+                        />
+                      ) : (
+                        <Text style={[styles.avatarOptionEmoji, { color: option.foregroundColor ?? '#fff' }]}>
+                          {option.emoji ?? '🙂'}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.avatarOptionLabel}>{option.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -351,6 +406,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 8
+  },
+  avatarPreviewWrapper: {
+    marginTop: 12,
+    marginBottom: 12,
+    alignItems: 'flex-start'
+  },
+  avatarPreviewCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  avatarPreviewEmoji: {
+    fontSize: 28
+  },
+  avatarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4
+  },
+  avatarOption: {
+    flexBasis: '30%',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 10,
+    borderWidth: 2,
+    borderRadius: 14
+  },
+  avatarOptionSpacing: {
+    marginRight: '5%'
+  },
+  avatarOptionCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6
+  },
+  avatarOptionEmoji: {
+    fontSize: 22
+  },
+  avatarOptionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textPrimary
   },
   accentRow: {
     flexDirection: 'row',

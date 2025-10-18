@@ -107,7 +107,8 @@ export function SettingsProvider({ children }) {
     nickname: '',
     country: '',
     province: '',
-    city: ''
+    city: '',
+    avatarKey: 'default'
   });
 
   const updateShowAddShortcut = useCallback(
