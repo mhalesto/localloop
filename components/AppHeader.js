@@ -12,10 +12,11 @@ export default function AppHeader({
   showSearch,
   searchPlaceholder = 'Search',
   onSearchChange,
-  searchValue
+  searchValue,
+  wrapperStyle
 }) {
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, wrapperStyle]}>
       <View style={styles.topRow}>
         <TouchableOpacity
           style={styles.iconButton}

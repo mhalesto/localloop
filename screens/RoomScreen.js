@@ -45,36 +45,42 @@ export default function RoomScreen({ navigation, route }) {
     navigation.navigate('PostThread', { city, postId });
   };
 
-  return (
-    <ScreenLayout
-      title={city}
-      subtitle="Anonymous room"
-      onBack={() => navigation.goBack()}
-      navigation={navigation}
-      activeTab="home"
-    >
-      <View style={styles.content}>
-        <View style={styles.headerCard}>
-          <View style={styles.headerTitleRow}>
-            <Text style={styles.headerSubtitle}>Room stats</Text>
-            <Text style={styles.headerTitle}>Today&apos;s pulse</Text>
+  const listData = useMemo(() => {
+    return [
+      { type: 'composer', key: 'composer' },
+      ...posts.map((post) => ({ type: 'post', key: post.id, data: post }))
+    ];
+  }, [posts]);
+
+  const renderStickyHeader = () => (
+    <View style={styles.stickyHeaderWrapper}>
+      <View style={styles.headerCard}>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerSubtitle}>Anonymous room</Text>
+          <Text style={styles.headerTitle}>{city}</Text>
+          <Text style={styles.headerMeta}>Today&apos;s pulse</Text>
+        </View>
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, styles.statCardLeft]}>
+            <Text style={styles.statValue}>{totalPosts}</Text>
+            <Text style={styles.statLabel}>Posts</Text>
           </View>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, styles.statCardLeft]}>
-              <Text style={styles.statValue}>{totalPosts}</Text>
-              <Text style={styles.statLabel}>Posts</Text>
-            </View>
-            <View style={[styles.statCard, styles.statCardMiddle]}>
-              <Text style={styles.statValue}>{totalComments}</Text>
-              <Text style={styles.statLabel}>Comments</Text>
-            </View>
-            <View style={[styles.statCard, styles.statCardRight]}>
-              <Text style={styles.statValue}>{averageReplies}</Text>
-              <Text style={styles.statLabel}>Avg Replies</Text>
-            </View>
+          <View style={[styles.statCard, styles.statCardMiddle]}>
+            <Text style={styles.statValue}>{totalComments}</Text>
+            <Text style={styles.statLabel}>Comments</Text>
+          </View>
+          <View style={[styles.statCard, styles.statCardRight]}>
+            <Text style={styles.statValue}>{averageReplies}</Text>
+            <Text style={styles.statLabel}>Avg Replies</Text>
           </View>
         </View>
+      </View>
+    </View>
+  );
 
+  const renderItem = ({ item }) => {
+    if (item.type === 'composer') {
+      return (
         <View style={styles.composerCard}>
           <Text style={styles.composerLabel}>Drop a new post</Text>
           <TextInput
@@ -97,48 +103,90 @@ export default function RoomScreen({ navigation, route }) {
             <Text style={styles.primaryButtonText}>Post</Text>
           </TouchableOpacity>
         </View>
+      );
+    }
 
-        <FlatList
-          style={styles.postsListWrapper}
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PostItem post={item} onPress={() => handleOpenPost(item.id)} />
-          )}
-          contentContainerStyle={[
-            styles.postsList,
-            posts.length === 0 && styles.postsListEmpty
-          ]}
-          ListEmptyComponent={
-            <Text style={styles.emptyState}>
-              No posts yet. Say something to kick things off.
-            </Text>
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+    return (
+      <PostItem
+        post={item.data}
+        onPress={() => handleOpenPost(item.data.id)}
+      />
+    );
+  };
+
+  return (
+    <ScreenLayout
+      title={city}
+      subtitle="Anonymous room"
+      onBack={() => navigation.goBack()}
+      navigation={navigation}
+      activeTab="home"
+      contentStyle={styles.screenContent}
+      headerStyle={styles.flatHeader}
+    >
+      <FlatList
+        style={styles.postsListWrapper}
+        data={listData}
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
+        ListHeaderComponent={renderStickyHeader}
+        stickyHeaderIndices={[0]}
+        contentContainerStyle={[
+          styles.listContainer,
+          posts.length === 0 && styles.postsListEmpty
+        ]}
+        ListFooterComponent={
+          posts.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyState}>
+                No posts yet. Say something to kick things off.
+              </Text>
+            </View>
+          ) : null
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    paddingBottom: 40
+  screenContent: {
+    paddingTop: 0,
+    paddingHorizontal: 0
+  },
+  flatHeader: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0
+  },
+  listContainer: {
+    paddingBottom: 80
+  },
+  stickyHeaderWrapper: {
+    backgroundColor: colors.primary,
+    paddingBottom: 24
   },
   headerCard: {
     backgroundColor: colors.primary,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6
   },
   headerTitleRow: {
-    marginBottom: 20
+    marginBottom: 20,
+    flexDirection: 'column'
   },
   headerSubtitle: {
     color: 'rgba(255,255,255,0.75)',
@@ -150,8 +198,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600'
   },
+  headerMeta: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginTop: 6
+  },
   statsRow: {
-    flexDirection: 'row'
+    flexDirection: 'row',
+    justifyContent: 'space-between'
   },
   statCard: {
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -184,6 +238,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 18,
+    marginHorizontal: 20,
+    marginTop: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOpacity: 0.05,
@@ -220,15 +276,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600'
   },
-  postsList: {
-    paddingBottom: 80
-  },
   postsListWrapper: {
     flex: 1
   },
   postsListEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center'
+    paddingBottom: 120
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center'
   },
   emptyState: {
     textAlign: 'center',

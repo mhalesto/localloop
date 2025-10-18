@@ -21,7 +21,8 @@ export default function ScreenLayout({
   contentStyle,
   activeTab = 'home',
   navigation,
-  showFooter = true
+  showFooter = true,
+  headerStyle
 }) {
   const { showAddShortcut } = useSettings();
 
@@ -39,6 +40,7 @@ export default function ScreenLayout({
           searchPlaceholder={searchPlaceholder}
           searchValue={searchValue}
           onSearchChange={onSearchChange}
+          wrapperStyle={headerStyle}
         />
         <View style={[styles.content, contentStyle]}>{children}</View>
         {showFooter ? (
