@@ -17,6 +17,7 @@ export function PostsProvider({ children }) {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         message: trimmed,
         createdAt: Date.now(),
+        createdByMe: true,
         comments: []
       };
 
@@ -42,7 +43,8 @@ export function PostsProvider({ children }) {
                 {
                   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
                   message: trimmed,
-                  createdAt: Date.now()
+                  createdAt: Date.now(),
+                  createdByMe: true
                 }
               ]
             }
@@ -66,14 +68,21 @@ export function PostsProvider({ children }) {
     [postsByCity]
   );
 
+  const getAllPosts = useCallback(() => {
+    return Object.entries(postsByCity).flatMap(([city, posts]) =>
+      posts.map((post) => ({ ...post, city }))
+    );
+  }, [postsByCity]);
+
   const value = useMemo(
     () => ({
       addComment,
       addPost,
       getPostById,
-      getPostsForCity
+      getPostsForCity,
+      getAllPosts
     }),
-    [addComment, addPost, getPostById, getPostsForCity]
+    [addComment, addPost, getPostById, getPostsForCity, getAllPosts]
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;

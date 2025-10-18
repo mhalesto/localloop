@@ -59,6 +59,8 @@ export default function PostThreadScreen({ route, navigation }) {
       title="Thread"
       subtitle={`${city} Room`}
       onBack={() => navigation.goBack()}
+      navigation={navigation}
+      activeTab="home"
     >
       <KeyboardAvoidingView
         style={styles.flex}
@@ -82,8 +84,23 @@ export default function PostThreadScreen({ route, navigation }) {
           data={comments}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <View style={styles.commentCard}>
-              <Text style={styles.commentMessage}>{item.message}</Text>
+            <View
+              style={[
+                styles.commentCard,
+                item.createdByMe && styles.commentCardMine
+              ]}
+            >
+              <Text
+                style={[
+                  styles.commentMessage,
+                  item.createdByMe && styles.commentMessageMine
+                ]}
+              >
+                {item.message}
+              </Text>
+              {item.createdByMe ? (
+                <Text style={styles.commentMeta}>You replied</Text>
+              ) : null}
             </View>
           )}
           ListEmptyComponent={
@@ -173,7 +190,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)'
   },
   commentsContainer: {
-    paddingBottom: 20
+    paddingBottom: 80
   },
   commentsList: {
     flex: 1
@@ -193,9 +210,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2
   },
+  commentCardMine: {
+    backgroundColor: colors.primaryLight + '22',
+    borderColor: colors.primaryLight,
+    borderWidth: 1
+  },
   commentMessage: {
     fontSize: 16,
     color: colors.textPrimary
+  },
+  commentMessageMine: {
+    color: colors.primaryDark
+  },
+  commentMeta: {
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.primaryDark,
+    fontWeight: '600'
   },
   emptyState: {
     textAlign: 'center',

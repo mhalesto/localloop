@@ -50,6 +50,8 @@ export default function RoomScreen({ navigation, route }) {
       title={city}
       subtitle="Anonymous room"
       onBack={() => navigation.goBack()}
+      navigation={navigation}
+      activeTab="home"
     >
       <View style={styles.content}>
         <View style={styles.headerCard}>
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   postsList: {
-    paddingBottom: 40
+    paddingBottom: 80
   },
   postsListEmpty: {
     flexGrow: 1,

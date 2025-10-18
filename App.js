@@ -1,35 +1,53 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import CountryScreen from './screens/CountryScreen';
 import ProvinceScreen from './screens/ProvinceScreen';
 import CityScreen from './screens/CityScreen';
 import RoomScreen from './screens/RoomScreen';
 import PostThreadScreen from './screens/PostThreadScreen';
+import MyCommentsScreen from './screens/MyCommentsScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import { PostsProvider } from './contexts/PostsContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
     <PostsProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Country"
-          screenOptions={{ headerShown: false }}
-        >
-          <Stack.Screen name="Country" component={CountryScreen} />
-          <Stack.Screen name="Province" component={ProvinceScreen} />
-          <Stack.Screen name="City" component={CityScreen} />
-          <Stack.Screen name="Room" component={RoomScreen} />
-          <Stack.Screen
-            name="PostThread"
-            component={PostThreadScreen}
-            options={{ title: 'Thread' }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <SettingsProvider>
+        <SafeAreaProvider>
+          <NavigationContainer>
+            <Stack.Navigator
+              initialRouteName="Country"
+              screenOptions={{ headerShown: false }}
+            >
+              <Stack.Screen name="Country" component={CountryScreen} />
+              <Stack.Screen name="Province" component={ProvinceScreen} />
+              <Stack.Screen name="City" component={CityScreen} />
+              <Stack.Screen name="Room" component={RoomScreen} />
+              <Stack.Screen
+                name="PostThread"
+                component={PostThreadScreen}
+                options={{ title: 'Thread' }}
+              />
+              <Stack.Screen
+                name="MyComments"
+                component={MyCommentsScreen}
+                options={{ title: 'My Replies' }}
+              />
+              <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ title: 'Settings' }}
+              />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </SettingsProvider>
     </PostsProvider>
   );
 }

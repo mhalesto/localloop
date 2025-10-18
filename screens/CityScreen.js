@@ -42,6 +42,8 @@ export default function CityScreen({ navigation, route }) {
       searchValue={query}
       onSearchChange={setQuery}
       onBack={() => navigation.goBack()}
+      navigation={navigation}
+      activeTab="home"
     >
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Cities</Text>
@@ -131,7 +133,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   listContent: {
-    paddingBottom: 40
+    paddingBottom: 80
   },
   listContentEmpty: {
     flexGrow: 1,

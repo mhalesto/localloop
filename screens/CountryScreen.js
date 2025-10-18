@@ -27,6 +27,8 @@ export default function CountryScreen({ navigation }) {
       searchPlaceholder="Search countries"
       searchValue={query}
       onSearchChange={setQuery}
+      navigation={navigation}
+      activeTab="home"
     >
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent</Text>
@@ -121,7 +123,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   listContent: {
-    paddingBottom: 40
+    paddingBottom: 80
   },
   listContentEmpty: {
     flexGrow: 1,
