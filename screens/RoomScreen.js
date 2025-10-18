@@ -11,6 +11,7 @@ import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
@@ -45,6 +46,10 @@ export default function RoomScreen({ navigation, route }) {
     navigation.navigate('PostThread', { city, postId });
   };
 
+  const { accentPreset } = useSettings();
+  const headerColor = accentPreset.background;
+  const isDarkHeader = accentPreset.isDark;
+
   const listData = useMemo(() => {
     return [
       { type: 'composer', key: 'composer' },
@@ -52,26 +57,35 @@ export default function RoomScreen({ navigation, route }) {
     ];
   }, [posts]);
 
+  const subtitleColor = accentPreset.subtitleColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
+  const titleColor = accentPreset.onPrimary ?? (accentPreset.isDark ? '#fff' : colors.textPrimary);
+  const metaColor = accentPreset.metaColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const statCardBackground = accentPreset.statCardBackground ?? (accentPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(108,77,244,0.12)');
+  const statValueColor = accentPreset.statValue ?? (accentPreset.isDark ? '#fff' : colors.primaryDark);
+  const statLabelColor = accentPreset.statLabel ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
+  const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
+  const buttonForeground = accentPreset.buttonForeground ?? '#fff';
+
   const renderStickyHeader = () => (
-    <View style={styles.stickyHeaderWrapper}>
-      <View style={styles.headerCard}>
+    <View style={[styles.stickyHeaderWrapper, { backgroundColor: headerColor }]}>
+      <View style={[styles.headerCard, { backgroundColor: headerColor }]}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerSubtitle}>Anonymous room</Text>
-          <Text style={styles.headerTitle}>{city}</Text>
-          <Text style={styles.headerMeta}>Today&apos;s pulse</Text>
+          <Text style={[styles.headerSubtitle, { color: subtitleColor }]}>Anonymous room</Text>
+          <Text style={[styles.headerTitle, { color: titleColor }]}>{city}</Text>
+          <Text style={[styles.headerMeta, { color: metaColor }]}>Today&apos;s pulse</Text>
         </View>
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, styles.statCardLeft]}>
-            <Text style={styles.statValue}>{totalPosts}</Text>
-            <Text style={styles.statLabel}>Posts</Text>
+          <View style={[styles.statCardBase, styles.statCardLeft, { backgroundColor: statCardBackground }]}>
+            <Text style={[styles.statValue, { color: statValueColor }]}>{totalPosts}</Text>
+            <Text style={[styles.statLabel, { color: statLabelColor }]}>Posts</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardMiddle]}>
-            <Text style={styles.statValue}>{totalComments}</Text>
-            <Text style={styles.statLabel}>Comments</Text>
+          <View style={[styles.statCardBase, styles.statCardMiddle, { backgroundColor: statCardBackground }]}>
+            <Text style={[styles.statValue, { color: statValueColor }]}>{totalComments}</Text>
+            <Text style={[styles.statLabel, { color: statLabelColor }]}>Comments</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardRight]}>
-            <Text style={styles.statValue}>{averageReplies}</Text>
-            <Text style={styles.statLabel}>Avg Replies</Text>
+          <View style={[styles.statCardBase, styles.statCardRight, { backgroundColor: statCardBackground }]}>
+            <Text style={[styles.statValue, { color: statValueColor }]}>{averageReplies}</Text>
+            <Text style={[styles.statLabel, { color: statLabelColor }]}>Avg Replies</Text>
           </View>
         </View>
       </View>
@@ -94,13 +108,14 @@ export default function RoomScreen({ navigation, route }) {
           <TouchableOpacity
             style={[
               styles.primaryButton,
+              { backgroundColor: buttonBackground },
               message.trim() === '' && styles.primaryButtonDisabled
             ]}
             onPress={handleAddPost}
             activeOpacity={0.85}
             disabled={message.trim() === ''}
           >
-            <Text style={styles.primaryButtonText}>Post</Text>
+            <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
           </TouchableOpacity>
         </View>
       );
@@ -154,7 +169,8 @@ export default function RoomScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   screenContent: {
     paddingTop: 0,
-    paddingHorizontal: 0
+    paddingHorizontal: 0,
+    backgroundColor: colors.background
   },
   flatHeader: {
     borderBottomLeftRadius: 0,
@@ -168,7 +184,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80
   },
   stickyHeaderWrapper: {
-    backgroundColor: colors.primary,
+    backgroundColor: 'transparent',
     paddingBottom: 24
   },
   headerCard: {
@@ -189,17 +205,14 @@ const styles = StyleSheet.create({
     flexDirection: 'column'
   },
   headerSubtitle: {
-    color: 'rgba(255,255,255,0.75)',
     fontSize: 14,
     marginBottom: 4
   },
   headerTitle: {
-    color: '#fff',
     fontSize: 24,
     fontWeight: '600'
   },
   headerMeta: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
     marginTop: 6
   },
@@ -207,8 +220,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between'
   },
-  statCard: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  statCardBase: {
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -225,12 +237,10 @@ const styles = StyleSheet.create({
     marginLeft: 12
   },
   statValue: {
-    color: '#fff',
     fontSize: 20,
     fontWeight: '600'
   },
   statLabel: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
     marginTop: 4
   },
@@ -263,7 +273,6 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   primaryButton: {
-    backgroundColor: colors.primaryDark,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center'
@@ -272,7 +281,6 @@ const styles = StyleSheet.create({
     opacity: 0.6
   },
   primaryButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600'
   },

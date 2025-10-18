@@ -43,6 +43,7 @@ export default function FooterMenu({
   onPressTab,
   onAddPostShortcut,
   showShortcut = true,
+  accent
 }) {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 12);
@@ -53,6 +54,11 @@ export default function FooterMenu({
 
   // Notch / FAB x-position
   const notchCx = anchorX != null ? anchorX + FAB_NUDGE_X : null;
+
+  const accentActiveColor = accent?.buttonBackground ?? colors.primaryDark;
+  const accentInactiveColor = colors.textSecondary;
+  const accentFabBackground = accent?.fabBackground ?? colors.primary;
+  const accentFabForeground = accent?.fabForeground ?? '#fff';
 
   // Keep notch inside SVG viewport
   const OFFSET_Y = NOTCH_R * NOTCH_DEPTH;
@@ -106,6 +112,8 @@ export default function FooterMenu({
             tab={tabs[0]}
             active={activeTab === tabs[0].key}
             onPress={() => onPressTab?.(tabs[0].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
           />
 
           {showShortcut ? (
@@ -124,12 +132,16 @@ export default function FooterMenu({
             tab={tabs[1]}
             active={activeTab === tabs[1].key}
             onPress={() => onPressTab?.(tabs[1].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
           />
           <TabItem
             width={tabItemW}
             tab={tabs[2]}
             active={activeTab === tabs[2].key}
             onPress={() => onPressTab?.(tabs[2].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
           />
         </View>
 
@@ -141,6 +153,7 @@ export default function FooterMenu({
               {
                 left: notchCx - FAB_SIZE / 2,
                 bottom: BAR_HEIGHT / 2 + FAB_RISE,
+                backgroundColor: accentFabBackground
               },
             ]}
             onPress={onAddPostShortcut}
@@ -148,7 +161,7 @@ export default function FooterMenu({
             accessibilityRole="button"
             accessibilityLabel="Create new post"
           >
-            <Ionicons name="add" size={26} color="#fff" />
+            <Ionicons name="add" size={26} color={accentFabForeground} />
           </TouchableOpacity>
         )}
       </View>
@@ -156,7 +169,7 @@ export default function FooterMenu({
   );
 }
 
-function TabItem({ tab, active, onPress, width }) {
+function TabItem({ tab, active, onPress, width, activeColor, inactiveColor }) {
   return (
     <TouchableOpacity
       style={[styles.tab, { width }]}
@@ -168,9 +181,14 @@ function TabItem({ tab, active, onPress, width }) {
       <Ionicons
         name={tab.icon}
         size={22}
-        color={active ? colors.primaryDark : colors.textSecondary}
+        color={active ? activeColor : inactiveColor}
       />
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+      <Text
+        style={[
+          styles.tabLabel,
+          { color: active ? activeColor : inactiveColor }
+        ]}
+      >
         {tab.label}
       </Text>
     </TouchableOpacity>
@@ -230,10 +248,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     marginTop: 4,
-    color: colors.textSecondary,
-  },
-  tabLabelActive: {
-    color: colors.primaryDark,
     fontWeight: '600',
   },
   fab: {
@@ -241,7 +255,6 @@ const styles = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 3,

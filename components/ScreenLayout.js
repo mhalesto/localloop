@@ -24,11 +24,12 @@ export default function ScreenLayout({
   showFooter = true,
   headerStyle
 }) {
-  const { showAddShortcut } = useSettings();
+  const { showAddShortcut, accentPreset } = useSettings();
+  const statusStyle = accentPreset.isDark ? 'light' : 'dark';
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar style="light" backgroundColor={colors.primary} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
+      <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
       <View style={styles.safeOverlay}>
         <AppHeader
           title={title}
@@ -40,7 +41,11 @@ export default function ScreenLayout({
           searchPlaceholder={searchPlaceholder}
           searchValue={searchValue}
           onSearchChange={onSearchChange}
-          wrapperStyle={headerStyle}
+          wrapperStyle={[
+            headerStyle,
+            { backgroundColor: accentPreset.background }
+          ]}
+          accent={accentPreset}
         />
         <View style={[styles.content, contentStyle]}>{children}</View>
         {showFooter ? (
@@ -71,6 +76,7 @@ export default function ScreenLayout({
               navigation.navigate('Country');
             }}
             showShortcut={showAddShortcut}
+            accent={accentPreset}
           />
         ) : null}
       </View>

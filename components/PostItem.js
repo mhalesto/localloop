@@ -1,8 +1,15 @@
 import React from 'react';
 import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../constants/colors';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function PostItem({ post, onPress }) {
+  const { accentPreset } = useSettings();
+  const badgeBackground = accentPreset.badgeBackground ?? colors.primaryLight;
+  const badgeTextColor = accentPreset.badgeTextColor ?? '#fff';
+  const linkColor = accentPreset.linkColor ?? colors.primaryDark;
+  const metaColor = colors.textSecondary;
+
   const commentCount = post.comments?.length ?? 0;
   const commentLabel =
     commentCount === 1 ? '1 comment' : `${commentCount} comments`;
@@ -14,13 +21,13 @@ export default function PostItem({ post, onPress }) {
       style={styles.touchable}
     >
       <View style={styles.card}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Anonymous</Text>
+        <View style={[styles.badge, { backgroundColor: badgeBackground }]}>
+          <Text style={[styles.badgeText, { color: badgeTextColor }]}>Anonymous</Text>
         </View>
         <Text style={styles.message}>{post.message}</Text>
         <View style={styles.metaRow}>
-          <Text style={styles.meta}>{commentLabel}</Text>
-          <Text style={styles.link}>View thread</Text>
+          <Text style={[styles.meta, { color: metaColor }]}>{commentLabel}</Text>
+          <Text style={[styles.link, { color: linkColor }]}>View thread</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -52,7 +59,6 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   badgeText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.3

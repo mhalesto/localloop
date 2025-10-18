@@ -7,15 +7,20 @@ import {
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
   const { addComment, getPostById } = usePosts();
+  const { accentPreset } = useSettings();
+
   const [reply, setReply] = useState('');
 
   const post = getPostById(city, postId);
@@ -31,6 +36,18 @@ export default function PostThreadScreen({ route, navigation }) {
     setReply('');
   };
 
+  const headerColor = accentPreset.background;
+  const headerTitleColor =
+    accentPreset.onPrimary ?? (accentPreset.isDark ? '#fff' : colors.textPrimary);
+  const headerMetaColor =
+    accentPreset.metaColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const badgeBackground = accentPreset.badgeBackground ?? colors.primaryLight;
+  const badgeTextColor = accentPreset.badgeTextColor ?? '#fff';
+  const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
+  const buttonForeground = accentPreset.buttonForeground ?? '#fff';
+  const linkColor = accentPreset.linkColor ?? colors.primaryDark;
+  const commentHighlight = `${linkColor}1A`;
+
   if (!post) {
     return (
       <ScreenLayout
@@ -43,10 +60,12 @@ export default function PostThreadScreen({ route, navigation }) {
             <Text style={styles.notice}>This post is no longer available.</Text>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={styles.primaryButton}
+              style={[styles.primaryButton, { backgroundColor: buttonBackground }]}
               activeOpacity={0.85}
             >
-              <Text style={styles.primaryButtonText}>Go Back</Text>
+              <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>
+                Go Back
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -67,17 +86,24 @@ export default function PostThreadScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
-        <View style={styles.postCard}>
+        <View style={[styles.postCard, { backgroundColor: headerColor }]}>
           <View style={styles.postHeader}>
-            <Text style={styles.postBadge}>Anonymous</Text>
-            <Text style={styles.postCity}>{city} Room</Text>
+            <View style={styles.headerLeftRow}>
+              <View style={[styles.avatar, { backgroundColor: badgeBackground }]}
+              >
+                <Text style={[styles.avatarInitials, { color: badgeTextColor }]}>A</Text>
+              </View>
+              <View>
+                <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
+                <Text style={[styles.postCity, { color: headerMetaColor }]}>{city} Room</Text>
+              </View>
+            </View>
+            <View style={styles.headerArrowAnchor}>
+              <View style={[styles.headerArrow, { borderTopColor: headerColor }]} />
+            </View>
           </View>
-          <Text style={styles.postMessage}>{post.message}</Text>
-          <Text style={styles.postMeta}>
-            {comments.length === 1
-              ? '1 comment'
-              : `${comments.length} comments`}
-          </Text>
+          <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
+          <Text style={[styles.postMeta, { color: headerMetaColor }]}> {comments.length === 1 ? '1 comment' : `${comments.length} comments`} </Text>
         </View>
 
         <FlatList
@@ -85,22 +111,55 @@ export default function PostThreadScreen({ route, navigation }) {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View
-              style={[
-                styles.commentCard,
-                item.createdByMe && styles.commentCardMine
-              ]}
+              style={[styles.commentRow, item.createdByMe && styles.commentRowRight]}
             >
-              <Text
-                style={[
-                  styles.commentMessage,
-                  item.createdByMe && styles.commentMessageMine
-                ]}
-              >
-                {item.message}
-              </Text>
-              {item.createdByMe ? (
-                <Text style={styles.commentMeta}>You replied</Text>
-              ) : null}
+              <View style={[styles.commentAvatarContainer, item.createdByMe && styles.commentAvatarContainerRight]}>
+                <Svg width={32} height={32} viewBox="0 0 64 64">
+                  <Circle cx="32" cy="24" r="12" fill={badgeBackground} />
+                  <Path
+                    d="M16 54C16 43.954 24.954 36 35 36H29C39.046 36 48 43.954 48 54"
+                    fill={badgeBackground}
+                  />
+                </Svg>
+              </View>
+              <View style={styles.commentBubbleWrapper}>
+                <View
+                  style={[
+                    styles.commentBubble,
+                    item.createdByMe && {
+                      backgroundColor: commentHighlight,
+                      borderColor: linkColor,
+                      borderWidth: 1
+                    }
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.commentMessage,
+                      item.createdByMe && { color: linkColor }
+                    ]}
+                  >
+                    {item.message}
+                  </Text>
+                  {item.createdByMe ? (
+                    <Text style={[styles.commentMeta, { color: linkColor }]}>You replied</Text>
+                  ) : null}
+                </View>
+                <Svg
+                  width={18}
+                  height={18}
+                  viewBox="0 0 40 40"
+                  style={[
+                    styles.commentTail,
+                    item.createdByMe ? styles.commentTailRight : styles.commentTailLeft
+                  ]}
+                >
+                  <Path
+                    d="M0 20L28 0V40L0 20Z"
+                    fill={item.createdByMe ? commentHighlight : colors.card}
+                  />
+                </Svg>
+              </View>
             </View>
           )}
           ListEmptyComponent={
@@ -129,13 +188,16 @@ export default function PostThreadScreen({ route, navigation }) {
           <TouchableOpacity
             style={[
               styles.primaryButton,
+              { backgroundColor: buttonBackground },
               reply.trim() === '' && styles.primaryButtonDisabled
             ]}
             onPress={handleAddComment}
             disabled={reply.trim() === ''}
             activeOpacity={0.85}
           >
-            <Text style={styles.primaryButtonText}>Reply</Text>
+            <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>
+              Reply
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -146,10 +208,10 @@ export default function PostThreadScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    paddingBottom: 20
+    paddingBottom: 20,
+    paddingHorizontal: 20
   },
   postCard: {
-    backgroundColor: colors.primary,
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
@@ -162,12 +224,14 @@ const styles = StyleSheet.create({
   postHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 14
   },
+  headerLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
   postBadge: {
-    backgroundColor: colors.primaryLight,
-    color: '#fff',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -176,18 +240,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3
   },
   postCity: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)'
+    fontSize: 12,
+    marginTop: 4
+  },
+  headerArrowAnchor: {
+    width: 40,
+    alignItems: 'flex-end'
+  },
+  headerArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 12,
+    borderRightWidth: 0,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderBottomColor: 'transparent'
   },
   postMessage: {
     fontSize: 20,
     marginBottom: 18,
-    color: '#fff',
     fontWeight: '500'
   },
   postMeta: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.75)'
+    fontSize: 13
   },
   commentsContainer: {
     paddingBottom: 80
@@ -199,33 +274,63 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center'
   },
-  commentCard: {
+  commentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16
+  },
+  commentRowRight: {
+    flexDirection: 'row-reverse'
+  },
+  commentAvatarContainer: {
+    width: 40,
+    alignItems: 'flex-start'
+  },
+  commentAvatarContainerRight: {
+    alignItems: 'flex-end'
+  },
+  commentAvatarIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16
+  },
+  commentBubbleWrapper: {
+    flex: 1,
+    paddingHorizontal: 8
+  },
+  commentBubble: {
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
-    marginBottom: 12,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2
   },
-  commentCardMine: {
-    backgroundColor: colors.primaryLight + '22',
-    borderColor: colors.primaryLight,
-    borderWidth: 1
+  commentTail: {
+    width: 18,
+    height: 18,
+    tintColor: colors.card
+  },
+  commentTailLeft: {
+    transform: [{ rotate: '180deg' }],
+    alignSelf: 'flex-start',
+    marginLeft: -12,
+    marginTop: -6
+  },
+  commentTailRight: {
+    alignSelf: 'flex-end',
+    marginRight: -12,
+    marginTop: -6
   },
   commentMessage: {
     fontSize: 16,
     color: colors.textPrimary
   },
-  commentMessageMine: {
-    color: colors.primaryDark
-  },
   commentMeta: {
     marginTop: 8,
     fontSize: 12,
-    color: colors.primaryDark,
     fontWeight: '600'
   },
   emptyState: {
@@ -260,11 +365,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     color: colors.textPrimary
   },
-  notice: {
+  primaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6
+  },
+  primaryButtonText: {
     fontSize: 16,
-    marginBottom: 16,
-    color: colors.textPrimary,
-    textAlign: 'center'
+    fontWeight: '600'
   },
   missingWrapper: {
     flex: 1,
@@ -283,19 +395,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 4
   },
-  primaryButton: {
-    backgroundColor: colors.primaryDark,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  primaryButtonDisabled: {
-    opacity: 0.6
-  },
-  primaryButtonText: {
-    color: '#fff',
+  notice: {
     fontSize: 16,
-    fontWeight: '600'
+    marginBottom: 16,
+    color: colors.textPrimary,
+    textAlign: 'center'
   }
 });

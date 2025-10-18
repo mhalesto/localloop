@@ -3,6 +3,16 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 
+const defaultAccent = {
+  background: colors.primary,
+  onPrimary: '#ffffff',
+  subtitleColor: 'rgba(255,255,255,0.8)',
+  iconTint: '#ffffff',
+  iconBackground: 'rgba(255,255,255,0.1)',
+  iconBorder: 'rgba(255,255,255,0.25)',
+  placeholderColor: colors.textSecondary
+};
+
 export default function AppHeader({
   title,
   subtitle,
@@ -13,13 +23,30 @@ export default function AppHeader({
   searchPlaceholder = 'Search',
   onSearchChange,
   searchValue,
-  wrapperStyle
+  wrapperStyle,
+  accent = defaultAccent
 }) {
+  const {
+    background = defaultAccent.background,
+    onPrimary = defaultAccent.onPrimary,
+    subtitleColor = defaultAccent.subtitleColor,
+    iconTint = defaultAccent.iconTint,
+    iconBackground = defaultAccent.iconBackground,
+    iconBorder = defaultAccent.iconBorder,
+    placeholderColor = defaultAccent.placeholderColor
+  } = accent ?? defaultAccent;
+
   return (
-    <View style={[styles.wrapper, wrapperStyle]}>
+    <View
+      style={[
+        styles.wrapper,
+        { backgroundColor: background },
+        wrapperStyle
+      ]}
+    >
       <View style={styles.topRow}>
         <TouchableOpacity
-          style={styles.iconButton}
+          style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
           onPress={onBack}
           disabled={!onBack}
           activeOpacity={0.8}
@@ -27,17 +54,19 @@ export default function AppHeader({
           <Ionicons
             name={onBack ? 'chevron-back' : 'menu'}
             size={22}
-            color="#fff"
+            color={iconTint}
           />
         </TouchableOpacity>
 
         <View style={styles.titleBlock}>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {subtitle ? (
+            <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text>
+          ) : null}
+          {title ? <Text style={[styles.title, { color: onPrimary }]}>{title}</Text> : null}
         </View>
 
         <TouchableOpacity
-          style={styles.iconButton}
+          style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
           onPress={onRightPress}
           disabled={!onRightPress}
           activeOpacity={0.8}
@@ -45,20 +74,21 @@ export default function AppHeader({
           <Ionicons
             name={rightIcon ?? 'notifications-outline'}
             size={22}
-            color="#fff"
+            color={iconTint}
           />
         </TouchableOpacity>
       </View>
 
       {showSearch ? (
         <View style={styles.searchWrapper}>
-          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <Ionicons name="search" size={18} color={placeholderColor} />
           <TextInput
             placeholder={searchPlaceholder}
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={placeholderColor}
             value={searchValue}
             onChangeText={onSearchChange}
             style={styles.searchInput}
+            autoCorrect={false}
           />
         </View>
       ) : null}
@@ -68,7 +98,6 @@ export default function AppHeader({
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: colors.primary,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     paddingHorizontal: 20,
@@ -100,12 +129,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 12
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     marginBottom: 2
   },
   title: {
-    color: '#fff',
     fontSize: 20,
     fontWeight: '600'
   },

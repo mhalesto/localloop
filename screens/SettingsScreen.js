@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
@@ -7,7 +7,14 @@ import { useSettings } from '../contexts/SettingsContext';
 export default function SettingsScreen({ navigation }) {
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const { showAddShortcut, setShowAddShortcut } = useSettings();
+  const {
+    showAddShortcut,
+    setShowAddShortcut,
+    accentOptions,
+    accentKey,
+    setAccentKey,
+    accentPreset
+  } = useSettings();
   const ghostIdentifier = useMemo(
     () => `Ghost #${Math.floor(Math.random() * 999)}`,
     []
@@ -33,8 +40,8 @@ export default function SettingsScreen({ navigation }) {
           <Switch
             value={locationEnabled}
             onValueChange={setLocationEnabled}
-            trackColor={{ true: colors.primaryLight }}
-            thumbColor={locationEnabled ? colors.primaryDark : '#f4f3f4'}
+            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
+            thumbColor={locationEnabled ? accentPreset.buttonBackground : '#f4f3f4'}
           />
         </View>
         <View style={styles.item}>
@@ -47,8 +54,8 @@ export default function SettingsScreen({ navigation }) {
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
-            trackColor={{ true: colors.primaryLight }}
-            thumbColor={notificationsEnabled ? colors.primaryDark : '#f4f3f4'}
+            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
+            thumbColor={notificationsEnabled ? accentPreset.buttonBackground : '#f4f3f4'}
           />
         </View>
       </View>
@@ -65,9 +72,47 @@ export default function SettingsScreen({ navigation }) {
           <Switch
             value={showAddShortcut}
             onValueChange={setShowAddShortcut}
-            trackColor={{ true: colors.primaryLight }}
-            thumbColor={showAddShortcut ? colors.primaryDark : '#f4f3f4'}
+            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
+            thumbColor={showAddShortcut ? accentPreset.buttonBackground : '#f4f3f4'}
           />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>App theme</Text>
+        <Text style={styles.sectionHint}>Pick the accent color used across the app.</Text>
+        <View style={styles.accentRow}>
+          {accentOptions.map((option) => {
+            const isActive = option.key === accentKey;
+            return (
+              <TouchableOpacity
+                key={option.key}
+                activeOpacity={0.85}
+                onPress={() => setAccentKey(option.key)}
+                style={[
+                  styles.accentSwatch,
+                  {
+                    borderColor: isActive
+                      ? option.isDark ? '#ffffff' : colors.primaryDark
+                      : 'rgba(0,0,0,0.08)'
+                  },
+                  isActive && styles.accentSwatchActive
+                ]}
+              >
+                <View
+                  style={[
+                    styles.accentDot,
+                    { backgroundColor: option.background }
+                  ]}
+                />
+                <Text
+                  style={[styles.accentLabel, option.isDark && styles.accentLabelOnDark]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -112,6 +157,11 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 16
   },
+  sectionHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 16
+  },
   item: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -137,5 +187,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     maxWidth: 220
+  },
+  accentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap'
+  },
+  accentSwatch: {
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginRight: 12,
+    marginBottom: 12
+  },
+  accentSwatchActive: {
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3
+  },
+  accentLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
+  accentLabelOnDark: {
+    color: '#ffffff'
+  },
+  accentDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 12
   }
 });
