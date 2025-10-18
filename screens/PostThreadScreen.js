@@ -113,6 +113,7 @@ export default function PostThreadScreen({ route, navigation }) {
       onBack={() => navigation.goBack()}
       navigation={navigation}
       activeTab="home"
+      showFooter={false}
     >
       <KeyboardAvoidingView
         style={styles.flex}
