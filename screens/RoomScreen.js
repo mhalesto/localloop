@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,20 @@ import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, accentPresets } from '../contexts/SettingsContext';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
-  const { addPost: createPost, getPostsForCity } = usePosts();
+  const { addPost, getPostsForCity } = usePosts();
+  const { accentPreset, accentKey } = useSettings();
   const posts = getPostsForCity(city);
+
   const [message, setMessage] = useState('');
+  const [selectedColorKey, setSelectedColorKey] = useState(accentKey);
+
+  useEffect(() => {
+    setSelectedColorKey(accentKey);
+  }, [accentKey]);
 
   const { totalPosts, totalComments, averageReplies } = useMemo(() => {
     const postCount = posts.length;
@@ -36,26 +43,10 @@ export default function RoomScreen({ navigation, route }) {
     };
   }, [posts]);
 
-  const handleAddPost = () => {
-    if (message.trim() === '') return;
-    createPost(city, message);
-    setMessage('');
-  };
-
-  const handleOpenPost = (postId) => {
-    navigation.navigate('PostThread', { city, postId });
-  };
-
-  const { accentPreset } = useSettings();
-  const headerColor = accentPreset.background;
-  const isDarkHeader = accentPreset.isDark;
-
-  const listData = useMemo(() => {
-    return [
-      { type: 'composer', key: 'composer' },
-      ...posts.map((post) => ({ type: 'post', key: post.id, data: post }))
-    ];
-  }, [posts]);
+  const listData = useMemo(
+    () => [{ type: 'composer', key: 'composer' }, ...posts.map((post) => ({ type: 'post', key: post.id, data: post }))],
+    [posts]
+  );
 
   const subtitleColor = accentPreset.subtitleColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
   const titleColor = accentPreset.onPrimary ?? (accentPreset.isDark ? '#fff' : colors.textPrimary);
@@ -66,9 +57,20 @@ export default function RoomScreen({ navigation, route }) {
   const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const buttonForeground = accentPreset.buttonForeground ?? '#fff';
 
+  const handleAddPost = () => {
+    if (message.trim() === '') return;
+    addPost(city, message, selectedColorKey);
+    setMessage('');
+  };
+
+  const handleOpenPost = (postId) => {
+    navigation.navigate('PostThread', { city, postId });
+  };
+
+
   const renderStickyHeader = () => (
-    <View style={[styles.stickyHeaderWrapper, { backgroundColor: headerColor }]}>
-      <View style={[styles.headerCard, { backgroundColor: headerColor }]}>
+    <View style={[styles.stickyHeaderWrapper, { backgroundColor: accentPreset.background }]}>
+      <View style={[styles.headerCard, { backgroundColor: accentPreset.background }]}>
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerSubtitle, { color: subtitleColor }]}>Anonymous room</Text>
           <Text style={[styles.headerTitle, { color: titleColor }]}>{city}</Text>
@@ -92,39 +94,68 @@ export default function RoomScreen({ navigation, route }) {
     </View>
   );
 
+  const renderComposer = () => (
+    <View style={styles.composerCard}>
+      <Text style={styles.composerLabel}>Drop a new post</Text>
+      <Text style={styles.composerHint}>Pick a vibe for your card</Text>
+      <View style={styles.composerSwatches}>
+        {accentPresets.map((preset) => {
+          const isActive = preset.key === selectedColorKey;
+          return (
+            <TouchableOpacity
+              key={preset.key}
+              activeOpacity={0.85}
+              onPress={() => setSelectedColorKey(preset.key)}
+              style={[
+                styles.colorDot,
+                {
+                  backgroundColor: preset.background,
+                  borderColor: isActive ? colors.textPrimary : 'transparent'
+                }
+              ]}
+            />
+          );
+        })}
+      </View>
+      <TextInput
+        placeholder="What's happening in this room?"
+        value={message}
+        onChangeText={setMessage}
+        multiline
+        style={styles.input}
+        placeholderTextColor={colors.textSecondary}
+      />
+      <TouchableOpacity
+        style={[styles.primaryButton, { backgroundColor: buttonBackground }, message.trim() === '' && styles.primaryButtonDisabled]}
+        onPress={handleAddPost}
+        activeOpacity={0.85}
+        disabled={message.trim() === ''}
+      >
+        <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderItem = ({ item }) => {
     if (item.type === 'composer') {
-      return (
-        <View style={styles.composerCard}>
-          <Text style={styles.composerLabel}>Drop a new post</Text>
-          <TextInput
-            placeholder="What's happening in this room?"
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            style={styles.input}
-            placeholderTextColor={colors.textSecondary}
-          />
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: buttonBackground },
-              message.trim() === '' && styles.primaryButtonDisabled
-            ]}
-            onPress={handleAddPost}
-            activeOpacity={0.85}
-            disabled={message.trim() === ''}
-          >
-            <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      return renderComposer();
     }
 
     return (
       <PostItem
         post={item.data}
         onPress={() => handleOpenPost(item.data.id)}
+        roomName={city}
+        onViewOriginal={
+          item.data.sourcePostId && item.data.sourceCity &&
+          !(item.data.sourceCity === city && item.data.sourcePostId === item.data.id)
+            ? () =>
+                navigation.navigate('PostThread', {
+                  city: item.data.sourceCity,
+                  postId: item.data.sourcePostId
+                })
+            : undefined
+        }
       />
     );
   };
@@ -146,19 +177,7 @@ export default function RoomScreen({ navigation, route }) {
         renderItem={renderItem}
         ListHeaderComponent={renderStickyHeader}
         stickyHeaderIndices={[0]}
-        contentContainerStyle={[
-          styles.listContainer,
-          posts.length === 0 && styles.postsListEmpty
-        ]}
-        ListFooterComponent={
-          posts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyState}>
-                No posts yet. Say something to kick things off.
-              </Text>
-            </View>
-          ) : null
-        }
+        contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
@@ -263,6 +282,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 12
   },
+  composerHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 12
+  },
+  composerSwatches: {
+    flexDirection: 'row',
+    marginBottom: 12
+  },
+  colorDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 10,
+    borderWidth: 2
+  },
   input: {
     minHeight: 70,
     backgroundColor: colors.background,
@@ -287,16 +322,4 @@ const styles = StyleSheet.create({
   postsListWrapper: {
     flex: 1
   },
-  postsListEmpty: {
-    paddingBottom: 120
-  },
-  emptyContainer: {
-    paddingVertical: 40,
-    alignItems: 'center'
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 15
-  }
 });

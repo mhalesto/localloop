@@ -14,7 +14,9 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, accentPresets } from '../contexts/SettingsContext';
+
+const SHARE_CITIES = ['Johannesburg', 'Pretoria', 'Soweto', 'Coastview', 'Hillcrest', 'Riverpark'];
 
 function AvatarIcon({ tint, size = 32, style }) {
   return (
@@ -25,28 +27,29 @@ function AvatarIcon({ tint, size = 32, style }) {
   );
 }
 
-function BubbleTail({ fill, direction }) {
-  const transform = direction === 'left' ? 'rotate(180 20 20)' : undefined;
+function BubbleTail({ fill, align }) {
   return (
     <Svg
       width={18}
       height={18}
       viewBox="0 0 40 40"
-      style={direction === 'right' ? styles.commentTailRight : styles.commentTailLeft}
+      style={align === 'right' ? styles.commentTailRight : styles.commentTailLeft}
     >
-      <Path d="M0 20L28 0V40L0 20Z" fill={fill} transform={transform} />
+      <Path d="M0 20L28 0V40L0 20Z" fill={fill} transform={align === 'left' ? 'rotate(180 20 20)' : undefined} />
     </Svg>
   );
 }
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
-  const { addComment, getPostById } = usePosts();
+  const { addComment, getPostById, sharePost } = usePosts();
   const { accentPreset } = useSettings();
 
   const [reply, setReply] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
 
   const post = getPostById(city, postId);
+
   const comments = useMemo(() => post?.comments ?? [], [post]);
 
   const handleAddComment = () => {
@@ -57,18 +60,6 @@ export default function PostThreadScreen({ route, navigation }) {
     addComment(city, postId, reply);
     setReply('');
   };
-
-  const headerColor = accentPreset.background;
-  const headerTitleColor =
-    accentPreset.onPrimary ?? (accentPreset.isDark ? '#fff' : colors.textPrimary);
-  const headerMetaColor =
-    accentPreset.metaColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
-  const badgeBackground = accentPreset.badgeBackground ?? colors.primaryLight;
-  const badgeTextColor = accentPreset.badgeTextColor ?? '#fff';
-  const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
-  const buttonForeground = accentPreset.buttonForeground ?? '#fff';
-  const linkColor = accentPreset.linkColor ?? colors.primaryDark;
-  const commentHighlight = `${linkColor}1A`;
 
   if (!post) {
     return (
@@ -82,16 +73,31 @@ export default function PostThreadScreen({ route, navigation }) {
             <Text style={styles.notice}>This post is no longer available.</Text>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={[styles.primaryButton, { backgroundColor: buttonBackground }]}
+              style={[styles.primaryButton, { backgroundColor: accentPreset.buttonBackground }]}
               activeOpacity={0.85}
             >
-              <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Go Back</Text>
+              <Text style={[styles.primaryButtonText, { color: accentPreset.buttonForeground }]}>Go Back</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScreenLayout>
     );
   }
+
+  const postPreset =
+    accentPresets.find((preset) => preset.key === post.colorKey) ?? accentPreset;
+
+  const headerColor = postPreset.background;
+  const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : colors.textPrimary);
+  const headerMetaColor = postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const badgeBackground = postPreset.badgeBackground ?? colors.primaryLight;
+  const badgeTextColor = postPreset.badgeTextColor ?? '#fff';
+  const linkColor = postPreset.linkColor ?? colors.primaryDark;
+  const commentHighlight = `${linkColor}1A`;
+  const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
+  const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
+
+  const shareTargets = SHARE_CITIES.filter((target) => target !== city);
 
   return (
     <ScreenLayout
@@ -110,24 +116,64 @@ export default function PostThreadScreen({ route, navigation }) {
           contentContainerStyle={styles.threadContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.postCard, { backgroundColor: headerColor }]}
-          >
+          <View style={[styles.postCard, { backgroundColor: headerColor }]}>
             <View style={styles.postHeader}>
-              <AvatarIcon tint={badgeBackground} size={36} style={styles.headerAvatarIcon} />
+              <AvatarIcon tint={badgeBackground} size={40} style={styles.postHeaderAvatar} />
               <View>
                 <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
                 <Text style={[styles.postCity, { color: headerMetaColor }]}>{city} Room</Text>
+                {post.sharedFrom ? (
+                  <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>Shared from {post.sharedFrom.city}</Text>
+                ) : null}
               </View>
             </View>
             <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
             <Text style={[styles.postMeta, { color: headerMetaColor }]}>
               {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
             </Text>
+            {post.sourceCity && post.sourcePostId &&
+              !(post.sourceCity === city && post.sourcePostId === post.id) ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PostThread', {
+                      city: post.sourceCity,
+                      postId: post.sourcePostId
+                    })
+                  }
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.viewOriginal, { color: headerMetaColor }]}>View original thread</Text>
+                </TouchableOpacity>
+              ) : null}
           </View>
+
+          {shareTargets.length ? (
+            <View style={styles.shareCard}>
+              <Text style={styles.shareTitle}>Share to another room</Text>
+              <View style={styles.shareChipRow}>
+                {shareTargets.map((target) => (
+                  <TouchableOpacity
+                    key={target}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      sharePost(city, postId, target);
+                      setShareMessage(`Shared to ${target}`);
+                      setTimeout(() => setShareMessage(''), 2000);
+                    }}
+                    style={[styles.shareChip, { borderColor: headerColor }]}
+                  >
+                    <Text style={[styles.shareChipText, { color: linkColor }]}>{target}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {shareMessage ? <Text style={styles.shareMessage}>{shareMessage}</Text> : null}
+            </View>
+          ) : null}
 
           <FlatList
             data={comments}
             keyExtractor={(item) => item.id}
+            scrollEnabled={false}
             renderItem={({ item }) => (
               <View
                 style={[styles.commentRow, item.createdByMe && styles.commentRowRight]}
@@ -161,7 +207,7 @@ export default function PostThreadScreen({ route, navigation }) {
                   </View>
                   <BubbleTail
                     fill={item.createdByMe ? commentHighlight : colors.card}
-                    direction={item.createdByMe ? 'right' : 'left'}
+                    align={item.createdByMe ? 'right' : 'left'}
                   />
                 </View>
               </View>
@@ -171,7 +217,6 @@ export default function PostThreadScreen({ route, navigation }) {
                 No comments yet. Be the first to reply.
               </Text>
             }
-            scrollEnabled={false}
             contentContainerStyle={[
               styles.commentsContainer,
               comments.length === 0 && styles.commentsContainerEmpty
@@ -191,14 +236,14 @@ export default function PostThreadScreen({ route, navigation }) {
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                { backgroundColor: buttonBackground },
+                { backgroundColor: replyButtonBackground },
                 reply.trim() === '' && styles.primaryButtonDisabled
               ]}
               onPress={handleAddComment}
               disabled={reply.trim() === ''}
               activeOpacity={0.85}
             >
-              <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Reply</Text>
+              <Text style={[styles.primaryButtonText, { color: replyButtonForeground }]}>Reply</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -210,8 +255,7 @@ export default function PostThreadScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    paddingBottom: 20,
-    paddingHorizontal: 0
+    paddingBottom: 20
   },
   threadContent: {
     paddingHorizontal: 20,
@@ -230,23 +274,22 @@ const styles = StyleSheet.create({
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14
+    marginBottom: 16
   },
-  headerLeftRow: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  headerAvatarIcon: {
+  postHeaderAvatar: {
     marginRight: 12
   },
   postBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.3
+    fontSize: 14,
+    fontWeight: '600'
   },
   postCity: {
     fontSize: 12,
     marginTop: 4
+  },
+  sharedBanner: {
+    fontSize: 12,
+    marginTop: 6
   },
   postMessage: {
     fontSize: 20,
@@ -254,7 +297,50 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   postMeta: {
-    fontSize: 13
+    fontSize: 13,
+    marginBottom: 12
+  },
+  viewOriginal: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4
+  },
+  shareCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
+  },
+  shareTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 12
+  },
+  shareChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap'
+  },
+  shareChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 10,
+    marginBottom: 10
+  },
+  shareChipText: {
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  shareMessage: {
+    fontSize: 12,
+    color: colors.textSecondary
   },
   commentsContainer: {
     paddingBottom: 40
@@ -266,7 +352,7 @@ const styles = StyleSheet.create({
   commentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16
+    marginBottom: 18
   },
   commentRowRight: {
     flexDirection: 'row-reverse'
@@ -293,12 +379,12 @@ const styles = StyleSheet.create({
   },
   commentTailLeft: {
     alignSelf: 'flex-start',
-    marginLeft: -10,
+    marginLeft: -12,
     marginTop: -8
   },
   commentTailRight: {
     alignSelf: 'flex-end',
-    marginRight: -10,
+    marginRight: -12,
     marginTop: -8
   },
   commentMessage: {

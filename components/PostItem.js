@@ -1,18 +1,24 @@
 import React from 'react';
 import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { colors } from '../constants/colors';
-import { useSettings } from '../contexts/SettingsContext';
+import { accentPresets } from '../contexts/SettingsContext';
 
-export default function PostItem({ post, onPress }) {
-  const { accentPreset } = useSettings();
-  const badgeBackground = accentPreset.badgeBackground ?? colors.primaryLight;
-  const badgeTextColor = accentPreset.badgeTextColor ?? '#fff';
-  const linkColor = accentPreset.linkColor ?? colors.primaryDark;
-  const metaColor = colors.textSecondary;
+const presetMap = accentPresets.reduce((acc, preset) => {
+  acc[preset.key] = preset;
+  return acc;
+}, {});
 
-  const commentCount = post.comments?.length ?? 0;
-  const commentLabel =
-    commentCount === 1 ? '1 comment' : `${commentCount} comments`;
+export default function PostItem({ post, onPress, onViewOriginal, roomName }) {
+  const preset = presetMap[post.colorKey ?? 'royal'] ?? accentPresets[0];
+  const cardBackground = preset.background;
+  const primaryTextColor = preset.onPrimary ?? (preset.isDark ? '#fff' : colors.textPrimary);
+  const metaColor = preset.metaColor ?? (preset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const badgeBackground = preset.badgeBackground ?? colors.primaryLight;
+  const badgeTextColor = preset.badgeTextColor ?? '#fff';
+  const linkColor = preset.linkColor ?? colors.primaryDark;
+
+  const sharedFrom = post.sharedFrom;
+  const originCity = post.sourceCity ?? roomName;
 
   return (
     <TouchableOpacity
@@ -20,15 +26,35 @@ export default function PostItem({ post, onPress }) {
       activeOpacity={0.85}
       style={styles.touchable}
     >
-      <View style={styles.card}>
-        <View style={[styles.badge, { backgroundColor: badgeBackground }]}>
-          <Text style={[styles.badgeText, { color: badgeTextColor }]}>Anonymous</Text>
+      <View style={[styles.card, { backgroundColor: cardBackground }]}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.headerLeft}
+          >
+            <View
+              style={[styles.badge, { backgroundColor: badgeBackground }]}>
+              <Text style={[styles.badgeText, { color: badgeTextColor }]}>Anonymous</Text>
+            </View>
+            {sharedFrom ? (
+              <Text style={[styles.sharedLabel, { color: metaColor }]}>Shared from {sharedFrom.city}</Text>
+            ) : null}
+          </View>
+          {sharedFrom && onViewOriginal ? (
+            <TouchableOpacity onPress={onViewOriginal} activeOpacity={0.7}>
+              <Text style={[styles.viewOriginal, { color: linkColor }]}>View original</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <Text style={styles.message}>{post.message}</Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.meta, { color: metaColor }]}>{commentLabel}</Text>
-          <Text style={[styles.link, { color: linkColor }]}>View thread</Text>
-        </View>
+
+        <Text style={[styles.roomMeta, { color: metaColor }]}>{originCity}</Text>
+        <Text style={[styles.message, { color: primaryTextColor }]}>{post.message}</Text>
+        <Text style={[styles.meta, { color: metaColor }]}
+        >
+          {post.comments?.length === 1
+            ? '1 comment'
+            : `${post.comments?.length ?? 0} comments`}
+        </Text>
+
       </View>
     </TouchableOpacity>
   );
@@ -36,50 +62,57 @@ export default function PostItem({ post, onPress }) {
 
 const styles = StyleSheet.create({
   touchable: {
-    borderRadius: 6
+    borderRadius: 20,
+    marginHorizontal: 20,
+    marginBottom: 16
   },
   card: {
-    padding: 18,
-    marginVertical: 6,
-    marginHorizontal: 20,
-    backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 20,
+    padding: 20,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2
   },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginRight: 8
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.3
+    fontWeight: '600'
+  },
+  sharedLabel: {
+    fontSize: 12
+  },
+  viewOriginal: {
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  roomMeta: {
+    fontSize: 12,
+    marginBottom: 6
   },
   message: {
-    fontSize: 16,
-    marginBottom: 16,
-    color: colors.textPrimary
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8
   },
   meta: {
-    fontSize: 13,
-    color: colors.textSecondary
-  },
-  link: {
-    fontSize: 13,
-    color: colors.primaryDark,
-    fontWeight: '600'
+    fontSize: 12,
+    marginBottom: 12
   }
 });

@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import { colors } from '../constants/colors';
 
-const accentPresets = [
+export const accentPresets = [
   {
     key: 'royal',
     label: 'Royal Purple',
