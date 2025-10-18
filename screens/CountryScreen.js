@@ -1,11 +1,162 @@
-import React from 'react';
-import { View, Text, Button } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Text, TouchableOpacity, StyleSheet, FlatList, View } from 'react-native';
+import ScreenLayout from '../components/ScreenLayout';
+import { colors } from '../constants/colors';
 
 export default function CountryScreen({ navigation }) {
+  const [query, setQuery] = useState('');
+
+  const countries = useMemo(
+    () => [
+      { name: 'South Africa', description: 'Vibrant cities and hidden gems' },
+      { name: 'Namibia', description: 'Desert sunsets & coastal breezes' },
+      { name: 'Botswana', description: 'Wildlife, safaris and open skies' }
+    ],
+    []
+  );
+
+  const filtered = countries.filter((country) =>
+    country.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
+
   return (
-    <View style={{ padding: 20 }}>
-      <Text>Select a Country:</Text>
-      <Button title="South Africa" onPress={() => navigation.navigate('Province', { country: 'South Africa' })} />
-    </View>
+    <ScreenLayout
+      title="Explore"
+      subtitle="Choose your country"
+      showSearch
+      searchPlaceholder="Search countries"
+      searchValue={query}
+      onSearchChange={setQuery}
+    >
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Recent</Text>
+        <TouchableOpacity activeOpacity={0.85}>
+          <Text style={styles.sectionAction}>Clear all</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.chipsRow}>
+        {['South Africa', 'Namibia', 'Botswana'].map((item) => (
+          <View key={item} style={styles.chip}>
+            <Text style={styles.chipText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
+        Pinned destinations
+      </Text>
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.name}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.85}
+            onPress={() =>
+              navigation.navigate('Province', { country: item.name })
+            }
+          >
+            <Text style={styles.cardTitle}>{item.name}</Text>
+            <Text style={styles.cardSubtitle}>{item.description}</Text>
+            <Text style={styles.cardAction}>Select →</Text>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          <Text style={styles.emptyState}>
+            No countries match your search yet.
+          </Text>
+        }
+        contentContainerStyle={[
+          styles.listContent,
+          filtered.length === 0 && styles.listContentEmpty
+        ]}
+        showsVerticalScrollIndicator={false}
+      />
+    </ScreenLayout>
   );
 }
+
+const styles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 16
+  },
+  secondaryTitle: {
+    marginTop: 12
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  sectionAction: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    marginTop: 12
+  },
+  chip: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
+  },
+  chipText: {
+    fontSize: 13,
+    color: colors.textPrimary
+  },
+  listContent: {
+    paddingBottom: 40
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center'
+  },
+  emptyState: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: 15
+  },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 6
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16
+  },
+  cardAction: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primaryDark
+  }
+});

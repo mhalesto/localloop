@@ -6,12 +6,12 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
+import ScreenLayout from '../components/ScreenLayout';
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
@@ -33,23 +33,33 @@ export default function PostThreadScreen({ route, navigation }) {
 
   if (!post) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.missingCard}>
-          <Text style={styles.notice}>This post is no longer available.</Text>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.primaryButton}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryButtonText}>Go Back</Text>
-          </TouchableOpacity>
+      <ScreenLayout
+        title="Thread"
+        subtitle={`${city} Room`}
+        onBack={() => navigation.goBack()}
+      >
+        <View style={styles.missingWrapper}>
+          <View style={styles.missingCard}>
+            <Text style={styles.notice}>This post is no longer available.</Text>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.primaryButton}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </SafeAreaView>
+      </ScreenLayout>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenLayout
+      title="Thread"
+      subtitle={`${city} Room`}
+      onBack={() => navigation.goBack()}
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -112,19 +122,14 @@ export default function PostThreadScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
   flex: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20
+    paddingBottom: 20
   },
   postCard: {
     backgroundColor: colors.primary,
@@ -229,6 +234,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: colors.textPrimary,
     textAlign: 'center'
+  },
+  missingWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 40
   },
   missingCard: {
     margin: 20,

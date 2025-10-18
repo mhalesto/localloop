@@ -5,12 +5,12 @@ import {
   TextInput,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
-  SafeAreaView
+  TouchableOpacity
 } from 'react-native';
 import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
+import ScreenLayout from '../components/ScreenLayout';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
@@ -46,12 +46,16 @@ export default function RoomScreen({ navigation, route }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenLayout
+      title={city}
+      subtitle="Anonymous room"
+      onBack={() => navigation.goBack()}
+    >
       <View style={styles.content}>
         <View style={styles.headerCard}>
           <View style={styles.headerTitleRow}>
-            <Text style={styles.headerSubtitle}>Anonymous Room</Text>
-            <Text style={styles.headerTitle}>{city}</Text>
+            <Text style={styles.headerSubtitle}>Room stats</Text>
+            <Text style={styles.headerTitle}>Today&apos;s pulse</Text>
           </View>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
@@ -110,19 +114,14 @@ export default function RoomScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         />
       </View>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20
+    paddingBottom: 40
   },
   headerCard: {
     backgroundColor: colors.primary,

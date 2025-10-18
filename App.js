@@ -15,7 +15,10 @@ export default function App() {
   return (
     <PostsProvider>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName="Country">
+        <Stack.Navigator
+          initialRouteName="Country"
+          screenOptions={{ headerShown: false }}
+        >
           <Stack.Screen name="Country" component={CountryScreen} />
           <Stack.Screen name="Province" component={ProvinceScreen} />
           <Stack.Screen name="City" component={CityScreen} />
