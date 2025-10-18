@@ -60,12 +60,7 @@ export default function PostItem({
             </View>
           </View>
 
-          {/* Optional "View original" action in header (small) */}
-          {sharedFrom && onViewOriginal ? (
-            <TouchableOpacity onPress={onViewOriginal} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={[styles.viewOriginal, { color: linkColor }]}>View original</Text>
-            </TouchableOpacity>
-          ) : null}
+          {/* No secondary header action */}
         </View>
 
         {/* Message */}
@@ -114,7 +109,7 @@ export default function PostItem({
           </TouchableOpacity>
         </View>
 
-        {/* Bottom link (full size, matches your example) */}
+        {/* Bottom link retained below actions */}
         {sharedFrom && onViewOriginal ? (
           <TouchableOpacity onPress={onViewOriginal} activeOpacity={0.7}>
             <Text style={[styles.viewOriginalLink, { color: linkColor }]}>View original thread →</Text>

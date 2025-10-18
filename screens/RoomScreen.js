@@ -108,7 +108,6 @@ export default function RoomScreen({ navigation, route }) {
     <View style={[styles.stickyHeaderWrapper, { backgroundColor: accentPreset.background }]}>
       <View style={[styles.headerCard, { backgroundColor: accentPreset.background }]}>
         <View style={styles.headerTitleRow}>
-          <Text style={[styles.headerSubtitle, { color: subtitleColor }]}>Anonymous room</Text>
           <Text style={[styles.headerTitle, { color: titleColor }]}>{city}</Text>
           <Text style={[styles.headerMeta, { color: metaColor }]}>Today&apos;s pulse</Text>
         </View>
