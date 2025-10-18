@@ -1,5 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import {
+  ScrollView,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet
+} from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
@@ -15,10 +22,13 @@ export default function SettingsScreen({ navigation }) {
     setAccentKey,
     accentPreset
   } = useSettings();
+
   const ghostIdentifier = useMemo(
     () => `Ghost #${Math.floor(Math.random() * 999)}`,
     []
   );
+
+  const accentSwitchColor = accentPreset.buttonBackground ?? colors.primaryDark;
 
   return (
     <ScreenLayout
@@ -27,119 +37,135 @@ export default function SettingsScreen({ navigation }) {
       navigation={navigation}
       activeTab="settings"
       showFooter
+      contentStyle={styles.screenContent}
     >
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Permissions</Text>
-        <View style={styles.item}>
-          <View>
-            <Text style={styles.itemTitle}>Location access</Text>
-            <Text style={styles.itemSubtitle}>
-              Helps suggest nearby rooms and surface local chatter.
-            </Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Permissions</Text>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Location access</Text>
+              <Text style={styles.itemSubtitle}>
+                Helps suggest nearby rooms and surface local chatter.
+              </Text>
+            </View>
+            <Switch
+              value={locationEnabled}
+              onValueChange={setLocationEnabled}
+              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
+              thumbColor={locationEnabled ? accentSwitchColor : '#f4f3f4'}
+            />
           </View>
-          <Switch
-            value={locationEnabled}
-            onValueChange={setLocationEnabled}
-            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
-            thumbColor={locationEnabled ? accentPreset.buttonBackground : '#f4f3f4'}
-          />
-        </View>
-        <View style={styles.item}>
-          <View>
-            <Text style={styles.itemTitle}>Notifications</Text>
-            <Text style={styles.itemSubtitle}>
-              Get nudges when someone replies to your anonymous posts.
-            </Text>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Notifications</Text>
+              <Text style={styles.itemSubtitle}>
+                Get nudges when someone replies to your anonymous posts.
+              </Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
+              thumbColor={notificationsEnabled ? accentSwitchColor : '#f4f3f4'}
+            />
           </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
-            thumbColor={notificationsEnabled ? accentPreset.buttonBackground : '#f4f3f4'}
-          />
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick actions</Text>
-        <View style={styles.itemLast}>
-          <View>
-            <Text style={styles.itemTitle}>Show add post shortcut</Text>
-            <Text style={styles.itemSubtitle}>
-              Keep the floating action handy for rapid posting anywhere.
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick actions</Text>
+          <View style={styles.itemLast}>
+            <View>
+              <Text style={styles.itemTitle}>Show add post shortcut</Text>
+              <Text style={styles.itemSubtitle}>
+                Keep the floating action handy for rapid posting anywhere.
+              </Text>
+            </View>
+            <Switch
+              value={showAddShortcut}
+              onValueChange={setShowAddShortcut}
+              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
+              thumbColor={showAddShortcut ? accentSwitchColor : '#f4f3f4'}
+            />
           </View>
-          <Switch
-            value={showAddShortcut}
-            onValueChange={setShowAddShortcut}
-            trackColor={{ true: accentPreset.buttonBackground, false: '#d1d5db' }}
-            thumbColor={showAddShortcut ? accentPreset.buttonBackground : '#f4f3f4'}
-          />
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App theme</Text>
-        <Text style={styles.sectionHint}>Pick the accent color used across the app.</Text>
-        <View style={styles.accentRow}>
-          {accentOptions.map((option) => {
-            const isActive = option.key === accentKey;
-            return (
-              <TouchableOpacity
-                key={option.key}
-                activeOpacity={0.85}
-                onPress={() => setAccentKey(option.key)}
-                style={[
-                  styles.accentSwatch,
-                  {
-                    borderColor: isActive
-                      ? option.isDark ? '#ffffff' : colors.primaryDark
-                      : 'rgba(0,0,0,0.08)'
-                  },
-                  isActive && styles.accentSwatchActive
-                ]}
-              >
-                <View
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App theme</Text>
+          <Text style={styles.sectionHint}>
+            Pick the accent color used across the app.
+          </Text>
+          <View style={styles.accentRow}>
+            {accentOptions.map((option, index) => {
+              const isActive = option.key === accentKey;
+
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  activeOpacity={0.85}
+                  onPress={() => setAccentKey(option.key)}
                   style={[
-                    styles.accentDot,
-                    { backgroundColor: option.background }
+                    styles.accentSwatch,
+                    {
+                      backgroundColor: isActive ? '#fff' : colors.card,
+                      borderColor: isActive
+                        ? option.isDark ? '#ffffff' : colors.textPrimary
+                        : 'rgba(0,0,0,0.08)'
+                    },
+                    isActive && styles.accentSwatchActive
                   ]}
-                />
-                <Text
-                  style={[styles.accentLabel, option.isDark && styles.accentLabelOnDark]}
                 >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  <View
+                    style={[styles.accentDot, { backgroundColor: option.background }]}
+                  />
+                  <Text style={styles.accentLabel}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <View style={styles.itemLast}>
-          <View>
-            <Text style={styles.itemTitle}>Anonymous identity</Text>
-            <Text style={styles.itemSubtitle}>
-              You&apos;re currently posting as {ghostIdentifier}.
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Privacy</Text>
+          <View style={styles.itemLast}>
+            <View>
+              <Text style={styles.itemTitle}>Anonymous identity</Text>
+              <Text style={styles.itemSubtitle}>
+                You&apos;re currently posting as {ghostIdentifier}.
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.itemLast, styles.itemDisabled]}>
+            <View>
+              <Text style={styles.itemTitle}>Coming soon</Text>
+              <Text style={styles.itemSubtitle}>
+                More privacy controls arrive when we connect to a backend.
+              </Text>
+            </View>
           </View>
         </View>
-        <View style={[styles.itemLast, styles.itemDisabled]}>
-          <View>
-            <Text style={styles.itemTitle}>Coming soon</Text>
-            <Text style={styles.itemSubtitle}>
-              More privacy controls arrive when we connect to a backend.
-            </Text>
-          </View>
-        </View>
-      </View>
+      </ScrollView>
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    paddingTop: 0,
+    paddingHorizontal: 0
+  },
+  scroll: {
+    flex: 1
+  },
+  scrollContent: {
+    paddingTop: 24,
+    paddingBottom: 140,
+    paddingHorizontal: 20
+  },
   section: {
     backgroundColor: colors.card,
     borderRadius: 18,
@@ -190,18 +216,18 @@ const styles = StyleSheet.create({
   },
   accentRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
   },
   accentSwatch: {
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 2,
-    minWidth: 120,
+    flexBasis: '48%',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    marginRight: 12,
     marginBottom: 12
   },
   accentSwatchActive: {
@@ -215,9 +241,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.textPrimary
-  },
-  accentLabelOnDark: {
-    color: '#ffffff'
   },
   accentDot: {
     width: 20,
