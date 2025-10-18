@@ -4,10 +4,14 @@ import {
   Text,
   FlatList,
   TextInput,
-  Button,
-  StyleSheet
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { usePosts } from '../contexts/PostsContext';
+import { colors } from '../constants/colors';
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
@@ -29,82 +33,139 @@ export default function PostThreadScreen({ route, navigation }) {
 
   if (!post) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.notice}>This post is no longer available.</Text>
-        <Button title="Back" onPress={() => navigation.goBack()} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.missingCard}>
+          <Text style={styles.notice}>This post is no longer available.</Text>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.primaryButton}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.postCard}>
-        <Text style={styles.postCity}>{city} Room</Text>
-        <Text style={styles.postMessage}>{post.message}</Text>
-        <Text style={styles.postMeta}>
-          {comments.length === 1
-            ? '1 comment'
-            : `${comments.length} comments`}
-        </Text>
-      </View>
-
-      <FlatList
-        data={comments}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.commentCard}>
-            <Text style={styles.commentMessage}>{item.message}</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={80}
+      >
+        <View style={styles.postCard}>
+          <View style={styles.postHeader}>
+            <Text style={styles.postBadge}>Anonymous</Text>
+            <Text style={styles.postCity}>{city} Room</Text>
           </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyState}>
-            No comments yet. Be the first to reply.
+          <Text style={styles.postMessage}>{post.message}</Text>
+          <Text style={styles.postMeta}>
+            {comments.length === 1
+              ? '1 comment'
+              : `${comments.length} comments`}
           </Text>
-        }
-        style={styles.commentsList}
-        contentContainerStyle={[
-          styles.commentsContainer,
-          comments.length === 0 && styles.commentsContainerEmpty
-        ]}
-      />
+        </View>
 
-      <View style={styles.replyBox}>
-        <TextInput
-          value={reply}
-          onChangeText={setReply}
-          placeholder="Add a comment..."
-          style={styles.input}
-          multiline
+        <FlatList
+          data={comments}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.commentCard}>
+              <Text style={styles.commentMessage}>{item.message}</Text>
+            </View>
+          )}
+          ListEmptyComponent={
+            <Text style={styles.emptyState}>
+              No comments yet. Be the first to reply.
+            </Text>
+          }
+          style={styles.commentsList}
+          contentContainerStyle={[
+            styles.commentsContainer,
+            comments.length === 0 && styles.commentsContainerEmpty
+          ]}
+          showsVerticalScrollIndicator={false}
         />
-        <Button title="Reply" onPress={handleAddComment} />
-      </View>
-    </View>
+
+        <View style={styles.replyBox}>
+          <Text style={styles.replyLabel}>Add a reply</Text>
+          <TextInput
+            value={reply}
+            onChangeText={setReply}
+            placeholder="Share your thoughts..."
+            style={styles.input}
+            multiline
+            placeholderTextColor={colors.textSecondary}
+          />
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              reply.trim() === '' && styles.primaryButtonDisabled
+            ]}
+            onPress={handleAddComment}
+            disabled={reply.trim() === ''}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Reply</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20
+    backgroundColor: colors.background
+  },
+  flex: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20
   },
   postCard: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 6,
-    padding: 16,
-    marginBottom: 16
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5
+  },
+  postHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14
+  },
+  postBadge: {
+    backgroundColor: colors.primaryLight,
+    color: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3
   },
   postCity: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)'
   },
   postMessage: {
-    fontSize: 18,
-    marginBottom: 12
+    fontSize: 20,
+    marginBottom: 18,
+    color: '#fff',
+    fontWeight: '500'
   },
   postMeta: {
-    fontSize: 12,
-    color: '#666'
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)'
   },
   commentsContainer: {
     paddingBottom: 20
@@ -117,37 +178,83 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   commentCard: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
   },
   commentMessage: {
-    fontSize: 16
+    fontSize: 16,
+    color: colors.textPrimary
   },
   emptyState: {
     textAlign: 'center',
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14
   },
   replyBox: {
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 12
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 12,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3
+  },
+  replyLabel: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 12
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 10,
     minHeight: 50,
-    textAlignVertical: 'top'
+    textAlignVertical: 'top',
+    backgroundColor: colors.background,
+    color: colors.textPrimary
   },
   notice: {
     fontSize: 16,
-    marginBottom: 12
+    marginBottom: 16,
+    color: colors.textPrimary,
+    textAlign: 'center'
+  },
+  missingCard: {
+    margin: 20,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4
+  },
+  primaryButton: {
+    backgroundColor: colors.primaryDark,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   }
 });
