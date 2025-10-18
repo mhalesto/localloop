@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Text, TouchableOpacity, StyleSheet, FlatList, View, ScrollView } from 'react-native';
+import { Text, TouchableOpacity, StyleSheet, FlatList, View } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
@@ -38,27 +38,18 @@ export default function CountryScreen({ navigation }) {
           <Text style={styles.sectionAction}>Clear all</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipScrollContent}
-        style={styles.chipScroll}
-      >
-        {['South Africa', 'Namibia', 'Botswana', 'Zimbabwe', 'Lesotho']
-          .slice(0, 10)
-          .map((item, index) => (
-            <TouchableOpacity
-              key={item}
-              style={[styles.chip, styles[`chipColor${index % 3}`]]}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('Province', { country: item })}
-            >
-              <Text style={styles.chipText}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-      </ScrollView>
+      <View style={styles.chipStaticRow}>
+        {['South Africa', 'Namibia', 'Botswana'].map((item, index) => (
+          <TouchableOpacity
+            key={item}
+            style={[styles.chip, styles[`chipColor${index % 3}`]]}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Province', { country: item })}
+          >
+            <Text style={styles.chipText}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
         Pinned destinations
@@ -118,23 +109,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  chipScroll: {
+  chipStaticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 12,
     marginBottom: 16,
   },
-  chipScrollContent: {
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
   chip: {
     backgroundColor: colors.card,
-    borderRadius: 22,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    height: 44,
-    marginRight: 14,
-    minWidth: 140,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginRight: 12,
+    minWidth: 100,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -143,10 +134,11 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 14,
-    color: colors.primaryDark,
+    color: colors.textPrimary,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
     textAlign: 'center',
+    lineHeight: 18,
   },
   chipColor0: {
     backgroundColor: '#D8CEFF', // lilac
