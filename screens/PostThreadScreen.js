@@ -19,6 +19,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { shareDestinations } from '../constants/shareDestinations';
 
+/* Avatar used for comments; header uses a visual badge with Ionicons instead */
 function AvatarIcon({ tint, size = 32, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64" style={style}>
@@ -52,25 +53,17 @@ export default function PostThreadScreen({ route, navigation }) {
   const [shareSearch, setShareSearch] = useState('');
 
   const post = getPostById(city, postId);
-
   const comments = useMemo(() => post?.comments ?? [], [post]);
 
   const handleAddComment = () => {
-    if (reply.trim() === '') {
-      return;
-    }
-
+    if (reply.trim() === '') return;
     addComment(city, postId, reply);
     setReply('');
   };
 
   if (!post) {
     return (
-      <ScreenLayout
-        title="Thread"
-        subtitle={`${city} Room`}
-        onBack={() => navigation.goBack()}
-      >
+      <ScreenLayout title="Thread" subtitle={`${city} Room`} onBack={() => navigation.goBack()}>
         <View style={styles.missingWrapper}>
           <View style={styles.missingCard}>
             <Text style={styles.notice}>This post is no longer available.</Text>
@@ -96,16 +89,16 @@ export default function PostThreadScreen({ route, navigation }) {
   const badgeBackground = postPreset.badgeBackground ?? colors.primaryLight;
   const badgeTextColor = postPreset.badgeTextColor ?? '#fff';
   const linkColor = postPreset.linkColor ?? colors.primaryDark;
+
   const commentHighlight = `${linkColor}1A`;
   const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
+  const commentCount = post.comments?.length ?? 0;
 
   useEffect(() => {
-    if (!shareMessage) {
-      return;
-    }
-    const timeout = setTimeout(() => setShareMessage(''), 2000);
-    return () => clearTimeout(timeout);
+    if (!shareMessage) return;
+    const t = setTimeout(() => setShareMessage(''), 2000);
+    return () => clearTimeout(t);
   }, [shareMessage]);
 
   return (
@@ -121,86 +114,111 @@ export default function PostThreadScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
-        <ScrollView
-          contentContainerStyle={styles.threadContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
+          {/* POST CARD */}
           <View style={[styles.postCard, { backgroundColor: headerColor }]}>
+            {/* Header with avatar + identity */}
             <View style={styles.postHeader}>
-              <AvatarIcon tint={badgeBackground} size={40} style={styles.postHeaderAvatar} />
+              <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
+                <View style={styles.avatarRing} />
+                <Ionicons name="person" size={22} color="#fff" />
+              </View>
+
               <View>
                 <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
-                <Text style={[styles.postCity, { color: headerMetaColor }]}>{city} Room</Text>
-                {post.sharedFrom ? (
-                  <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>Shared from {post.sharedFrom.city}</Text>
+
+                {/* Hide room line if it's the same as the header room */}
+                {post.sourceCity && post.sourceCity !== city ? (
+                  <Text style={[styles.postCity, { color: headerMetaColor }]}>
+                    {post.sourceCity} Room
+                  </Text>
+                ) : null}
+
+                {/* Show only when available */}
+                {post.sharedFrom?.city ? (
+                  <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
+                    Shared from {post.sharedFrom.city}
+                  </Text>
                 ) : null}
               </View>
             </View>
+
             <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
-          <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-            {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-          </Text>
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleVote(city, postId, 'up')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
-                size={20}
-                color={post.userVote === 'up' ? linkColor : headerMetaColor}
-              />
-              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleVote(city, postId, 'down')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
-                size={20}
-                color={post.userVote === 'down' ? linkColor : headerMetaColor}
-              />
-              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                setShareModalVisible(true);
-                setShareSearch('');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
-              <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
-            </TouchableOpacity>
-          </View>
+
+            <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+            </Text>
+
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => toggleVote(city, postId, 'up')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                  size={20}
+                  color={post.userVote === 'up' ? linkColor : headerMetaColor}
+                />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => toggleVote(city, postId, 'down')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                  size={20}
+                  color={post.userVote === 'down' ? linkColor : headerMetaColor}
+                />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.actionButton, styles.commentButton]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={headerMetaColor} />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{commentCount}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.shareButton]}
+                onPress={() => {
+                  setShareModalVisible(true);
+                  setShareSearch('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+                <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+              </TouchableOpacity>
+            </View>
+
             {post.sourceCity && post.sourcePostId &&
               !(post.sourceCity === city && post.sourcePostId === post.id) ? (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('PostThread', {
-                      city: post.sourceCity,
-                      postId: post.sourcePostId
-                    })
-                  }
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.viewOriginal, { color: headerMetaColor }]}>View original thread</Text>
-                </TouchableOpacity>
-              ) : null}
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('PostThread', {
+                    city: post.sourceCity,
+                    postId: post.sourcePostId
+                  })
+                }
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.viewOriginal, { color: headerMetaColor }]}>
+                  View original thread
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
+          {/* COMMENTS */}
           <FlatList
             data={comments}
             keyExtractor={(item) => item.id}
             scrollEnabled={false}
             renderItem={({ item }) => (
-              <View
-                style={[styles.commentRow, item.createdByMe && styles.commentRowRight]}
-              >
+              <View style={[styles.commentRow, item.createdByMe && styles.commentRowRight]}>
                 <AvatarIcon
                   tint={badgeBackground}
                   style={item.createdByMe ? styles.commentAvatarRight : styles.commentAvatarLeft}
@@ -246,6 +264,7 @@ export default function PostThreadScreen({ route, navigation }) {
             ]}
           />
 
+          {/* REPLY */}
           <View style={styles.replyBox}>
             <Text style={styles.replyLabel}>Add a reply</Text>
             <TextInput
@@ -271,11 +290,15 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* TOAST */}
       {shareMessage ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{shareMessage}</Text>
         </View>
       ) : null}
+
+      {/* SHARE MODAL */}
       <Modal
         visible={shareModalVisible}
         transparent
@@ -313,16 +336,11 @@ export default function PostThreadScreen({ route, navigation }) {
                   <Text style={styles.modalOptionType}>{item.type}</Text>
                 </TouchableOpacity>
               )}
-              ListEmptyComponent={
-                <Text style={styles.modalEmpty}>No matches found.</Text>
-              }
+              ListEmptyComponent={<Text style={styles.modalEmpty}>No matches found.</Text>}
               style={styles.modalList}
               keyboardShouldPersistTaps="handled"
             />
-            <TouchableOpacity
-              style={styles.modalClose}
-              onPress={() => setShareModalVisible(false)}
-            >
+            <TouchableOpacity style={styles.modalClose} onPress={() => setShareModalVisible(false)}>
               <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -333,14 +351,9 @@ export default function PostThreadScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    paddingBottom: 20
-  },
-  threadContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40
-  },
+  flex: { flex: 1, paddingBottom: 20 },
+  threadContent: { paddingHorizontal: 20, paddingBottom: 40 },
+
   postCard: {
     borderRadius: 24,
     padding: 24,
@@ -349,90 +362,56 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 5
+    elevation: 5,
   },
+
+  /* Header */
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16
+    marginBottom: 16,
   },
-  postHeaderAvatar: {
-    marginRight: 12
-  },
-  postBadge: {
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  postCity: {
-    fontSize: 12,
-    marginTop: 4
-  },
-  sharedBanner: {
-    fontSize: 12,
-    marginTop: 6
-  },
-  postMessage: {
-    fontSize: 20,
-    marginBottom: 18,
-    fontWeight: '500'
-  },
-  postMeta: {
-    fontSize: 13,
-    marginBottom: 12
-  },
-  viewOriginal: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 12
-  },
-  actionsRow: {
-    flexDirection: 'row',
+  // Avatar badge for post header
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
-    marginBottom: 12
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 20
+  avatarRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  actionCount: {
-    fontSize: 12,
-    marginLeft: 6
-  },
-  actionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 6
-  },
-  shareMessage: {
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  commentsContainer: {
-    paddingBottom: 40
-  },
-  commentsContainerEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center'
-  },
-  commentRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 18
-  },
-  commentRowRight: {
-    flexDirection: 'row-reverse'
-  },
-  commentAvatarLeft: {
-    marginRight: 10
-  },
-  commentAvatarRight: {
-    marginLeft: 10
-  },
-  commentBubbleWrapper: {
-    flex: 1,
-    paddingHorizontal: 4
-  },
+
+  postBadge: { fontSize: 16, fontWeight: '700' },
+  postCity: { fontSize: 12, marginTop: 4 },
+  sharedBanner: { fontSize: 12, marginTop: 6 },
+
+  postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
+  postMeta: { fontSize: 13, marginBottom: 12 },
+
+  actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
+  actionCount: { fontSize: 12, marginLeft: 6 },
+  actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
+  commentButton: { marginRight: 24 },
+  shareButton: { marginRight: 0 },
+
+  viewOriginal: { fontSize: 12, fontWeight: '600', marginTop: 12 },
+
+  /* Comments */
+  commentsContainer: { paddingBottom: 40 },
+  commentsContainerEmpty: { flexGrow: 1, justifyContent: 'center' },
+  commentRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 18 },
+  commentRowRight: { flexDirection: 'row-reverse' },
+  commentAvatarLeft: { marginRight: 10 },
+  commentAvatarRight: { marginLeft: 10 },
+  commentBubbleWrapper: { flex: 1, paddingHorizontal: 4 },
   commentBubble: {
     backgroundColor: colors.card,
     borderRadius: 18,
@@ -441,33 +420,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2
+    elevation: 2,
   },
-  commentTailLeft: {
-    alignSelf: 'flex-start',
-    marginLeft: -12,
-    marginTop: -8
-  },
-  commentTailRight: {
-    alignSelf: 'flex-end',
-    marginRight: -12,
-    marginTop: -8
-  },
-  commentMessage: {
-    fontSize: 16,
-    color: colors.textPrimary
-  },
-  commentMeta: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 14,
-    paddingVertical: 40
-  },
+  commentTailLeft: { alignSelf: 'flex-start', marginLeft: -12, marginTop: -8 },
+  commentTailRight: { alignSelf: 'flex-end', marginRight: -12, marginTop: -8 },
+  commentMessage: { fontSize: 16, color: colors.textPrimary },
+  commentMeta: { marginTop: 8, fontSize: 12, fontWeight: '600' },
+
+  /* Reply box */
   replyBox: {
     backgroundColor: colors.card,
     borderRadius: 16,
@@ -478,14 +438,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 3
+    elevation: 3,
   },
-  replyLabel: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12
-  },
+  replyLabel: { color: colors.textPrimary, fontSize: 16, fontWeight: '500', marginBottom: 12 },
   input: {
     borderRadius: 12,
     padding: 12,
@@ -493,21 +448,13 @@ const styles = StyleSheet.create({
     minHeight: 50,
     textAlignVertical: 'top',
     backgroundColor: colors.background,
-    color: colors.textPrimary
+    color: colors.textPrimary,
   },
-  primaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  primaryButtonDisabled: {
-    opacity: 0.6
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600'
-  },
+  primaryButton: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center' },
+  primaryButtonDisabled: { opacity: 0.6 },
+  primaryButtonText: { fontSize: 16, fontWeight: '600' },
+
+  /* Toast */
   toast: {
     position: 'absolute',
     bottom: 140,
@@ -516,18 +463,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.75)',
     paddingVertical: 10,
     borderRadius: 12,
-    alignItems: 'center'
+    alignItems: 'center',
   },
-  toastText: {
-    color: '#fff',
-    fontSize: 12
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    padding: 24
-  },
+  toastText: { color: '#fff', fontSize: 12 },
+
+  /* Share modal */
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 24 },
   modalCard: {
     borderRadius: 20,
     backgroundColor: colors.card,
@@ -536,14 +477,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 6
+    elevation: 6,
   },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 12
-  },
+  modalTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
   modalInput: {
     borderRadius: 12,
     borderWidth: 1,
@@ -552,46 +488,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: colors.textPrimary,
-    marginBottom: 16
+    marginBottom: 16,
   },
-  modalList: {
-    maxHeight: 240
-  },
-  modalOption: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider
-  },
-  modalOptionLabel: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  modalOptionType: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    textTransform: 'uppercase'
-  },
-  modalEmpty: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingVertical: 20
-  },
-  modalClose: {
-    marginTop: 12,
-    alignSelf: 'center'
-  },
-  modalCloseText: {
-    color: colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 14
-  },
-  missingWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 40
-  },
+  modalList: { maxHeight: 240 },
+  modalOption: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  modalOptionLabel: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
+  modalOptionType: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase' },
+  modalEmpty: { textAlign: 'center', color: colors.textSecondary, fontSize: 13, paddingVertical: 20 },
+  modalClose: { marginTop: 12, alignSelf: 'center' },
+  modalCloseText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
+
+  /* Missing state */
+  missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },
   missingCard: {
     margin: 20,
     backgroundColor: colors.card,
@@ -602,12 +510,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 4
+    elevation: 4,
   },
-  notice: {
-    fontSize: 16,
-    marginBottom: 16,
-    color: colors.textPrimary,
-    textAlign: 'center'
-  }
+  notice: { fontSize: 16, marginBottom: 16, color: colors.textPrimary, textAlign: 'center' },
 });
