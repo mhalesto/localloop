@@ -60,15 +60,15 @@ export default function RoomScreen({ navigation, route }) {
             <Text style={styles.headerTitle}>Today&apos;s pulse</Text>
           </View>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardLeft]}>
               <Text style={styles.statValue}>{totalPosts}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardMiddle]}>
               <Text style={styles.statValue}>{totalComments}</Text>
               <Text style={styles.statLabel}>Comments</Text>
             </View>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, styles.statCardRight]}>
               <Text style={styles.statValue}>{averageReplies}</Text>
               <Text style={styles.statLabel}>Avg Replies</Text>
             </View>
@@ -99,6 +99,7 @@ export default function RoomScreen({ navigation, route }) {
         </View>
 
         <FlatList
+          style={styles.postsListWrapper}
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -150,8 +151,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between'
+    flexDirection: 'row'
   },
   statCard: {
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -159,8 +159,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 12,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 4
+    flex: 1
+  },
+  statCardLeft: {
+    marginRight: 12
+  },
+  statCardMiddle: {
+    marginHorizontal: 6
+  },
+  statCardRight: {
+    marginLeft: 12
   },
   statValue: {
     color: '#fff',
@@ -214,6 +222,9 @@ const styles = StyleSheet.create({
   },
   postsList: {
     paddingBottom: 80
+  },
+  postsListWrapper: {
+    flex: 1
   },
   postsListEmpty: {
     flexGrow: 1,

@@ -89,6 +89,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 24,
     paddingHorizontal: 20,
-    paddingBottom: 120
+    paddingBottom: 0
   }
 });
