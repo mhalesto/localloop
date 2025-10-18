@@ -1,3 +1,4 @@
+// screens/PostThreadScreen.js
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -6,20 +7,21 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
-  ScrollView,
-  Modal
+  Modal,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { shareDestinations } from '../constants/shareDestinations';
 
-/* Avatar used for comments; header uses a visual badge with Ionicons instead */
+/* Simple circular avatar (no arrow/tail) */
 function AvatarIcon({ tint, size = 32, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64" style={style}>
@@ -29,35 +31,48 @@ function AvatarIcon({ tint, size = 32, style }) {
   );
 }
 
-function BubbleTail({ fill, align }) {
-  return (
-    <Svg
-      width={18}
-      height={18}
-      viewBox="0 0 40 40"
-      style={align === 'right' ? styles.commentTailRight : styles.commentTailLeft}
-    >
-      <Path d="M0 20L28 0V40L0 20Z" fill={fill} transform={align === 'left' ? 'rotate(180 20 20)' : undefined} />
-    </Svg>
-  );
-}
-
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
   const { addComment, getPostById, sharePost, toggleVote } = usePosts();
   const { accentPreset } = useSettings();
+  const insets = useSafeAreaInsets();
 
   const [reply, setReply] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
 
+  // UI state: composer height & keyboard offset (so composer sits above keyboard)
+  const [composerH, setComposerH] = useState(68);
+  const [kbOffset, setKbOffset] = useState(0);
+
   const post = getPostById(city, postId);
   const comments = useMemo(() => post?.comments ?? [], [post]);
 
+  // --- Keyboard listeners (robust with absolute-positioned composer)
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e) => {
+      const h = e?.endCoordinates?.height ?? 0;
+      setKbOffset(Math.max(0, h - (insets.bottom || 0)));
+    };
+    const onHide = () => setKbOffset(0);
+
+    const s1 = Keyboard.addListener(showEvt, onShow);
+    const s2 = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      s1.remove();
+      s2.remove();
+    };
+  }, [insets.bottom]);
+
+  // Add comment
   const handleAddComment = () => {
-    if (reply.trim() === '') return;
-    addComment(city, postId, reply);
+    const t = reply.trim();
+    if (!t) return;
+    addComment(city, postId, t);
     setReply('');
   };
 
@@ -80,31 +95,115 @@ export default function PostThreadScreen({ route, navigation }) {
     );
   }
 
-  const postPreset =
-    accentPresets.find((preset) => preset.key === post.colorKey) ?? accentPreset;
-
+  // Palette pulled from the post's preset, falling back to the screen preset
+  const postPreset = accentPresets.find((p) => p.key === post.colorKey) ?? accentPreset;
   const headerColor = postPreset.background;
   const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : colors.textPrimary);
-  const headerMetaColor = postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const headerMetaColor =
+    postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
   const badgeBackground = postPreset.badgeBackground ?? colors.primaryLight;
   const badgeTextColor = postPreset.badgeTextColor ?? '#fff';
   const linkColor = postPreset.linkColor ?? colors.primaryDark;
   const dividerColor = postPreset.isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)';
-
   const commentHighlight = `${linkColor}1A`;
   const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
-  const commentCount = post.comments?.length ?? 0;
+
   const showViewOriginal =
-    post.sourceCity &&
-    post.sourcePostId &&
-    !(post.sourceCity === city && post.sourcePostId === post.id);
+    post.sourceCity && post.sourcePostId && !(post.sourceCity === city && post.sourcePostId === post.id);
 
   useEffect(() => {
     if (!shareMessage) return;
     const t = setTimeout(() => setShareMessage(''), 2000);
     return () => clearTimeout(t);
   }, [shareMessage]);
+
+  /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
+  const Header = (
+    <View style={styles.stickyHeaderWrap}>
+      <View style={[styles.postCard, { backgroundColor: headerColor }]}>
+        <View style={styles.postHeaderRow}>
+          <View style={styles.postHeader}>
+            <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
+              <View style={styles.avatarRing} />
+              <Ionicons name="person" size={22} color="#fff" />
+            </View>
+
+            <View>
+              <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
+              {post.sourceCity && post.sourceCity !== city ? (
+                <Text style={[styles.postCity, { color: headerMetaColor }]}>{post.sourceCity} Room</Text>
+              ) : null}
+              {post.sharedFrom?.city ? (
+                <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
+                  Shared from {post.sharedFrom.city}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {showViewOriginal ? (
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+              }
+              style={styles.viewOriginalButton}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
+        <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+          {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+        </Text>
+
+        <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleVote(city, postId, 'up')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                size={20}
+                color={post.userVote === 'up' ? linkColor : headerMetaColor}
+              />
+              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleVote(city, postId, 'down')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                size={20}
+                color={post.userVote === 'down' ? linkColor : headerMetaColor}
+              />
+              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setShareModalVisible(true);
+                setShareSearch('');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+              <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <ScreenLayout
@@ -115,195 +214,88 @@ export default function PostThreadScreen({ route, navigation }) {
       activeTab="home"
       showFooter={false}
     >
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80}
+      {/* Comments list with sticky header. Padding grows with composer+keyboard */}
+      <FlatList
+        data={comments}
+        keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={Header}
+        stickyHeaderIndices={[0]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => {
+          const mine = item.createdByMe;
+          return (
+            <View style={[styles.commentRow, mine && styles.commentRowMine]}>
+              {/* left avatar only for others */}
+              {!mine && <AvatarIcon tint={badgeBackground} style={styles.commentAvatarLeft} />}
+
+              {/* bubble */}
+              <View
+                style={[
+                  styles.commentBubble,
+                  mine && { backgroundColor: commentHighlight, borderColor: linkColor, borderWidth: 1 },
+                ]}
+              >
+                <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{item.message}</Text>
+                {mine ? <Text style={[styles.commentMeta, { color: linkColor }]}>You replied</Text> : null}
+              </View>
+
+              {/* right avatar only for me */}
+              {mine && <AvatarIcon tint={badgeBackground} style={styles.commentAvatarRight} />}
+            </View>
+          );
+        }}
+        ListEmptyComponent={<Text style={styles.emptyState}>No comments yet. Be the first to reply.</Text>}
+        contentContainerStyle={{
+          paddingHorizontal: 0,
+          paddingBottom: composerH + kbOffset + (insets.bottom || 8) + 12,
+        }}
+      />
+
+      {/* Fixed bottom composer pinned above the keyboard */}
+      <View
+        style={[
+          styles.composerWrap,
+          { bottom: kbOffset, paddingBottom: insets.bottom || 8 },
+        ]}
+        onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
       >
-        <ScrollView contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
-          {/* POST CARD */}
-          <View style={[styles.postCard, { backgroundColor: headerColor }]}>
-            {/* Header with avatar + identity */}
-            <View style={styles.postHeaderRow}>
-              <View style={styles.postHeader}>
-                <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
-                  <View style={styles.avatarRing} />
-                  <Ionicons name="person" size={22} color="#fff" />
-                </View>
-
-                <View>
-                  <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
-
-                  {/* Hide room line if it's the same as the header room */}
-                  {post.sourceCity && post.sourceCity !== city ? (
-                    <Text style={[styles.postCity, { color: headerMetaColor }]}>
-                      {post.sourceCity} Room
-                    </Text>
-                  ) : null}
-
-                  {/* Show only when available */}
-                  {post.sharedFrom?.city ? (
-                    <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
-                      Shared from {post.sharedFrom.city}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-
-              {showViewOriginal ? (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('PostThread', {
-                      city: post.sourceCity,
-                      postId: post.sourcePostId
-                    })
-                  }
-                  style={styles.viewOriginalButton}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.viewOriginalTop, { color: linkColor }]}>
-                    View original
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
-
-            <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-            </Text>
-
-            <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => toggleVote(city, postId, 'up')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
-                    size={20}
-                    color={post.userVote === 'up' ? linkColor : headerMetaColor}
-                  />
-                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => toggleVote(city, postId, 'down')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
-                    size={20}
-                    color={post.userVote === 'down' ? linkColor : headerMetaColor}
-                  />
-                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => {
-                    setShareModalVisible(true);
-                    setShareSearch('');
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
-                  <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* COMMENTS */}
-          <FlatList
-            data={comments}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <View style={[styles.commentRow, item.createdByMe && styles.commentRowRight]}>
-                <AvatarIcon
-                  tint={badgeBackground}
-                  style={item.createdByMe ? styles.commentAvatarRight : styles.commentAvatarLeft}
-                />
-                <View style={styles.commentBubbleWrapper}>
-                  <View
-                    style={[
-                      styles.commentBubble,
-                      item.createdByMe && {
-                        backgroundColor: commentHighlight,
-                        borderColor: linkColor,
-                        borderWidth: 1
-                      }
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.commentMessage,
-                        item.createdByMe && { color: linkColor }
-                      ]}
-                    >
-                      {item.message}
-                    </Text>
-                    {item.createdByMe ? (
-                      <Text style={[styles.commentMeta, { color: linkColor }]}>You replied</Text>
-                    ) : null}
-                  </View>
-                  <BubbleTail
-                    fill={item.createdByMe ? commentHighlight : colors.card}
-                    align={item.createdByMe ? 'right' : 'left'}
-                  />
-                </View>
-              </View>
-            )}
-            ListEmptyComponent={
-              <Text style={styles.emptyState}>
-                No comments yet. Be the first to reply.
-              </Text>
-            }
-            contentContainerStyle={[
-              styles.commentsContainer,
-              comments.length === 0 && styles.commentsContainerEmpty
-            ]}
+        <View style={styles.composerInner}>
+          <TextInput
+            value={reply}
+            onChangeText={setReply}
+            placeholder="Share your thoughts…"
+            placeholderTextColor={colors.textSecondary}
+            style={styles.composerInput}
+            autoCapitalize="sentences"
+            autoCorrect
+            returnKeyType="send"
+            onSubmitEditing={handleAddComment}
+            clearButtonMode="while-editing"
           />
+          <TouchableOpacity
+            onPress={handleAddComment}
+            disabled={!reply.trim()}
+            activeOpacity={0.9}
+            style={[
+              styles.sendBtn,
+              { backgroundColor: replyButtonBackground, opacity: reply.trim() ? 1 : 0.5 },
+            ]}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="send" size={18} color={replyButtonForeground} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-          {/* REPLY */}
-          <View style={styles.replyBox}>
-            <Text style={styles.replyLabel}>Add a reply</Text>
-            <TextInput
-              value={reply}
-              onChangeText={setReply}
-              placeholder="Share your thoughts..."
-              style={styles.input}
-              multiline
-              placeholderTextColor={colors.textSecondary}
-            />
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                { backgroundColor: replyButtonBackground },
-                reply.trim() === '' && styles.primaryButtonDisabled
-              ]}
-              onPress={handleAddComment}
-              disabled={reply.trim() === ''}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.primaryButtonText, { color: replyButtonForeground }]}>Reply</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* TOAST */}
+      {/* Toast */}
       {shareMessage ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{shareMessage}</Text>
         </View>
       ) : null}
 
-      {/* SHARE MODAL */}
+      {/* Share modal (unchanged logic) */}
       <Modal
         visible={shareModalVisible}
         transparent
@@ -355,14 +347,17 @@ export default function PostThreadScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, paddingBottom: 20 },
-  threadContent: { paddingHorizontal: 20, paddingBottom: 40 },
 
+const styles = StyleSheet.create({
+  /* Sticky header wrapper so the pinned card blends with background */
+  stickyHeaderWrap: { backgroundColor: colors.background, paddingTop: 8, paddingBottom: 12 },
+
+  /* Post card (wider) */
   postCard: {
     borderRadius: 24,
     padding: 24,
-    marginBottom: 20,
+    marginHorizontal: 8,           // tighter margins → wider card
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -371,105 +366,93 @@ const styles = StyleSheet.create({
   },
 
   /* Header */
-  postHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-    flex: 1,
-  },
-  // Avatar badge for post header
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  avatarRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-
+  postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' },
+  avatarRing: { ...StyleSheet.absoluteFillObject, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)' },
   postBadge: { fontSize: 16, fontWeight: '700' },
   postCity: { fontSize: 12, marginTop: 4 },
   sharedBanner: { fontSize: 12, marginTop: 6 },
-
   postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
   postMeta: { fontSize: 13, marginBottom: 12 },
-
-  actionsFooter: {
-    marginTop: 4,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  footerMeta: { marginBottom: 10 },
+  actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
   actionCount: { fontSize: 12, marginLeft: 6 },
   actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
-
   viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
   viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
 
-  /* Comments */
-  commentsContainer: { paddingBottom: 40 },
-  commentsContainerEmpty: { flexGrow: 1, justifyContent: 'center' },
-  commentRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 18 },
-  commentRowRight: { flexDirection: 'row-reverse' },
+  /* Comments (wider) */
+  commentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 14,
+    paddingHorizontal: 8,          // tighter margins → wider bubbles
+  },
+  // push my messages to the right (so avatar sits on the right)
+  commentRowMine: { justifyContent: 'flex-end' },
   commentAvatarLeft: { marginRight: 10 },
   commentAvatarRight: { marginLeft: 10 },
-  commentBubbleWrapper: { flex: 1, paddingHorizontal: 4 },
   commentBubble: {
+    maxWidth: '92%',               // was 88% → wider
+    flexShrink: 1,                 // so it won’t overflow when the avatar is present
     backgroundColor: colors.card,
     borderRadius: 18,
-    padding: 18,
+    padding: 14,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  commentTailLeft: { alignSelf: 'flex-start', marginLeft: -12, marginTop: -8 },
-  commentTailRight: { alignSelf: 'flex-end', marginRight: -12, marginTop: -8 },
   commentMessage: { fontSize: 16, color: colors.textPrimary },
-  commentMeta: { marginTop: 8, fontSize: 12, fontWeight: '600' },
+  commentMeta: { marginTop: 6, fontSize: 12, fontWeight: '600' },
+  emptyState: { paddingHorizontal: 12, paddingVertical: 40, color: colors.textSecondary, textAlign: 'center' },
 
-  /* Reply box */
-  replyBox: {
+  /* Fixed bottom composer */
+  composerWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    paddingTop: 8,
+    paddingHorizontal: 8,          // align with wider look
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.divider,
+  },
+  composerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: 16,
-    padding: 18,
-    marginTop: 12,
-    marginBottom: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.divider,
+    marginHorizontal: 6,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  replyLabel: { color: colors.textPrimary, fontSize: 16, fontWeight: '500', marginBottom: 12 },
-  input: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    minHeight: 50,
-    textAlignVertical: 'top',
-    backgroundColor: colors.background,
+  composerInput: {
+    flex: 1,
+    height: 38,
+    fontSize: 15,
     color: colors.textPrimary,
+    paddingVertical: 6,
   },
-  primaryButton: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center' },
-  primaryButtonDisabled: { opacity: 0.6 },
-  primaryButtonText: { fontSize: 16, fontWeight: '600' },
+  sendBtn: {
+    marginLeft: 8,
+    borderRadius: 16,
+    height: 32,
+    minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
 
   /* Toast */
   toast: {
