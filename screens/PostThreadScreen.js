@@ -89,11 +89,16 @@ export default function PostThreadScreen({ route, navigation }) {
   const badgeBackground = postPreset.badgeBackground ?? colors.primaryLight;
   const badgeTextColor = postPreset.badgeTextColor ?? '#fff';
   const linkColor = postPreset.linkColor ?? colors.primaryDark;
+  const dividerColor = postPreset.isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)';
 
   const commentHighlight = `${linkColor}1A`;
   const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
   const commentCount = post.comments?.length ?? 0;
+  const showViewOriginal =
+    post.sourceCity &&
+    post.sourcePostId &&
+    !(post.sourceCity === city && post.sourcePostId === post.id);
 
   useEffect(() => {
     if (!shareMessage) return;
@@ -118,29 +123,48 @@ export default function PostThreadScreen({ route, navigation }) {
           {/* POST CARD */}
           <View style={[styles.postCard, { backgroundColor: headerColor }]}>
             {/* Header with avatar + identity */}
-            <View style={styles.postHeader}>
-              <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
-                <View style={styles.avatarRing} />
-                <Ionicons name="person" size={22} color="#fff" />
+            <View style={styles.postHeaderRow}>
+              <View style={styles.postHeader}>
+                <View style={[styles.avatar, { backgroundColor: badgeBackground }]}>
+                  <View style={styles.avatarRing} />
+                  <Ionicons name="person" size={22} color="#fff" />
+                </View>
+
+                <View>
+                  <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
+
+                  {/* Hide room line if it's the same as the header room */}
+                  {post.sourceCity && post.sourceCity !== city ? (
+                    <Text style={[styles.postCity, { color: headerMetaColor }]}>
+                      {post.sourceCity} Room
+                    </Text>
+                  ) : null}
+
+                  {/* Show only when available */}
+                  {post.sharedFrom?.city ? (
+                    <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
+                      Shared from {post.sharedFrom.city}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
 
-              <View>
-                <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
-
-                {/* Hide room line if it's the same as the header room */}
-                {post.sourceCity && post.sourceCity !== city ? (
-                  <Text style={[styles.postCity, { color: headerMetaColor }]}>
-                    {post.sourceCity} Room
+              {showViewOriginal ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PostThread', {
+                      city: post.sourceCity,
+                      postId: post.sourcePostId
+                    })
+                  }
+                  style={styles.viewOriginalButton}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.viewOriginalTop, { color: linkColor }]}>
+                    View original
                   </Text>
-                ) : null}
-
-                {/* Show only when available */}
-                {post.sharedFrom?.city ? (
-                  <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
-                    Shared from {post.sharedFrom.city}
-                  </Text>
-                ) : null}
-              </View>
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
@@ -149,67 +173,47 @@ export default function PostThreadScreen({ route, navigation }) {
               {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
             </Text>
 
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleVote(city, postId, 'up')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
-                  size={20}
-                  color={post.userVote === 'up' ? linkColor : headerMetaColor}
-                />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
-              </TouchableOpacity>
+            <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => toggleVote(city, postId, 'up')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                    size={20}
+                    color={post.userVote === 'up' ? linkColor : headerMetaColor}
+                  />
+                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleVote(city, postId, 'down')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
-                  size={20}
-                  color={post.userVote === 'down' ? linkColor : headerMetaColor}
-                />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => toggleVote(city, postId, 'down')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                    size={20}
+                    color={post.userVote === 'down' ? linkColor : headerMetaColor}
+                  />
+                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+                </TouchableOpacity>
 
-              <View style={[styles.actionButton, styles.commentButton]}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color={headerMetaColor} />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{commentCount}</Text>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => {
+                    setShareModalVisible(true);
+                    setShareSearch('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+                  <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+                </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                style={[styles.actionButton, styles.shareButton]}
-                onPress={() => {
-                  setShareModalVisible(true);
-                  setShareSearch('');
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
-                <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
-              </TouchableOpacity>
             </View>
-
-            {post.sourceCity && post.sourcePostId &&
-              !(post.sourceCity === city && post.sourcePostId === post.id) ? (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('PostThread', {
-                    city: post.sourceCity,
-                    postId: post.sourcePostId
-                  })
-                }
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.viewOriginal, { color: headerMetaColor }]}>
-                  View original thread
-                </Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
 
           {/* COMMENTS */}
@@ -366,10 +370,17 @@ const styles = StyleSheet.create({
   },
 
   /* Header */
+  postHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginRight: 12,
+    flex: 1,
   },
   // Avatar badge for post header
   avatar: {
@@ -395,14 +406,19 @@ const styles = StyleSheet.create({
   postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
   postMeta: { fontSize: 13, marginBottom: 12 },
 
-  actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  actionsFooter: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  footerMeta: { marginBottom: 10 },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },
   actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
   actionCount: { fontSize: 12, marginLeft: 6 },
   actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
-  commentButton: { marginRight: 24 },
-  shareButton: { marginRight: 0 },
 
-  viewOriginal: { fontSize: 12, fontWeight: '600', marginTop: 12 },
+  viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
+  viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
 
   /* Comments */
   commentsContainer: { paddingBottom: 40 },

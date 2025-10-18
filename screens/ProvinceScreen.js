@@ -1,37 +1,73 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
+import { fetchStates } from '../services/locationService';
+
+const INITIAL_VISIBLE = 40;
+const PAGE_SIZE = 30;
 
 export default function ProvinceScreen({ navigation, route }) {
   const { country } = route.params;
   const [query, setQuery] = useState('');
 
-  const provinces = useMemo(() => {
-    if (country === 'South Africa') {
-      return [
-        { name: 'Gauteng', description: 'City lights and fast pace' },
-        { name: 'Western Cape', description: 'Coastal views & winelands' },
-        { name: 'KwaZulu-Natal', description: 'Warm beaches & culture' }
-      ];
-    }
+  const [provinces, setProvinces] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-    return [
-      { name: 'Central', description: 'Main hub of activity' },
-      { name: 'North', description: 'Nature reserves and escapes' },
-      { name: 'South', description: 'Coastal calm and hidden gems' }
-    ];
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        setLoading(true);
+        const states = await fetchStates(country);
+        if (!mounted) return;
+        const items = states.map((name) => ({ name }));
+        setProvinces(items);
+        setError('');
+        setVisibleCount(INITIAL_VISIBLE);
+      } catch (err) {
+        if (!mounted) return;
+        setError('Unable to load provinces right now.');
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
   }, [country]);
 
-  const filtered = provinces.filter((province) =>
-    province.name.toLowerCase().includes(query.trim().toLowerCase())
+  const filtered = useMemo(() => {
+    if (!query.trim()) return provinces;
+    const lower = query.trim().toLowerCase();
+    return provinces.filter((province) => province.name.toLowerCase().includes(lower));
+  }, [provinces, query]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [query]);
+
+  const paginated = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
   );
+
+  const handleLoadMore = useCallback(() => {
+    if (visibleCount >= filtered.length) return;
+    setVisibleCount((prev) => Math.min(filtered.length, prev + PAGE_SIZE));
+  }, [filtered.length, visibleCount]);
 
   return (
     <ScreenLayout
@@ -45,92 +81,52 @@ export default function ProvinceScreen({ navigation, route }) {
       navigation={navigation}
       activeTab="home"
     >
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Provinces</Text>
-        <TouchableOpacity activeOpacity={0.85}>
-          <Text style={styles.sectionAction}>See all</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.filterRow}>
-        {['All', 'Coastal', 'City life', 'Nature'].map((item) => (
-          <View key={item} style={styles.filterChip}>
-            <Text style={styles.filterText}>{item}</Text>
-          </View>
-        ))}
-      </View>
-
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.name}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.85}
-            onPress={() =>
-              navigation.navigate('City', { province: item.name })
-            }
-          >
-            <View style={styles.cardTopRow}>
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={colors.primaryDark} />
+        </View>
+      ) : error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : (
+        <FlatList
+          data={paginated}
+          keyExtractor={(item) => item.name}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate('City', { country, province: item.name })
+              }
+            >
               <Text style={styles.cardTitle}>{item.name}</Text>
-              <Text style={styles.cardBadge}>Active</Text>
-            </View>
-            <Text style={styles.cardSubtitle}>{item.description}</Text>
-            <Text style={styles.cardAction}>Enter →</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyState}>
-            No provinces match your search yet.
-          </Text>
-        }
-        contentContainerStyle={[
-          styles.listContent,
-          filtered.length === 0 && styles.listContentEmpty
-        ]}
-        showsVerticalScrollIndicator={false}
-      />
+              <Text style={styles.cardAction}>See cities →</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <Text style={styles.emptyState}>
+              No provinces match your search yet.
+            </Text>
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            filtered.length === 0 && styles.listContentEmpty
+          ]}
+          showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+        />
+      )}
     </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 16
-  },
-  sectionAction: {
-    color: colors.primaryDark,
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16
-  },
-  filterChip: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginRight: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  filterText: {
-    fontSize: 13,
-    color: colors.textPrimary
   },
   listContent: {
     paddingBottom: 80
@@ -155,34 +151,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 3
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10
-  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary
   },
-  cardBadge: {
-    backgroundColor: colors.primaryLight,
-    color: '#fff',
-    fontSize: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    fontWeight: '600'
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 16
-  },
   cardAction: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.primaryDark
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  errorText: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginTop: 40
   }
 });
