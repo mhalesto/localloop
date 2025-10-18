@@ -2,14 +2,32 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 
 const PostsContext = createContext(null);
 
+function normalizeProfile(profile) {
+  if (!profile) {
+    return {
+      nickname: '',
+      country: '',
+      province: '',
+      city: ''
+    };
+  }
+  return {
+    nickname: profile.nickname?.trim() ?? '',
+    country: profile.country ?? '',
+    province: profile.province ?? '',
+    city: profile.city ?? ''
+  };
+}
+
 export function PostsProvider({ children }) {
   const [postsByCity, setPostsByCity] = useState({});
 
-  const addPost = useCallback((city, message, colorKey = 'royal') => {
+  const addPost = useCallback((city, message, colorKey = 'royal', authorProfile = null) => {
     const trimmed = message.trim();
     if (!trimmed) {
       return;
     }
+    const author = normalizeProfile(authorProfile);
 
     setPostsByCity((prev) => {
       const cityPosts = prev[city] ?? [];
@@ -25,7 +43,8 @@ export function PostsProvider({ children }) {
         upvotes: 0,
         downvotes: 0,
         userVote: null,
-        sharedFrom: null
+        sharedFrom: null,
+        author
       };
 
       newPost.sourcePostId = newPost.id;
@@ -83,7 +102,7 @@ export function PostsProvider({ children }) {
     );
   }, [postsByCity]);
 
-  const sharePost = useCallback((fromCity, postId, toCity) => {
+  const sharePost = useCallback((fromCity, postId, toCity, authorProfile = null) => {
     if (fromCity === toCity) {
       return;
     }
@@ -94,6 +113,7 @@ export function PostsProvider({ children }) {
       if (!original) {
         return prev;
       }
+      const author = normalizeProfile(authorProfile ?? original.author);
 
       const targetPosts = prev[toCity] ?? [];
       const newPost = {
@@ -107,7 +127,8 @@ export function PostsProvider({ children }) {
         createdByMe: true,
         upvotes: 0,
         downvotes: 0,
-        userVote: null
+        userVote: null,
+        author
       };
 
       return {

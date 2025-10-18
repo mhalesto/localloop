@@ -30,6 +30,9 @@ export default function PostItem({
   const downvotes = post.downvotes ?? 0;
   const userVote = post.userVote ?? null;     // 'up' | 'down' | null
   const commentCount = post.comments?.length ?? 0;
+  const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
+  const locationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
+  const authorLocation = locationParts.join(', ');
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.touchable}>
@@ -45,8 +48,10 @@ export default function PostItem({
             </View>
 
             <View style={styles.authorBlock}>
-              <Text style={[styles.posterName, { color: primaryTextColor }]}>Anonymous</Text>
-              {/* room removed on purpose; show only "Shared from ..." if present */}
+              <Text style={[styles.posterName, { color: primaryTextColor }]}>{authorName}</Text>
+              {authorLocation ? (
+                <Text style={[styles.posterMeta, { color: metaColor }]}>{authorLocation}</Text>
+              ) : null}
               {sharedFrom?.city ? (
                 <Text style={[styles.posterMeta, { color: metaColor }]}>
                   {`Shared from ${sharedFrom.city}`}

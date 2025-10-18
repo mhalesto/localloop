@@ -103,11 +103,26 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [showAddShortcut, setShowAddShortcut] = useState(true);
   const [accentKey, setAccentKey] = useState(accentPresets[0].key);
+  const [userProfile, setUserProfile] = useState({
+    nickname: '',
+    country: '',
+    province: '',
+    city: ''
+  });
+
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
     []
   );
   const updateAccentKey = useCallback((key) => setAccentKey(key), []);
+  const updateUserProfile = useCallback(
+    (patch) =>
+      setUserProfile((prev) => ({
+        ...prev,
+        ...patch
+      })),
+    []
+  );
 
   const accentPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === accentKey) ?? accentPresets[0],
@@ -121,9 +136,11 @@ export function SettingsProvider({ children }) {
       accentKey,
       setAccentKey: updateAccentKey,
       accentPreset,
-      accentOptions: accentPresets
+      accentOptions: accentPresets,
+      userProfile,
+      updateUserProfile
     }),
-    [showAddShortcut, updateShowAddShortcut, accentKey, updateAccentKey, accentPreset]
+    [showAddShortcut, updateShowAddShortcut, accentKey, updateAccentKey, accentPreset, userProfile, updateUserProfile]
   );
 
   return (

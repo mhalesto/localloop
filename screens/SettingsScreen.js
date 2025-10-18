@@ -1,15 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   Switch,
   Text,
   TouchableOpacity,
   View,
-  StyleSheet
+  StyleSheet,
+  TextInput
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
+import ShareLocationModal from '../components/ShareLocationModal';
 
 export default function SettingsScreen({ navigation }) {
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -20,15 +22,55 @@ export default function SettingsScreen({ navigation }) {
     accentOptions,
     accentKey,
     setAccentKey,
-    accentPreset
+    accentPreset,
+    userProfile,
+    updateUserProfile
   } = useSettings();
 
-  const ghostIdentifier = useMemo(
-    () => `Ghost #${Math.floor(Math.random() * 999)}`,
-    []
-  );
+  const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+
+  const ghostIdentifier = useMemo(() => {
+    if (userProfile.nickname?.trim()) {
+      return userProfile.nickname.trim();
+    }
+    return `Ghost #${Math.floor(Math.random() * 999)}`;
+  }, [userProfile.nickname]);
 
   const accentSwitchColor = accentPreset.buttonBackground ?? colors.primaryDark;
+
+  useEffect(() => {
+    setNicknameDraft(userProfile.nickname ?? '');
+  }, [userProfile.nickname]);
+
+  const handleNicknameChange = (value) => {
+    const trimmedValue = value.slice(0, 32);
+    setNicknameDraft(trimmedValue);
+    updateUserProfile({ nickname: trimmedValue });
+  };
+
+  const handleSelectLocation = (cityName, meta = {}) => {
+    updateUserProfile({
+      city: cityName ?? '',
+      province: meta.province ?? '',
+      country: meta.country ?? ''
+    });
+    setLocationPickerVisible(false);
+  };
+
+  const handleClearLocation = () => {
+    updateUserProfile({ city: '', province: '', country: '' });
+  };
+
+  const locationSummary = useMemo(() => {
+    if (!userProfile.city) {
+      return 'No location set yet.';
+    }
+    const parts = [userProfile.city];
+    if (userProfile.province) parts.push(userProfile.province);
+    if (userProfile.country) parts.push(userProfile.country);
+    return parts.join(', ');
+  }, [userProfile.city, userProfile.country, userProfile.province]);
 
   return (
     <ScreenLayout
@@ -130,6 +172,48 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profile</Text>
+          <Text style={styles.sectionHint}>
+            Set a playful nickname and your home base. This information never leaves your device—it simply helps personalize rooms.
+          </Text>
+          <View style={styles.profileField}>
+            <Text style={styles.itemTitle}>Temporary nickname</Text>
+            <TextInput
+              value={nicknameDraft}
+              onChangeText={handleNicknameChange}
+              placeholder="Keep it playful"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.profileInput}
+              autoCapitalize="words"
+              maxLength={32}
+            />
+          </View>
+          <View style={styles.profileField}>
+            <View style={styles.profileLocationHeader}>
+              <Text style={styles.itemTitle}>Home location</Text>
+              {userProfile.city ? (
+                <TouchableOpacity onPress={handleClearLocation} activeOpacity={0.75}>
+                  <Text style={styles.clearButtonText}>Clear</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <Text style={styles.profileSummary}>{locationSummary}</Text>
+            <TouchableOpacity
+              style={[styles.profileButton, { borderColor: accentSwitchColor }]}
+              onPress={() => setLocationPickerVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.profileButtonText, { color: accentSwitchColor }]}>
+                {userProfile.city ? 'Change location' : 'Select location'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.privacyNote}>
+            We don&apos;t store or share this info—clearing the app resets it.
+          </Text>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy</Text>
           <View style={styles.itemLast}>
             <View>
@@ -149,6 +233,14 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
+      <ShareLocationModal
+        visible={locationPickerVisible}
+        onClose={() => setLocationPickerVisible(false)}
+        onSelectCity={handleSelectLocation}
+        accentColor={accentSwitchColor}
+        initialCountry={userProfile.country || undefined}
+        initialProvince={userProfile.province || undefined}
+      />
     </ScreenLayout>
   );
 }
@@ -213,6 +305,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     maxWidth: 220
+  },
+  profileField: {
+    marginBottom: 16
+  },
+  profileInput: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.background
+  },
+  profileLocationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  profileSummary: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 6
+  },
+  profileButton: {
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignSelf: 'flex-start'
+  },
+  profileButtonText: {
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  clearButtonText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600'
+  },
+  privacyNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 8
   },
   accentRow: {
     flexDirection: 'row',

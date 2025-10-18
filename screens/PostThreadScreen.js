@@ -1,5 +1,5 @@
 // screens/PostThreadScreen.js
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,6 @@ import {
   TouchableOpacity,
   Keyboard,
   Platform,
-  Modal,
-  ActivityIndicator,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +18,7 @@ import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
-import { fetchCountries, fetchStates, fetchCities } from '../services/locationService';
+import ShareLocationModal from '../components/ShareLocationModal';
 
 /* Simple circular avatar (no arrow/tail) */
 function AvatarIcon({ tint, size = 32, style }) {
@@ -35,107 +33,12 @@ function AvatarIcon({ tint, size = 32, style }) {
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
   const { addComment, getPostById, sharePost, toggleVote } = usePosts();
-  const { accentPreset } = useSettings();
+  const { accentPreset, userProfile } = useSettings();
   const insets = useSafeAreaInsets();
 
   const [reply, setReply] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [shareSearch, setShareSearch] = useState('');
-  const [shareStep, setShareStep] = useState('country');
-  const [shareLoading, setShareLoading] = useState(false);
-  const [shareError, setShareError] = useState('');
-  const [countryOptions, setCountryOptions] = useState([]);
-  const [provinceCache, setProvinceCache] = useState({});
-  const [cityCache, setCityCache] = useState({});
-  const [selectedCountry, setSelectedCountry] = useState(null);
-  const [selectedProvince, setSelectedProvince] = useState(null);
-  const shareFetchTracker = useRef({
-    countries: false,
-    provinces: new Set(),
-    cities: new Set(),
-  });
-
-  const loadCountries = useCallback(async () => {
-    if (countryOptions.length > 0) {
-      return;
-    }
-    const tracker = shareFetchTracker.current;
-    if (tracker.countries) {
-      return;
-    }
-    tracker.countries = true;
-    try {
-      setShareLoading(true);
-      const data = await fetchCountries();
-      const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
-      setCountryOptions(sorted);
-      setShareError('');
-    } catch (error) {
-      setShareError('Unable to load countries right now.');
-    } finally {
-      tracker.countries = false;
-      setShareLoading(false);
-    }
-  }, [countryOptions.length]);
-
-  const loadProvinces = useCallback(
-    async (countryName) => {
-      if (!countryName || provinceCache[countryName]) {
-        return;
-      }
-      const tracker = shareFetchTracker.current;
-      if (tracker.provinces.has(countryName)) {
-        return;
-      }
-      tracker.provinces.add(countryName);
-      try {
-        setShareLoading(true);
-        const states = await fetchStates(countryName);
-        const sorted = [...(states ?? [])].sort((a, b) => a.localeCompare(b));
-        setProvinceCache((prev) => ({ ...prev, [countryName]: sorted }));
-        setShareError('');
-      } catch (error) {
-        setShareError('Unable to load provinces right now.');
-      } finally {
-        tracker.provinces.delete(countryName);
-        setShareLoading(false);
-      }
-    },
-    [provinceCache]
-  );
-
-  const loadCities = useCallback(
-    async (countryName, provinceName) => {
-      if (!countryName || !provinceName) {
-        return;
-      }
-      const cacheKey = `${countryName}::${provinceName}`;
-      if (cityCache[cacheKey]) {
-        return;
-      }
-      const tracker = shareFetchTracker.current;
-      if (tracker.cities.has(cacheKey)) {
-        return;
-      }
-      tracker.cities.add(cacheKey);
-      try {
-        setShareLoading(true);
-        const results = await fetchCities(countryName, provinceName);
-        const unique = Array.from(
-          new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
-        ).sort((a, b) => a.localeCompare(b));
-        setCityCache((prev) => ({ ...prev, [cacheKey]: unique }));
-        setShareError('');
-      } catch (error) {
-        setShareError('Unable to load cities right now.');
-      } finally {
-        tracker.cities.delete(cacheKey);
-        setShareLoading(false);
-      }
-    },
-    [cityCache]
-  );
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
@@ -171,70 +74,6 @@ export default function PostThreadScreen({ route, navigation }) {
     setReply('');
   };
 
-  const openShareModal = useCallback(() => {
-    setShareModalVisible(true);
-    setShareStep('country');
-    setSelectedCountry(null);
-    setSelectedProvince(null);
-    setShareSearch('');
-    setShareError('');
-  }, []);
-
-  const closeShareModal = useCallback(() => {
-    setShareModalVisible(false);
-    setShareSearch('');
-    setShareError('');
-    setShareLoading(false);
-  }, []);
-
-  const handleShareBack = useCallback(() => {
-    if (shareStep === 'city') {
-      setShareStep('province');
-      setSelectedProvince(null);
-    } else if (shareStep === 'province') {
-      setShareStep('country');
-      setSelectedCountry(null);
-      setSelectedProvince(null);
-    }
-    setShareSearch('');
-    setShareError('');
-  }, [shareStep]);
-
-  const handleSelectShareOption = useCallback(
-    async (option) => {
-      if (shareStep === 'country') {
-        const country = option.data;
-        setSelectedCountry(country);
-        setSelectedProvince(null);
-        setShareStep('province');
-        setShareSearch('');
-        setShareError('');
-        await loadProvinces(country.name);
-        return;
-      }
-
-      if (shareStep === 'province') {
-        const provinceName = option.data;
-        setSelectedProvince(provinceName);
-        setShareStep('city');
-        setShareSearch('');
-        setShareError('');
-        if (selectedCountry) {
-          await loadCities(selectedCountry.name, provinceName);
-        }
-        return;
-      }
-
-      if (shareStep === 'city') {
-        const targetCity = option.data;
-        sharePost(city, postId, targetCity);
-        setShareMessage(`Shared to ${targetCity}`);
-        closeShareModal();
-      }
-    },
-    [city, closeShareModal, loadCities, loadProvinces, postId, selectedCountry, sharePost, shareStep]
-  );
-
   if (!post) {
     return (
       <ScreenLayout title="Thread" subtitle={`${city} Room`} onBack={() => navigation.goBack()}>
@@ -267,6 +106,9 @@ export default function PostThreadScreen({ route, navigation }) {
   const commentHighlight = `${linkColor}1A`;
   const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
+  const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
+  const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
+  const authorLocation = authorLocationParts.join(', ');
 
   const showViewOriginal =
     post.sourceCity && post.sourcePostId && !(post.sourceCity === city && post.sourcePostId === post.id);
@@ -277,101 +119,26 @@ export default function PostThreadScreen({ route, navigation }) {
     return () => clearTimeout(t);
   }, [shareMessage]);
 
-  useEffect(() => {
-    if (!shareModalVisible) {
-      return;
-    }
-    if (shareStep === 'country') {
-      loadCountries();
-    } else if (shareStep === 'province' && selectedCountry) {
-      loadProvinces(selectedCountry.name);
-    } else if (shareStep === 'city' && selectedCountry && selectedProvince) {
-      loadCities(selectedCountry.name, selectedProvince);
-    }
-  }, [
-    loadCities,
-    loadCountries,
-    loadProvinces,
-    selectedCountry,
-    selectedProvince,
-    shareModalVisible,
-    shareStep,
-  ]);
+  const openShareModal = useCallback(() => {
+    setShareModalVisible(true);
+  }, []);
 
-  const shareSearchPlaceholder =
-    shareStep === 'country'
-      ? 'Search countries'
-      : shareStep === 'province'
-      ? 'Search provinces or states'
-      : 'Search cities';
+  const closeShareModal = useCallback(() => {
+    setShareModalVisible(false);
+  }, []);
 
-  const shareStepTitle =
-    shareStep === 'country'
-      ? 'Choose a country'
-      : shareStep === 'province'
-      ? `Choose a province in ${selectedCountry?.name ?? 'this country'}`
-      : `Choose a city in ${selectedProvince ?? 'this province'}`;
-
-  const currentOptions = useMemo(() => {
-    if (shareStep === 'country') {
-      return countryOptions.map((item) => ({
-        key: item.iso2 ?? item.name,
-        label: item.name,
-        subtitle: 'Country',
-        data: item,
-      }));
-    }
-
-    if (shareStep === 'province' && selectedCountry) {
-      const provinces = provinceCache[selectedCountry.name] ?? [];
-      return provinces.map((name) => ({
-        key: name,
-        label: name,
-        subtitle: 'Province',
-        data: name,
-      }));
-    }
-
-    if (shareStep === 'city' && selectedCountry && selectedProvince) {
-      const cacheKey = `${selectedCountry.name}::${selectedProvince}`;
-      const cities = cityCache[cacheKey] ?? [];
-      return cities
-        .filter((name) => name !== city)
-        .map((name) => ({
-          key: name,
-          label: name,
-          subtitle: 'City',
-          data: name,
-        }));
-    }
-
-    return [];
-  }, [city, cityCache, countryOptions, provinceCache, selectedCountry, selectedProvince, shareStep]);
-
-  const filteredOptions = useMemo(() => {
-    const trimmed = shareSearch.trim().toLowerCase();
-    if (!trimmed) {
-      return currentOptions;
-    }
-    return currentOptions.filter((option) => option.label.toLowerCase().includes(trimmed));
-  }, [currentOptions, shareSearch]);
-
-  const emptyMessage =
-    shareStep === 'country'
-      ? 'No countries match your search yet.'
-      : shareStep === 'province'
-      ? 'No provinces match your search yet.'
-      : 'No cities match your search yet.';
-
-  const sharePathLabel = useMemo(() => {
-    if (!selectedCountry) {
-      return '';
-    }
-    if (!selectedProvince) {
-      return selectedCountry.name;
-    }
-    return `${selectedCountry.name} · ${selectedProvince}`;
-  }, [selectedCountry, selectedProvince]);
+  const handleShareCity = useCallback(
+    (targetCity) => {
+      if (!targetCity || targetCity === city) {
+        closeShareModal();
+        return;
+      }
+      sharePost(city, postId, targetCity, userProfile);
+      setShareMessage(`Shared to ${targetCity}`);
+      closeShareModal();
+    },
+    [city, closeShareModal, postId, sharePost, userProfile]
+  );
 
   /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
   const Header = (
@@ -385,14 +152,15 @@ export default function PostThreadScreen({ route, navigation }) {
             </View>
 
             <View>
-              <Text style={[styles.postBadge, { color: badgeTextColor }]}>Anonymous</Text>
+              <Text style={[styles.postBadge, { color: badgeTextColor }]}>{authorName}</Text>
+              {authorLocation ? (
+                <Text style={[styles.postCity, { color: headerMetaColor }]}>{authorLocation}</Text>
+              ) : null}
               {post.sourceCity && post.sourceCity !== city ? (
                 <Text style={[styles.postCity, { color: headerMetaColor }]}>{post.sourceCity} Room</Text>
               ) : null}
               {post.sharedFrom?.city ? (
-                <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>
-                  Shared from {post.sharedFrom.city}
-                </Text>
+                <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>Shared from {post.sharedFrom.city}</Text>
               ) : null}
             </View>
           </View>
@@ -543,69 +311,15 @@ export default function PostThreadScreen({ route, navigation }) {
         </View>
       ) : null}
 
-      {/* Share modal with cascading country → province → city flow */}
-      <Modal
+      <ShareLocationModal
         visible={shareModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeShareModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Share to another room</Text>
-            <Text style={styles.modalSubtitle}>{shareStepTitle}</Text>
-            {shareStep !== 'country' ? (
-              <TouchableOpacity
-                onPress={handleShareBack}
-                style={styles.modalBackButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chevron-back" size={16} color={linkColor} />
-                <Text style={[styles.modalBackText, { color: linkColor }]}>Back</Text>
-              </TouchableOpacity>
-            ) : null}
-            {sharePathLabel ? (
-              <Text style={styles.modalPath}>Selected: {sharePathLabel}</Text>
-            ) : null}
-            <TextInput
-              placeholder={shareSearchPlaceholder}
-              value={shareSearch}
-              onChangeText={setShareSearch}
-              style={styles.modalInput}
-              placeholderTextColor={colors.textSecondary}
-            />
-            {shareError ? <Text style={styles.modalError}>{shareError}</Text> : null}
-            <FlatList
-              data={filteredOptions}
-              keyExtractor={(item) => item.key}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  activeOpacity={0.75}
-                  onPress={() => handleSelectShareOption(item)}
-                >
-                  <Text style={styles.modalOptionLabel}>{item.label}</Text>
-                  <Text style={styles.modalOptionType}>{item.subtitle}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                shareLoading ? (
-                  <View style={styles.modalEmptyState}>
-                    <ActivityIndicator size="small" color={linkColor} />
-                  </View>
-                ) : (
-                  <Text style={styles.modalEmpty}>{emptyMessage}</Text>
-                )
-              }
-              style={styles.modalList}
-              keyboardShouldPersistTaps="handled"
-            />
-            <TouchableOpacity style={styles.modalClose} onPress={closeShareModal}>
-              <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={closeShareModal}
+        onSelectCity={(destinationCity) => handleShareCity(destinationCity)}
+        originCity={city}
+        accentColor={linkColor}
+        initialCountry={userProfile.country || undefined}
+        initialProvince={userProfile.province || undefined}
+      />
     </ScreenLayout>
   );
 }
@@ -729,43 +443,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toastText: { color: '#fff', fontSize: 12 },
-
-  /* Share modal */
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 24 },
-  modalCard: {
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  modalTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 12 },
-  modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 8 },
-  modalBackButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 8 },
-  modalBackText: { fontSize: 13, fontWeight: '600', marginLeft: 4 },
-  modalPath: { fontSize: 12, color: colors.textSecondary, marginBottom: 12 },
-  modalInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  modalError: { color: colors.primaryDark, fontSize: 12, marginBottom: 8 },
-  modalList: { maxHeight: 240 },
-  modalOption: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  modalOptionLabel: { fontSize: 14, color: colors.textPrimary, fontWeight: '600' },
-  modalOptionType: { fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase' },
-  modalEmptyState: { paddingVertical: 24, alignItems: 'center', justifyContent: 'center' },
-  modalEmpty: { textAlign: 'center', color: colors.textSecondary, fontSize: 13, paddingVertical: 20 },
-  modalClose: { marginTop: 12, alignSelf: 'center' },
-  modalCloseText: { color: colors.textPrimary, fontWeight: '600', fontSize: 14 },
 
   /* Missing state */
   missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },

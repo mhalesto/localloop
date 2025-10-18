@@ -1,30 +1,28 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
-  Modal
+  TouchableOpacity
 } from 'react-native';
 import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
-import { shareDestinations } from '../constants/shareDestinations';
+import ShareLocationModal from '../components/ShareLocationModal';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
   const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
-  const { accentPreset, accentKey } = useSettings();
+  const { accentPreset, accentKey, userProfile } = useSettings();
   const posts = getPostsForCity(city);
 
   const [message, setMessage] = useState('');
   const [selectedColorKey, setSelectedColorKey] = useState(accentKey);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [shareSearch, setShareSearch] = useState('');
   const [postToShare, setPostToShare] = useState(null);
   const [shareToast, setShareToast] = useState('');
 
@@ -70,10 +68,34 @@ export default function RoomScreen({ navigation, route }) {
   const statLabelColor = accentPreset.statLabel ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
   const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const buttonForeground = accentPreset.buttonForeground ?? '#fff';
+  const shareAccentColor = accentPreset.linkColor ?? colors.primaryDark;
+
+  const openShareModal = useCallback((post) => {
+    setPostToShare(post);
+    setShareModalVisible(true);
+  }, []);
+
+  const closeShareModal = useCallback(() => {
+    setShareModalVisible(false);
+    setPostToShare(null);
+  }, []);
+
+  const handleShareCity = useCallback(
+    (targetCity) => {
+      if (!postToShare || !targetCity || targetCity === city) {
+        closeShareModal();
+        return;
+      }
+      sharePost(city, postToShare.id, targetCity, userProfile);
+      setShareToast(`Shared to ${targetCity}`);
+      closeShareModal();
+    },
+    [city, closeShareModal, postToShare, sharePost, userProfile]
+  );
 
   const handleAddPost = () => {
     if (message.trim() === '') return;
-    addPost(city, message, selectedColorKey);
+    addPost(city, message, selectedColorKey, userProfile);
     setMessage('');
   };
 
@@ -161,11 +183,7 @@ export default function RoomScreen({ navigation, route }) {
         onPress={() => handleOpenPost(item.data.id)}
         roomName={city}
         onReact={(direction) => toggleVote(city, item.data.id, direction)}
-        onShare={() => {
-          setPostToShare(item.data);
-          setShareSearch('');
-          setShareModalVisible(true);
-        }}
+        onShare={() => openShareModal(item.data)}
         onViewOriginal={
           item.data.sourcePostId && item.data.sourceCity &&
           !(item.data.sourceCity === city && item.data.sourcePostId === item.data.id)
@@ -201,61 +219,15 @@ export default function RoomScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
-      <Modal
+      <ShareLocationModal
         visible={shareModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShareModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Share to another room</Text>
-            <TextInput
-              placeholder="Search city, province, or country"
-              value={shareSearch}
-              onChangeText={setShareSearch}
-              style={styles.modalInput}
-              placeholderTextColor={colors.textSecondary}
-            />
-            <FlatList
-              data={shareDestinations.filter(
-                (option) =>
-                  option.value !== city &&
-                  option.label.toLowerCase().includes(shareSearch.toLowerCase())
-              )}
-              keyExtractor={(item) => `${item.type}-${item.label}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  activeOpacity={0.75}
-                  onPress={() => {
-                    if (postToShare) {
-                      sharePost(city, postToShare.id, item.value);
-                      setShareToast(`Shared to ${item.label}`);
-                      setTimeout(() => setShareToast(''), 2000);
-                    }
-                    setShareModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.modalOptionLabel}>{item.label}</Text>
-                  <Text style={styles.modalOptionType}>{item.type}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text style={styles.modalEmpty}>No matches found.</Text>
-              }
-              style={styles.modalList}
-              keyboardShouldPersistTaps="handled"
-            />
-            <TouchableOpacity
-              style={styles.modalClose}
-              onPress={() => setShareModalVisible(false)}
-            >
-              <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={closeShareModal}
+        onSelectCity={(destinationCity) => handleShareCity(destinationCity)}
+        originCity={city}
+        accentColor={shareAccentColor}
+        initialCountry={userProfile.country || undefined}
+        initialProvince={userProfile.province || undefined}
+      />
       {shareToast ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{shareToast}</Text>
@@ -401,71 +373,6 @@ const styles = StyleSheet.create({
   },
   postsListWrapper: {
     flex: 1
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    padding: 24
-  },
-  modalCard: {
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 12
-  },
-  modalInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.textPrimary,
-    marginBottom: 16
-  },
-  modalList: {
-    maxHeight: 240
-  },
-  modalOption: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider
-  },
-  modalOptionLabel: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  modalOptionType: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    textTransform: 'uppercase'
-  },
-  modalEmpty: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingVertical: 20
-  },
-  modalClose: {
-    marginTop: 12,
-    alignSelf: 'center'
-  },
-  modalCloseText: {
-    color: colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 14
   },
   toast: {
     position: 'absolute',

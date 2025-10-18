@@ -10,7 +10,7 @@ import {
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
-import { fetchCountries } from '../services/locationService';
+import { fetchCountries, fetchCities } from '../services/locationService';
 
 const INITIAL_VISIBLE = 40;
 const PAGE_SIZE = 30;
@@ -18,12 +18,38 @@ const TOP_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU',
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
-  const { showAddShortcut } = useSettings();
+  const { showAddShortcut, userProfile } = useSettings();
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [personalCities, setPersonalCities] = useState([]);
+  const [personalLoading, setPersonalLoading] = useState(false);
+  const [personalError, setPersonalError] = useState('');
+  const [showPersonalized, setShowPersonalized] = useState(false);
+  const profileCountry = userProfile?.country ?? '';
+  const profileProvince = userProfile?.province ?? '';
+  const hasProfileLocation = Boolean(profileCountry && profileProvince);
+
+  const loadPersonalCities = useCallback(async () => {
+    if (!profileCountry || !profileProvince) {
+      return;
+    }
+    try {
+      setPersonalLoading(true);
+      const results = await fetchCities(profileCountry, profileProvince);
+      const unique = Array.from(
+        new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
+      ).sort((a, b) => a.localeCompare(b));
+      setPersonalCities(unique);
+      setPersonalError('');
+    } catch (err) {
+      setPersonalError('Unable to load your province right now.');
+    } finally {
+      setPersonalLoading(false);
+    }
+  }, [profileCountry, profileProvince]);
 
   useEffect(() => {
     let mounted = true;
@@ -58,6 +84,17 @@ export default function CountryScreen({ navigation }) {
     setVisibleCount(INITIAL_VISIBLE);
   }, [query]);
 
+  useEffect(() => {
+    if (hasProfileLocation) {
+      setShowPersonalized(true);
+      loadPersonalCities();
+    } else {
+      setShowPersonalized(false);
+      setPersonalCities([]);
+      setPersonalError('');
+    }
+  }, [hasProfileLocation, loadPersonalCities]);
+
   const filtered = useMemo(() => {
     if (!query.trim()) {
       return countries;
@@ -70,6 +107,14 @@ export default function CountryScreen({ navigation }) {
         country.iso3?.toLowerCase().includes(lower)
     );
   }, [countries, query]);
+
+  const personalFiltered = useMemo(() => {
+    if (!query.trim()) {
+      return personalCities;
+    }
+    const lower = query.trim().toLowerCase();
+    return personalCities.filter((cityName) => cityName.toLowerCase().includes(lower));
+  }, [personalCities, query]);
 
   const topCountries = useMemo(() => {
     if (!countries.length) return [];
@@ -93,12 +138,20 @@ export default function CountryScreen({ navigation }) {
     setVisibleCount((prev) => Math.min(filtered.length, prev + PAGE_SIZE));
   }, [filtered.length, visibleCount]);
 
+  const showingPersonalized = hasProfileLocation && showPersonalized;
+  const listData = showingPersonalized ? personalFiltered : paginated;
+  const listIsEmpty = listData.length === 0;
+  const searchPlaceholder = showingPersonalized ? 'Search cities' : 'Search countries';
+  const subtitleText = showingPersonalized
+    ? [profileProvince, profileCountry].filter(Boolean).join(' · ')
+    : 'Choose your country';
+
   return (
     <ScreenLayout
       title="Explore"
-      subtitle="Choose your country"
+      subtitle={subtitleText || 'Choose your country'}
       showSearch
-      searchPlaceholder="Search countries"
+      searchPlaceholder={searchPlaceholder}
       searchValue={query}
       onSearchChange={setQuery}
       navigation={navigation}
@@ -128,43 +181,86 @@ export default function CountryScreen({ navigation }) {
             ))}
           </View>
 
-          <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
-            All destinations
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
+              {showingPersonalized
+                ? `${profileProvince || 'Your province'} cities`
+                : 'All destinations'}
+            </Text>
+            {hasProfileLocation ? (
+              <TouchableOpacity
+                onPress={() => setShowPersonalized((prev) => !prev)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.sectionAction}>
+                  {showingPersonalized ? 'Browse countries' : 'Show my cities'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {showingPersonalized && personalError ? (
+            <Text style={styles.personalError}>{personalError}</Text>
+          ) : null}
 
           <FlatList
-            data={paginated}
-            keyExtractor={(item) => item.iso2 ?? item.name}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate('Province', { country: item.name })
-                }
-              >
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <Text style={styles.cardSubtitle}>
-                  {item.iso3 ? `ISO: ${item.iso3}` : 'Explore provinces and cities'}
-                </Text>
-                <Text style={styles.cardAction}>Select →</Text>
-              </TouchableOpacity>
-            )}
+            data={listData}
+            keyExtractor={(item) =>
+              typeof item === 'string' ? item : item.iso2 ?? item.name
+            }
+            renderItem={({ item }) =>
+              showingPersonalized ? (
+                <TouchableOpacity
+                  style={styles.card}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Room', { city: item })}
+                >
+                  <Text style={styles.cardTitle}>{item}</Text>
+                  <Text style={styles.cardSubtitle}>
+                    {[profileProvince, profileCountry].filter(Boolean).join(', ') ||
+                      'Jump into this city'}
+                  </Text>
+                  <Text style={styles.cardAction}>Enter room →</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.card}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    navigation.navigate('Province', { country: item.name })
+                  }
+                >
+                  <Text style={styles.cardTitle}>{item.name}</Text>
+                  <Text style={styles.cardSubtitle}>
+                    {item.iso3 ? `ISO: ${item.iso3}` : 'Explore provinces and cities'}
+                  </Text>
+                  <Text style={styles.cardAction}>Select →</Text>
+                </TouchableOpacity>
+              )
+            }
             ListEmptyComponent={
-              <Text style={styles.emptyState}>
-                No countries match your search yet.
-              </Text>
+              showingPersonalized ? (
+                personalLoading ? (
+                  <ActivityIndicator size="small" color={colors.primaryDark} />
+                ) : (
+                  <Text style={styles.emptyState}>
+                    {personalError || 'No cities match your search yet.'}
+                  </Text>
+                )
+              ) : (
+                <Text style={styles.emptyState}>No countries match your search yet.</Text>
+              )
             }
             ListFooterComponent={
               <View style={{ height: showAddShortcut ? 160 : 60 }} />
             }
             contentContainerStyle={[
               styles.listContent,
-              filtered.length === 0 && styles.listContentEmpty
+              listIsEmpty && styles.listContentEmpty
             ]}
             showsVerticalScrollIndicator={false}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.3}
+            onEndReached={showingPersonalized ? undefined : handleLoadMore}
+            onEndReachedThreshold={showingPersonalized ? undefined : 0.3}
           />
         </>
       )}
@@ -243,6 +339,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     fontSize: 15,
+  },
+  personalError: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 8
   },
   card: {
     backgroundColor: colors.card,
