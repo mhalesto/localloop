@@ -21,7 +21,11 @@ export function PostsProvider({ children }) {
         colorKey,
         sourceCity: city,
         sourcePostId: null, // fill after id set
-        comments: []
+        comments: [],
+        upvotes: 0,
+        downvotes: 0,
+        userVote: null,
+        sharedFrom: null
       };
 
       newPost.sourcePostId = newPost.id;
@@ -100,13 +104,64 @@ export function PostsProvider({ children }) {
         sharedFrom: { city: fromCity },
         sourceCity: original.sourceCity ?? fromCity,
         sourcePostId: original.sourcePostId ?? original.id,
-        createdByMe: true
+        createdByMe: true,
+        upvotes: 0,
+        downvotes: 0,
+        userVote: null
       };
 
       return {
         ...prev,
         [toCity]: [newPost, ...targetPosts]
       };
+    });
+  }, []);
+
+  const toggleVote = useCallback((city, postId, direction) => {
+    setPostsByCity((prev) => {
+      const cityPosts = prev[city] ?? [];
+      const updated = cityPosts.map((post) => {
+        if (post.id !== postId) {
+          return post;
+        }
+
+        let upvotes = post.upvotes ?? 0;
+        let downvotes = post.downvotes ?? 0;
+        let userVote = post.userVote ?? null;
+
+        if (direction === 'up') {
+          if (userVote === 'up') {
+            upvotes = Math.max(0, upvotes - 1);
+            userVote = null;
+          } else {
+            if (userVote === 'down') {
+              downvotes = Math.max(0, downvotes - 1);
+            }
+            upvotes += 1;
+            userVote = 'up';
+          }
+        } else if (direction === 'down') {
+          if (userVote === 'down') {
+            downvotes = Math.max(0, downvotes - 1);
+            userVote = null;
+          } else {
+            if (userVote === 'up') {
+              upvotes = Math.max(0, upvotes - 1);
+            }
+            downvotes += 1;
+            userVote = 'down';
+          }
+        }
+
+        return {
+          ...post,
+          upvotes,
+          downvotes,
+          userVote
+        };
+      });
+
+      return { ...prev, [city]: updated };
     });
   }, []);
 
@@ -117,9 +172,10 @@ export function PostsProvider({ children }) {
       getPostById,
       getPostsForCity,
       getAllPosts,
-      sharePost
+      sharePost,
+      toggleVote
     }),
-    [addComment, addPost, getPostById, getPostsForCity, getAllPosts, sharePost]
+    [addComment, addPost, getPostById, getPostsForCity, getAllPosts, sharePost, toggleVote]
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;

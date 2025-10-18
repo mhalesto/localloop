@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,16 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  Modal
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
-
-const SHARE_CITIES = ['Johannesburg', 'Pretoria', 'Soweto', 'Coastview', 'Hillcrest', 'Riverpark'];
+import { shareDestinations } from '../constants/shareDestinations';
 
 function AvatarIcon({ tint, size = 32, style }) {
   return (
@@ -42,11 +43,13 @@ function BubbleTail({ fill, align }) {
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
-  const { addComment, getPostById, sharePost } = usePosts();
+  const { addComment, getPostById, sharePost, toggleVote } = usePosts();
   const { accentPreset } = useSettings();
 
   const [reply, setReply] = useState('');
   const [shareMessage, setShareMessage] = useState('');
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [shareSearch, setShareSearch] = useState('');
 
   const post = getPostById(city, postId);
 
@@ -97,7 +100,13 @@ export default function PostThreadScreen({ route, navigation }) {
   const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
 
-  const shareTargets = SHARE_CITIES.filter((target) => target !== city);
+  useEffect(() => {
+    if (!shareMessage) {
+      return;
+    }
+    const timeout = setTimeout(() => setShareMessage(''), 2000);
+    return () => clearTimeout(timeout);
+  }, [shareMessage]);
 
   return (
     <ScreenLayout
@@ -128,9 +137,46 @@ export default function PostThreadScreen({ route, navigation }) {
               </View>
             </View>
             <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
-            <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-            </Text>
+          <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+            {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+          </Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleVote(city, postId, 'up')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                size={20}
+                color={post.userVote === 'up' ? linkColor : headerMetaColor}
+              />
+              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => toggleVote(city, postId, 'down')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                size={20}
+                color={post.userVote === 'down' ? linkColor : headerMetaColor}
+              />
+              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setShareModalVisible(true);
+                setShareSearch('');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+              <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+            </TouchableOpacity>
+          </View>
             {post.sourceCity && post.sourcePostId &&
               !(post.sourceCity === city && post.sourcePostId === post.id) ? (
                 <TouchableOpacity
@@ -146,29 +192,6 @@ export default function PostThreadScreen({ route, navigation }) {
                 </TouchableOpacity>
               ) : null}
           </View>
-
-          {shareTargets.length ? (
-            <View style={styles.shareCard}>
-              <Text style={styles.shareTitle}>Share to another room</Text>
-              <View style={styles.shareChipRow}>
-                {shareTargets.map((target) => (
-                  <TouchableOpacity
-                    key={target}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      sharePost(city, postId, target);
-                      setShareMessage(`Shared to ${target}`);
-                      setTimeout(() => setShareMessage(''), 2000);
-                    }}
-                    style={[styles.shareChip, { borderColor: headerColor }]}
-                  >
-                    <Text style={[styles.shareChipText, { color: linkColor }]}>{target}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {shareMessage ? <Text style={styles.shareMessage}>{shareMessage}</Text> : null}
-            </View>
-          ) : null}
 
           <FlatList
             data={comments}
@@ -248,6 +271,63 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {shareMessage ? (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{shareMessage}</Text>
+        </View>
+      ) : null}
+      <Modal
+        visible={shareModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShareModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Share to another room</Text>
+            <TextInput
+              placeholder="Search city, province, or country"
+              value={shareSearch}
+              onChangeText={setShareSearch}
+              style={styles.modalInput}
+              placeholderTextColor={colors.textSecondary}
+            />
+            <FlatList
+              data={shareDestinations.filter(
+                (option) =>
+                  option.value !== city &&
+                  option.label.toLowerCase().includes(shareSearch.toLowerCase())
+              )}
+              keyExtractor={(item) => `${item.type}-${item.label}`}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    sharePost(city, postId, item.value);
+                    setShareMessage(`Shared to ${item.label}`);
+                    setShareModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalOptionLabel}>{item.label}</Text>
+                  <Text style={styles.modalOptionType}>{item.type}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.modalEmpty}>No matches found.</Text>
+              }
+              style={styles.modalList}
+              keyboardShouldPersistTaps="handled"
+            />
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setShareModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScreenLayout>
   );
 }
@@ -303,40 +383,26 @@ const styles = StyleSheet.create({
   viewOriginal: {
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 4
-  },
-  shareCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  shareTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
     marginBottom: 12
   },
-  shareChipRow: {
+  actionsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap'
+    alignItems: 'center',
+    marginBottom: 12
   },
-  shareChip: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 10,
-    marginBottom: 10
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20
   },
-  shareChipText: {
+  actionCount: {
     fontSize: 12,
-    fontWeight: '600'
+    marginLeft: 6
+  },
+  actionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6
   },
   shareMessage: {
     fontSize: 12,
@@ -441,6 +507,85 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '600'
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 140,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 12
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: 24
+  },
+  modalCard: {
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 12
+  },
+  modalInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginBottom: 16
+  },
+  modalList: {
+    maxHeight: 240
+  },
+  modalOption: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider
+  },
+  modalOptionLabel: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontWeight: '600'
+  },
+  modalOptionType: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    textTransform: 'uppercase'
+  },
+  modalEmpty: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontSize: 13,
+    paddingVertical: 20
+  },
+  modalClose: {
+    marginTop: 12,
+    alignSelf: 'center'
+  },
+  modalCloseText: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 14
   },
   missingWrapper: {
     flex: 1,
