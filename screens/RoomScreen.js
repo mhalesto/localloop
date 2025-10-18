@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, FlatList } from 'react-native';
 import PostItem from '../components/PostItem';
+import { usePosts } from '../contexts/PostsContext';
 
-export default function RoomScreen({ route }) {
+export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
-  const [posts, setPosts] = useState([]);
+  const { addPost: createPost, getPostsForCity } = usePosts();
+  const posts = getPostsForCity(city);
   const [message, setMessage] = useState('');
 
-  const addPost = () => {
+  const handleAddPost = () => {
     if (message.trim() === '') return;
-    const newPost = { id: Date.now().toString(), message };
-    setPosts([newPost, ...posts]);
+    createPost(city, message);
     setMessage('');
+  };
+
+  const handleOpenPost = (postId) => {
+    navigation.navigate('PostThread', { city, postId });
   };
 
   return (
@@ -30,12 +35,14 @@ export default function RoomScreen({ route }) {
           borderRadius: 5
         }}
       />
-      <Button title="Post" onPress={addPost} />
+      <Button title="Post" onPress={handleAddPost} />
 
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PostItem post={item} />}
+        renderItem={({ item }) => (
+          <PostItem post={item} onPress={() => handleOpenPost(item.id)} />
+        )}
         style={{ marginTop: 20 }}
       />
     </View>
