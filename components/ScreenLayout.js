@@ -8,6 +8,7 @@ import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import CreatePostModal from './CreatePostModal';
+import { getAvatarConfig } from '../constants/avatars';
 
 export default function ScreenLayout({
   children,
@@ -42,6 +43,11 @@ export default function ScreenLayout({
           }
         : null,
     [userProfile]
+  );
+
+  const authorAvatarConfig = useMemo(
+    () => getAvatarConfig(userProfile?.avatarKey),
+    [userProfile?.avatarKey]
   );
 
   const handleSubmitPost = ({ location, colorKey, message }) => {
@@ -135,6 +141,10 @@ export default function ScreenLayout({
           initialLocation={initialLocation}
           initialAccentKey={accentPreset?.key}
           onSubmitPost={handleSubmitPost}
+          authorProfile={{
+            nickname: userProfile?.nickname ?? '',
+            avatarConfig: authorAvatarConfig
+          }}
         />
       </View>
     </SafeAreaView>

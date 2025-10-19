@@ -7,11 +7,13 @@ import {
   StyleSheet,
   TouchableOpacity
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
 import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
+import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 
 export default function RoomScreen({ navigation, route }) {
@@ -25,6 +27,14 @@ export default function RoomScreen({ navigation, route }) {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [postToShare, setPostToShare] = useState(null);
   const [shareToast, setShareToast] = useState('');
+  const selectedPreset = useMemo(
+    () => accentPresets.find((preset) => preset.key === selectedColorKey) ?? accentPresets[0],
+    [selectedColorKey]
+  );
+  const authorAvatarConfig = useMemo(
+    () => getAvatarConfig(userProfile?.avatarKey),
+    [userProfile?.avatarKey]
+  );
 
   useEffect(() => {
     setSelectedColorKey(accentKey);
@@ -128,6 +138,9 @@ export default function RoomScreen({ navigation, route }) {
     </View>
   );
 
+  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : colors.textPrimary);
+  const previewMeta = selectedPreset.metaColor ?? (selectedPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+
   const renderComposer = () => (
     <View style={styles.composerCard}>
       <Text style={styles.composerLabel}>Drop a new post</Text>
@@ -151,14 +164,37 @@ export default function RoomScreen({ navigation, route }) {
           );
         })}
       </View>
-      <TextInput
-        placeholder="What's happening in this room?"
-        value={message}
-        onChangeText={setMessage}
-        multiline
-        style={styles.input}
-        placeholderTextColor={colors.textSecondary}
-      />
+      <View style={[styles.previewCard, { backgroundColor: selectedPreset.background }]}>
+        <View style={styles.previewHeaderRow}>
+          <View style={[styles.previewAvatar, { backgroundColor: authorAvatarConfig.backgroundColor ?? previewPrimary }]}>
+            {authorAvatarConfig.icon ? (
+              <Ionicons
+                name={authorAvatarConfig.icon.name}
+                size={18}
+                color={authorAvatarConfig.icon.color ?? '#fff'}
+              />
+            ) : (
+              <Text style={[styles.previewAvatarEmoji, { color: authorAvatarConfig.foregroundColor ?? '#fff' }]}> 
+                {authorAvatarConfig.emoji ?? '🙂'}
+              </Text>
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.previewTitle, { color: previewPrimary }]}>
+              {userProfile?.nickname?.trim() || 'Anonymous'}
+            </Text>
+            <Text style={[styles.previewMeta, { color: previewMeta }]}>{city} Room</Text>
+          </View>
+        </View>
+        <TextInput
+          placeholder="What's happening in this room?"
+          value={message}
+          onChangeText={setMessage}
+          multiline
+          style={[styles.previewInput, { color: previewPrimary }]}
+          placeholderTextColor={previewMeta}
+        />
+      </View>
       <TouchableOpacity
         style={[styles.primaryButton, { backgroundColor: buttonBackground }, message.trim() === '' && styles.primaryButtonDisabled]}
         onPress={handleAddPost}
@@ -348,14 +384,45 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderWidth: 2
   },
-  input: {
-    minHeight: 70,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 12,
-    textAlignVertical: 'top',
-    color: colors.textPrimary,
+  previewCard: {
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2
+  },
+  previewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12
+  },
+  previewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  previewAvatarEmoji: {
+    fontSize: 18
+  },
+  previewTitle: {
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  previewMeta: {
+    fontSize: 12,
+    marginTop: 4
+  },
+  previewInput: {
+    minHeight: 80,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlignVertical: 'top'
   },
   primaryButton: {
     paddingVertical: 12,

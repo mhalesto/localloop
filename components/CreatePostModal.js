@@ -14,13 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { accentPresets } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
+import { getAvatarConfig } from '../constants/avatars';
 
 export default function CreatePostModal({
   visible,
   onClose,
   initialLocation,
   initialAccentKey,
-  onSubmitPost
+  onSubmitPost,
+  authorProfile = {}
 }) {
   const [message, setMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState(
@@ -50,12 +52,21 @@ export default function CreatePostModal({
             }
           : null
       );
+    } else {
+      setLocationModalVisible(false);
     }
   }, [visible, initialAccentKey, initialLocation]);
 
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColor) ?? accentPresets[0],
     [selectedColor]
+  );
+  const previewBackground = selectedPreset.background;
+  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : colors.textPrimary);
+  const previewMuted = selectedPreset.metaColor ?? 'rgba(255,255,255,0.8)';
+  const previewAvatarConfig = useMemo(
+    () => authorProfile.avatarConfig ?? getAvatarConfig(authorProfile.avatarKey),
+    [authorProfile.avatarConfig, authorProfile.avatarKey]
   );
 
   const handleClose = () => {
@@ -145,16 +156,52 @@ export default function CreatePostModal({
               })}
             </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Message</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="What's happening?"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              value={message}
-              onChangeText={setMessage}
-              autoCapitalize="sentences"
-            />
+            <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Preview</Text>
+            <View style={[styles.previewCard, { backgroundColor: previewBackground }]}>
+              <View style={styles.previewHeaderRow}>
+                <View
+                  style={[
+                    styles.previewAvatar,
+                    { backgroundColor: previewAvatarConfig.backgroundColor ?? previewPrimary }
+                  ]}
+                >
+                  {previewAvatarConfig.icon ? (
+                    <Ionicons
+                      name={previewAvatarConfig.icon.name}
+                      size={18}
+                      color={previewAvatarConfig.icon.color ?? '#fff'}
+                    />
+                  ) : (
+                    <Text style={[styles.previewAvatarEmoji, { color: previewAvatarConfig.foregroundColor ?? '#fff' }]}>
+                      {previewAvatarConfig.emoji ?? '🙂'}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.previewTitle, { color: previewPrimary }]}>
+                    {authorProfile?.nickname?.trim() || 'Anonymous'}
+                  </Text>
+                  <Text
+                    style={[styles.previewMeta, { color: previewMuted }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {selectedLocation?.city
+                      ? `${selectedLocation.city}${selectedLocation.province ? `, ${selectedLocation.province}` : ''}${selectedLocation.country ? `, ${selectedLocation.country}` : ''}`
+                      : 'Choose a location to preview'}
+                  </Text>
+                </View>
+              </View>
+              <TextInput
+                style={[styles.previewInput, { color: previewPrimary }]}
+                placeholder="What's happening?"
+                placeholderTextColor={previewMuted}
+                multiline
+                value={message}
+                onChangeText={setMessage}
+                autoCapitalize="sentences"
+              />
+            </View>
           </ScrollView>
 
           <TouchableOpacity
@@ -251,6 +298,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary
   },
+  previewCard: {
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3
+  },
+  previewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  previewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
+  previewAvatarEmoji: {
+    fontSize: 18
+  },
+  previewTitle: {
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  previewMeta: {
+    fontSize: 12,
+    marginTop: 4
+  },
   swatchRow: {
     flexDirection: 'row',
     flexWrap: 'wrap'
@@ -273,17 +354,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3
-  },
-  input: {
-    minHeight: 100,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    padding: 14,
-    textAlignVertical: 'top',
-    fontSize: 15,
-    color: colors.textPrimary,
-    backgroundColor: colors.background
   },
   submitButton: {
     marginTop: 16,
