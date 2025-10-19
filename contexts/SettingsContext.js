@@ -5,13 +5,13 @@ import React, {
   useMemo,
   useState
 } from 'react';
-import { colors } from '../constants/colors';
+import { darkColors, lightColors } from '../constants/colors';
 
 export const accentPresets = [
   {
     key: 'royal',
     label: 'Royal Purple',
-    background: colors.primary,
+    background: lightColors.primary,
     isDark: true,
     onPrimary: '#ffffff',
     subtitleColor: 'rgba(255,255,255,0.8)',
@@ -22,12 +22,12 @@ export const accentPresets = [
     statCardBackground: 'rgba(255,255,255,0.18)',
     statValue: '#ffffff',
     statLabel: 'rgba(255,255,255,0.8)',
-    buttonBackground: colors.primaryDark,
+    buttonBackground: lightColors.primaryDark,
     buttonForeground: '#ffffff',
-    badgeBackground: colors.primaryLight,
+    badgeBackground: lightColors.primaryLight,
     badgeTextColor: '#ffffff',
-    linkColor: colors.primaryDark,
-    fabBackground: colors.primary,
+    linkColor: lightColors.primaryDark,
+    fabBackground: lightColors.primary,
     fabForeground: '#ffffff'
   },
   {
@@ -35,19 +35,19 @@ export const accentPresets = [
     label: 'Lavender Drift',
     background: '#D8CEFF',
     isDark: false,
-    onPrimary: colors.textPrimary,
+    onPrimary: lightColors.textPrimary,
     subtitleColor: '#5A4EA5',
     metaColor: '#7A76A9',
-    iconTint: colors.primaryDark,
+    iconTint: lightColors.primaryDark,
     iconBorder: 'rgba(108,77,244,0.35)',
     iconBackground: '#ffffff',
     statCardBackground: 'rgba(108,77,244,0.12)',
-    statValue: colors.primaryDark,
-    statLabel: colors.textSecondary,
+    statValue: lightColors.primaryDark,
+    statLabel: lightColors.textSecondary,
     buttonBackground: '#6C4DF4',
     buttonForeground: '#ffffff',
     badgeBackground: '#D8CEFF',
-    badgeTextColor: colors.primaryDark,
+    badgeTextColor: lightColors.primaryDark,
     linkColor: '#6C4DF4',
     fabBackground: '#6C4DF4',
     fabForeground: '#ffffff'
@@ -57,19 +57,19 @@ export const accentPresets = [
     label: 'Clear Sky',
     background: '#CFE1FF',
     isDark: false,
-    onPrimary: colors.textPrimary,
+    onPrimary: lightColors.textPrimary,
     subtitleColor: '#3C5AB8',
     metaColor: '#6E7FA6',
-    iconTint: colors.primaryDark,
+    iconTint: lightColors.primaryDark,
     iconBorder: 'rgba(108,77,244,0.25)',
     iconBackground: '#ffffff',
     statCardBackground: 'rgba(76,137,255,0.14)',
     statValue: '#3C5AB8',
-    statLabel: colors.textSecondary,
+    statLabel: lightColors.textSecondary,
     buttonBackground: '#3C5AB8',
     buttonForeground: '#ffffff',
     badgeBackground: '#CFE1FF',
-    badgeTextColor: colors.primaryDark,
+    badgeTextColor: lightColors.primaryDark,
     linkColor: '#3C5AB8',
     fabBackground: '#3C5AB8',
     fabForeground: '#ffffff'
@@ -79,19 +79,19 @@ export const accentPresets = [
     label: 'Blush Rose',
     background: '#EBD0FF',
     isDark: false,
-    onPrimary: colors.textPrimary,
+    onPrimary: lightColors.textPrimary,
     subtitleColor: '#9A54B6',
     metaColor: '#836D9C',
-    iconTint: colors.primaryDark,
+    iconTint: lightColors.primaryDark,
     iconBorder: 'rgba(154,84,182,0.25)',
     iconBackground: '#ffffff',
     statCardBackground: 'rgba(154,84,182,0.15)',
     statValue: '#7A46A1',
-    statLabel: colors.textSecondary,
+    statLabel: lightColors.textSecondary,
     buttonBackground: '#9A54B6',
     buttonForeground: '#ffffff',
     badgeBackground: '#EBD0FF',
-    badgeTextColor: colors.primaryDark,
+    badgeTextColor: lightColors.primaryDark,
     linkColor: '#9A54B6',
     fabBackground: '#9A54B6',
     fabForeground: '#ffffff'
@@ -104,6 +104,7 @@ export function SettingsProvider({ children }) {
   const [showAddShortcut, setShowAddShortcut] = useState(true);
   const [accentKey, setAccentKey] = useState(accentPresets[0].key);
   const [locationPermissionStatus, setLocationPermissionStatus] = useState('undetermined');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -117,6 +118,7 @@ export function SettingsProvider({ children }) {
     []
   );
   const updateAccentKey = useCallback((key) => setAccentKey(key), []);
+  const updateIsDarkMode = useCallback((enabled) => setIsDarkMode(Boolean(enabled)), []);
   const updateUserProfile = useCallback(
     (patch) =>
       setUserProfile((prev) => ({
@@ -130,6 +132,7 @@ export function SettingsProvider({ children }) {
     () => accentPresets.find((preset) => preset.key === accentKey) ?? accentPresets[0],
     [accentKey]
   );
+  const themeColors = isDarkMode ? darkColors : lightColors;
 
   const value = useMemo(
     () => ({
@@ -142,9 +145,25 @@ export function SettingsProvider({ children }) {
       userProfile,
       updateUserProfile,
       locationPermissionStatus,
-      setLocationPermissionStatus
+      setLocationPermissionStatus,
+      isDarkMode,
+      setIsDarkMode: updateIsDarkMode,
+      themeColors
     }),
-    [showAddShortcut, updateShowAddShortcut, accentKey, updateAccentKey, accentPreset, userProfile, updateUserProfile, locationPermissionStatus, setLocationPermissionStatus]
+    [
+      showAddShortcut,
+      updateShowAddShortcut,
+      accentKey,
+      updateAccentKey,
+      accentPreset,
+      userProfile,
+      updateUserProfile,
+      locationPermissionStatus,
+      setLocationPermissionStatus,
+      isDarkMode,
+      updateIsDarkMode,
+      themeColors
+    ]
   );
 
   return (

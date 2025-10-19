@@ -3,7 +3,6 @@ import { View, StyleSheet, Modal, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from './AppHeader';
-import { colors } from '../constants/colors';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -28,7 +27,14 @@ export default function ScreenLayout({
   showFooter = true,
   headerStyle
 }) {
-  const { showAddShortcut, accentPreset, userProfile, updateUserProfile } = useSettings();
+  const {
+    showAddShortcut,
+    accentPreset,
+    userProfile,
+    updateUserProfile,
+    themeColors,
+    isDarkMode
+  } = useSettings();
   const { addPost, getReplyNotificationCount } = usePosts();
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
   const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
@@ -121,6 +127,11 @@ export default function ScreenLayout({
     }
   };
 
+  const styles = useMemo(
+    () => createStyles(themeColors, { isDarkMode }),
+    [themeColors, isDarkMode]
+  );
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
       <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
@@ -197,36 +208,37 @@ export default function ScreenLayout({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.primary
-  },
-  safeOverlay: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
-  content: {
-    flex: 1,
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 0
-  },
-  drawerContainer: {
-    flex: 1,
-    flexDirection: 'row'
-  },
-  drawerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)'
-  },
-  drawerSheet: {
-    width: '78%',
-    backgroundColor: colors.background,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 4, height: 0 },
-    elevation: 8
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    safe: {
+      flex: 1
+    },
+    safeOverlay: {
+      flex: 1,
+      backgroundColor: palette.background
+    },
+    content: {
+      flex: 1,
+      paddingTop: 24,
+      paddingHorizontal: 20,
+      paddingBottom: 0,
+      backgroundColor: palette.background
+    },
+    drawerContainer: {
+      flex: 1,
+      flexDirection: 'row'
+    },
+    drawerOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)'
+    },
+    drawerSheet: {
+      width: '78%',
+      backgroundColor: isDarkMode ? palette.card : palette.background,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.4 : 0.2,
+      shadowRadius: 10,
+      shadowOffset: { width: 4, height: 0 },
+      elevation: 8
+    }
+  });

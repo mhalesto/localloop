@@ -10,7 +10,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import PostItem from '../components/PostItem';
 import { usePosts } from '../contexts/PostsContext';
-import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
@@ -19,8 +18,9 @@ import ShareLocationModal from '../components/ShareLocationModal';
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
   const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
-  const { accentPreset, accentKey, userProfile } = useSettings();
+  const { accentPreset, accentKey, userProfile, themeColors, isDarkMode } = useSettings();
   const posts = getPostsForCity(city);
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const [message, setMessage] = useState('');
   const [selectedColorKey, setSelectedColorKey] = useState(accentKey);
@@ -70,15 +70,13 @@ export default function RoomScreen({ navigation, route }) {
     [posts]
   );
 
-  const subtitleColor = accentPreset.subtitleColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
-  const titleColor = accentPreset.onPrimary ?? (accentPreset.isDark ? '#fff' : colors.textPrimary);
-  const metaColor = accentPreset.metaColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const metaColor = accentPreset.metaColor ?? (accentPreset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
   const statCardBackground = accentPreset.statCardBackground ?? (accentPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(108,77,244,0.12)');
-  const statValueColor = accentPreset.statValue ?? (accentPreset.isDark ? '#fff' : colors.primaryDark);
-  const statLabelColor = accentPreset.statLabel ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : colors.textSecondary);
-  const buttonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
+  const statValueColor = accentPreset.statValue ?? (accentPreset.isDark ? '#fff' : themeColors.primaryDark);
+  const statLabelColor = accentPreset.statLabel ?? (accentPreset.isDark ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary);
+  const buttonBackground = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const buttonForeground = accentPreset.buttonForeground ?? '#fff';
-  const shareAccentColor = accentPreset.linkColor ?? colors.primaryDark;
+  const shareAccentColor = accentPreset.linkColor ?? themeColors.primaryDark;
 
   const openShareModal = useCallback((post) => {
     setPostToShare(post);
@@ -138,8 +136,8 @@ export default function RoomScreen({ navigation, route }) {
     </View>
   );
 
-  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : colors.textPrimary);
-  const previewMeta = selectedPreset.metaColor ?? (selectedPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
+  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : themeColors.textPrimary);
+  const previewMeta = selectedPreset.metaColor ?? (selectedPreset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
 
   const renderComposer = () => (
     <View style={styles.composerCard}>
@@ -157,7 +155,7 @@ export default function RoomScreen({ navigation, route }) {
                 styles.colorDot,
                 {
                   backgroundColor: preset.background,
-                  borderColor: isActive ? colors.textPrimary : 'transparent'
+                  borderColor: isActive ? themeColors.textPrimary : 'transparent'
                 }
               ]}
             />
@@ -271,186 +269,187 @@ export default function RoomScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screenContent: {
-    paddingTop: 0,
-    paddingHorizontal: 0,
-    backgroundColor: colors.background
-  },
-  flatHeader: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 0
-  },
-  listContainer: {
-    paddingBottom: 80
-  },
-  stickyHeaderWrapper: {
-    backgroundColor: 'transparent',
-    paddingBottom: 24
-  },
-  headerCard: {
-    backgroundColor: colors.primary,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6
-  },
-  headerTitleRow: {
-    marginBottom: 20,
-    flexDirection: 'column'
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    marginBottom: 4
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '600'
-  },
-  headerMeta: {
-    fontSize: 14,
-    marginTop: 6
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  statCardBase: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    flex: 1
-  },
-  statCardLeft: {
-    marginRight: 12
-  },
-  statCardMiddle: {
-    marginHorizontal: 6
-  },
-  statCardRight: {
-    marginLeft: 12
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '600'
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4
-  },
-  composerCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 18,
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  composerLabel: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12
-  },
-  composerHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 12
-  },
-  composerSwatches: {
-    flexDirection: 'row',
-    marginBottom: 12
-  },
-  colorDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 10,
-    borderWidth: 2
-  },
-  previewCard: {
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  previewHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  previewAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10
-  },
-  previewAvatarEmoji: {
-    fontSize: 18
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: '700'
-  },
-  previewMeta: {
-    fontSize: 12,
-    marginTop: 4
-  },
-  previewInput: {
-    minHeight: 80,
-    fontSize: 16,
-    fontWeight: '500',
-    textAlignVertical: 'top'
-  },
-  primaryButton: {
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  primaryButtonDisabled: {
-    opacity: 0.6
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  postsListWrapper: {
-    flex: 1
-  },
-  toast: {
-    position: 'absolute',
-    bottom: 140,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  toastText: {
-    color: '#fff',
-    fontSize: 12
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    screenContent: {
+      paddingTop: 0,
+      paddingHorizontal: 0,
+      backgroundColor: palette.background
+    },
+    flatHeader: {
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 0
+    },
+    listContainer: {
+      paddingBottom: 80
+    },
+    stickyHeaderWrapper: {
+      backgroundColor: 'transparent',
+      paddingBottom: 24
+    },
+    headerCard: {
+      backgroundColor: palette.card,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 24,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.25 : 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6
+    },
+    headerTitleRow: {
+      marginBottom: 20,
+      flexDirection: 'column'
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      marginBottom: 4
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: '600'
+    },
+    headerMeta: {
+      fontSize: 14,
+      marginTop: 6
+    },
+    statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between'
+    },
+    statCardBase: {
+      borderRadius: 14,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      flex: 1
+    },
+    statCardLeft: {
+      marginRight: 12
+    },
+    statCardMiddle: {
+      marginHorizontal: 6
+    },
+    statCardRight: {
+      marginLeft: 12
+    },
+    statValue: {
+      fontSize: 20,
+      fontWeight: '600'
+    },
+    statLabel: {
+      fontSize: 12,
+      marginTop: 4
+    },
+    composerCard: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 18,
+      marginHorizontal: 20,
+      marginTop: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.18 : 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2
+    },
+    composerLabel: {
+      color: palette.textPrimary,
+      fontSize: 16,
+      fontWeight: '500',
+      marginBottom: 12
+    },
+    composerHint: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginBottom: 12
+    },
+    composerSwatches: {
+      flexDirection: 'row',
+      marginBottom: 12
+    },
+    colorDot: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      marginRight: 10,
+      borderWidth: 2
+    },
+    previewCard: {
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.18 : 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2
+    },
+    previewHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12
+    },
+    previewAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10
+    },
+    previewAvatarEmoji: {
+      fontSize: 18
+    },
+    previewTitle: {
+      fontSize: 16,
+      fontWeight: '700'
+    },
+    previewMeta: {
+      fontSize: 12,
+      marginTop: 4
+    },
+    previewInput: {
+      minHeight: 80,
+      fontSize: 16,
+      fontWeight: '500',
+      textAlignVertical: 'top'
+    },
+    primaryButton: {
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center'
+    },
+    primaryButtonDisabled: {
+      opacity: 0.6
+    },
+    primaryButtonText: {
+      fontSize: 16,
+      fontWeight: '600'
+    },
+    postsListWrapper: {
+      flex: 1
+    },
+    toast: {
+      position: 'absolute',
+      bottom: 140,
+      left: 20,
+      right: 20,
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      paddingVertical: 10,
+      borderRadius: 12,
+      alignItems: 'center'
+    },
+    toastText: {
+      color: '#fff',
+      fontSize: 12
+    }
+  });

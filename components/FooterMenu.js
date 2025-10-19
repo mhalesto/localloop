@@ -4,14 +4,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect, Path, Circle } from 'react-native-svg';
-import { colors } from '../constants/colors';
+import { useSettings } from '../contexts/SettingsContext';
 
 /**
- * colors needed:
- *  colors.card          -> bar fill (usually #FFFFFF)
- *  colors.primary       -> FAB color
- *  colors.primaryDark   -> active tab color
- *  colors.textSecondary -> inactive tab color
+ * theme tokens:
+ *  themeColors.card          -> bar fill
+ *  themeColors.primary       -> FAB color
+ *  themeColors.primaryDark   -> active tab color
+ *  themeColors.textSecondary -> inactive tab color
  */
 
 const tabs = [
@@ -46,6 +46,7 @@ export default function FooterMenu({
   accent,
   myRepliesBadge = 0
 }) {
+  const { themeColors, isDarkMode } = useSettings();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 12);
 
@@ -56,9 +57,9 @@ export default function FooterMenu({
   // Notch / FAB x-position
   const notchCx = anchorX != null ? anchorX + FAB_NUDGE_X : null;
 
-  const accentActiveColor = accent?.buttonBackground ?? colors.primaryDark;
-  const accentInactiveColor = colors.textSecondary;
-  const accentFabBackground = accent?.fabBackground ?? colors.primary;
+  const accentActiveColor = accent?.buttonBackground ?? themeColors.primaryDark;
+  const accentInactiveColor = themeColors.textSecondary;
+  const accentFabBackground = accent?.fabBackground ?? themeColors.primary;
   const accentFabForeground = accent?.fabForeground ?? '#fff';
 
   // Keep notch inside SVG viewport
@@ -73,7 +74,10 @@ export default function FooterMenu({
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { paddingBottom: bottomPad }]}>
       <View
-        style={styles.barWrap}
+        style={[
+          styles.barWrap,
+          { shadowOpacity: isDarkMode ? 0.3 : 0.12 }
+        ]}
         onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
       >
         {/* SVG pill with true circular notch via luminance mask */}
@@ -102,7 +106,14 @@ export default function FooterMenu({
                 )}
               </Mask>
             </Defs>
-            <Rect x="0" y="0" width={barW} height={SVG_H} fill={colors.card} mask={`url(#${maskId})`} />
+            <Rect
+              x="0"
+              y="0"
+              width={barW}
+              height={SVG_H}
+              fill={themeColors.card}
+              mask={`url(#${maskId})`}
+            />
           </Svg>
         )}
 
@@ -155,7 +166,8 @@ export default function FooterMenu({
               {
                 left: notchCx - FAB_SIZE / 2,
                 bottom: BAR_HEIGHT / 2 + FAB_RISE,
-                backgroundColor: accentFabBackground
+                backgroundColor: accentFabBackground,
+                shadowOpacity: isDarkMode ? 0.3 : 0.16
               },
             ]}
             onPress={onAddPostShortcut}

@@ -8,7 +8,6 @@ import {
   ActivityIndicator
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
-import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
@@ -21,7 +20,7 @@ const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
-  const { showAddShortcut, userProfile } = useSettings();
+  const { showAddShortcut, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts } = usePosts();
 
   const [countries, setCountries] = useState([]);
@@ -205,6 +204,8 @@ export default function CountryScreen({ navigation }) {
   const listData = showingPersonalized ? personalFiltered : paginated;
   const listIsEmpty = listData.length === 0;
 
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+
   return (
     <ScreenLayout
       title="Explore"
@@ -218,7 +219,7 @@ export default function CountryScreen({ navigation }) {
     >
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={colors.primaryDark} />
+          <ActivityIndicator size="large" color={themeColors.primaryDark} />
         </View>
       ) : (
         <FlatList
@@ -308,7 +309,7 @@ export default function CountryScreen({ navigation }) {
           ListEmptyComponent={
             showingPersonalized ? (
               personalLoading ? (
-                <ActivityIndicator size="small" color={colors.primaryDark} />
+                <ActivityIndicator size="small" color={themeColors.primaryDark} />
               ) : (
                 <Text style={styles.emptyState}>
                   {personalError || 'No cities match your search yet.'}
@@ -338,134 +339,135 @@ export default function CountryScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  secondaryTitle: {
-    marginTop: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  chipStaticRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'nowrap',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  chip: {
-    backgroundColor: colors.card,
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    minWidth: 110,
-    flexShrink: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-    position: 'relative'
-  },
-  chipSpacing: {
-    marginRight: 12
-  },
-  chipText: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: '600',
-    letterSpacing: 0.1,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  chipColor0: {
-    backgroundColor: '#D8CEFF',
-  },
-  chipColor1: {
-    backgroundColor: '#CFE1FF',
-  },
-  chipColor2: {
-    backgroundColor: '#EBD0FF',
-  },
-  hotBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FF4D6D',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  hotBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase'
-  },
-  listContent: {
-    paddingBottom: 80,
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 15,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 6,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 16,
-  },
-  cardAction: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primaryDark,
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  errorText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 16,
-    marginBottom: 12
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 16
+    },
+    sectionHint: {
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    secondaryTitle: {
+      marginTop: 12
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    chipStaticRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'nowrap',
+      justifyContent: 'space-between',
+      marginTop: 12,
+      marginBottom: 16
+    },
+    chip: {
+      backgroundColor: palette.card,
+      borderRadius: 999,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      minWidth: 110,
+      flexShrink: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.15 : 0.04,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+      position: 'relative'
+    },
+    chipSpacing: {
+      marginRight: 12
+    },
+    chipText: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      fontWeight: '600',
+      letterSpacing: 0.1,
+      textAlign: 'center',
+      lineHeight: 18
+    },
+    chipColor0: {
+      backgroundColor: '#D8CEFF'
+    },
+    chipColor1: {
+      backgroundColor: '#CFE1FF'
+    },
+    chipColor2: {
+      backgroundColor: '#EBD0FF'
+    },
+    hotBadge: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
+      backgroundColor: '#FF4D6D',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10
+    },
+    hotBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase'
+    },
+    listContent: {
+      paddingBottom: 80
+    },
+    listContentEmpty: {
+      flexGrow: 1,
+      justifyContent: 'center'
+    },
+    emptyState: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 15
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      padding: 20,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.22 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 6
+    },
+    cardSubtitle: {
+      fontSize: 14,
+      color: palette.textSecondary,
+      marginBottom: 16
+    },
+    cardAction: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primaryDark
+    },
+    loaderContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    errorText: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 14,
+      marginTop: 16,
+      marginBottom: 12
+    }
+  });

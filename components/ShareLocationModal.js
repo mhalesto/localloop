@@ -10,7 +10,7 @@ import {
   View
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import { useSettings } from '../contexts/SettingsContext';
 import { fetchCities, fetchCountries, fetchStates } from '../services/locationService';
 
 function normalizeName(name) {
@@ -22,11 +22,14 @@ export default function ShareLocationModal({
   onClose,
   onSelectCity,
   originCity,
-  accentColor = colors.primaryDark,
+  accentColor,
   initialCountry,
   initialProvince,
   title = 'Share to another room'
 }) {
+  const { themeColors, isDarkMode } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+  const effectiveAccentColor = accentColor ?? themeColors.primaryDark;
   const [step, setStep] = useState('country');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -309,8 +312,8 @@ export default function ShareLocationModal({
           <Text style={styles.subtitle}>{shareStepTitle}</Text>
           {step !== 'country' ? (
             <TouchableOpacity style={styles.backButton} activeOpacity={0.7} onPress={handleBack}>
-              <Ionicons name="chevron-back" size={16} color={accentColor} />
-              <Text style={[styles.backLabel, { color: accentColor }]}>Back</Text>
+              <Ionicons name="chevron-back" size={16} color={effectiveAccentColor} />
+              <Text style={[styles.backLabel, { color: effectiveAccentColor }]}>Back</Text>
             </TouchableOpacity>
           ) : null}
           {pathLabel ? <Text style={styles.pathLabel}>Selected: {pathLabel}</Text> : null}
@@ -319,7 +322,7 @@ export default function ShareLocationModal({
             value={search}
             onChangeText={setSearch}
             style={styles.input}
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={themeColors.textSecondary}
           />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <FlatList
@@ -338,7 +341,7 @@ export default function ShareLocationModal({
             ListEmptyComponent={
               loading ? (
                 <View style={styles.emptyState}>
-                  <ActivityIndicator size="small" color={accentColor} />
+                  <ActivityIndicator size="small" color={effectiveAccentColor} />
                 </View>
               ) : (
                 <Text style={styles.emptyText}>{emptyMessage}</Text>
@@ -356,101 +359,103 @@ export default function ShareLocationModal({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    padding: 24
-  },
-  card: {
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 12
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 8
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 8
-  },
-  backLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4
-  },
-  pathLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 12
-  },
-  input: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.textPrimary,
-    marginBottom: 12
-  },
-  error: {
-    color: colors.primaryDark,
-    fontSize: 12,
-    marginBottom: 8
-  },
-  list: {
-    maxHeight: 240
-  },
-  option: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider
-  },
-  optionLabel: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    fontWeight: '600'
-  },
-  optionType: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    textTransform: 'uppercase'
-  },
-  emptyState: {
-    paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingVertical: 20
-  },
-  closeButton: {
-    marginTop: 12,
-    alignSelf: 'center'
-  },
-  closeLabel: {
-    color: colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 14
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'center',
+      padding: 24
+    },
+    card: {
+      borderRadius: 20,
+      backgroundColor: palette.card,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.28 : 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 12
+    },
+    subtitle: {
+      fontSize: 13,
+      color: palette.textSecondary,
+      marginBottom: 8
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      marginBottom: 8
+    },
+    backLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginLeft: 4
+    },
+    pathLabel: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginBottom: 12
+    },
+    input: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: palette.textPrimary,
+      backgroundColor: isDarkMode ? palette.background : '#ffffff',
+      marginBottom: 12
+    },
+    error: {
+      color: palette.primaryDark,
+      fontSize: 12,
+      marginBottom: 8
+    },
+    list: {
+      maxHeight: 240
+    },
+    option: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.divider
+    },
+    optionLabel: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      fontWeight: '600'
+    },
+    optionType: {
+      fontSize: 11,
+      color: palette.textSecondary,
+      textTransform: 'uppercase'
+    },
+    emptyState: {
+      paddingVertical: 24,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    emptyText: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 13,
+      paddingVertical: 20
+    },
+    closeButton: {
+      marginTop: 12,
+      alignSelf: 'center'
+    },
+    closeLabel: {
+      color: palette.textPrimary,
+      fontWeight: '600',
+      fontSize: 14
+    }
+  });

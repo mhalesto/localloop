@@ -8,7 +8,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
-import { colors } from '../constants/colors';
+import { useSettings } from '../contexts/SettingsContext';
 import { fetchCities } from '../services/locationService';
 
 const INITIAL_VISIBLE = 50;
@@ -17,6 +17,8 @@ const PAGE_SIZE = 30;
 export default function CityScreen({ navigation, route }) {
   const { country, province } = route.params;
   const [query, setQuery] = useState('');
+  const { themeColors, isDarkMode } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const [cities, setCities] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -83,7 +85,7 @@ export default function CityScreen({ navigation, route }) {
     >
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={colors.primaryDark} />
+          <ActivityIndicator size="large" color={themeColors.primaryDark} />
         </View>
       ) : error ? (
         <Text style={styles.errorText}>{error}</Text>
@@ -119,56 +121,57 @@ export default function CityScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  listContent: {
-    paddingBottom: 80
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center'
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 15
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 4
-  },
-  cardAction: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primaryDark
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  errorText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginTop: 40
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    listContent: {
+      paddingBottom: 80
+    },
+    listContentEmpty: {
+      flexGrow: 1,
+      justifyContent: 'center'
+    },
+    emptyState: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 15
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      padding: 20,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.22 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
+    },
+    cardTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 4
+    },
+    cardAction: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primaryDark
+    },
+    loaderContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    errorText: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 14,
+      marginTop: 40
+    }
+  });

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
 import { accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
+import { useSettings } from '../contexts/SettingsContext';
 
 const presetMap = accentPresets.reduce((acc, p) => {
   acc[p.key] = p;
@@ -17,14 +17,15 @@ export default function PostItem({
   onReact,
   onShare,
 }) {
+  const { themeColors } = useSettings();
   const preset = presetMap[post.colorKey ?? 'royal'] ?? accentPresets[0];
 
   // palette from preset (kept from your theme)
   const cardBackground = preset.background;
-  const primaryTextColor = preset.onPrimary ?? (preset.isDark ? '#fff' : colors.textPrimary);
-  const metaColor = preset.metaColor ?? (preset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
-  const badgeBg = preset.badgeBackground ?? colors.primaryLight;
-  const linkColor = preset.linkColor ?? colors.primaryDark;
+  const primaryTextColor = preset.onPrimary ?? (preset.isDark ? '#fff' : themeColors.textPrimary);
+  const metaColor = preset.metaColor ?? (preset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
+  const badgeBg = preset.badgeBackground ?? themeColors.primaryLight;
+  const linkColor = preset.linkColor ?? themeColors.primaryDark;
 
   const sharedFrom = post.sharedFrom;           // { city?: string }
   const upvotes = post.upvotes ?? 0;

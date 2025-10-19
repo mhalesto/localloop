@@ -11,8 +11,7 @@ import {
   ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
-import { accentPresets } from '../contexts/SettingsContext';
+import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 
@@ -24,6 +23,8 @@ export default function CreatePostModal({
   onSubmitPost,
   authorProfile = {}
 }) {
+  const { themeColors, isDarkMode } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const [message, setMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState(
     initialAccentKey ?? accentPresets[0].key
@@ -62,8 +63,10 @@ export default function CreatePostModal({
     [selectedColor]
   );
   const previewBackground = selectedPreset.background;
-  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : colors.textPrimary);
-  const previewMuted = selectedPreset.metaColor ?? 'rgba(255,255,255,0.8)';
+  const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : themeColors.textPrimary);
+  const previewMuted =
+    selectedPreset.metaColor ??
+    (selectedPreset.isDark ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary);
   const previewAvatarConfig = useMemo(
     () => authorProfile.avatarConfig ?? getAvatarConfig(authorProfile.avatarKey),
     [authorProfile.avatarConfig, authorProfile.avatarKey]
@@ -103,7 +106,7 @@ export default function CreatePostModal({
           <View style={styles.header}>
             <Text style={styles.title}>Create a post</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
+              <Ionicons name="close" size={22} color={themeColors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -120,7 +123,7 @@ export default function CreatePostModal({
               <Ionicons
                 name="location-outline"
                 size={18}
-                color={colors.primaryDark}
+                color={themeColors.primaryDark}
                 style={{ marginRight: 8 }}
               />
               <Text style={styles.locationButtonText}>
@@ -208,7 +211,7 @@ export default function CreatePostModal({
             style={[
               styles.submitButton,
               {
-                backgroundColor: selectedPreset.buttonBackground ?? colors.primaryDark,
+                backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark,
                 opacity: message.trim() && selectedLocation?.city ? 1 : 0.6
               }
             ]}
@@ -242,127 +245,134 @@ export default function CreatePostModal({
         originCity={selectedLocation?.city}
         initialCountry={selectedLocation?.country || initialLocation?.country}
         initialProvince={selectedLocation?.province || initialLocation?.province}
-        accentColor={selectedPreset.linkColor ?? colors.primaryDark}
+        accentColor={selectedPreset.linkColor ?? themeColors.primaryDark}
         title="Choose a room"
       />
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-end'
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '85%'
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 8
-  },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.divider,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14
-  },
-  locationButtonText: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    flexShrink: 1
-  },
-  helperText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: colors.textSecondary
-  },
-  previewCard: {
-    borderRadius: 18,
-    padding: 18,
-    marginTop: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3
-  },
-  previewHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  previewAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10
-  },
-  previewAvatarEmoji: {
-    fontSize: 18
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: '700'
-  },
-  previewMeta: {
-    fontSize: 12,
-    marginTop: 4
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap'
-  },
-  swatch: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: 'transparent'
-  },
-  swatchActive: {
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3
-  },
-  submitButton: {
-    marginTop: 16,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center'
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600'
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      justifyContent: 'flex-end'
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 20,
+      maxHeight: '85%',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.35 : 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 10
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    sectionLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 8
+    },
+    locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: palette.divider,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      backgroundColor: isDarkMode ? palette.background : '#ffffff'
+    },
+    locationButtonText: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      flexShrink: 1
+    },
+    helperText: {
+      marginTop: 6,
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    previewCard: {
+      borderRadius: 18,
+      padding: 18,
+      marginTop: 4,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.35 : 0.06,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3
+    },
+    previewHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12
+    },
+    previewAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10
+    },
+    previewAvatarEmoji: {
+      fontSize: 18
+    },
+    previewTitle: {
+      fontSize: 16,
+      fontWeight: '700'
+    },
+    previewMeta: {
+      fontSize: 12,
+      marginTop: 4
+    },
+    swatchRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap'
+    },
+    swatch: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      marginBottom: 12,
+      borderWidth: 2,
+      borderColor: 'transparent'
+    },
+    swatchActive: {
+      borderColor: '#fff',
+      shadowColor: '#000',
+      shadowOpacity: 0.18,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3
+    },
+    submitButton: {
+      marginTop: 16,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: 'center'
+    },
+    submitButtonText: {
+      fontSize: 16,
+      fontWeight: '600'
+    }
+  });

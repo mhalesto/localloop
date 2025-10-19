@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePosts } from '../contexts/PostsContext';
-import { colors } from '../constants/colors';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
@@ -34,7 +33,8 @@ function AvatarIcon({ tint, size = 32, style }) {
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
   const { addComment, getPostById, sharePost, toggleVote } = usePosts();
-  const { accentPreset, userProfile } = useSettings();
+  const { accentPreset, userProfile, themeColors, isDarkMode } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const insets = useSafeAreaInsets();
 
   const [reply, setReply] = useState('');
@@ -97,15 +97,15 @@ export default function PostThreadScreen({ route, navigation }) {
   // Palette pulled from the post's preset, falling back to the screen preset
   const postPreset = accentPresets.find((p) => p.key === post.colorKey) ?? accentPreset;
   const headerColor = postPreset.background;
-  const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : colors.textPrimary);
+  const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : themeColors.textPrimary);
   const headerMetaColor =
-    postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary);
-  const badgeBackground = postPreset.badgeBackground ?? colors.primaryLight;
+    postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
+  const badgeBackground = postPreset.badgeBackground ?? themeColors.primaryLight;
   const badgeTextColor = postPreset.badgeTextColor ?? '#fff';
-  const linkColor = postPreset.linkColor ?? colors.primaryDark;
+  const linkColor = postPreset.linkColor ?? themeColors.primaryDark;
   const dividerColor = postPreset.isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)';
   const commentHighlight = `${linkColor}1A`;
-  const replyButtonBackground = accentPreset.buttonBackground ?? colors.primaryDark;
+  const replyButtonBackground = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
   const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
   const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
@@ -301,7 +301,7 @@ export default function PostThreadScreen({ route, navigation }) {
             value={reply}
             onChangeText={setReply}
             placeholder="Share your thoughts…"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={themeColors.textSecondary}
             style={styles.composerInput}
             autoCapitalize="sentences"
             autoCorrect
@@ -345,155 +345,155 @@ export default function PostThreadScreen({ route, navigation }) {
 }
 
 
-const styles = StyleSheet.create({
-  /* Sticky header wrapper so the pinned card blends with background */
-  stickyHeaderWrap: { backgroundColor: colors.background, paddingTop: 8, paddingBottom: 12 },
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    /* Sticky header wrapper so the pinned card blends with background */
+    stickyHeaderWrap: { backgroundColor: palette.background, paddingTop: 8, paddingBottom: 12 },
 
-  /* Post card (wider) */
-  postCard: {
-    borderRadius: 24,
-    padding: 24,
-    marginHorizontal: 8,           // tighter margins → wider card
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5,
-  },
+    /* Post card (wider) */
+    postCard: {
+      borderRadius: 24,
+      padding: 24,
+      marginHorizontal: 8, // tighter margins → wider card
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.24 : 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 5
+    },
 
-  /* Header */
-  postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    overflow: 'hidden'
-  },
-  avatarRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)'
-  },
-  avatarEmoji: {
-    fontSize: 20,
-    textAlign: 'center'
-  },
-  postBadge: { fontSize: 16, fontWeight: '700' },
-  postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
-  sharedBanner: { fontSize: 12, marginTop: 6 },
-  postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
-  postMeta: { fontSize: 13, marginBottom: 12 },
-  actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
-  actionCount: { fontSize: 12, marginLeft: 6 },
-  actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
-  viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
-  viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
+    /* Header */
+    postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      overflow: 'hidden'
+    },
+    avatarRing: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 22,
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.35)'
+    },
+    avatarEmoji: {
+      fontSize: 20,
+      textAlign: 'center'
+    },
+    postBadge: { fontSize: 16, fontWeight: '700' },
+    postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
+    sharedBanner: { fontSize: 12, marginTop: 6 },
+    postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
+    postMeta: { fontSize: 13, marginBottom: 12 },
+    actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+    actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },
+    actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
+    actionCount: { fontSize: 12, marginLeft: 6 },
+    actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
+    viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
+    viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
 
-  /* Comments (wider) */
-  commentRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 14,
-    paddingHorizontal: 8,          // tighter margins → wider bubbles
-  },
-  // push my messages to the right (so avatar sits on the right)
-  commentRowMine: { justifyContent: 'flex-end' },
-  commentAvatarLeft: { marginRight: 10 },
-  commentAvatarRight: { marginLeft: 10 },
-  commentBubble: {
-    maxWidth: '92%',               // was 88% → wider
-    flexShrink: 1,                 // so it won’t overflow when the avatar is present
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  commentMessage: { fontSize: 16, color: colors.textPrimary },
-  commentMeta: { marginTop: 6, fontSize: 12, fontWeight: '600' },
-  emptyState: { paddingHorizontal: 12, paddingVertical: 40, color: colors.textSecondary, textAlign: 'center' },
+    /* Comments (wider) */
+    commentRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      marginBottom: 14,
+      paddingHorizontal: 8 // tighter margins → wider bubbles
+    },
+    commentRowMine: { justifyContent: 'flex-end' },
+    commentAvatarLeft: { marginRight: 10 },
+    commentAvatarRight: { marginLeft: 10 },
+    commentBubble: {
+      maxWidth: '92%',
+      flexShrink: 1,
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      padding: 14,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.16 : 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2
+    },
+    commentMessage: { fontSize: 16, color: palette.textPrimary },
+    commentMeta: { marginTop: 6, fontSize: 12, fontWeight: '600' },
+    emptyState: { paddingHorizontal: 12, paddingVertical: 40, color: palette.textSecondary, textAlign: 'center' },
 
-  /* Fixed bottom composer */
-  composerWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: colors.background,
-    paddingTop: 8,
-    paddingHorizontal: 8,          // align with wider look
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.divider,
-  },
-  composerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.divider,
-    marginHorizontal: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  composerInput: {
-    flex: 1,
-    height: 38,
-    fontSize: 15,
-    color: colors.textPrimary,
-    paddingVertical: 6,
-  },
-  sendBtn: {
-    marginLeft: 8,
-    borderRadius: 16,
-    height: 32,
-    minWidth: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
+    /* Fixed bottom composer */
+    composerWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      backgroundColor: palette.background,
+      paddingTop: 8,
+      paddingHorizontal: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: palette.divider
+    },
+    composerInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.divider,
+      marginHorizontal: 6,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.14 : 0.04,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2
+    },
+    composerInput: {
+      flex: 1,
+      height: 38,
+      fontSize: 15,
+      color: palette.textPrimary,
+      paddingVertical: 6
+    },
+    sendBtn: {
+      marginLeft: 8,
+      borderRadius: 16,
+      height: 32,
+      minWidth: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 10
+    },
 
-  /* Toast */
-  toast: {
-    position: 'absolute',
-    bottom: 140,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  toastText: { color: '#fff', fontSize: 12 },
+    /* Toast */
+    toast: {
+      position: 'absolute',
+      bottom: 140,
+      left: 20,
+      right: 20,
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      paddingVertical: 10,
+      borderRadius: 12,
+      alignItems: 'center'
+    },
+    toastText: { color: '#fff', fontSize: 12 },
 
-  /* Missing state */
-  missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },
-  missingCard: {
-    margin: 20,
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  notice: { fontSize: 16, marginBottom: 16, color: colors.textPrimary, textAlign: 'center' },
-});
+    /* Missing state */
+    missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },
+    missingCard: {
+      margin: 20,
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 24,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.16 : 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4
+    },
+    notice: { fontSize: 16, marginBottom: 16, color: palette.textPrimary, textAlign: 'center' }
+  });

@@ -1,0 +1,176 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 3302 >>
+stream
+BT
+/F1 18 Tf
+72 770 Td
+(Toilet App Documentation) Tj
+/F1 12 Tf
+0 -24 Td
+(Updated: 2025-10-19) Tj
+0 -16 Td
+0 -16 Td
+(Overview) Tj
+0 -16 Td
+(React Native community storytelling app for local city rooms, built with Expo.) Tj
+0 -16 Td
+(Explore screen guides users through countries, provinces, and city rooms.) Tj
+0 -16 Td
+0 -16 Td
+(Key Features) Tj
+0 -16 Td
+(- Explore destinations with search, trending chips, and personalized lists.) Tj
+0 -16 Td
+(- Create posts and comments with offline queueing and background sync.) Tj
+0 -16 Td
+(- Footer shortcuts to My Comments and Settings with avatar-driven theming.) Tj
+0 -16 Td
+0 -16 Td
+(Architecture) Tj
+0 -16 Td
+(React Navigation stack in App.js orchestrates seven primary screens.) Tj
+0 -16 Td
+(ScreenLayout centralizes header, search, drawers, and footer navigation.) Tj
+0 -16 Td
+(PostsContext and SettingsContext provide app-wide state and helpers.) Tj
+0 -16 Td
+0 -16 Td
+(State & Data) Tj
+0 -16 Td
+(PostsContext stores posts by city, pending operations, and vote state.) Tj
+0 -16 Td
+(SettingsContext persists profile, shortcut flag, and accent presets.) Tj
+0 -16 Td
+0 -16 Td
+(Navigation Flow) Tj
+0 -16 Td
+(Country -> Province -> City -> Room -> Post Thread with contextual modals.) Tj
+0 -16 Td
+(Footer tabs jump between Explore, My Comments, and Settings views.) Tj
+0 -16 Td
+0 -16 Td
+(Offline & Sync) Tj
+0 -16 Td
+(AsyncStorage caches posts and queues network actions until online.) Tj
+0 -16 Td
+(Pull-to-refresh refreshes countries, personal cities, and remote posts.) Tj
+0 -16 Td
+0 -16 Td
+(APIs & Services) Tj
+0 -16 Td
+(Firebase client powers postService for CRUD and vote persistence.) Tj
+0 -16 Td
+(locationService fetches hierarchical geography listings.) Tj
+0 -16 Td
+0 -16 Td
+(Styling & Theming) Tj
+0 -16 Td
+(colors.js defines palettes; avatars.js maps profile avatar presets.) Tj
+0 -16 Td
+(Screens compose cards, chips, and modals with StyleSheet rules.) Tj
+0 -16 Td
+0 -16 Td
+(Running Locally) Tj
+0 -16 Td
+(- Install dependencies: npm install) Tj
+0 -16 Td
+(- Start Expo dev server: npm start) Tj
+0 -16 Td
+(- Open Expo Go or an emulator to preview the app.) Tj
+0 -16 Td
+0 -16 Td
+(Testing) Tj
+0 -16 Td
+(Manual smoke tests cover navigation, posting, and offline recovery.) Tj
+0 -16 Td
+0 -16 Td
+(File Structure) Tj
+0 -16 Td
+(.) Tj
+0 -16 Td
+(|-- App.js) Tj
+0 -16 Td
+(|-- api/) Tj
+0 -16 Td
+(|   |-- firebaseClient.js) Tj
+0 -16 Td
+(|   |-- firebaseConfig.js) Tj
+0 -16 Td
+(|   `-- postService.js) Tj
+0 -16 Td
+(|-- components/) Tj
+0 -16 Td
+(|   |-- AppHeader.js) Tj
+0 -16 Td
+(|   |-- CreatePostModal.js) Tj
+0 -16 Td
+(|   |-- FooterMenu.js) Tj
+0 -16 Td
+(|   |-- MainDrawerContent.js) Tj
+0 -16 Td
+(|   |-- PostItem.js) Tj
+0 -16 Td
+(|   `-- ScreenLayout.js) Tj
+0 -16 Td
+(|-- constants/) Tj
+0 -16 Td
+(|   |-- avatars.js) Tj
+0 -16 Td
+(|   `-- colors.js) Tj
+0 -16 Td
+(|-- contexts/) Tj
+0 -16 Td
+(|   |-- PostsContext.js) Tj
+0 -16 Td
+(|   `-- SettingsContext.js) Tj
+0 -16 Td
+(|-- screens/) Tj
+0 -16 Td
+(|   |-- CountryScreen.js) Tj
+0 -16 Td
+(|   |-- ProvinceScreen.js) Tj
+0 -16 Td
+(|   |-- CityScreen.js) Tj
+0 -16 Td
+(|   |-- RoomScreen.js) Tj
+0 -16 Td
+(|   |-- PostThreadScreen.js) Tj
+0 -16 Td
+(|   |-- MyCommentsScreen.js) Tj
+0 -16 Td
+(|   `-- SettingsScreen.js) Tj
+0 -16 Td
+(|-- services/) Tj
+0 -16 Td
+(|   `-- locationService.js) Tj
+0 -16 Td
+(`-- README.md) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000003594 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3664
+%%EOF

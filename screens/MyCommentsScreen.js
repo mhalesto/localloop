@@ -7,7 +7,7 @@ import {
   FlatList
 } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
-import { colors } from '../constants/colors';
+import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 
 const FILTERS = [
@@ -42,6 +42,8 @@ function formatRelativeTime(timestamp) {
 export default function MyCommentsScreen({ navigation }) {
   const { getAllPosts } = usePosts();
   const [filter, setFilter] = useState('all');
+  const { themeColors, isDarkMode } = useSettings();
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const threads = useMemo(() => {
     const posts = getAllPosts();
@@ -156,87 +158,88 @@ export default function MyCommentsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16
-  },
-  filterChip: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    marginRight: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary
-  },
-  filterText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500'
-  },
-  filterTextActive: {
-    color: '#fff'
-  },
-  listContent: {
-    paddingBottom: 80
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center'
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    fontSize: 15,
-    paddingHorizontal: 20
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14
-  },
-  cardBadge: {
-    backgroundColor: colors.primaryLight,
-    color: '#fff',
-    fontSize: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    fontWeight: '600'
-  },
-  cardMeta: {
-    fontSize: 13,
-    color: colors.textSecondary
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 10
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    filterRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 16
+    },
+    filterChip: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      marginRight: 10,
+      marginBottom: 10,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.16 : 0.04,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2
+    },
+    filterChipActive: {
+      backgroundColor: palette.primary
+    },
+    filterText: {
+      fontSize: 13,
+      color: palette.textSecondary,
+      fontWeight: '500'
+    },
+    filterTextActive: {
+      color: '#fff'
+    },
+    listContent: {
+      paddingBottom: 80
+    },
+    listContentEmpty: {
+      flexGrow: 1,
+      justifyContent: 'center'
+    },
+    emptyState: {
+      textAlign: 'center',
+      color: palette.textSecondary,
+      fontSize: 15,
+      paddingHorizontal: 20
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      padding: 20,
+      marginBottom: 14,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14
+    },
+    cardBadge: {
+      backgroundColor: palette.primaryLight,
+      color: '#fff',
+      fontSize: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      fontWeight: '600'
+    },
+    cardMeta: {
+      fontSize: 13,
+      color: palette.textSecondary
+    },
+    cardTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 10
+    },
+    cardSubtitle: {
+      fontSize: 13,
+      color: palette.textSecondary
+    }
+  });

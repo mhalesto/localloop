@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 
 export default function MainDrawerContent({ navigation, onSelectShortcut, accent }) {
-  const { userProfile, accentPreset: globalAccent } = useSettings();
+  const { userProfile, accentPreset: globalAccent, themeColors, isDarkMode } = useSettings();
   const preset = accent ?? globalAccent;
   const avatarConfig = getAvatarConfig(userProfile?.avatarKey);
+  const styles = React.useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const shortcuts = [
     {
@@ -56,9 +56,9 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
   const headerMetaColor = preset.subtitleColor ?? 'rgba(255,255,255,0.8)';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
-      <View style={[styles.header, { backgroundColor: preset.background }]}> 
-        <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? colors.primary }]}> 
+    <View style={styles.container}>
+      <View style={[styles.header, { backgroundColor: preset.background }]}>
+        <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? themeColors.primary }]}>
           {avatarConfig.icon ? (
             <Ionicons name={avatarConfig.icon.name} size={22} color={avatarConfig.icon.color ?? '#fff'} />
           ) : (
@@ -87,9 +87,9 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
             activeOpacity={0.85}
             onPress={item.onPress}
           >
-            <Ionicons name={item.icon} size={20} color={colors.primaryDark} style={{ marginRight: 14 }} />
+            <Ionicons name={item.icon} size={20} color={themeColors.primaryDark} style={{ marginRight: 14 }} />
             <Text style={styles.shortcutLabel}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} style={{ marginLeft: 'auto' }} />
+            <Ionicons name="chevron-forward" size={18} color={themeColors.textSecondary} style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -97,53 +97,62 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16
-  },
-  avatarEmoji: {
-    fontSize: 24
-  },
-  nameText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary
-  },
-  metaText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4
-  },
-  body: {
-    flex: 1
-  },
-  shortcut: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14
-  },
-  shortcutLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 24,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.divider,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4
+    },
+    avatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16
+    },
+    avatarEmoji: {
+      fontSize: 24
+    },
+    nameText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    metaText: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginTop: 4
+    },
+    body: {
+      flex: 1,
+      backgroundColor: palette.background
+    },
+    shortcut: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.divider
+    },
+    shortcutLabel: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: palette.textPrimary
+    }
+  });

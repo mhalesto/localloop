@@ -12,7 +12,6 @@ import {
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
-import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
@@ -29,7 +28,10 @@ export default function SettingsScreen({ navigation }) {
     userProfile,
     updateUserProfile,
     locationPermissionStatus,
-    setLocationPermissionStatus
+    setLocationPermissionStatus,
+    isDarkMode,
+    setIsDarkMode,
+    themeColors
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
@@ -44,7 +46,13 @@ export default function SettingsScreen({ navigation }) {
     return `Ghost #${Math.floor(Math.random() * 999)}`;
   }, [userProfile.nickname]);
 
-  const accentSwitchColor = accentPreset.buttonBackground ?? colors.primaryDark;
+  const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
+  const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
+  const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';
+  const styles = useMemo(
+    () => createStyles(themeColors, { isDarkMode }),
+    [themeColors, isDarkMode]
+  );
 
   useEffect(() => {
     setNicknameDraft(userProfile.nickname ?? '');
@@ -140,8 +148,9 @@ export default function SettingsScreen({ navigation }) {
             <Switch
               value={locationEnabled}
               onValueChange={handleToggleLocation}
-              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
-              thumbColor={locationEnabled ? accentSwitchColor : '#f4f3f4'}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={locationEnabled ? accentSwitchColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
             />
           </View>
           <View style={styles.item}>
@@ -154,8 +163,9 @@ export default function SettingsScreen({ navigation }) {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
-              thumbColor={notificationsEnabled ? accentSwitchColor : '#f4f3f4'}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={notificationsEnabled ? accentSwitchColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
             />
           </View>
         </View>
@@ -172,14 +182,30 @@ export default function SettingsScreen({ navigation }) {
             <Switch
               value={showAddShortcut}
               onValueChange={setShowAddShortcut}
-              trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
-              thumbColor={showAddShortcut ? accentSwitchColor : '#f4f3f4'}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={showAddShortcut ? accentSwitchColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App theme</Text>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Dark mode</Text>
+              <Text style={styles.itemSubtitle}>
+                Dim backgrounds and cards for late-night browsing.
+              </Text>
+            </View>
+            <Switch
+              value={isDarkMode}
+              onValueChange={setIsDarkMode}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={isDarkMode ? accentSwitchColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
           <Text style={styles.sectionHint}>
             Pick the accent color used across the app.
           </Text>
@@ -195,9 +221,9 @@ export default function SettingsScreen({ navigation }) {
                   style={[
                     styles.accentSwatch,
                     {
-                      backgroundColor: isActive ? '#fff' : colors.card,
+                      backgroundColor: isActive ? themeColors.card : themeColors.background,
                       borderColor: isActive
-                        ? option.isDark ? '#ffffff' : colors.textPrimary
+                        ? option.isDark ? '#ffffff' : themeColors.textPrimary
                         : 'rgba(0,0,0,0.08)'
                     },
                     isActive && styles.accentSwatchActive
@@ -224,7 +250,7 @@ export default function SettingsScreen({ navigation }) {
               value={nicknameDraft}
               onChangeText={handleNicknameChange}
               placeholder="Keep it playful"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={themeColors.textSecondary}
               style={styles.profileInput}
               autoCapitalize="words"
               maxLength={32}
@@ -339,192 +365,196 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screenContent: {
-    paddingTop: 0,
-    paddingHorizontal: 0
-  },
-  scroll: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingTop: 24,
-    paddingBottom: 140,
-    paddingHorizontal: 20
-  },
-  section: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 16
-  },
-  sectionHint: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 16
-  },
-  item: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  itemLast: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  itemDisabled: {
-    opacity: 0.6,
-    marginTop: 16
-  },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 6
-  },
-  itemSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    maxWidth: 220
-  },
-  profileField: {
-    marginBottom: 16
-  },
-  profileInput: {
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.textPrimary,
-    backgroundColor: colors.background
-  },
-  profileLocationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  profileSummary: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 6
-  },
-  profileButton: {
-    marginTop: 12,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignSelf: 'flex-start'
-  },
-  profileButtonText: {
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  clearButtonText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: '600'
-  },
-  privacyNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 8
-  },
-  avatarPreviewWrapper: {
-    marginTop: 12,
-    marginBottom: 12,
-    alignItems: 'flex-start'
-  },
-  avatarPreviewCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  avatarPreviewEmoji: {
-    fontSize: 28
-  },
-  avatarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4
-  },
-  avatarOption: {
-    flexBasis: '30%',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingVertical: 10,
-    borderWidth: 2,
-    borderRadius: 14
-  },
-  avatarOptionSpacing: {
-    marginRight: '5%'
-  },
-  avatarOptionCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6
-  },
-  avatarOptionEmoji: {
-    fontSize: 22
-  },
-  avatarOptionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  accentRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between'
-  },
-  accentSwatch: {
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    flexBasis: '48%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginBottom: 12
-  },
-  accentSwatchActive: {
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3
-  },
-  accentLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary
-  },
-  accentDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginRight: 12
-  }
-});
+const createStyles = (palette, { isDarkMode } = {}) =>
+  StyleSheet.create({
+    screenContent: {
+      paddingTop: 0,
+      paddingHorizontal: 0,
+      backgroundColor: palette.background
+    },
+    scroll: {
+      flex: 1
+    },
+    scrollContent: {
+      paddingTop: 24,
+      paddingBottom: 140,
+      paddingHorizontal: 20
+    },
+    section: {
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 16
+    },
+    sectionHint: {
+      fontSize: 13,
+      color: palette.textSecondary,
+      marginBottom: 16
+    },
+    item: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16
+    },
+    itemLast: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    itemDisabled: {
+      opacity: 0.6,
+      marginTop: 16
+    },
+    itemTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      marginBottom: 6
+    },
+    itemSubtitle: {
+      fontSize: 13,
+      color: palette.textSecondary,
+      maxWidth: 220
+    },
+    profileField: {
+      marginBottom: 16
+    },
+    profileInput: {
+      marginTop: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: palette.textPrimary,
+      backgroundColor: isDarkMode ? palette.card : palette.background
+    },
+    profileLocationHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    profileSummary: {
+      fontSize: 13,
+      color: palette.textSecondary,
+      marginTop: 6
+    },
+    profileButton: {
+      marginTop: 12,
+      borderWidth: 1.5,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      alignSelf: 'flex-start'
+    },
+    profileButtonText: {
+      fontSize: 13,
+      fontWeight: '600'
+    },
+    clearButtonText: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      fontWeight: '600'
+    },
+    privacyNote: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginTop: 8
+    },
+    avatarPreviewWrapper: {
+      marginTop: 12,
+      marginBottom: 12,
+      alignItems: 'flex-start'
+    },
+    avatarPreviewCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.background
+    },
+    avatarPreviewEmoji: {
+      fontSize: 28
+    },
+    avatarGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: 4
+    },
+    avatarOption: {
+      flexBasis: '30%',
+      alignItems: 'center',
+      marginBottom: 12,
+      paddingVertical: 10,
+      borderWidth: 2,
+      borderRadius: 14,
+      backgroundColor: palette.background
+    },
+    avatarOptionSpacing: {
+      marginRight: '5%'
+    },
+    avatarOptionCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6
+    },
+    avatarOptionEmoji: {
+      fontSize: 22
+    },
+    avatarOptionLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    accentRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between'
+    },
+    accentSwatch: {
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderWidth: 2,
+      flexBasis: '48%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      marginBottom: 12
+    },
+    accentSwatchActive: {
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.35 : 0.12,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3
+    },
+    accentLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    accentDot: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      marginRight: 12
+    }
+  });

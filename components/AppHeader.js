@@ -1,16 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
 
 const defaultAccent = {
-  background: colors.primary,
+  background: '#6C4DF4',
   onPrimary: '#ffffff',
   subtitleColor: 'rgba(255,255,255,0.8)',
   iconTint: '#ffffff',
   iconBackground: 'rgba(255,255,255,0.1)',
   iconBorder: 'rgba(255,255,255,0.25)',
-  placeholderColor: colors.textSecondary
+  placeholderColor: '#7A76A9'
 };
 
 export default function AppHeader({
@@ -27,7 +26,7 @@ export default function AppHeader({
   wrapperStyle,
   accent = defaultAccent
 }) {
-  const {
+  let {
     background = defaultAccent.background,
     onPrimary = defaultAccent.onPrimary,
     subtitleColor = defaultAccent.subtitleColor,
@@ -36,6 +35,13 @@ export default function AppHeader({
     iconBorder = defaultAccent.iconBorder,
     placeholderColor = defaultAccent.placeholderColor
   } = accent ?? defaultAccent;
+
+  if (accent?.isDark && !accent?.placeholderColor) {
+    placeholderColor = 'rgba(255,255,255,0.7)';
+  }
+
+  const searchBackground = accent?.isDark ? 'rgba(255,255,255,0.2)' : '#ffffff';
+  const searchTextColor = accent?.isDark ? '#ffffff' : '#1F1845';
 
   return (
     <View
@@ -81,14 +87,14 @@ export default function AppHeader({
       </View>
 
       {showSearch ? (
-        <View style={styles.searchWrapper}>
+        <View style={[styles.searchWrapper, { backgroundColor: searchBackground }]}>
           <Ionicons name="search" size={18} color={placeholderColor} />
           <TextInput
             placeholder={searchPlaceholder}
             placeholderTextColor={placeholderColor}
             value={searchValue}
             onChangeText={onSearchChange}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: searchTextColor }]}
             autoCorrect={false}
           />
         </View>
@@ -149,7 +155,6 @@ const styles = StyleSheet.create({
   searchInput: {
     marginLeft: 10,
     flex: 1,
-    color: colors.textPrimary,
     fontSize: 14
   }
 });
