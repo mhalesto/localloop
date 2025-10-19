@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,7 @@ const PostsContext = createContext(null);
 
 const POSTS_CACHE_KEY = '@toilet.postsCache';
 const QUEUE_CACHE_KEY = '@toilet.postsQueue';
+const CLIENT_ID_KEY = '@toilet.clientId';
 
 function normalizeProfile(profile) {
   if (!profile) {
@@ -38,12 +40,14 @@ function normalizeProfile(profile) {
   };
 }
 
-function createComment(message) {
+function createComment(message, clientId, authorProfile = null) {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     message,
     createdAt: Date.now(),
-    createdByMe: true
+    createdByMe: true,
+    clientId,
+    author: normalizeProfile(authorProfile)
   };
 }
 
@@ -51,6 +55,67 @@ export function PostsProvider({ children }) {
   const [postsByCity, setPostsByCity] = useState({});
   const [pendingQueue, setPendingQueue] = useState([]);
   const [isOnline, setIsOnline] = useState(true);
+  const [clientId, setClientId] = useState(null);
+  const clientIdRef = useRef(null);
+
+  const normalizePostsForClient = useCallback((data) => {
+    if (!data || typeof data !== 'object') {
+      return data;
+    }
+    const localClientId = clientIdRef.current;
+    const result = {};
+    Object.entries(data).forEach(([cityName, posts]) => {
+      result[cityName] = (posts ?? []).map((post) => {
+        const postClientId = post.clientId ?? null;
+        const rawVotes =
+          post.votes && typeof post.votes === 'object' && !Array.isArray(post.votes) ? post.votes : {};
+        const voteValues = Object.values(rawVotes);
+        const hasVoteData = voteValues.length > 0;
+        const computedUpvotes = voteValues.filter((vote) => vote === 'up').length;
+        const computedDownvotes = voteValues.filter((vote) => vote === 'down').length;
+        const fallbackUpvotes = Number(post.upvotes ?? 0);
+        const fallbackDownvotes = Number(post.downvotes ?? 0);
+        const upvotes = hasVoteData ? computedUpvotes : Number.isFinite(fallbackUpvotes) ? fallbackUpvotes : 0;
+        const downvotes = hasVoteData
+          ? computedDownvotes
+          : Number.isFinite(fallbackDownvotes)
+          ? fallbackDownvotes
+          : 0;
+        const userVote = localClientId
+          ? hasVoteData
+            ? rawVotes[localClientId] ?? null
+            : postClientId && postClientId === localClientId
+            ? post.userVote ?? null
+            : null
+          : null;
+        const shareCountRaw = post.shareCount ?? post.shares ?? 0;
+        const shareCountNumber = Number(shareCountRaw);
+        const shareCount = Number.isFinite(shareCountNumber) ? shareCountNumber : 0;
+
+        const normalizedComments = (post.comments ?? []).map((comment) => {
+          const ownerId = comment.clientId ?? null;
+          const mine = ownerId ? ownerId === localClientId : false;
+          return {
+            ...comment,
+            createdByMe: mine,
+            clientId: ownerId
+          };
+        });
+
+        return {
+          ...post,
+          votes: rawVotes,
+          upvotes,
+          downvotes,
+          userVote,
+          shareCount,
+          createdByMe: postClientId ? postClientId === localClientId : Boolean(post.createdByMe),
+          comments: normalizedComments
+        };
+      });
+    });
+    return result;
+  }, []);
 
   const persistPosts = useCallback((data) => {
     AsyncStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(data)).catch((error) =>
@@ -67,12 +132,13 @@ export function PostsProvider({ children }) {
   const setPostsWithPersist = useCallback(
     (updater) => {
       setPostsByCity((prev) => {
-        const next = typeof updater === 'function' ? updater(prev) : updater;
+        const nextRaw = typeof updater === 'function' ? updater(prev) : updater;
+        const next = normalizePostsForClient(nextRaw);
         persistPosts(next);
         return next;
       });
     },
-    [persistPosts]
+    [normalizePostsForClient, persistPosts]
   );
 
   const enqueueOperation = useCallback(
@@ -91,7 +157,7 @@ export function PostsProvider({ children }) {
       try {
         const cachedPosts = await AsyncStorage.getItem(POSTS_CACHE_KEY);
         if (cachedPosts) {
-          setPostsByCity(JSON.parse(cachedPosts));
+          setPostsByCity(normalizePostsForClient(JSON.parse(cachedPosts)));
         }
       } catch (error) {
         console.warn('[PostsProvider] load posts cache failed', error);
@@ -108,7 +174,53 @@ export function PostsProvider({ children }) {
     };
 
     loadCache();
+  }, [normalizePostsForClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const initialiseClientId = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(CLIENT_ID_KEY);
+        if (cancelled) {
+          return;
+        }
+        let resolved = stored;
+        if (!resolved) {
+          resolved = `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          AsyncStorage.setItem(CLIENT_ID_KEY, resolved).catch((error) =>
+            console.warn('[PostsProvider] persist client id failed', error)
+          );
+        }
+        clientIdRef.current = resolved;
+        setClientId(resolved);
+      } catch (error) {
+        console.warn('[PostsProvider] init client id failed', error);
+        if (!cancelled) {
+          const fallback = `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          clientIdRef.current = fallback;
+          setClientId(fallback);
+        }
+      }
+    };
+
+    initialiseClientId();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!clientId) {
+      return;
+    }
+    setPostsByCity((prev) => {
+      const normalized = normalizePostsForClient(prev);
+      persistPosts(normalized);
+      return normalized;
+    });
+  }, [clientId, normalizePostsForClient, persistPosts]);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -124,6 +236,19 @@ export function PostsProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  const ensureClientId = useCallback(() => {
+    if (clientIdRef.current) {
+      return clientIdRef.current;
+    }
+    const generated = `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    clientIdRef.current = generated;
+    setClientId(generated);
+    AsyncStorage.setItem(CLIENT_ID_KEY, generated).catch((error) =>
+      console.warn('[PostsProvider] persist client id failed', error)
+    );
+    return generated;
+  }, [setClientId]);
+
   const refreshFromRemote = useCallback(async () => {
     if (!isOnline) return;
     try {
@@ -131,11 +256,24 @@ export function PostsProvider({ children }) {
       if (!remotePosts.length) return;
 
       setPostsWithPersist((prev) => {
+        const localClientId = clientIdRef.current;
         const grouped = remotePosts.reduce((acc, post) => {
           const city = post.city ?? post.sourceCity ?? 'Unknown';
+          const rawVotes =
+            post.votes && typeof post.votes === 'object' && !Array.isArray(post.votes) ? post.votes : {};
           const mapped = {
             ...post,
-            comments: post.comments ?? [],
+            votes: rawVotes,
+            userVote: null,
+            comments: (post.comments ?? []).map((comment) => {
+              const ownerId = comment.clientId ?? null;
+              const mine = ownerId ? ownerId === localClientId : false;
+              return {
+                ...comment,
+                createdByMe: mine,
+                clientId: ownerId
+              };
+            }),
             createdByMe: prev[city]?.some((p) => p.id === post.id && p.createdByMe) ?? false
           };
           if (!acc[city]) acc[city] = [];
@@ -164,7 +302,7 @@ export function PostsProvider({ children }) {
     } catch (error) {
       console.warn('[PostsProvider] refresh remote failed', error?.message ?? error);
     }
-  }, [isOnline, setPostsWithPersist]);
+  }, [isOnline, setPostsWithPersist, clientId]);
 
   useEffect(() => {
     if (isOnline) {
@@ -186,6 +324,8 @@ export function PostsProvider({ children }) {
             await savePostRemote(operation.payload.post);
           } else if (operation.type === 'addComment') {
             await saveCommentRemote(operation.payload.postId, operation.payload.comment);
+          } else if (operation.type === 'updatePost') {
+            await savePostRemote(operation.payload.post);
           }
         } catch (error) {
           console.warn('[PostsProvider] queue operation failed', error);
@@ -214,6 +354,7 @@ export function PostsProvider({ children }) {
       if (!trimmed) {
         return;
       }
+      const ownerId = ensureClientId();
       const author = normalizeProfile(authorProfile);
       const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const newPost = {
@@ -222,6 +363,7 @@ export function PostsProvider({ children }) {
         message: trimmed,
         createdAt: Date.now(),
         createdByMe: true,
+        clientId: ownerId,
         colorKey,
         sourceCity: city,
         sourcePostId: newPostId,
@@ -229,6 +371,8 @@ export function PostsProvider({ children }) {
         upvotes: 0,
         downvotes: 0,
         userVote: null,
+        votes: {},
+        shareCount: 0,
         sharedFrom: null,
         author
       };
@@ -240,17 +384,18 @@ export function PostsProvider({ children }) {
 
       enqueueOperation({ type: 'addPost', payload: { post: newPost } });
     },
-    [enqueueOperation, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
   const addComment = useCallback(
-    (city, postId, message) => {
+    (city, postId, message, authorProfile = null) => {
       const trimmed = message.trim();
       if (!trimmed) {
         return;
       }
 
-      const newComment = createComment(trimmed);
+      const ownerId = ensureClientId();
+      const newComment = createComment(trimmed, ownerId, authorProfile);
 
       setPostsWithPersist((prev) => {
         const cityPosts = prev[city] ?? [];
@@ -265,7 +410,7 @@ export function PostsProvider({ children }) {
 
       enqueueOperation({ type: 'addComment', payload: { city, postId, comment: newComment } });
     },
-    [enqueueOperation, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
   const getPostsForCity = useCallback(
@@ -373,7 +518,9 @@ export function PostsProvider({ children }) {
         return;
       }
 
+      const ownerId = ensureClientId();
       const author = normalizeProfile(authorProfile ?? basePost.author);
+      const nextShareCount = (basePost.shareCount ?? 0) + 1;
 
       const sharedPost = {
         ...basePost,
@@ -385,72 +532,95 @@ export function PostsProvider({ children }) {
         sourceCity: basePost.sourceCity ?? basePost.city ?? fromCity,
         sourcePostId: basePost.sourcePostId ?? basePost.id,
         createdByMe: true,
+        clientId: ownerId,
         upvotes: 0,
         downvotes: 0,
         userVote: null,
+        votes: {},
+        shareCount: 0,
         author
       };
 
       setPostsWithPersist((prev) => {
         const targetPosts = prev[toCity] ?? [];
+        const fromPosts = prev[fromCity] ?? [];
         return {
           ...prev,
-          [toCity]: [sharedPost, ...targetPosts]
+          [toCity]: [sharedPost, ...targetPosts],
+          [fromCity]: fromPosts.map((post) =>
+            post.id === postId ? { ...post, shareCount: nextShareCount } : post
+          )
         };
       });
 
       enqueueOperation({ type: 'addPost', payload: { post: sharedPost } });
+      enqueueOperation({
+        type: 'updatePost',
+        payload: { post: { id: postId, shareCount: nextShareCount } }
+      });
     },
-    [enqueueOperation, postsByCity, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, postsByCity, setPostsWithPersist]
   );
 
-  const toggleVote = useCallback((city, postId, direction) => {
-    setPostsWithPersist((prev) => {
-      const cityPosts = prev[city] ?? [];
-      const updated = cityPosts.map((post) => {
-        if (post.id !== postId) {
-          return post;
-        }
+  const toggleVote = useCallback(
+    (city, postId, direction) => {
+      const voterId = ensureClientId();
+      let remotePayload = null;
 
-        let upvotes = post.upvotes ?? 0;
-        let downvotes = post.downvotes ?? 0;
-        let userVote = post.userVote ?? null;
-
-        if (direction === 'up') {
-          if (userVote === 'up') {
-            upvotes = Math.max(0, upvotes - 1);
-            userVote = null;
-          } else {
-            if (userVote === 'down') {
-              downvotes = Math.max(0, downvotes - 1);
-            }
-            upvotes += 1;
-            userVote = 'up';
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        const updated = cityPosts.map((post) => {
+          if (post.id !== postId) {
+            return post;
           }
-        } else if (direction === 'down') {
-          if (userVote === 'down') {
-            downvotes = Math.max(0, downvotes - 1);
-            userVote = null;
-          } else {
-            if (userVote === 'up') {
-              upvotes = Math.max(0, upvotes - 1);
-            }
-            downvotes += 1;
-            userVote = 'down';
-          }
-        }
 
-        return {
-          ...post,
-          upvotes,
-          downvotes,
-          userVote
-        };
+          const votes = { ...(post.votes ?? {}) };
+          const currentVote = votes[voterId] ?? null;
+          let nextVote = currentVote;
+
+          if (direction === 'up') {
+            nextVote = currentVote === 'up' ? null : 'up';
+          } else if (direction === 'down') {
+            nextVote = currentVote === 'down' ? null : 'down';
+          }
+
+          if (!nextVote) {
+            delete votes[voterId];
+          } else {
+            votes[voterId] = nextVote;
+          }
+
+          const voteValues = Object.values(votes);
+          const upvotes = voteValues.filter((vote) => vote === 'up').length;
+          const downvotes = voteValues.filter((vote) => vote === 'down').length;
+
+          const nextPost = {
+            ...post,
+            votes,
+            upvotes,
+            downvotes,
+            userVote: nextVote ?? null
+          };
+
+          remotePayload = {
+            id: postId,
+            votes: { ...votes },
+            upvotes,
+            downvotes
+          };
+
+          return nextPost;
+        });
+
+        return { ...prev, [city]: updated };
       });
 
-      return { ...prev, [city]: updated };
-    });
-  }, [setPostsWithPersist]);
+      if (remotePayload) {
+        enqueueOperation({ type: 'updatePost', payload: { post: remotePayload } });
+      }
+    },
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
+  );
 
   const value = useMemo(
     () => ({

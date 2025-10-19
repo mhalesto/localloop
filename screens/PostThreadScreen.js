@@ -71,7 +71,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const handleAddComment = () => {
     const t = reply.trim();
     if (!t) return;
-    addComment(city, postId, t);
+    addComment(city, postId, t, userProfile);
     setReply('');
   };
 
@@ -232,6 +232,7 @@ export default function PostThreadScreen({ route, navigation }) {
 
             <TouchableOpacity style={styles.actionButton} onPress={openShareModal} activeOpacity={0.7}>
               <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.shareCount ?? 0}</Text>
               <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
             </TouchableOpacity>
           </View>

@@ -29,6 +29,7 @@ export default function PostItem({
   const sharedFrom = post.sharedFrom;           // { city?: string }
   const upvotes = post.upvotes ?? 0;
   const downvotes = post.downvotes ?? 0;
+  const shareCount = post.shareCount ?? 0;
   const userVote = post.userVote ?? null;     // 'up' | 'down' | null
   const commentCount = post.comments?.length ?? 0;
   const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
@@ -123,6 +124,7 @@ export default function PostItem({
             activeOpacity={0.7}
           >
             <Ionicons name="paper-plane-outline" size={18} color={linkColor} />
+            <Text style={[styles.actionCount, { color: metaColor }]}>{shareCount}</Text>
             <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
           </TouchableOpacity>
         </View>
