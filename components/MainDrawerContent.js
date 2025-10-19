@@ -52,31 +52,34 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
     }
   ];
 
+  const headerTextColor = preset.onPrimary ?? '#fff';
+  const headerMetaColor = preset.subtitleColor ?? 'rgba(255,255,255,0.8)';
+
   return (
-    <View style={[styles.container, { backgroundColor: preset.background }]}> 
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
       <View style={[styles.header, { backgroundColor: preset.background }]}> 
         <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? colors.primary }]}> 
           {avatarConfig.icon ? (
             <Ionicons name={avatarConfig.icon.name} size={22} color={avatarConfig.icon.color ?? '#fff'} />
           ) : (
-            <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}>
+            <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}> 
               {avatarConfig.emoji ?? '🙂'}
             </Text>
           )}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.nameText}>{userProfile?.nickname?.trim() || 'Anonymous'}</Text>
+          <Text style={[styles.nameText, { color: headerTextColor }]}>{userProfile?.nickname?.trim() || 'Anonymous'}</Text>
           {userProfile?.city ? (
-            <Text style={styles.metaText}>
+            <Text style={[styles.metaText, { color: headerMetaColor }]}> 
               {[userProfile.city, userProfile.province, userProfile.country].filter(Boolean).join(', ')}
             </Text>
           ) : (
-            <Text style={styles.metaText}>Add your location in settings</Text>
+            <Text style={[styles.metaText, { color: headerMetaColor }]}>Add your location in settings</Text>
           )}
         </View>
       </View>
 
-      <ScrollView style={[styles.body, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingVertical: 12 }}>
+      <ScrollView style={styles.body} contentContainerStyle={{ paddingVertical: 12 }}>
         {shortcuts.map((item) => (
           <TouchableOpacity
             key={item.label}
