@@ -632,7 +632,8 @@ export function PostsProvider({ children }) {
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,
-      toggleVote
+      toggleVote,
+      refreshPosts: refreshFromRemote
     }),
     [
       addComment,
@@ -643,7 +644,8 @@ export function PostsProvider({ children }) {
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,
-      toggleVote
+      toggleVote,
+      refreshFromRemote
     ]
   );
 

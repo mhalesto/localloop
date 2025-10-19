@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Text,
   TouchableOpacity,
@@ -22,7 +22,7 @@ const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, userProfile } = useSettings();
-  const { getRecentCityActivity } = usePosts();
+  const { getRecentCityActivity, refreshPosts } = usePosts();
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -31,22 +31,90 @@ export default function CountryScreen({ navigation }) {
   const [personalCities, setPersonalCities] = useState([]);
   const [personalLoading, setPersonalLoading] = useState(false);
   const [personalError, setPersonalError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const loadCountries = useCallback(async () => {
+    try {
+      const data = await fetchCountries();
+      if (!isMounted.current) {
+        return;
+      }
+      const normalized = Array.isArray(data) ? data : [];
+      const sorted = [...normalized].sort((a, b) => (a?.name ?? '').localeCompare(b?.name ?? ''));
+      setCountries(sorted);
+      setError('');
+    } catch (err) {
+      if (!isMounted.current) {
+        return;
+      }
+      setError('Unable to load countries. Pull to refresh or try again later.');
+    }
+  }, []);
+
+  const loadPersonalCities = useCallback(async () => {
+    if (!userProfile?.country || !userProfile?.province) {
+      if (!isMounted.current) {
+        return;
+      }
+      setPersonalCities([]);
+      setPersonalError('');
+      setPersonalLoading(false);
+      return;
+    }
+    setPersonalLoading(true);
+    try {
+      const results = await fetchCities(userProfile.country, userProfile.province);
+      if (!isMounted.current) {
+        return;
+      }
+      const unique = Array.from(
+        new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
+      ).sort((a, b) => a.localeCompare(b));
+      setPersonalCities(unique);
+      setPersonalError('');
+    } catch (err) {
+      if (!isMounted.current) {
+        return;
+      }
+      setPersonalError('Unable to load your province right now.');
+      setPersonalCities([]);
+    } finally {
+      if (isMounted.current) {
+        setPersonalLoading(false);
+      }
+    }
+  }, [userProfile?.country, userProfile?.province]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const postsRefreshPromise = refreshPosts ? refreshPosts() : Promise.resolve();
+      await Promise.all([loadCountries(), loadPersonalCities(), postsRefreshPromise]);
+    } finally {
+      if (isMounted.current) {
+        setRefreshing(false);
+      }
+    }
+  }, [loadCountries, loadPersonalCities, refreshPosts]);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
+      if (!mounted) return;
+      setLoading(true);
       try {
-        setLoading(true);
-        const data = await fetchCountries();
-        if (!mounted) return;
-        const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
-        setCountries(sorted);
-        setError('');
-      } catch (err) {
-        if (!mounted) return;
-        setError('Unable to load countries. Pull to refresh or try again later.');
+        await loadCountries();
       } finally {
-        if (mounted) {
+        if (mounted && isMounted.current) {
           setLoading(false);
         }
       }
@@ -55,7 +123,7 @@ export default function CountryScreen({ navigation }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadCountries]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
@@ -124,37 +192,8 @@ export default function CountryScreen({ navigation }) {
   const chipItemsToShow = topChipItems.slice(0, CHIP_ROW_MAX);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadCities() {
-      if (!userProfile?.country || !userProfile?.province) {
-        setPersonalCities([]);
-        setPersonalError('');
-        return;
-      }
-      try {
-        setPersonalLoading(true);
-        const results = await fetchCities(userProfile.country, userProfile.province);
-        if (cancelled) return;
-        const unique = Array.from(
-          new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
-        ).sort((a, b) => a.localeCompare(b));
-        setPersonalCities(unique);
-        setPersonalError('');
-      } catch (err) {
-        if (cancelled) return;
-        setPersonalError('Unable to load your province right now.');
-        setPersonalCities([]);
-      } finally {
-        if (!cancelled) {
-          setPersonalLoading(false);
-        }
-      }
-    }
-    loadCities();
-    return () => {
-      cancelled = true;
-    };
-  }, [userProfile?.country, userProfile?.province]);
+    loadPersonalCities();
+  }, [loadPersonalCities]);
 
   const personalFiltered = useMemo(() => {
     if (!query.trim()) return personalCities;
@@ -163,6 +202,8 @@ export default function CountryScreen({ navigation }) {
   }, [personalCities, query]);
 
   const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0;
+  const listData = showingPersonalized ? personalFiltered : paginated;
+  const listIsEmpty = listData.length === 0;
 
   return (
     <ScreenLayout
@@ -179,115 +220,119 @@ export default function CountryScreen({ navigation }) {
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={colors.primaryDark} />
         </View>
-      ) : error ? (
-        <Text style={styles.errorText}>{error}</Text>
       ) : (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top picks</Text>
-            {hasLocalActivity ? (
-              <Text style={styles.sectionHint}>Latest activity near you</Text>
-            ) : null}
-          </View>
+        <FlatList
+          data={listData}
+          keyExtractor={(item) =>
+            showingPersonalized ? item : item.iso2 ?? item.name
+          }
+          renderItem={({ item }) =>
+            showingPersonalized ? (
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Room', { city: item })}
+              >
+                <Text style={styles.cardTitle}>{item}</Text>
+                <Text style={styles.cardSubtitle}>
+                  {[userProfile?.province, userProfile?.country].filter(Boolean).join(', ') || 'Jump into this city'}
+                </Text>
+                <Text style={styles.cardAction}>Enter room →</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.85}
+                onPress={() =>
+                  navigation.navigate('Province', { country: item.name })
+                }
+              >
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.cardSubtitle}>
+                  {item.iso3 ? `ISO: ${item.iso3}` : 'Explore provinces and cities'}
+                </Text>
+                <Text style={styles.cardAction}>Select →</Text>
+              </TouchableOpacity>
+            )
+          }
+          ListHeaderComponent={
+            <View>
+              {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Top picks</Text>
+                {hasLocalActivity ? (
+                  <Text style={styles.sectionHint}>Latest activity near you</Text>
+                ) : null}
+              </View>
 
-          <View style={styles.chipStaticRow}>
-            {chipItemsToShow.map((item, index) => {
-              const backgroundStyle = styles[`chipColor${index % 3}`];
-              const label = item.type === 'city' ? item.city : item.country.name;
-              const isLast = index === chipItemsToShow.length - 1;
+              <View style={styles.chipStaticRow}>
+                {chipItemsToShow.map((item, index) => {
+                  const backgroundStyle = styles[`chipColor${index % 3}`];
+                  const label = item.type === 'city' ? item.city : item.country.name;
+                  const isLast = index === chipItemsToShow.length - 1;
 
-              return (
-                <TouchableOpacity
-                  key={`${item.type}-${label}`}
-                  style={[styles.chip, backgroundStyle, !isLast && styles.chipSpacing]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    item.type === 'city'
-                      ? navigation.navigate('Room', { city: item.city })
-                      : navigation.navigate('Province', { country: item.country.name })
-                  }
-                >
-                  {item.type === 'city' && index === 0 ? (
-                    <View style={styles.hotBadge}>
-                      <Text style={styles.hotBadgeText}>Hot</Text>
-                    </View>
-                  ) : null}
-                  <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                  return (
+                    <TouchableOpacity
+                      key={`${item.type}-${label}`}
+                      style={[styles.chip, backgroundStyle, !isLast && styles.chipSpacing]}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        item.type === 'city'
+                          ? navigation.navigate('Room', { city: item.city })
+                          : navigation.navigate('Province', { country: item.country.name })
+                      }
+                    >
+                      {item.type === 'city' && index === 0 ? (
+                        <View style={styles.hotBadge}>
+                          <Text style={styles.hotBadgeText}>Hot</Text>
+                        </View>
+                      ) : null}
+                      <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-          <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
-            {showingPersonalized
-              ? `${userProfile?.province || 'Your province'} cities`
-              : 'All destinations'}
-          </Text>
-          {showingPersonalized && personalError ? (
-            <Text style={styles.personalError}>{personalError}</Text>
-          ) : null}
-
-          <FlatList
-            data={showingPersonalized ? personalFiltered : paginated}
-            keyExtractor={(item) =>
-              showingPersonalized ? item : item.iso2 ?? item.name
-            }
-            renderItem={({ item }) =>
-              showingPersonalized ? (
-                <TouchableOpacity
-                  style={styles.card}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('Room', { city: item })}
-                >
-                  <Text style={styles.cardTitle}>{item}</Text>
-                  <Text style={styles.cardSubtitle}>
-                    {[userProfile?.province, userProfile?.country].filter(Boolean).join(', ') || 'Jump into this city'}
-                  </Text>
-                  <Text style={styles.cardAction}>Enter room →</Text>
-                </TouchableOpacity>
+              <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
+                {showingPersonalized
+                  ? `${userProfile?.province || 'Your province'} cities`
+                  : 'All destinations'}
+              </Text>
+              {showingPersonalized && personalError ? (
+                <Text style={styles.personalError}>{personalError}</Text>
+              ) : null}
+            </View>
+          }
+          ListEmptyComponent={
+            showingPersonalized ? (
+              personalLoading ? (
+                <ActivityIndicator size="small" color={colors.primaryDark} />
               ) : (
-                <TouchableOpacity
-                  style={styles.card}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    navigation.navigate('Province', { country: item.name })
-                  }
-                >
-                  <Text style={styles.cardTitle}>{item.name}</Text>
-                  <Text style={styles.cardSubtitle}>
-                    {item.iso3 ? `ISO: ${item.iso3}` : 'Explore provinces and cities'}
-                  </Text>
-                  <Text style={styles.cardAction}>Select →</Text>
-                </TouchableOpacity>
+                <Text style={styles.emptyState}>
+                  {personalError || 'No cities match your search yet.'}
+                </Text>
               )
-            }
-            ListEmptyComponent={
-              showingPersonalized ? (
-                personalLoading ? (
-                  <ActivityIndicator size="small" color={colors.primaryDark} />
-                ) : (
-                  <Text style={styles.emptyState}>
-                    {personalError || 'No cities match your search yet.'}
-                  </Text>
-                )
-              ) : (
-                <Text style={styles.emptyState}>No countries match your search yet.</Text>
-              )
-            }
-            ListFooterComponent={
-              <View style={{ height: showAddShortcut ? 160 : 60 }} />
-            }
-            contentContainerStyle={[
-              styles.listContent,
-              (showingPersonalized ? personalFiltered.length === 0 : paginated.length === 0) && styles.listContentEmpty
-            ]}
-            showsVerticalScrollIndicator={false}
-            onEndReached={showingPersonalized ? undefined : handleLoadMore}
-            onEndReachedThreshold={showingPersonalized ? undefined : 0.3}
-          />
-        </>
+            ) : error ? (
+              <Text style={styles.emptyState}>{error}</Text>
+            ) : (
+              <Text style={styles.emptyState}>No countries match your search yet.</Text>
+            )
+          }
+          ListFooterComponent={
+            <View style={{ height: showAddShortcut ? 160 : 60 }} />
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            listIsEmpty && styles.listContentEmpty
+          ]}
+          showsVerticalScrollIndicator={false}
+          onEndReached={showingPersonalized ? undefined : handleLoadMore}
+          onEndReachedThreshold={showingPersonalized ? undefined : 0.3}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+        />
       )}
     </ScreenLayout>
   );
@@ -420,6 +465,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     fontSize: 14,
-    marginTop: 40
+    marginTop: 16,
+    marginBottom: 12
   }
 });
