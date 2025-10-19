@@ -29,21 +29,9 @@ export default function App() {
               <Stack.Screen name="Province" component={ProvinceScreen} />
               <Stack.Screen name="City" component={CityScreen} />
               <Stack.Screen name="Room" component={RoomScreen} />
-              <Stack.Screen
-                name="PostThread"
-                component={PostThreadScreen}
-                options={{ title: 'Thread' }}
-              />
-              <Stack.Screen
-                name="MyComments"
-                component={MyCommentsScreen}
-                options={{ title: 'My Replies' }}
-              />
-              <Stack.Screen
-                name="Settings"
-                component={SettingsScreen}
-                options={{ title: 'Settings' }}
-              />
+              <Stack.Screen name="PostThread" component={PostThreadScreen} />
+              <Stack.Screen name="MyComments" component={MyCommentsScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </SafeAreaProvider>

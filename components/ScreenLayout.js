@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Modal, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from './AppHeader';
 import { colors } from '../constants/colors';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import CreatePostModal from './CreatePostModal';
+import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
 
 export default function ScreenLayout({
@@ -32,6 +33,8 @@ export default function ScreenLayout({
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
   const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
   const [composerVisible, setComposerVisible] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const initialLocation = useMemo(
     () =>
@@ -49,7 +52,6 @@ export default function ScreenLayout({
     () => getAvatarConfig(userProfile?.avatarKey),
     [userProfile?.avatarKey]
   );
-
   const handleSubmitPost = ({ location, colorKey, message }) => {
     if (!location?.city || !message) {
       setComposerVisible(false);
@@ -103,6 +105,22 @@ export default function ScreenLayout({
     }
   };
 
+  const handleMenuPress = () => {
+    setDrawerVisible(true);
+  };
+
+  const handleShortcutSelect = (key) => {
+    setDrawerVisible(false);
+    if (!navigation) return;
+    if (key === 'home') {
+      navigation.navigate('Country');
+    } else if (key === 'myComments') {
+      navigation.navigate('MyComments');
+    } else if (key === 'settings') {
+      navigation.navigate('Settings');
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
       <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
@@ -111,6 +129,7 @@ export default function ScreenLayout({
           title={title}
           subtitle={subtitle}
           onBack={onBack}
+          onMenu={!onBack ? handleMenuPress : undefined}
           rightIcon={rightIcon}
           onRightPress={onRightPress}
           showSearch={showSearch}
@@ -143,9 +162,36 @@ export default function ScreenLayout({
           onSubmitPost={handleSubmitPost}
           authorProfile={{
             nickname: userProfile?.nickname ?? '',
-            avatarConfig: authorAvatarConfig
+            avatarConfig: authorAvatarConfig,
+            avatarKey: userProfile?.avatarKey
           }}
         />
+
+        <Modal
+          visible={drawerVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setDrawerVisible(false)}
+        >
+          <StatusBar backgroundColor={accentPreset.background} style={statusStyle} />
+          <View style={styles.drawerContainer}>
+            <View
+              style={[
+                styles.drawerSheet,
+                {
+                  paddingTop: insets.top + 12,
+                  backgroundColor: accentPreset.background
+                }
+              ]}
+            >
+              <MainDrawerContent
+                accent={accentPreset}
+                onSelectShortcut={handleShortcutSelect}
+              />
+            </View>
+            <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)} />
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -165,5 +211,22 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingHorizontal: 20,
     paddingBottom: 0
+  },
+  drawerContainer: {
+    flex: 1,
+    flexDirection: 'row'
+  },
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)'
+  },
+  drawerSheet: {
+    width: '78%',
+    backgroundColor: colors.background,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 4, height: 0 },
+    elevation: 8
   }
 });

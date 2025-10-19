@@ -17,6 +17,7 @@ export default function AppHeader({
   title,
   subtitle,
   onBack,
+  onMenu,
   rightIcon,
   onRightPress,
   showSearch,
@@ -47,8 +48,8 @@ export default function AppHeader({
       <View style={styles.topRow}>
         <TouchableOpacity
           style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
-          onPress={onBack}
-          disabled={!onBack}
+          onPress={onBack ?? onMenu}
+          disabled={!onBack && !onMenu}
           activeOpacity={0.8}
         >
           <Ionicons
