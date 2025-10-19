@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { colors } from '../constants/colors';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
+import CreatePostModal from './CreatePostModal';
 
 export default function ScreenLayout({
   children,
@@ -25,13 +26,76 @@ export default function ScreenLayout({
   showFooter = true,
   headerStyle
 }) {
-  const { showAddShortcut, accentPreset } = useSettings();
-  const { getReplyNotificationCount } = usePosts();
-  const myRepliesBadge = React.useMemo(
-    () => (getReplyNotificationCount ? getReplyNotificationCount() : 0),
-    [getReplyNotificationCount]
-  );
+  const { showAddShortcut, accentPreset, userProfile, updateUserProfile } = useSettings();
+  const { addPost, getReplyNotificationCount } = usePosts();
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
+  const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
+  const [composerVisible, setComposerVisible] = useState(false);
+
+  const initialLocation = useMemo(
+    () =>
+      userProfile?.city
+        ? {
+            city: userProfile.city,
+            province: userProfile.province ?? '',
+            country: userProfile.country ?? ''
+          }
+        : null,
+    [userProfile]
+  );
+
+  const handleSubmitPost = ({ location, colorKey, message }) => {
+    if (!location?.city || !message) {
+      setComposerVisible(false);
+      return;
+    }
+
+    const mergedAuthor = {
+      ...userProfile,
+      nickname: userProfile?.nickname ?? '',
+      city: location.city,
+      province: location.province ?? userProfile?.province ?? '',
+      country: location.country ?? userProfile?.country ?? '',
+      avatarKey: userProfile?.avatarKey ?? 'default'
+    };
+
+    addPost(location.city, message, colorKey, mergedAuthor);
+
+    if (!userProfile?.city) {
+      updateUserProfile?.({
+        city: location.city,
+        province: location.province ?? '',
+        country: location.country ?? ''
+      });
+    }
+
+    setComposerVisible(false);
+    if (navigation) {
+      navigation.navigate('Room', { city: location.city });
+    }
+  };
+
+  const handleFooterShortcut = () => {
+    setComposerVisible(true);
+  };
+
+  const handleTabPress = (tab) => {
+    if (!navigation) return;
+    if (tab === 'home') {
+      if (navigation.canGoBack && navigation.canGoBack()) {
+        navigation.popToTop();
+      }
+      navigation.navigate('Country');
+    } else if (tab === 'myComments') {
+      if (navigation.getCurrentRoute?.()?.name !== 'MyComments') {
+        navigation.navigate('MyComments');
+      }
+    } else if (tab === 'settings') {
+      if (navigation.getCurrentRoute?.()?.name !== 'Settings') {
+        navigation.navigate('Settings');
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
@@ -57,35 +121,21 @@ export default function ScreenLayout({
         {showFooter ? (
           <FooterMenu
             activeTab={activeTab}
-            onPressTab={(tab) => {
-              if (!navigation) return;
-              if (tab === 'home') {
-                if (navigation.canGoBack && navigation.canGoBack()) {
-                  navigation.popToTop();
-                }
-                navigation.navigate('Country');
-              } else if (tab === 'myComments') {
-                if (navigation.getCurrentRoute?.()?.name !== 'MyComments') {
-                  navigation.navigate('MyComments');
-                }
-              } else if (tab === 'settings') {
-                if (navigation.getCurrentRoute?.()?.name !== 'Settings') {
-                  navigation.navigate('Settings');
-                }
-              }
-            }}
-            onAddPostShortcut={() => {
-              if (!navigation) return;
-              if (navigation.canGoBack && navigation.canGoBack()) {
-                navigation.popToTop();
-              }
-              navigation.navigate('Country');
-            }}
+            onPressTab={handleTabPress}
+            onAddPostShortcut={handleFooterShortcut}
             showShortcut={showAddShortcut}
             accent={accentPreset}
             myRepliesBadge={myRepliesBadge}
           />
         ) : null}
+
+        <CreatePostModal
+          visible={composerVisible}
+          onClose={() => setComposerVisible(false)}
+          initialLocation={initialLocation}
+          initialAccentKey={accentPreset?.key}
+          onSubmitPost={handleSubmitPost}
+        />
       </View>
     </SafeAreaView>
   );
