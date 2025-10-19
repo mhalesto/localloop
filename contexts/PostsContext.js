@@ -1,6 +1,23 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import {
+  fetchAllPostsRemote,
+  saveCommentRemote,
+  savePostRemote
+} from '../api/postService';
 
 const PostsContext = createContext(null);
+
+const POSTS_CACHE_KEY = '@toilet.postsCache';
+const QUEUE_CACHE_KEY = '@toilet.postsQueue';
 
 function normalizeProfile(profile) {
   if (!profile) {
@@ -8,38 +25,206 @@ function normalizeProfile(profile) {
       nickname: '',
       country: '',
       province: '',
-      city: ''
+      city: '',
+      avatarKey: 'default'
     };
   }
-    return {
-      nickname: profile.nickname?.trim() ?? '',
-      country: profile.country ?? '',
-      province: profile.province ?? '',
-      city: profile.city ?? '',
-      avatarKey: profile.avatarKey ?? 'default'
-    };
-  }
+  return {
+    nickname: profile.nickname?.trim() ?? '',
+    country: profile.country ?? '',
+    province: profile.province ?? '',
+    city: profile.city ?? '',
+    avatarKey: profile.avatarKey ?? 'default'
+  };
+}
+
+function createComment(message) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    message,
+    createdAt: Date.now(),
+    createdByMe: true
+  };
+}
 
 export function PostsProvider({ children }) {
   const [postsByCity, setPostsByCity] = useState({});
+  const [pendingQueue, setPendingQueue] = useState([]);
+  const [isOnline, setIsOnline] = useState(true);
 
-  const addPost = useCallback((city, message, colorKey = 'royal', authorProfile = null) => {
-    const trimmed = message.trim();
-    if (!trimmed) {
-      return;
+  const persistPosts = useCallback((data) => {
+    AsyncStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(data)).catch((error) =>
+      console.warn('[PostsProvider] persistPosts failed', error)
+    );
+  }, []);
+
+  const persistQueue = useCallback((queue) => {
+    AsyncStorage.setItem(QUEUE_CACHE_KEY, JSON.stringify(queue)).catch((error) =>
+      console.warn('[PostsProvider] persistQueue failed', error)
+    );
+  }, []);
+
+  const setPostsWithPersist = useCallback(
+    (updater) => {
+      setPostsByCity((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        persistPosts(next);
+        return next;
+      });
+    },
+    [persistPosts]
+  );
+
+  const enqueueOperation = useCallback(
+    (operation) => {
+      setPendingQueue((prev) => {
+        const next = [...prev, operation];
+        persistQueue(next);
+        return next;
+      });
+    },
+    [persistQueue]
+  );
+
+  useEffect(() => {
+    const loadCache = async () => {
+      try {
+        const cachedPosts = await AsyncStorage.getItem(POSTS_CACHE_KEY);
+        if (cachedPosts) {
+          setPostsByCity(JSON.parse(cachedPosts));
+        }
+      } catch (error) {
+        console.warn('[PostsProvider] load posts cache failed', error);
+      }
+
+      try {
+        const cachedQueue = await AsyncStorage.getItem(QUEUE_CACHE_KEY);
+        if (cachedQueue) {
+          setPendingQueue(JSON.parse(cachedQueue));
+        }
+      } catch (error) {
+        console.warn('[PostsProvider] load queue cache failed', error);
+      }
+    };
+
+    loadCache();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      setIsOnline(online);
+    });
+
+    NetInfo.fetch().then((state) => {
+      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      setIsOnline(online);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const refreshFromRemote = useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const remotePosts = await fetchAllPostsRemote();
+      if (!remotePosts.length) return;
+
+      setPostsWithPersist((prev) => {
+        const grouped = remotePosts.reduce((acc, post) => {
+          const city = post.city ?? post.sourceCity ?? 'Unknown';
+          const mapped = {
+            ...post,
+            comments: post.comments ?? [],
+            createdByMe: prev[city]?.some((p) => p.id === post.id && p.createdByMe) ?? false
+          };
+          if (!acc[city]) acc[city] = [];
+          acc[city].push(mapped);
+          return acc;
+        }, {});
+
+        Object.keys(grouped).forEach((city) => {
+          grouped[city].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+        });
+
+        Object.entries(prev).forEach(([city, posts]) => {
+          const target = grouped[city] ?? [];
+          const remoteIds = new Set(target.map((post) => post.id));
+          posts.forEach((post) => {
+            if (!remoteIds.has(post.id)) {
+              target.push(post);
+            }
+          });
+          target.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+          grouped[city] = target;
+        });
+
+        return grouped;
+      });
+    } catch (error) {
+      console.warn('[PostsProvider] refresh remote failed', error?.message ?? error);
     }
-    const author = normalizeProfile(authorProfile);
+  }, [isOnline, setPostsWithPersist]);
 
-    setPostsByCity((prev) => {
-      const cityPosts = prev[city] ?? [];
+  useEffect(() => {
+    if (isOnline) {
+      refreshFromRemote();
+    }
+  }, [isOnline, refreshFromRemote]);
+
+  useEffect(() => {
+    if (!isOnline || pendingQueue.length === 0) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const remaining = [];
+      for (const operation of pendingQueue) {
+        if (cancelled) return;
+        try {
+          if (operation.type === 'addPost') {
+            await savePostRemote(operation.payload.post);
+          } else if (operation.type === 'addComment') {
+            await saveCommentRemote(operation.payload.postId, operation.payload.comment);
+          }
+        } catch (error) {
+          console.warn('[PostsProvider] queue operation failed', error);
+          remaining.push(operation);
+        }
+      }
+
+      if (!cancelled) {
+        if (remaining.length !== pendingQueue.length) {
+          setPendingQueue(remaining);
+          persistQueue(remaining);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOnline, pendingQueue, persistQueue]);
+
+  const addPost = useCallback(
+    (city, message, colorKey = 'royal', authorProfile = null) => {
+      const trimmed = message.trim();
+      if (!trimmed) {
+        return;
+      }
+      const author = normalizeProfile(authorProfile);
+      const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const newPost = {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        id: newPostId,
+        city,
         message: trimmed,
         createdAt: Date.now(),
         createdByMe: true,
         colorKey,
         sourceCity: city,
-        sourcePostId: null, // fill after id set
+        sourcePostId: newPostId,
         comments: [],
         upvotes: 0,
         downvotes: 0,
@@ -48,41 +233,40 @@ export function PostsProvider({ children }) {
         author
       };
 
-      newPost.sourcePostId = newPost.id;
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        return { ...prev, [city]: [newPost, ...cityPosts] };
+      });
 
-      return { ...prev, [city]: [newPost, ...cityPosts] };
-    });
-  }, []);
+      enqueueOperation({ type: 'addPost', payload: { post: newPost } });
+    },
+    [enqueueOperation, setPostsWithPersist]
+  );
 
-  const addComment = useCallback((city, postId, message) => {
-    const trimmed = message.trim();
-    if (!trimmed) {
-      return;
-    }
+  const addComment = useCallback(
+    (city, postId, message) => {
+      const trimmed = message.trim();
+      if (!trimmed) {
+        return;
+      }
 
-    setPostsByCity((prev) => {
-      const cityPosts = prev[city] ?? [];
+      const newComment = createComment(trimmed);
 
-      const updatedPosts = cityPosts.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              comments: [
-                ...post.comments,
-                {
-                  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                  message: trimmed,
-                  createdAt: Date.now(),
-                  createdByMe: true
-                }
-              ]
-            }
-          : post
-      );
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        const updatedPosts = cityPosts.map((post) =>
+          post.id === postId
+            ? { ...post, comments: [...(post.comments ?? []), newComment] }
+            : post
+        );
 
-      return { ...prev, [city]: updatedPosts };
-    });
-  }, []);
+        return { ...prev, [city]: updatedPosts };
+      });
+
+      enqueueOperation({ type: 'addComment', payload: { city, postId, comment: newComment } });
+    },
+    [enqueueOperation, setPostsWithPersist]
+  );
 
   const getPostsForCity = useCallback(
     (city) => postsByCity[city] ?? [],
@@ -174,28 +358,32 @@ export function PostsProvider({ children }) {
     return count;
   }, [postsByCity]);
 
-  const sharePost = useCallback((fromCity, postId, toCity, authorProfile = null) => {
-    if (fromCity === toCity) {
-      return;
-    }
-
-    setPostsByCity((prev) => {
-      const fromPosts = prev[fromCity] ?? [];
-      const original = fromPosts.find((post) => post.id === postId);
-      if (!original) {
-        return prev;
+  const sharePost = useCallback(
+    (fromCity, postId, toCity, authorProfile = null) => {
+      if (fromCity === toCity) {
+        return;
       }
-      const author = normalizeProfile(authorProfile ?? original.author);
 
-      const targetPosts = prev[toCity] ?? [];
-      const newPost = {
-        ...original,
+      const basePost = (() => {
+        const fromPosts = postsByCity[fromCity] ?? [];
+        return fromPosts.find((post) => post.id === postId) ?? null;
+      })();
+
+      if (!basePost) {
+        return;
+      }
+
+      const author = normalizeProfile(authorProfile ?? basePost.author);
+
+      const sharedPost = {
+        ...basePost,
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        city: toCity,
         createdAt: Date.now(),
         comments: [],
         sharedFrom: { city: fromCity },
-        sourceCity: original.sourceCity ?? fromCity,
-        sourcePostId: original.sourcePostId ?? original.id,
+        sourceCity: basePost.sourceCity ?? basePost.city ?? fromCity,
+        sourcePostId: basePost.sourcePostId ?? basePost.id,
         createdByMe: true,
         upvotes: 0,
         downvotes: 0,
@@ -203,15 +391,21 @@ export function PostsProvider({ children }) {
         author
       };
 
-      return {
-        ...prev,
-        [toCity]: [newPost, ...targetPosts]
-      };
-    });
-  }, []);
+      setPostsWithPersist((prev) => {
+        const targetPosts = prev[toCity] ?? [];
+        return {
+          ...prev,
+          [toCity]: [sharedPost, ...targetPosts]
+        };
+      });
+
+      enqueueOperation({ type: 'addPost', payload: { post: sharedPost } });
+    },
+    [enqueueOperation, postsByCity, setPostsWithPersist]
+  );
 
   const toggleVote = useCallback((city, postId, direction) => {
-    setPostsByCity((prev) => {
+    setPostsWithPersist((prev) => {
       const cityPosts = prev[city] ?? [];
       const updated = cityPosts.map((post) => {
         if (post.id !== postId) {
@@ -256,7 +450,7 @@ export function PostsProvider({ children }) {
 
       return { ...prev, [city]: updated };
     });
-  }, []);
+  }, [setPostsWithPersist]);
 
   const value = useMemo(
     () => ({
@@ -270,7 +464,17 @@ export function PostsProvider({ children }) {
       getReplyNotificationCount,
       toggleVote
     }),
-    [addComment, addPost, getPostById, getPostsForCity, getAllPosts, sharePost, getRecentCityActivity, getReplyNotificationCount, toggleVote]
+    [
+      addComment,
+      addPost,
+      getPostById,
+      getPostsForCity,
+      getAllPosts,
+      sharePost,
+      getRecentCityActivity,
+      getReplyNotificationCount,
+      toggleVote
+    ]
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;
