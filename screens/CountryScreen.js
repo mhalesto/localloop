@@ -10,15 +10,19 @@ import {
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePosts } from '../contexts/PostsContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
 
 const INITIAL_VISIBLE = 40;
 const PAGE_SIZE = 30;
-const TOP_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
+const TOP_TRENDING_TO_SHOW = 6;
+const CHIP_ROW_MAX = 4;
+const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, userProfile } = useSettings();
+  const { getRecentCityActivity } = usePosts();
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -27,29 +31,6 @@ export default function CountryScreen({ navigation }) {
   const [personalCities, setPersonalCities] = useState([]);
   const [personalLoading, setPersonalLoading] = useState(false);
   const [personalError, setPersonalError] = useState('');
-  const [showPersonalized, setShowPersonalized] = useState(false);
-  const profileCountry = userProfile?.country ?? '';
-  const profileProvince = userProfile?.province ?? '';
-  const hasProfileLocation = Boolean(profileCountry && profileProvince);
-
-  const loadPersonalCities = useCallback(async () => {
-    if (!profileCountry || !profileProvince) {
-      return;
-    }
-    try {
-      setPersonalLoading(true);
-      const results = await fetchCities(profileCountry, profileProvince);
-      const unique = Array.from(
-        new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
-      ).sort((a, b) => a.localeCompare(b));
-      setPersonalCities(unique);
-      setPersonalError('');
-    } catch (err) {
-      setPersonalError('Unable to load your province right now.');
-    } finally {
-      setPersonalLoading(false);
-    }
-  }, [profileCountry, profileProvince]);
 
   useEffect(() => {
     let mounted = true;
@@ -84,17 +65,6 @@ export default function CountryScreen({ navigation }) {
     setVisibleCount(INITIAL_VISIBLE);
   }, [query]);
 
-  useEffect(() => {
-    if (hasProfileLocation) {
-      setShowPersonalized(true);
-      loadPersonalCities();
-    } else {
-      setShowPersonalized(false);
-      setPersonalCities([]);
-      setPersonalError('');
-    }
-  }, [hasProfileLocation, loadPersonalCities]);
-
   const filtered = useMemo(() => {
     if (!query.trim()) {
       return countries;
@@ -108,25 +78,38 @@ export default function CountryScreen({ navigation }) {
     );
   }, [countries, query]);
 
-  const personalFiltered = useMemo(() => {
-    if (!query.trim()) {
-      return personalCities;
-    }
-    const lower = query.trim().toLowerCase();
-    return personalCities.filter((cityName) => cityName.toLowerCase().includes(lower));
-  }, [personalCities, query]);
-
   const topCountries = useMemo(() => {
     if (!countries.length) return [];
-    const matched = TOP_COUNTRY_CODES.map((code) =>
+    const matched = FALLBACK_COUNTRY_CODES.map((code) =>
       countries.find((country) => country.iso2 === code)
     ).filter(Boolean);
-    if (matched.length >= 10) return matched;
+    if (matched.length >= TOP_TRENDING_TO_SHOW) return matched.slice(0, TOP_TRENDING_TO_SHOW);
     const fallback = countries.filter(
       (country) => !matched.some((item) => item.iso2 === country.iso2)
     );
-    return [...matched, ...fallback].slice(0, 10);
-  }, [TOP_COUNTRY_CODES, countries]);
+    return [...matched, ...fallback].slice(0, TOP_TRENDING_TO_SHOW);
+  }, [countries]);
+
+  const trendingCities = useMemo(() => {
+    if (!getRecentCityActivity) return [];
+    return getRecentCityActivity({
+      limit: TOP_TRENDING_TO_SHOW,
+      province: userProfile?.province,
+      country: userProfile?.country
+    });
+  }, [getRecentCityActivity, userProfile?.province, userProfile?.country]);
+  const hasLocalActivity = trendingCities.length > 0 && Boolean(userProfile?.country || userProfile?.province);
+  const topChipItems = useMemo(() => {
+    if (hasLocalActivity) {
+      return trendingCities.map((item) => ({
+        type: 'city',
+        city: item.city,
+        province: item.province,
+        country: item.country
+      }));
+    }
+    return topCountries.map((item) => ({ type: 'country', country: item }));
+  }, [hasLocalActivity, topCountries, trendingCities]);
 
   const paginated = useMemo(
     () => filtered.slice(0, visibleCount),
@@ -138,20 +121,55 @@ export default function CountryScreen({ navigation }) {
     setVisibleCount((prev) => Math.min(filtered.length, prev + PAGE_SIZE));
   }, [filtered.length, visibleCount]);
 
-  const showingPersonalized = hasProfileLocation && showPersonalized;
-  const listData = showingPersonalized ? personalFiltered : paginated;
-  const listIsEmpty = listData.length === 0;
-  const searchPlaceholder = showingPersonalized ? 'Search cities' : 'Search countries';
-  const subtitleText = showingPersonalized
-    ? [profileProvince, profileCountry].filter(Boolean).join(' · ')
-    : 'Choose your country';
+  const chipItemsToShow = topChipItems.slice(0, CHIP_ROW_MAX);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCities() {
+      if (!userProfile?.country || !userProfile?.province) {
+        setPersonalCities([]);
+        setPersonalError('');
+        return;
+      }
+      try {
+        setPersonalLoading(true);
+        const results = await fetchCities(userProfile.country, userProfile.province);
+        if (cancelled) return;
+        const unique = Array.from(
+          new Set((results ?? []).filter((name) => typeof name === 'string' && name.trim().length > 0))
+        ).sort((a, b) => a.localeCompare(b));
+        setPersonalCities(unique);
+        setPersonalError('');
+      } catch (err) {
+        if (cancelled) return;
+        setPersonalError('Unable to load your province right now.');
+        setPersonalCities([]);
+      } finally {
+        if (!cancelled) {
+          setPersonalLoading(false);
+        }
+      }
+    }
+    loadCities();
+    return () => {
+      cancelled = true;
+    };
+  }, [userProfile?.country, userProfile?.province]);
+
+  const personalFiltered = useMemo(() => {
+    if (!query.trim()) return personalCities;
+    const lower = query.trim().toLowerCase();
+    return personalCities.filter((cityName) => cityName.toLowerCase().includes(lower));
+  }, [personalCities, query]);
+
+  const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0;
 
   return (
     <ScreenLayout
       title="Explore"
-      subtitle={subtitleText || 'Choose your country'}
+      subtitle="Choose your country"
       showSearch
-      searchPlaceholder={searchPlaceholder}
+      searchPlaceholder="Search countries"
       searchValue={query}
       onSearchChange={setQuery}
       navigation={navigation}
@@ -167,46 +185,54 @@ export default function CountryScreen({ navigation }) {
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Top picks</Text>
-          </View>
-          <View style={styles.chipStaticRow}>
-            {topCountries.map((item, index) => (
-              <TouchableOpacity
-                key={item.iso2 ?? item.name}
-                style={[styles.chip, styles[`chipColor${index % 3}`]]}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('Province', { country: item.name })}
-              >
-                <Text style={styles.chipText}>{item.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
-              {showingPersonalized
-                ? `${profileProvince || 'Your province'} cities`
-                : 'All destinations'}
-            </Text>
-            {hasProfileLocation ? (
-              <TouchableOpacity
-                onPress={() => setShowPersonalized((prev) => !prev)}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.sectionAction}>
-                  {showingPersonalized ? 'Browse countries' : 'Show my cities'}
-                </Text>
-              </TouchableOpacity>
+            {hasLocalActivity ? (
+              <Text style={styles.sectionHint}>Latest activity near you</Text>
             ) : null}
           </View>
 
+          <View style={styles.chipStaticRow}>
+            {chipItemsToShow.map((item, index) => {
+              const backgroundStyle = styles[`chipColor${index % 3}`];
+              const label = item.type === 'city' ? item.city : item.country.name;
+              const isLast = index === chipItemsToShow.length - 1;
+
+              return (
+                <TouchableOpacity
+                  key={`${item.type}-${label}`}
+                  style={[styles.chip, backgroundStyle, !isLast && styles.chipSpacing]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    item.type === 'city'
+                      ? navigation.navigate('Room', { city: item.city })
+                      : navigation.navigate('Province', { country: item.country.name })
+                  }
+                >
+                  {item.type === 'city' && index === 0 ? (
+                    <View style={styles.hotBadge}>
+                      <Text style={styles.hotBadgeText}>Hot</Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
+            {showingPersonalized
+              ? `${userProfile?.province || 'Your province'} cities`
+              : 'All destinations'}
+          </Text>
           {showingPersonalized && personalError ? (
             <Text style={styles.personalError}>{personalError}</Text>
           ) : null}
 
           <FlatList
-            data={listData}
+            data={showingPersonalized ? personalFiltered : paginated}
             keyExtractor={(item) =>
-              typeof item === 'string' ? item : item.iso2 ?? item.name
+              showingPersonalized ? item : item.iso2 ?? item.name
             }
             renderItem={({ item }) =>
               showingPersonalized ? (
@@ -217,8 +243,7 @@ export default function CountryScreen({ navigation }) {
                 >
                   <Text style={styles.cardTitle}>{item}</Text>
                   <Text style={styles.cardSubtitle}>
-                    {[profileProvince, profileCountry].filter(Boolean).join(', ') ||
-                      'Jump into this city'}
+                    {[userProfile?.province, userProfile?.country].filter(Boolean).join(', ') || 'Jump into this city'}
                   </Text>
                   <Text style={styles.cardAction}>Enter room →</Text>
                 </TouchableOpacity>
@@ -256,7 +281,7 @@ export default function CountryScreen({ navigation }) {
             }
             contentContainerStyle={[
               styles.listContent,
-              listIsEmpty && styles.listContentEmpty
+              (showingPersonalized ? personalFiltered.length === 0 : paginated.length === 0) && styles.listContentEmpty
             ]}
             showsVerticalScrollIndicator={false}
             onEndReached={showingPersonalized ? undefined : handleLoadMore}
@@ -275,6 +300,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 16,
   },
+  sectionHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
   secondaryTitle: {
     marginTop: 12,
   },
@@ -283,14 +312,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  sectionAction: {
-    color: colors.primaryDark,
-    fontSize: 13,
-    fontWeight: '600',
-  },
   chipStaticRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'nowrap',
     justifyContent: 'space-between',
     marginTop: 12,
     marginBottom: 16,
@@ -298,10 +323,10 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: colors.card,
     borderRadius: 999,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 10,
-    marginRight: 12,
-    minWidth: 100,
+    minWidth: 110,
+    flexShrink: 1,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -310,6 +335,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+    position: 'relative'
+  },
+  chipSpacing: {
+    marginRight: 12
   },
   chipText: {
     fontSize: 14,
@@ -320,13 +349,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   chipColor0: {
-    backgroundColor: '#D8CEFF', // lilac
+    backgroundColor: '#D8CEFF',
   },
   chipColor1: {
-    backgroundColor: '#CFE1FF', // light blue
+    backgroundColor: '#CFE1FF',
   },
   chipColor2: {
-    backgroundColor: '#EBD0FF', // pink-lilac
+    backgroundColor: '#EBD0FF',
+  },
+  hotBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF4D6D',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  hotBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase'
   },
   listContent: {
     paddingBottom: 80,
@@ -339,11 +383,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     fontSize: 15,
-  },
-  personalError: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginBottom: 8
   },
   card: {
     backgroundColor: colors.card,

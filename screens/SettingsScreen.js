@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   Switch,
   Text,
@@ -8,6 +9,7 @@ import {
   StyleSheet,
   TextInput
 } from 'react-native';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { colors } from '../constants/colors';
@@ -16,7 +18,6 @@ import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
 
 export default function SettingsScreen({ navigation }) {
-  const [locationEnabled, setLocationEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const {
     showAddShortcut,
@@ -26,12 +27,15 @@ export default function SettingsScreen({ navigation }) {
     setAccentKey,
     accentPreset,
     userProfile,
-    updateUserProfile
+    updateUserProfile,
+    locationPermissionStatus,
+    setLocationPermissionStatus
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const avatarConfig = getAvatarConfig(userProfile.avatarKey);
+  const locationEnabled = locationPermissionStatus === 'granted';
 
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
@@ -63,6 +67,41 @@ export default function SettingsScreen({ navigation }) {
 
   const handleClearLocation = () => {
     updateUserProfile({ city: '', province: '', country: '' });
+  };
+
+  const handleToggleLocation = async (value) => {
+    if (value) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationPermissionStatus(status);
+          Alert.alert(
+            'Permission needed',
+            'We need location permission to suggest nearby rooms.'
+          );
+          return;
+        }
+        setLocationPermissionStatus('granted');
+        try {
+          const position = await Location.getCurrentPositionAsync({});
+          const [address] = await Location.reverseGeocodeAsync(position.coords);
+          if (address) {
+            updateUserProfile({
+              city: address.city ?? address.subregion ?? userProfile.city,
+              province: address.region ?? userProfile.province,
+              country: address.country ?? userProfile.country
+            });
+          }
+        } catch (err) {
+          // ignore reverse geocode failures
+        }
+      } catch (error) {
+        Alert.alert('Location error', 'Unable to access location right now.');
+        setLocationPermissionStatus('denied');
+      }
+    } else {
+      setLocationPermissionStatus('disabled');
+    }
   };
 
   const locationSummary = useMemo(() => {
@@ -100,7 +139,7 @@ export default function SettingsScreen({ navigation }) {
             </View>
             <Switch
               value={locationEnabled}
-              onValueChange={setLocationEnabled}
+              onValueChange={handleToggleLocation}
               trackColor={{ true: accentSwitchColor, false: '#d1d5db' }}
               thumbColor={locationEnabled ? accentSwitchColor : '#f4f3f4'}
             />

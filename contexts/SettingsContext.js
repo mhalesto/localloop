@@ -103,6 +103,7 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [showAddShortcut, setShowAddShortcut] = useState(true);
   const [accentKey, setAccentKey] = useState(accentPresets[0].key);
+  const [locationPermissionStatus, setLocationPermissionStatus] = useState('undetermined');
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -139,9 +140,11 @@ export function SettingsProvider({ children }) {
       accentPreset,
       accentOptions: accentPresets,
       userProfile,
-      updateUserProfile
+      updateUserProfile,
+      locationPermissionStatus,
+      setLocationPermissionStatus
     }),
-    [showAddShortcut, updateShowAddShortcut, accentKey, updateAccentKey, accentPreset, userProfile, updateUserProfile]
+    [showAddShortcut, updateShowAddShortcut, accentKey, updateAccentKey, accentPreset, userProfile, updateUserProfile, locationPermissionStatus, setLocationPermissionStatus]
   );
 
   return (

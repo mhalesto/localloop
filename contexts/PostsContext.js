@@ -103,6 +103,77 @@ export function PostsProvider({ children }) {
     );
   }, [postsByCity]);
 
+  const getRecentCityActivity = useCallback(
+    ({ limit = 6, province, country } = {}) => {
+      const entries = [];
+      Object.entries(postsByCity).forEach(([cityName, posts]) => {
+        if (!posts.length) return;
+        let lastActivity = 0;
+        let provinceMeta = '';
+        let countryMeta = '';
+        posts.forEach((post) => {
+          lastActivity = Math.max(lastActivity, post.createdAt ?? 0);
+          if (!provinceMeta && post.author?.province) {
+            provinceMeta = post.author.province;
+          }
+          if (!countryMeta && post.author?.country) {
+            countryMeta = post.author.country;
+          }
+          (post.comments ?? []).forEach((comment) => {
+            lastActivity = Math.max(lastActivity, comment.createdAt ?? 0);
+          });
+        });
+        entries.push({ city: cityName, province: provinceMeta, country: countryMeta, lastActivity });
+      });
+
+      const sortedAll = [...entries].sort((a, b) => (b.lastActivity ?? 0) - (a.lastActivity ?? 0));
+      const normalize = (value) => value?.toLowerCase().trim();
+      const selected = [];
+      const used = new Set();
+
+      const pushFrom = (list) => {
+        list.forEach((item) => {
+          if (used.has(item.city)) return;
+          selected.push(item);
+          used.add(item.city);
+        });
+      };
+
+      if (province) {
+        const provinceMatches = sortedAll.filter((item) => normalize(item.province) === normalize(province));
+        pushFrom(provinceMatches);
+      }
+
+      if (selected.length < limit && country) {
+        const countryMatches = sortedAll.filter((item) => normalize(item.country) === normalize(country));
+        pushFrom(countryMatches);
+      }
+
+      if (selected.length < limit) {
+        pushFrom(sortedAll);
+      }
+
+      return selected.slice(0, limit);
+    },
+    [postsByCity]
+  );
+
+  const getReplyNotificationCount = useCallback(() => {
+    let count = 0;
+    Object.values(postsByCity).forEach((posts) => {
+      posts.forEach((post) => {
+        const comments = post.comments ?? [];
+        const hasMyComment = comments.some((comment) => comment.createdByMe);
+        if (!hasMyComment) {
+          return;
+        }
+        const others = comments.filter((comment) => !comment.createdByMe).length;
+        count += others;
+      });
+    });
+    return count;
+  }, [postsByCity]);
+
   const sharePost = useCallback((fromCity, postId, toCity, authorProfile = null) => {
     if (fromCity === toCity) {
       return;
@@ -195,9 +266,11 @@ export function PostsProvider({ children }) {
       getPostsForCity,
       getAllPosts,
       sharePost,
+      getRecentCityActivity,
+      getReplyNotificationCount,
       toggleVote
     }),
-    [addComment, addPost, getPostById, getPostsForCity, getAllPosts, sharePost, toggleVote]
+    [addComment, addPost, getPostById, getPostsForCity, getAllPosts, sharePost, getRecentCityActivity, getReplyNotificationCount, toggleVote]
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;

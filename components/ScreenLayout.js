@@ -6,6 +6,7 @@ import AppHeader from './AppHeader';
 import { colors } from '../constants/colors';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePosts } from '../contexts/PostsContext';
 
 export default function ScreenLayout({
   children,
@@ -25,6 +26,11 @@ export default function ScreenLayout({
   headerStyle
 }) {
   const { showAddShortcut, accentPreset } = useSettings();
+  const { getReplyNotificationCount } = usePosts();
+  const myRepliesBadge = React.useMemo(
+    () => (getReplyNotificationCount ? getReplyNotificationCount() : 0),
+    [getReplyNotificationCount]
+  );
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
 
   return (
@@ -77,6 +83,7 @@ export default function ScreenLayout({
             }}
             showShortcut={showAddShortcut}
             accent={accentPreset}
+            myRepliesBadge={myRepliesBadge}
           />
         ) : null}
       </View>

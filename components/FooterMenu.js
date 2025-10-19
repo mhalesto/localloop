@@ -43,7 +43,8 @@ export default function FooterMenu({
   onPressTab,
   onAddPostShortcut,
   showShortcut = true,
-  accent
+  accent,
+  myRepliesBadge = 0
 }) {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 12);
@@ -134,6 +135,7 @@ export default function FooterMenu({
             onPress={() => onPressTab?.(tabs[1].key)}
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
+            badgeCount={myRepliesBadge}
           />
           <TabItem
             width={tabItemW}
@@ -169,7 +171,7 @@ export default function FooterMenu({
   );
 }
 
-function TabItem({ tab, active, onPress, width, activeColor, inactiveColor }) {
+function TabItem({ tab, active, onPress, width, activeColor, inactiveColor, badgeCount = 0 }) {
   return (
     <TouchableOpacity
       style={[styles.tab, { width }]}
@@ -178,6 +180,11 @@ function TabItem({ tab, active, onPress, width, activeColor, inactiveColor }) {
       accessibilityRole="tab"
       accessibilityState={active ? { selected: true } : {}}
     >
+      {badgeCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      )}
       <Ionicons
         name={tab.icon}
         size={22}
@@ -244,6 +251,25 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative'
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 22,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF4D6D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    zIndex: 2
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700'
   },
   tabLabel: {
     fontSize: 12,
