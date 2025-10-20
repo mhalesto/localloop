@@ -549,12 +549,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderRadius: 24,
       paddingVertical: 20,
       paddingHorizontal: 18,
-      marginHorizontal: 6, // matches composer spacing
-      marginTop: 4,
+      marginHorizontal: 0, // matches composer spacing
+      marginTop: 0,
       marginBottom: 8,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.24 : 0.1,
-      shadowRadius: 12,
+      shadowRadius: 4,
       shadowOffset: { width: 0, height: 8 },
       elevation: 5
     },
