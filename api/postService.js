@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   orderBy,
@@ -81,5 +82,18 @@ export async function saveCommentRemote(postId, comment) {
 
   const { id, ...rest } = comment;
   await setDoc(doc(collection(db, POSTS_COLLECTION, postId, 'comments'), id), rest, { merge: true });
+}
+
+export async function deletePostRemote(postId) {
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] deletePostRemote skipped:', error.message);
+    return;
+  }
+
+  const commentsSnapshot = await getDocs(collection(db, POSTS_COLLECTION, postId, 'comments'));
+  await Promise.all(commentsSnapshot.docs.map((commentDoc) => deleteDoc(commentDoc.ref)));
+  await deleteDoc(doc(db, POSTS_COLLECTION, postId));
 }
 

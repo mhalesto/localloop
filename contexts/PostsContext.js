@@ -10,6 +10,7 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import {
+  deletePostRemote,
   fetchAllPostsRemote,
   saveCommentRemote,
   savePostRemote
@@ -326,6 +327,8 @@ export function PostsProvider({ children }) {
             await saveCommentRemote(operation.payload.postId, operation.payload.comment);
           } else if (operation.type === 'updatePost') {
             await savePostRemote(operation.payload.post);
+          } else if (operation.type === 'deletePost') {
+            await deletePostRemote(operation.payload.id);
           }
         } catch (error) {
           console.warn('[PostsProvider] queue operation failed', error);
@@ -622,10 +625,103 @@ export function PostsProvider({ children }) {
     [enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
+  const updatePost = useCallback(
+    (city, postId, updates) => {
+      if (!city || !postId || !updates || typeof updates !== 'object') {
+        return false;
+      }
+
+      const ownerId = ensureClientId();
+      let payloadForQueue = null;
+
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        let mutated = false;
+        const timestamp = Date.now();
+        const nextPosts = cityPosts.map((post) => {
+          if (post.id !== postId) {
+            return post;
+          }
+
+          const canEdit = post.createdByMe || (post.clientId && post.clientId === ownerId);
+          if (!canEdit) {
+            return post;
+          }
+
+          const patch = { ...updates };
+          if (!('updatedAt' in patch)) {
+            patch.updatedAt = timestamp;
+          }
+
+          payloadForQueue = { id: postId, ...patch };
+          mutated = true;
+          return { ...post, ...patch };
+        });
+
+        if (!mutated) {
+          return prev;
+        }
+
+        return { ...prev, [city]: nextPosts };
+      });
+
+      if (payloadForQueue) {
+        enqueueOperation({ type: 'updatePost', payload: { post: payloadForQueue } });
+        return true;
+      }
+
+      return false;
+    },
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
+  );
+
+  const deletePost = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return false;
+      }
+
+      const ownerId = ensureClientId();
+      let removed = false;
+
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        const nextPosts = cityPosts.filter((post) => {
+          if (post.id !== postId) {
+            return true;
+          }
+
+          const canDelete = post.createdByMe || (post.clientId && post.clientId === ownerId);
+          if (canDelete) {
+            removed = true;
+            return false;
+          }
+
+          return true;
+        });
+
+        if (!removed) {
+          return prev;
+        }
+
+        return { ...prev, [city]: nextPosts };
+      });
+
+      if (removed) {
+        enqueueOperation({ type: 'deletePost', payload: { id: postId } });
+        return true;
+      }
+
+      return false;
+    },
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
+  );
+
   const value = useMemo(
     () => ({
       addComment,
       addPost,
+      deletePost,
       getPostById,
       getPostsForCity,
       getAllPosts,
@@ -633,11 +729,13 @@ export function PostsProvider({ children }) {
       getRecentCityActivity,
       getReplyNotificationCount,
       toggleVote,
+      updatePost,
       refreshPosts: refreshFromRemote
     }),
     [
       addComment,
       addPost,
+      deletePost,
       getPostById,
       getPostsForCity,
       getAllPosts,
@@ -645,6 +743,7 @@ export function PostsProvider({ children }) {
       getRecentCityActivity,
       getReplyNotificationCount,
       toggleVote,
+      updatePost,
       refreshFromRemote
     ]
   );

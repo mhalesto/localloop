@@ -1,6 +1,8 @@
 // screens/PostThreadScreen.js
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  Modal,
   View,
   Text,
   FlatList,
@@ -32,14 +34,16 @@ function AvatarIcon({ tint, size = 32, style }) {
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
-  const { addComment, getPostById, sharePost, toggleVote } = usePosts();
+  const { addComment, deletePost, getPostById, sharePost, toggleVote, updatePost } = usePosts();
   const { accentPreset, userProfile, themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const insets = useSafeAreaInsets();
 
   const [reply, setReply] = useState('');
-  const [shareMessage, setShareMessage] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editMessage, setEditMessage] = useState('');
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
@@ -107,6 +111,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const commentHighlight = `${linkColor}1A`;
   const replyButtonBackground = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const replyButtonForeground = accentPreset.buttonForeground ?? '#fff';
+  const destructiveColor = isDarkMode ? '#ff6b6b' : '#d64545';
   const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
   const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
   const authorLocation = authorLocationParts.join(', ');
@@ -115,12 +120,22 @@ export default function PostThreadScreen({ route, navigation }) {
 
   const showViewOriginal =
     post.sourceCity && post.sourcePostId && !(post.sourceCity === city && post.sourcePostId === post.id);
+  const trimmedEditMessage = editMessage.trim();
+  const editModalSaveDisabled =
+    !trimmedEditMessage || trimmedEditMessage === (post?.message ?? '').trim();
 
   useEffect(() => {
-    if (!shareMessage) return;
-    const t = setTimeout(() => setShareMessage(''), 2000);
+    if (!feedbackMessage) return;
+    const t = setTimeout(() => setFeedbackMessage(''), 2000);
     return () => clearTimeout(t);
-  }, [shareMessage]);
+  }, [feedbackMessage]);
+
+  useEffect(() => {
+    if (!editModalVisible) {
+      return;
+    }
+    setEditMessage(post?.message ?? '');
+  }, [editModalVisible, post?.message]);
 
   const openShareModal = useCallback(() => {
     setShareModalVisible(true);
@@ -137,11 +152,70 @@ export default function PostThreadScreen({ route, navigation }) {
         return;
       }
       sharePost(city, postId, targetCity, userProfile);
-      setShareMessage(`Shared to ${targetCity}`);
+      setFeedbackMessage(`Shared to ${targetCity}`);
       closeShareModal();
     },
     [city, closeShareModal, postId, sharePost, userProfile]
   );
+
+  const openEditModal = useCallback(() => {
+    if (!post?.createdByMe) {
+      return;
+    }
+    setEditMessage(post?.message ?? '');
+    setEditModalVisible(true);
+  }, [post]);
+
+  const closeEditModal = useCallback(() => {
+    setEditModalVisible(false);
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (!trimmedEditMessage) {
+      return;
+    }
+
+    if (trimmedEditMessage === (post?.message ?? '').trim()) {
+      setEditModalVisible(false);
+      return;
+    }
+
+    const success = updatePost(city, postId, { message: trimmedEditMessage });
+    if (success) {
+      setEditModalVisible(false);
+      setFeedbackMessage('Post updated');
+    } else {
+      setFeedbackMessage('Unable to update post');
+    }
+  }, [city, post?.message, postId, trimmedEditMessage, updatePost]);
+
+  const confirmDeletePost = useCallback(() => {
+    if (!post?.createdByMe) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete post',
+      'Are you sure you want to delete this post?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const success = deletePost(city, postId);
+            if (success) {
+              setEditModalVisible(false);
+              navigation.goBack();
+            } else {
+              setFeedbackMessage('Unable to delete post');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [city, deletePost, navigation, post?.createdByMe, postId]);
 
   /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
   const Header = (
@@ -184,17 +258,40 @@ export default function PostThreadScreen({ route, navigation }) {
             </View>
           </View>
 
-          {showViewOriginal ? (
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
-              }
-              style={styles.viewOriginalButton}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
-            </TouchableOpacity>
-          ) : null}
+          <View style={styles.postHeaderActions}>
+            {post.createdByMe ? (
+              <View style={[styles.ownerActionsRow, showViewOriginal && styles.ownerActionsSpacing]}>
+                <TouchableOpacity
+                  onPress={openEditModal}
+                  style={[styles.ownerActionButton, styles.ownerActionButtonFirst]}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="create-outline" size={18} color={linkColor} />
+                  <Text style={[styles.ownerActionText, { color: linkColor }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmDeletePost}
+                  style={styles.ownerActionButton}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="trash-outline" size={18} color={destructiveColor} />
+                  <Text style={[styles.ownerActionText, { color: destructiveColor }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {showViewOriginal ? (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+                }
+                style={styles.viewOriginalButton}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
@@ -325,12 +422,6 @@ export default function PostThreadScreen({ route, navigation }) {
       </View>
 
       {/* Toast */}
-      {shareMessage ? (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>{shareMessage}</Text>
-        </View>
-      ) : null}
-
       <ShareLocationModal
         visible={shareModalVisible}
         onClose={closeShareModal}
@@ -340,6 +431,54 @@ export default function PostThreadScreen({ route, navigation }) {
         initialCountry={userProfile.country || undefined}
         initialProvince={userProfile.province || undefined}
       />
+
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEditModal}
+      >
+        <View style={styles.editModalOverlay}>
+          <View style={styles.editModalCard}>
+            <Text style={styles.editModalTitle}>Edit post</Text>
+            <TextInput
+              value={editMessage}
+              onChangeText={setEditMessage}
+              multiline
+              style={styles.editModalInput}
+              placeholder="Update your message"
+              placeholderTextColor={themeColors.textSecondary}
+            />
+            <View style={styles.editModalActions}>
+              <TouchableOpacity
+                onPress={closeEditModal}
+                style={[styles.editModalButton, styles.editModalButtonSecondary]}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.editModalButtonText, styles.editModalButtonSecondaryText]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveEdit}
+                style={[
+                  styles.editModalButton,
+                  styles.editModalButtonPrimary,
+                  { opacity: editModalSaveDisabled ? 0.6 : 1 },
+                ]}
+                disabled={editModalSaveDisabled}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.editModalButtonText, styles.editModalButtonPrimaryText]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {feedbackMessage ? (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{feedbackMessage}</Text>
+        </View>
+      ) : null}
     </ScreenLayout>
   );
 }
@@ -366,6 +505,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     /* Header */
     postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
+    postHeaderActions: { alignItems: 'flex-end', maxWidth: '45%', marginLeft: 12 },
     avatar: {
       width: 44,
       height: 44,
@@ -397,6 +537,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
     viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
     viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
+    ownerActionsRow: { flexDirection: 'row', alignItems: 'center' },
+    ownerActionsSpacing: { marginBottom: 8 },
+    ownerActionButton: { flexDirection: 'row', alignItems: 'center', marginLeft: 12, paddingVertical: 4 },
+    ownerActionButtonFirst: { marginLeft: 0 },
+    ownerActionText: { marginLeft: 4, fontSize: 12, fontWeight: '600' },
 
     /* Comments (wider) */
     commentRow: {
@@ -480,6 +625,44 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       alignItems: 'center'
     },
     toastText: { color: '#fff', fontSize: 12 },
+
+    editModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24
+    },
+    editModalCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: palette.card,
+      borderRadius: 24,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.45 : 0.15,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10
+    },
+    editModalTitle: { fontSize: 18, fontWeight: '700', color: palette.textPrimary, marginBottom: 12 },
+    editModalInput: {
+      minHeight: 120,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      padding: 12,
+      color: palette.textPrimary,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff',
+      textAlignVertical: 'top'
+    },
+    editModalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20 },
+    editModalButton: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 14 },
+    editModalButtonSecondary: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.divider },
+    editModalButtonPrimary: { backgroundColor: palette.primary },
+    editModalButtonText: { fontSize: 14, fontWeight: '600' },
+    editModalButtonSecondaryText: { color: palette.textSecondary },
+    editModalButtonPrimaryText: { color: '#fff' },
 
     /* Missing state */
     missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },
