@@ -196,8 +196,12 @@ export default function PostThreadScreen({ route, navigation }) {
         }
         metaBits.push(`${city} Room`);
         const shareLines = [];
-        const trimmedMessage = post.message?.trim();
-        if (trimmedMessage) {
+        const trimmedTitle = post.title?.trim?.();
+        const trimmedMessage = post.message?.trim?.();
+        if (trimmedTitle) {
+          shareLines.push(trimmedTitle);
+        }
+        if (trimmedMessage && trimmedMessage !== trimmedTitle) {
           shareLines.push(trimmedMessage);
         }
         shareLines.push(metaBits.join(' • '));
@@ -227,12 +231,17 @@ export default function PostThreadScreen({ route, navigation }) {
   }, []);
 
   const handleSubmitEdit = useCallback(
-    ({ message: nextMessage, colorKey }) => {
-      const trimmed = nextMessage?.trim?.() ?? '';
+    ({ title: nextTitle, message: nextMessage, colorKey }) => {
+      const trimmedTitle = nextTitle?.trim?.() ?? '';
+      const trimmedMessage = nextMessage?.trim?.() ?? '';
       const updates = {};
 
-      if (trimmed && trimmed !== (post?.message ?? '').trim()) {
-        updates.message = trimmed;
+      if (trimmedTitle && trimmedTitle !== (post?.title ?? '').trim()) {
+        updates.title = trimmedTitle;
+      }
+
+      if (trimmedMessage !== (post?.message ?? '').trim()) {
+        updates.message = trimmedMessage;
       }
 
       if (colorKey && colorKey !== post?.colorKey) {
@@ -252,7 +261,7 @@ export default function PostThreadScreen({ route, navigation }) {
         setFeedbackMessage('Unable to update post');
       }
     },
-    [city, post?.colorKey, post?.message, postId, updatePost]
+    [city, post?.colorKey, post?.message, post?.title, postId, updatePost]
   );
 
   const confirmDeletePost = useCallback(() => {
@@ -326,132 +335,144 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [ownerMenuVisible, post?.createdByMe]);
 
   const renderPostCard = useCallback(
-    ({ hideHeaderActions = false } = {}) => (
-      <View style={[styles.postCard, { backgroundColor: headerColor }]}>
-        <View style={styles.postHeaderRow}>
-          <View style={styles.postHeader}>
-            <View style={[styles.avatar, { backgroundColor: authorAvatarBackground }]}>
-              <View style={styles.avatarRing} />
-              {authorAvatar.icon ? (
-                <Ionicons
-                  name={authorAvatar.icon.name}
-                  size={22}
-                  color={authorAvatar.icon.color ?? '#fff'}
-                />
-              ) : (
-                <Text style={[styles.avatarEmoji, { color: authorAvatar.foregroundColor ?? '#fff' }]}>
-                  {authorAvatar.emoji ?? '🙂'}
-                </Text>
-              )}
+    ({ hideHeaderActions = false } = {}) => {
+      if (!post) {
+        return null;
+      }
+      const trimmedTitle = post?.title?.trim?.() ?? '';
+      const trimmedDescription = post?.message?.trim?.() ?? '';
+      const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+
+      return (
+        <View style={[styles.postCard, { backgroundColor: headerColor }]}>
+          <View style={styles.postHeaderRow}>
+            <View style={styles.postHeader}>
+              <View style={[styles.avatar, { backgroundColor: authorAvatarBackground }]}>
+                <View style={styles.avatarRing} />
+                {authorAvatar.icon ? (
+                  <Ionicons
+                    name={authorAvatar.icon.name}
+                    size={22}
+                    color={authorAvatar.icon.color ?? '#fff'}
+                  />
+                ) : (
+                  <Text style={[styles.avatarEmoji, { color: authorAvatar.foregroundColor ?? '#fff' }]}>
+                    {authorAvatar.emoji ?? '🙂'}
+                  </Text>
+                )}
+              </View>
+
+              <View>
+                <Text style={[styles.postBadge, { color: badgeTextColor }]}>{authorName}</Text>
+                {authorLocation ? (
+                  <Text
+                    style={[styles.postCity, { color: headerMetaColor }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {authorLocation}
+                  </Text>
+                ) : null}
+                {post.sourceCity && post.sourceCity !== city ? (
+                  <Text style={[styles.postCity, { color: headerMetaColor }]}>{post.sourceCity} Room</Text>
+                ) : null}
+                {post.sharedFrom?.city ? (
+                  <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>Shared from {post.sharedFrom.city}</Text>
+                ) : null}
+              </View>
             </View>
 
-            <View>
-              <Text style={[styles.postBadge, { color: badgeTextColor }]}>{authorName}</Text>
-              {authorLocation ? (
-                <Text
-                  style={[styles.postCity, { color: headerMetaColor }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
+            {!hideHeaderActions ? (
+              <View style={styles.postHeaderActions}>
+                {showViewOriginal ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+                    }
+                    style={styles.viewOriginalButton}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  onPress={handleShareOutside}
+                  style={[styles.shareExternalButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share this post"
+                  disabled={isSharingOutside}
                 >
-                  {authorLocation}
-                </Text>
-              ) : null}
-              {post.sourceCity && post.sourceCity !== city ? (
-                <Text style={[styles.postCity, { color: headerMetaColor }]}>{post.sourceCity} Room</Text>
-              ) : null}
-              {post.sharedFrom?.city ? (
-                <Text style={[styles.sharedBanner, { color: headerMetaColor }]}>Shared from {post.sharedFrom.city}</Text>
-              ) : null}
-            </View>
+                  {isSharingOutside ? (
+                    <ActivityIndicator size="small" color={linkColor} style={styles.shareExternalSpinner} />
+                  ) : (
+                    <Ionicons name="share-social-outline" size={18} color={linkColor} />
+                  )}
+                </TouchableOpacity>
+
+                {post.createdByMe ? (
+                  <TouchableOpacity
+                    ref={ownerMenuAnchorRef}
+                    onPress={openOwnerMenu}
+                    style={[styles.ownerMenuTrigger, showViewOriginal && styles.ownerMenuTriggerWithOriginal]}
+                    activeOpacity={0.65}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color={linkColor} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
           </View>
 
-          {!hideHeaderActions ? (
-            <View style={styles.postHeaderActions}>
-              {showViewOriginal ? (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
-                  }
-                  style={styles.viewOriginalButton}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
-                </TouchableOpacity>
-              ) : null}
+          <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
+          {trimmedDescription && trimmedDescription !== displayTitle ? (
+            <Text style={[styles.postMessage, { color: headerTitleColor }]}>{trimmedDescription}</Text>
+          ) : null}
+          <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+            {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+          </Text>
 
+          <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
+            <View style={styles.actionsRow}>
               <TouchableOpacity
-                onPress={handleShareOutside}
-                style={[styles.shareExternalButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                style={styles.actionButton}
+                onPress={() => toggleVote(city, postId, 'up')}
                 activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="Share this post"
-                disabled={isSharingOutside}
               >
-                {isSharingOutside ? (
-                  <ActivityIndicator size="small" color={linkColor} style={styles.shareExternalSpinner} />
-                ) : (
-                  <Ionicons name="share-social-outline" size={18} color={linkColor} />
-                )}
+                <Ionicons
+                  name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                  size={20}
+                  color={post.userVote === 'up' ? linkColor : headerMetaColor}
+                />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
               </TouchableOpacity>
 
-              {post.createdByMe ? (
-                <TouchableOpacity
-                  ref={ownerMenuAnchorRef}
-                  onPress={openOwnerMenu}
-                  style={[styles.ownerMenuTrigger, showViewOriginal && styles.ownerMenuTriggerWithOriginal]}
-                  activeOpacity={0.65}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="ellipsis-vertical" size={18} color={linkColor} />
-                </TouchableOpacity>
-              ) : null}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => toggleVote(city, postId, 'down')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                  size={20}
+                  color={post.userVote === 'down' ? linkColor : headerMetaColor}
+                />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionButton} onPress={openShareModal} activeOpacity={0.7}>
+                <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.shareCount ?? 0}</Text>
+                <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+              </TouchableOpacity>
             </View>
-          ) : null}
-        </View>
-
-        <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
-        <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-          {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-        </Text>
-
-        <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleVote(city, postId, 'up')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
-                size={20}
-                color={post.userVote === 'up' ? linkColor : headerMetaColor}
-              />
-              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => toggleVote(city, postId, 'down')}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
-                size={20}
-                color={post.userVote === 'down' ? linkColor : headerMetaColor}
-              />
-              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionButton} onPress={openShareModal} activeOpacity={0.7}>
-              <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
-              <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.shareCount ?? 0}</Text>
-              <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
-    ),
+      );
+    },
     [
       authorAvatar,
       authorAvatarBackground,
@@ -598,6 +619,7 @@ export default function PostThreadScreen({ route, navigation }) {
         initialLocation={editInitialLocation}
         initialAccentKey={post?.colorKey ?? accentPreset.key}
         initialMessage={post?.message ?? ''}
+        initialTitle={post?.title ?? ''}
         authorProfile={post?.author ?? {}}
         allowLocationChange={false}
         onSubmit={handleSubmitEdit}
@@ -711,7 +733,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postBadge: { fontSize: 16, fontWeight: '700' },
     postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
     sharedBanner: { fontSize: 12, marginTop: 6 },
-    postMessage: { fontSize: 20, marginBottom: 18, fontWeight: '500' },
+    postTitle: { fontSize: 22, marginTop: 6, marginBottom: 10, fontWeight: '700', lineHeight: 28 },
+    postMessage: { fontSize: 18, marginBottom: 18, fontWeight: '500', lineHeight: 24 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
     actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },

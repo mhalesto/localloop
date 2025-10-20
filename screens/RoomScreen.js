@@ -22,6 +22,7 @@ export default function RoomScreen({ navigation, route }) {
   const posts = getPostsForCity(city);
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedColorKey, setSelectedColorKey] = useState(accentKey);
   const [shareModalVisible, setShareModalVisible] = useState(false);
@@ -102,8 +103,10 @@ export default function RoomScreen({ navigation, route }) {
   );
 
   const handleAddPost = () => {
-    if (message.trim() === '') return;
-    addPost(city, message, selectedColorKey, userProfile);
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+    addPost(city, trimmedTitle, message, selectedColorKey, userProfile);
+    setTitle('');
     setMessage('');
   };
 
@@ -172,7 +175,7 @@ export default function RoomScreen({ navigation, route }) {
                 color={authorAvatarConfig.icon.color ?? '#fff'}
               />
             ) : (
-              <Text style={[styles.previewAvatarEmoji, { color: authorAvatarConfig.foregroundColor ?? '#fff' }]}> 
+              <Text style={[styles.previewAvatarEmoji, { color: authorAvatarConfig.foregroundColor ?? '#fff' }]}>
                 {authorAvatarConfig.emoji ?? '🙂'}
               </Text>
             )}
@@ -185,6 +188,14 @@ export default function RoomScreen({ navigation, route }) {
           </View>
         </View>
         <TextInput
+          placeholder="Post title"
+          value={title}
+          onChangeText={setTitle}
+          style={[styles.previewTitleInput, { color: previewPrimary }]}
+          placeholderTextColor={previewMeta}
+          returnKeyType="next"
+        />
+        <TextInput
           placeholder="What's happening in this room?"
           value={message}
           onChangeText={setMessage}
@@ -194,10 +205,14 @@ export default function RoomScreen({ navigation, route }) {
         />
       </View>
       <TouchableOpacity
-        style={[styles.primaryButton, { backgroundColor: buttonBackground }, message.trim() === '' && styles.primaryButtonDisabled]}
+        style={[
+          styles.primaryButton,
+          { backgroundColor: buttonBackground },
+          !title.trim() && styles.primaryButtonDisabled,
+        ]}
         onPress={handleAddPost}
         activeOpacity={0.85}
-        disabled={message.trim() === ''}
+        disabled={!title.trim()}
       >
         <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
       </TouchableOpacity>
@@ -416,6 +431,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     previewMeta: {
       fontSize: 12,
       marginTop: 4
+    },
+    previewTitleInput: {
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 10,
     },
     previewInput: {
       minHeight: 80,

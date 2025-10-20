@@ -24,6 +24,7 @@ export default function CreatePostModal({
   onSubmit,
   authorProfile = {},
   initialMessage = '',
+  initialTitle = '',
   mode = 'create',
   titleText,
   submitLabel,
@@ -31,6 +32,7 @@ export default function CreatePostModal({
 }) {
   const { themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState(
     initialAccentKey ?? accentPresets[0].key
@@ -48,6 +50,7 @@ export default function CreatePostModal({
 
   useEffect(() => {
     if (visible) {
+      setTitle(initialTitle ?? '');
       setMessage(initialMessage ?? '');
       setSelectedColor(initialAccentKey ?? accentPresets[0].key);
       setSelectedLocation(
@@ -62,14 +65,15 @@ export default function CreatePostModal({
     } else {
       setLocationModalVisible(false);
     }
-  }, [visible, initialAccentKey, initialLocation, initialMessage]);
+  }, [visible, initialAccentKey, initialLocation, initialMessage, initialTitle]);
 
   const computedTitle = titleText ?? (mode === 'edit' ? 'Edit post' : 'Create a post');
   const computedSubmitLabel = submitLabel ?? (mode === 'edit' ? 'Save changes' : 'Publish');
   const submitHandler = onSubmit ?? onSubmitPost;
   const canChangeLocation = allowLocationChange ?? mode !== 'edit';
+  const trimmedTitle = title.trim();
   const trimmedMessage = message.trim();
-  const submitDisabled = !submitHandler || !trimmedMessage || !selectedLocation?.city;
+  const submitDisabled = !submitHandler || !trimmedTitle || !selectedLocation?.city;
 
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColor) ?? accentPresets[0],
@@ -86,6 +90,7 @@ export default function CreatePostModal({
   );
 
   const handleClose = () => {
+    setTitle('');
     setMessage('');
     setLocationModalVisible(false);
     onClose?.();
@@ -98,9 +103,12 @@ export default function CreatePostModal({
     submitHandler({
       location: selectedLocation,
       colorKey: selectedColor,
-      message: trimmedMessage
+      title: trimmedTitle,
+      message: trimmedMessage,
+      description: trimmedMessage
     });
     if (mode === 'create') {
+      setTitle('');
       setMessage('');
     }
     setLocationModalVisible(false);
@@ -218,8 +226,17 @@ export default function CreatePostModal({
                 </View>
               </View>
               <TextInput
-                style={[styles.previewInput, { color: previewPrimary }]}
-                placeholder="What's happening?"
+                style={[styles.previewTitleInput, { color: previewPrimary }]}
+                placeholder="Post title"
+                placeholderTextColor={previewMuted}
+                value={title}
+                onChangeText={setTitle}
+                autoCapitalize="sentences"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={[styles.previewBodyInput, { color: previewPrimary }]}
+                placeholder="Description (optional)"
                 placeholderTextColor={previewMuted}
                 multiline
                 value={message}
@@ -366,6 +383,17 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     previewMeta: {
       fontSize: 12,
       marginTop: 4
+    },
+    previewTitleInput: {
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 10,
+    },
+    previewBodyInput: {
+      minHeight: 80,
+      fontSize: 16,
+      fontWeight: '500',
+      textAlignVertical: 'top'
     },
     swatchRow: {
       flexDirection: 'row',

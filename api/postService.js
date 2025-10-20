@@ -49,9 +49,17 @@ export async function fetchAllPostsRemote() {
       };
     });
 
+    const normalizedTitle =
+      typeof data.title === 'string' && data.title.trim().length > 0
+        ? data.title
+        : typeof data.message === 'string'
+        ? data.message
+        : '';
+
     posts.push({
       id: postDoc.id,
       ...data,
+      title: normalizedTitle,
       createdAt: normaliseTimestamp(data.createdAt),
       comments
     });
