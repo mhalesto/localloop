@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
+import CreatePostModal from '../components/CreatePostModal';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
@@ -45,7 +46,6 @@ export default function PostThreadScreen({ route, navigation }) {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editMessage, setEditMessage] = useState('');
   const [ownerMenuVisible, setOwnerMenuVisible] = useState(false);
   const [ownerMenuPosition, setOwnerMenuPosition] = useState({ top: 0, right: 12 });
   const ownerMenuAnchorRef = useRef(null);
@@ -123,24 +123,25 @@ export default function PostThreadScreen({ route, navigation }) {
   const authorAvatar = getAvatarConfig(post.author?.avatarKey);
   const authorAvatarBackground = authorAvatar.backgroundColor ?? badgeBackground;
 
+  const editInitialLocation = useMemo(() => {
+    if (!post) {
+      return null;
+    }
+    const postCity = post.city ?? city;
+    return {
+      city: postCity,
+      province: post.author?.province ?? '',
+      country: post.author?.country ?? '',
+    };
+  }, [city, post]);
+
   const showViewOriginal =
     post.sourceCity && post.sourcePostId && !(post.sourceCity === city && post.sourcePostId === post.id);
-  const trimmedEditMessage = editMessage.trim();
-  const editModalSaveDisabled =
-    !trimmedEditMessage || trimmedEditMessage === (post?.message ?? '').trim();
-
   useEffect(() => {
     if (!feedbackMessage) return;
     const t = setTimeout(() => setFeedbackMessage(''), 2000);
     return () => clearTimeout(t);
   }, [feedbackMessage]);
-
-  useEffect(() => {
-    if (!editModalVisible) {
-      return;
-    }
-    setEditMessage(post?.message ?? '');
-  }, [editModalVisible, post?.message]);
 
   const openShareModal = useCallback(() => {
     setShareModalVisible(true);
@@ -167,32 +168,41 @@ export default function PostThreadScreen({ route, navigation }) {
     if (!post?.createdByMe) {
       return;
     }
-    setEditMessage(post?.message ?? '');
     setEditModalVisible(true);
-  }, [post]);
+  }, [post?.createdByMe]);
 
   const closeEditModal = useCallback(() => {
     setEditModalVisible(false);
   }, []);
 
-  const handleSaveEdit = useCallback(() => {
-    if (!trimmedEditMessage) {
-      return;
-    }
+  const handleSubmitEdit = useCallback(
+    ({ message: nextMessage, colorKey }) => {
+      const trimmed = nextMessage?.trim?.() ?? '';
+      const updates = {};
 
-    if (trimmedEditMessage === (post?.message ?? '').trim()) {
-      setEditModalVisible(false);
-      return;
-    }
+      if (trimmed && trimmed !== (post?.message ?? '').trim()) {
+        updates.message = trimmed;
+      }
 
-    const success = updatePost(city, postId, { message: trimmedEditMessage });
-    if (success) {
-      setEditModalVisible(false);
-      setFeedbackMessage('Post updated');
-    } else {
-      setFeedbackMessage('Unable to update post');
-    }
-  }, [city, post?.message, postId, trimmedEditMessage, updatePost]);
+      if (colorKey && colorKey !== post?.colorKey) {
+        updates.colorKey = colorKey;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        setEditModalVisible(false);
+        return;
+      }
+
+      const success = updatePost(city, postId, updates);
+      if (success) {
+        setEditModalVisible(false);
+        setFeedbackMessage('Post updated');
+      } else {
+        setFeedbackMessage('Unable to update post');
+      }
+    },
+    [city, post?.colorKey, post?.message, postId, updatePost]
+  );
 
   const confirmDeletePost = useCallback(() => {
     if (!post?.createdByMe) {
@@ -470,47 +480,19 @@ export default function PostThreadScreen({ route, navigation }) {
         initialProvince={userProfile.province || undefined}
       />
 
-      <Modal
+      <CreatePostModal
         visible={editModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEditModal}
-      >
-        <View style={styles.editModalOverlay}>
-          <View style={styles.editModalCard}>
-            <Text style={styles.editModalTitle}>Edit post</Text>
-            <TextInput
-              value={editMessage}
-              onChangeText={setEditMessage}
-              multiline
-              style={styles.editModalInput}
-              placeholder="Update your message"
-              placeholderTextColor={themeColors.textSecondary}
-            />
-            <View style={styles.editModalActions}>
-              <TouchableOpacity
-                onPress={closeEditModal}
-                style={[styles.editModalButton, styles.editModalButtonSecondary]}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.editModalButtonText, styles.editModalButtonSecondaryText]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSaveEdit}
-                style={[
-                  styles.editModalButton,
-                  styles.editModalButtonPrimary,
-                  { opacity: editModalSaveDisabled ? 0.6 : 1 },
-                ]}
-                disabled={editModalSaveDisabled}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.editModalButtonText, styles.editModalButtonPrimaryText]}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={closeEditModal}
+        mode="edit"
+        titleText="Edit post"
+        submitLabel="Save changes"
+        initialLocation={editInitialLocation}
+        initialAccentKey={post?.colorKey ?? accentPreset.key}
+        initialMessage={post?.message ?? ''}
+        authorProfile={post?.author ?? {}}
+        allowLocationChange={false}
+        onSubmit={handleSubmitEdit}
+      />
 
       <Modal
         visible={ownerMenuVisible}
@@ -724,44 +706,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       alignItems: 'center'
     },
     toastText: { color: '#fff', fontSize: 12 },
-
-    editModalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 24
-    },
-    editModalCard: {
-      width: '100%',
-      maxWidth: 420,
-      backgroundColor: palette.card,
-      borderRadius: 24,
-      padding: 20,
-      shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.45 : 0.15,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 10
-    },
-    editModalTitle: { fontSize: 18, fontWeight: '700', color: palette.textPrimary, marginBottom: 12 },
-    editModalInput: {
-      minHeight: 120,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: palette.divider,
-      padding: 12,
-      color: palette.textPrimary,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff',
-      textAlignVertical: 'top'
-    },
-    editModalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20 },
-    editModalButton: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 14 },
-    editModalButtonSecondary: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.divider },
-    editModalButtonPrimary: { backgroundColor: palette.primary },
-    editModalButtonText: { fontSize: 14, fontWeight: '600' },
-    editModalButtonSecondaryText: { color: palette.textSecondary },
-    editModalButtonPrimaryText: { color: '#fff' },
 
     /* Missing state */
     missingWrapper: { flex: 1, justifyContent: 'center', paddingBottom: 40 },

@@ -21,7 +21,13 @@ export default function CreatePostModal({
   initialLocation,
   initialAccentKey,
   onSubmitPost,
-  authorProfile = {}
+  onSubmit,
+  authorProfile = {},
+  initialMessage = '',
+  mode = 'create',
+  titleText,
+  submitLabel,
+  allowLocationChange,
 }) {
   const { themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -42,7 +48,7 @@ export default function CreatePostModal({
 
   useEffect(() => {
     if (visible) {
-      setMessage('');
+      setMessage(initialMessage ?? '');
       setSelectedColor(initialAccentKey ?? accentPresets[0].key);
       setSelectedLocation(
         initialLocation?.city
@@ -56,7 +62,14 @@ export default function CreatePostModal({
     } else {
       setLocationModalVisible(false);
     }
-  }, [visible, initialAccentKey, initialLocation]);
+  }, [visible, initialAccentKey, initialLocation, initialMessage]);
+
+  const computedTitle = titleText ?? (mode === 'edit' ? 'Edit post' : 'Create a post');
+  const computedSubmitLabel = submitLabel ?? (mode === 'edit' ? 'Save changes' : 'Publish');
+  const submitHandler = onSubmit ?? onSubmitPost;
+  const canChangeLocation = allowLocationChange ?? mode !== 'edit';
+  const trimmedMessage = message.trim();
+  const submitDisabled = !submitHandler || !trimmedMessage || !selectedLocation?.city;
 
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColor) ?? accentPresets[0],
@@ -79,15 +92,17 @@ export default function CreatePostModal({
   };
 
   const handleSubmit = () => {
-    if (!selectedLocation?.city || !message.trim()) {
+    if (submitDisabled) {
       return;
     }
-    onSubmitPost?.({
+    submitHandler({
       location: selectedLocation,
       colorKey: selectedColor,
-      message: message.trim()
+      message: trimmedMessage
     });
-    setMessage('');
+    if (mode === 'create') {
+      setMessage('');
+    }
     setLocationModalVisible(false);
   };
 
@@ -104,7 +119,7 @@ export default function CreatePostModal({
       >
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Create a post</Text>
+            <Text style={styles.title}>{computedTitle}</Text>
             <TouchableOpacity onPress={handleClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={themeColors.textSecondary} />
             </TouchableOpacity>
@@ -116,9 +131,16 @@ export default function CreatePostModal({
           >
             <Text style={styles.sectionLabel}>Location</Text>
             <TouchableOpacity
-              style={styles.locationButton}
-              activeOpacity={0.85}
-              onPress={() => setLocationModalVisible(true)}
+              style={[
+                styles.locationButton,
+                !canChangeLocation && styles.locationButtonDisabled
+              ]}
+              activeOpacity={canChangeLocation ? 0.85 : 1}
+              onPress={() => {
+                if (canChangeLocation) {
+                  setLocationModalVisible(true);
+                }
+              }}
             >
               <Ionicons
                 name="location-outline"
@@ -132,7 +154,7 @@ export default function CreatePostModal({
                   : 'Choose city'}
               </Text>
             </TouchableOpacity>
-            {!selectedLocation?.city ? (
+            {!selectedLocation?.city && canChangeLocation ? (
               <Text style={styles.helperText}>Select a city to post into.</Text>
             ) : null}
 
@@ -212,12 +234,12 @@ export default function CreatePostModal({
               styles.submitButton,
               {
                 backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark,
-                opacity: message.trim() && selectedLocation?.city ? 1 : 0.6
+                opacity: submitDisabled ? 0.6 : 1
               }
             ]}
             onPress={handleSubmit}
             activeOpacity={0.85}
-            disabled={!message.trim() || !selectedLocation?.city}
+            disabled={submitDisabled}
           >
             <Text
               style={[
@@ -225,7 +247,7 @@ export default function CreatePostModal({
                 { color: selectedPreset.buttonForeground ?? '#fff' }
               ]}
             >
-              Publish
+              {computedSubmitLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -297,6 +319,9 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingVertical: 12,
       paddingHorizontal: 14,
       backgroundColor: isDarkMode ? palette.background : '#ffffff'
+    },
+    locationButtonDisabled: {
+      opacity: 0.6
     },
     locationButtonText: {
       fontSize: 14,
