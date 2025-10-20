@@ -1,5 +1,5 @@
 // screens/PostThreadScreen.js
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -9,8 +9,10 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  Dimensions,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +46,9 @@ export default function PostThreadScreen({ route, navigation }) {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editMessage, setEditMessage] = useState('');
+  const [ownerMenuVisible, setOwnerMenuVisible] = useState(false);
+  const [ownerMenuPosition, setOwnerMenuPosition] = useState({ top: 0, right: 12 });
+  const ownerMenuAnchorRef = useRef(null);
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
@@ -217,6 +222,48 @@ export default function PostThreadScreen({ route, navigation }) {
     );
   }, [city, deletePost, navigation, post?.createdByMe, postId]);
 
+  const closeOwnerMenu = useCallback(() => {
+    setOwnerMenuVisible(false);
+  }, []);
+
+  const openOwnerMenu = useCallback(() => {
+    if (!post?.createdByMe) {
+      return;
+    }
+
+    const anchor = ownerMenuAnchorRef.current;
+    if (!anchor) {
+      setOwnerMenuVisible(true);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      anchor.measureInWindow((x = 0, y = 0, width = 0, height = 0) => {
+        const { width: screenWidth } = Dimensions.get('window');
+        const right = Math.max(12, screenWidth - (x + width));
+        const top = Math.max(12, y + height + 4);
+        setOwnerMenuPosition({ top, right });
+        setOwnerMenuVisible(true);
+      });
+    });
+  }, [post?.createdByMe]);
+
+  const handlePressEdit = useCallback(() => {
+    closeOwnerMenu();
+    openEditModal();
+  }, [closeOwnerMenu, openEditModal]);
+
+  const handlePressDelete = useCallback(() => {
+    closeOwnerMenu();
+    confirmDeletePost();
+  }, [closeOwnerMenu, confirmDeletePost]);
+
+  useEffect(() => {
+    if (!post?.createdByMe && ownerMenuVisible) {
+      setOwnerMenuVisible(false);
+    }
+  }, [ownerMenuVisible, post?.createdByMe]);
+
   /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
   const Header = (
     <View style={styles.stickyHeaderWrap}>
@@ -259,27 +306,6 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
 
           <View style={styles.postHeaderActions}>
-            {post.createdByMe ? (
-              <View style={[styles.ownerActionsRow, showViewOriginal && styles.ownerActionsSpacing]}>
-                <TouchableOpacity
-                  onPress={openEditModal}
-                  style={[styles.ownerActionButton, styles.ownerActionButtonFirst]}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="create-outline" size={18} color={linkColor} />
-                  <Text style={[styles.ownerActionText, { color: linkColor }]}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={confirmDeletePost}
-                  style={styles.ownerActionButton}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="trash-outline" size={18} color={destructiveColor} />
-                  <Text style={[styles.ownerActionText, { color: destructiveColor }]}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
             {showViewOriginal ? (
               <TouchableOpacity
                 onPress={() =>
@@ -289,6 +315,18 @@ export default function PostThreadScreen({ route, navigation }) {
                 activeOpacity={0.75}
               >
                 <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {post.createdByMe ? (
+              <TouchableOpacity
+                ref={ownerMenuAnchorRef}
+                onPress={openOwnerMenu}
+                style={[styles.ownerMenuTrigger, showViewOriginal && styles.ownerMenuTriggerWithOriginal]}
+                activeOpacity={0.65}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="ellipsis-vertical" size={18} color={linkColor} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -474,6 +512,41 @@ export default function PostThreadScreen({ route, navigation }) {
         </View>
       </Modal>
 
+      <Modal
+        visible={ownerMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeOwnerMenu}
+      >
+        <View style={styles.ownerMenuBackdrop}>
+          <TouchableWithoutFeedback onPress={closeOwnerMenu}>
+            <View style={styles.ownerMenuBackground} />
+          </TouchableWithoutFeedback>
+
+          <View style={[styles.ownerMenuContainer, { top: ownerMenuPosition.top, right: ownerMenuPosition.right }]}>
+            <TouchableOpacity
+              style={styles.ownerMenuItem}
+              onPress={handlePressEdit}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={18} color={linkColor} style={styles.ownerMenuItemIcon} />
+              <Text style={[styles.ownerMenuItemText, { color: linkColor }]}>Edit post</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.ownerMenuDivider, { backgroundColor: dividerColor }]} />
+
+            <TouchableOpacity
+              style={styles.ownerMenuItem}
+              onPress={handlePressDelete}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={18} color={destructiveColor} style={styles.ownerMenuItemIcon} />
+              <Text style={[styles.ownerMenuItemText, { color: destructiveColor }]}>Delete post</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {feedbackMessage ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{feedbackMessage}</Text>
@@ -505,7 +578,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     /* Header */
     postHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     postHeader: { flexDirection: 'row', alignItems: 'center', marginRight: 12, flex: 1 },
-    postHeaderActions: { alignItems: 'flex-end', maxWidth: '45%', marginLeft: 12 },
+    postHeaderActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      maxWidth: '45%',
+      marginLeft: 12,
+    },
     avatar: {
       width: 44,
       height: 44,
@@ -535,13 +614,33 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
     actionCount: { fontSize: 12, marginLeft: 6 },
     actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
-    viewOriginalButton: { marginLeft: 12, paddingVertical: 4, paddingRight: 4 },
+    viewOriginalButton: { marginRight: 4, paddingVertical: 4, paddingHorizontal: 4 },
     viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
-    ownerActionsRow: { flexDirection: 'row', alignItems: 'center' },
-    ownerActionsSpacing: { marginBottom: 8 },
-    ownerActionButton: { flexDirection: 'row', alignItems: 'center', marginLeft: 12, paddingVertical: 4 },
-    ownerActionButtonFirst: { marginLeft: 0 },
-    ownerActionText: { marginLeft: 4, fontSize: 12, fontWeight: '600' },
+    ownerMenuTrigger: {
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+      borderRadius: 16,
+      marginLeft: 4,
+    },
+    ownerMenuTriggerWithOriginal: { marginLeft: 8 },
+    ownerMenuBackdrop: { flex: 1 },
+    ownerMenuBackground: { ...StyleSheet.absoluteFillObject },
+    ownerMenuContainer: {
+      position: 'absolute',
+      minWidth: 160,
+      backgroundColor: palette.card,
+      borderRadius: 14,
+      paddingVertical: 4,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.28 : 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    ownerMenuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
+    ownerMenuItemIcon: { marginRight: 10 },
+    ownerMenuItemText: { fontSize: 14, fontWeight: '600' },
+    ownerMenuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 10 },
 
     /* Comments (wider) */
     commentRow: {
