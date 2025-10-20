@@ -542,13 +542,15 @@ export default function PostThreadScreen({ route, navigation }) {
 const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
     /* Sticky header wrapper so the pinned card blends with background */
-    stickyHeaderWrap: { backgroundColor: palette.background, paddingTop: 8, paddingBottom: 12 },
+    stickyHeaderWrap: { backgroundColor: palette.background, paddingTop: 4, paddingBottom: 12 },
 
     /* Post card (wider) */
     postCard: {
       borderRadius: 24,
-      padding: 24,
-      marginHorizontal: 8, // tighter margins → wider card
+      paddingVertical: 20,
+      paddingHorizontal: 18,
+      marginHorizontal: 6, // matches composer spacing
+      marginTop: 4,
       marginBottom: 8,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.24 : 0.1,
