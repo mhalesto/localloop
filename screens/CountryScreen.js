@@ -7,6 +7,7 @@ import {
   View,
   ActivityIndicator
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -17,6 +18,8 @@ const PAGE_SIZE = 30;
 const TOP_TRENDING_TO_SHOW = 6;
 const CHIP_ROW_MAX = 4;
 const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
+const COUNTRIES_CACHE_KEY = '@toilet.countriesCache';
+const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
@@ -33,12 +36,40 @@ export default function CountryScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const isMounted = useRef(true);
+  const countriesRef = useRef(0);
+
+  useEffect(() => {
+    countriesRef.current = countries.length;
+  }, [countries]);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
     };
+  }, []);
+
+  const loadCountriesFromCache = useCallback(async () => {
+    try {
+      const cached = await AsyncStorage.getItem(COUNTRIES_CACHE_KEY);
+      if (!cached) {
+        return { hasData: false, isFresh: false };
+      }
+
+      const parsed = JSON.parse(cached);
+      if (!parsed || !Array.isArray(parsed.items)) {
+        return { hasData: false, isFresh: false };
+      }
+
+      const isStale = parsed.savedAt && Date.now() - parsed.savedAt > COUNTRIES_CACHE_TTL;
+      const sorted = [...parsed.items].sort((a, b) => (a?.name ?? '').localeCompare(b?.name ?? ''));
+      setCountries(sorted);
+      setError('');
+      return { hasData: true, isFresh: !isStale };
+    } catch (err) {
+      console.warn('[CountryScreen] load countries cache failed', err);
+      return { hasData: false, isFresh: false };
+    }
   }, []);
 
   const loadCountries = useCallback(async () => {
@@ -51,11 +82,18 @@ export default function CountryScreen({ navigation }) {
       const sorted = [...normalized].sort((a, b) => (a?.name ?? '').localeCompare(b?.name ?? ''));
       setCountries(sorted);
       setError('');
+
+      AsyncStorage.setItem(
+        COUNTRIES_CACHE_KEY,
+        JSON.stringify({ savedAt: Date.now(), items: sorted })
+      ).catch((err) => console.warn('[CountryScreen] persist countries cache failed', err));
     } catch (err) {
       if (!isMounted.current) {
         return;
       }
-      setError('Unable to load countries. Pull to refresh or try again later.');
+      if (countriesRef.current === 0) {
+        setError('Unable to load countries. Pull to refresh or try again later.');
+      }
     }
   }, []);
 
@@ -109,7 +147,15 @@ export default function CountryScreen({ navigation }) {
     let mounted = true;
     async function load() {
       if (!mounted) return;
-      setLoading(true);
+
+      const cacheStatus = await loadCountriesFromCache();
+
+      if (!mounted) return;
+
+      if (!cacheStatus.hasData) {
+        setLoading(true);
+      }
+
       try {
         await loadCountries();
       } finally {
@@ -118,11 +164,12 @@ export default function CountryScreen({ navigation }) {
         }
       }
     }
+
     load();
     return () => {
       mounted = false;
     };
-  }, [loadCountries]);
+  }, [loadCountries, loadCountriesFromCache]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
