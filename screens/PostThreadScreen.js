@@ -1,6 +1,7 @@
 // screens/PostThreadScreen.js
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   View,
@@ -13,10 +14,13 @@ import {
   Keyboard,
   Platform,
   Dimensions,
+  Share,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
@@ -49,6 +53,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const [ownerMenuVisible, setOwnerMenuVisible] = useState(false);
   const [ownerMenuPosition, setOwnerMenuPosition] = useState({ top: 0, right: 12 });
   const ownerMenuAnchorRef = useRef(null);
+  const sharePreviewRef = useRef(null);
+  const [isSharingOutside, setIsSharingOutside] = useState(false);
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
@@ -164,6 +170,51 @@ export default function PostThreadScreen({ route, navigation }) {
     [city, closeShareModal, postId, sharePost, userProfile]
   );
 
+  const handleShareOutside = useCallback(async () => {
+    if (isSharingOutside || !post || !sharePreviewRef.current?.capture) {
+      return;
+    }
+
+    try {
+      setIsSharingOutside(true);
+      const uri = await sharePreviewRef.current.capture({ result: 'tmpfile', format: 'png', quality: 1 });
+      if (!uri) {
+        throw new Error('capture_failed');
+      }
+
+      const canUseSharing = typeof Sharing?.isAvailableAsync === 'function' && (await Sharing.isAvailableAsync());
+      if (canUseSharing) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Share post',
+          UTI: 'public.png',
+        });
+      } else {
+        const metaBits = [authorName];
+        if (authorLocation) {
+          metaBits.push(authorLocation);
+        }
+        metaBits.push(`${city} Room`);
+        const shareLines = [];
+        const trimmedMessage = post.message?.trim();
+        if (trimmedMessage) {
+          shareLines.push(trimmedMessage);
+        }
+        shareLines.push(metaBits.join(' • '));
+        await Share.share({
+          url: uri,
+          message: shareLines.filter(Boolean).join('\n\n'),
+          title: 'Share post',
+        });
+      }
+    } catch (error) {
+      console.warn('Share outside failed', error);
+      setFeedbackMessage('Unable to share right now');
+    } finally {
+      setIsSharingOutside(false);
+    }
+  }, [authorLocation, authorName, city, isSharingOutside, post, sharePreviewRef, setFeedbackMessage]);
+
   const openEditModal = useCallback(() => {
     if (!post?.createdByMe) {
       return;
@@ -274,9 +325,8 @@ export default function PostThreadScreen({ route, navigation }) {
     }
   }, [ownerMenuVisible, post?.createdByMe]);
 
-  /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
-  const Header = (
-    <View style={styles.stickyHeaderWrap}>
+  const renderPostCard = useCallback(
+    ({ hideHeaderActions = false } = {}) => (
       <View style={[styles.postCard, { backgroundColor: headerColor }]}>
         <View style={styles.postHeaderRow}>
           <View style={styles.postHeader}>
@@ -315,31 +365,49 @@ export default function PostThreadScreen({ route, navigation }) {
             </View>
           </View>
 
-          <View style={styles.postHeaderActions}>
-            {showViewOriginal ? (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
-                }
-                style={styles.viewOriginalButton}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
-              </TouchableOpacity>
-            ) : null}
+          {!hideHeaderActions ? (
+            <View style={styles.postHeaderActions}>
+              {showViewOriginal ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+                  }
+                  style={styles.viewOriginalButton}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
+                </TouchableOpacity>
+              ) : null}
 
-            {post.createdByMe ? (
               <TouchableOpacity
-                ref={ownerMenuAnchorRef}
-                onPress={openOwnerMenu}
-                style={[styles.ownerMenuTrigger, showViewOriginal && styles.ownerMenuTriggerWithOriginal]}
-                activeOpacity={0.65}
+                onPress={handleShareOutside}
+                style={[styles.shareExternalButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Share this post"
+                disabled={isSharingOutside}
               >
-                <Ionicons name="ellipsis-vertical" size={18} color={linkColor} />
+                {isSharingOutside ? (
+                  <ActivityIndicator size="small" color={linkColor} style={styles.shareExternalSpinner} />
+                ) : (
+                  <Ionicons name="share-social-outline" size={18} color={linkColor} />
+                )}
               </TouchableOpacity>
-            ) : null}
-          </View>
+
+              {post.createdByMe ? (
+                <TouchableOpacity
+                  ref={ownerMenuAnchorRef}
+                  onPress={openOwnerMenu}
+                  style={[styles.ownerMenuTrigger, showViewOriginal && styles.ownerMenuTriggerWithOriginal]}
+                  activeOpacity={0.65}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={linkColor} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <Text style={[styles.postMessage, { color: headerTitleColor }]}>{post.message}</Text>
@@ -383,7 +451,36 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
         </View>
       </View>
-    </View>
+    ),
+    [
+      authorAvatar,
+      authorAvatarBackground,
+      authorLocation,
+      authorName,
+      badgeTextColor,
+      city,
+      comments.length,
+      dividerColor,
+      handleShareOutside,
+      headerColor,
+      headerMetaColor,
+      headerTitleColor,
+      isSharingOutside,
+      linkColor,
+      navigation,
+      openOwnerMenu,
+      openShareModal,
+      post,
+      postId,
+      showViewOriginal,
+      toggleVote,
+      styles,
+    ]
+  );
+
+  /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
+  const Header = (
+    <View style={styles.stickyHeaderWrap}>{renderPostCard({ hideHeaderActions: false })}</View>
   );
 
   return (
@@ -395,6 +492,16 @@ export default function PostThreadScreen({ route, navigation }) {
       activeTab="home"
       showFooter={false}
     >
+      <View style={styles.shareCaptureContainer} pointerEvents="none" accessible={false}>
+        <ViewShot
+          ref={sharePreviewRef}
+          options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+          style={styles.shareCaptureShot}
+        >
+          <View style={styles.stickyHeaderWrap}>{renderPostCard({ hideHeaderActions: true })}</View>
+        </ViewShot>
+      </View>
+
       {/* Comments list with sticky header. Padding grows with composer+keyboard */}
       <FlatList
         data={comments}
@@ -478,6 +585,8 @@ export default function PostThreadScreen({ route, navigation }) {
         accentColor={linkColor}
         initialCountry={userProfile.country || undefined}
         initialProvince={userProfile.province || undefined}
+        onShareOutside={handleShareOutside}
+        shareBusy={isSharingOutside}
       />
 
       <CreatePostModal
@@ -543,6 +652,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
     /* Sticky header wrapper so the pinned card blends with background */
     stickyHeaderWrap: { backgroundColor: palette.background, paddingTop: 4, paddingBottom: 12 },
+    shareCaptureContainer: { position: 'absolute', top: -10000, left: 0, right: 0 },
+    shareCaptureShot: { alignSelf: 'stretch' },
 
     /* Post card (wider) */
     postCard: {
@@ -569,6 +680,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       maxWidth: '45%',
       marginLeft: 12,
     },
+    shareExternalButton: {
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    shareExternalButtonWithLabel: { marginLeft: 8 },
+    shareExternalSpinner: { width: 18, height: 18 },
     avatar: {
       width: 44,
       height: 44,
