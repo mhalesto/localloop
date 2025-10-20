@@ -85,10 +85,14 @@ export default function ShareLocationModal({
       tracker.provinces.add(countryName);
       try {
         setLoading(true);
-        const states = await fetchStates(countryName);
+        const { states, fallback } = await fetchStates(countryName);
         const sorted = [...(states ?? [])].sort((a, b) => a.localeCompare(b));
         setProvinceCache((prev) => ({ ...prev, [countryName]: sorted }));
-        setError('');
+        setError(
+          fallback
+            ? 'Unable to reach the full list right now. Showing a limited set for now.'
+            : ''
+        );
       } catch (err) {
         setError('Unable to load provinces right now.');
       } finally {

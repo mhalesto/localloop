@@ -1,3 +1,5 @@
+import { getFallbackStatesForCountry } from '../constants/locationFallbacks';
+
 const BASE_URL = 'https://countriesnow.space/api/v0.1';
 
 const REQUEST_TIMEOUT_MS = 10000;
@@ -50,15 +52,30 @@ export async function fetchCountries() {
 }
 
 export async function fetchStates(country) {
-  const data = await fetchJson(`${BASE_URL}/countries/states`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ country })
-  });
+  try {
+    const data = await fetchJson(`${BASE_URL}/countries/states`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ country })
+    });
 
-  return (data.states ?? []).map((state) => state.name);
+    const states = (data.states ?? []).map((state) => state.name);
+    return { states, fallback: false };
+  } catch (error) {
+    const fallbackStates = getFallbackStatesForCountry(country);
+    if (fallbackStates.length > 0) {
+      console.warn(
+        'locationService warning: using fallback states for country',
+        country,
+        'due to error',
+        error?.message ?? error
+      );
+      return { states: fallbackStates, fallback: true };
+    }
+    throw error;
+  }
 }
 
 export async function fetchCities(country, state) {

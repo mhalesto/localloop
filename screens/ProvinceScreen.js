@@ -24,21 +24,28 @@ export default function ProvinceScreen({ navigation, route }) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         setLoading(true);
-        const states = await fetchStates(country);
+        const { states, fallback } = await fetchStates(country);
         if (!mounted) return;
-        const items = states.map((name) => ({ name }));
+        const items = (states ?? []).map((name) => ({ name }));
         setProvinces(items);
         setError('');
+        setNotice(
+          fallback
+            ? 'Unable to reach the full list right now. Showing a limited set for now.'
+            : ''
+        );
         setVisibleCount(INITIAL_VISIBLE);
       } catch (err) {
         if (!mounted) return;
         setError('Unable to load provinces right now.');
+        setNotice('');
       } finally {
         if (mounted) {
           setLoading(false);
@@ -105,6 +112,9 @@ export default function ProvinceScreen({ navigation, route }) {
               <Text style={styles.cardAction}>See cities →</Text>
             </TouchableOpacity>
           )}
+          ListHeaderComponent={
+            notice ? <Text style={styles.noticeText}>{notice}</Text> : null
+          }
           ListEmptyComponent={
             <Text style={styles.emptyState}>
               No provinces match your search yet.
@@ -163,6 +173,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 13,
       fontWeight: '600',
       color: palette.primaryDark
+    },
+    noticeText: {
+      color: palette.textSecondary,
+      fontSize: 13,
+      marginBottom: 12,
+      paddingHorizontal: 4
     },
     loaderContainer: {
       flex: 1,
