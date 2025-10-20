@@ -119,7 +119,8 @@ export function PostsProvider({ children }) {
           shareCount,
           title: normalizedTitle,
           createdByMe: postClientId ? postClientId === localClientId : Boolean(post.createdByMe),
-          comments: normalizedComments
+          comments: normalizedComments,
+          highlightDescription: Boolean(post.highlightDescription)
         };
       });
     });
@@ -360,7 +361,14 @@ export function PostsProvider({ children }) {
   }, [isOnline, pendingQueue, persistQueue]);
 
   const addPost = useCallback(
-    (city, title, description = '', colorKey = 'royal', authorProfile = null) => {
+    (
+      city,
+      title,
+      description = '',
+      colorKey = 'royal',
+      authorProfile = null,
+      highlightDescription = false
+    ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
         return;
@@ -388,7 +396,8 @@ export function PostsProvider({ children }) {
         votes: {},
         shareCount: 0,
         sharedFrom: null,
-        author
+        author,
+        highlightDescription: !!highlightDescription
       };
 
       setPostsWithPersist((prev) => {

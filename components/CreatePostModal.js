@@ -8,7 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
@@ -25,6 +26,7 @@ export default function CreatePostModal({
   authorProfile = {},
   initialMessage = '',
   initialTitle = '',
+  initialHighlightDescription = false,
   mode = 'create',
   titleText,
   submitLabel,
@@ -47,6 +49,8 @@ export default function CreatePostModal({
         }
       : null
   );
+  const [advancedEnabled, setAdvancedEnabled] = useState(false);
+  const [highlightDescription, setHighlightDescription] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -62,10 +66,21 @@ export default function CreatePostModal({
             }
           : null
       );
+      setAdvancedEnabled(initialHighlightDescription ?? false);
+      setHighlightDescription(initialHighlightDescription ?? false);
     } else {
       setLocationModalVisible(false);
+      setAdvancedEnabled(false);
+      setHighlightDescription(false);
     }
-  }, [visible, initialAccentKey, initialLocation, initialMessage, initialTitle]);
+  }, [
+    visible,
+    initialAccentKey,
+    initialLocation,
+    initialMessage,
+    initialTitle,
+    initialHighlightDescription
+  ]);
 
   const computedTitle = titleText ?? (mode === 'edit' ? 'Edit post' : 'Create a post');
   const computedSubmitLabel = submitLabel ?? (mode === 'edit' ? 'Save changes' : 'Publish');
@@ -84,6 +99,11 @@ export default function CreatePostModal({
   const previewMuted =
     selectedPreset.metaColor ??
     (selectedPreset.isDark ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary);
+  const previewHighlightFill =
+    selectedPreset.highlightFill ??
+    (selectedPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)');
+  const advancedTrackOn = themeColors.primaryLight ?? themeColors.primaryDark;
+  const advancedThumbOn = themeColors.primaryDark ?? '#ffffff';
   const previewAvatarConfig = useMemo(
     () => authorProfile.avatarConfig ?? getAvatarConfig(authorProfile.avatarKey),
     [authorProfile.avatarConfig, authorProfile.avatarKey]
@@ -93,6 +113,8 @@ export default function CreatePostModal({
     setTitle('');
     setMessage('');
     setLocationModalVisible(false);
+    setAdvancedEnabled(false);
+    setHighlightDescription(false);
     onClose?.();
   };
 
@@ -105,7 +127,8 @@ export default function CreatePostModal({
       colorKey: selectedColor,
       title: trimmedTitle,
       message: trimmedMessage,
-      description: trimmedMessage
+      description: trimmedMessage,
+      highlightDescription
     });
     if (mode === 'create') {
       setTitle('');
@@ -137,6 +160,47 @@ export default function CreatePostModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionLabel}>Advanced options</Text>
+              <Switch
+                value={advancedEnabled}
+                onValueChange={setAdvancedEnabled}
+                trackColor={{ false: themeColors.divider, true: advancedTrackOn }}
+                thumbColor={advancedEnabled ? advancedThumbOn : '#f4f3f4'}
+                ios_backgroundColor={themeColors.divider}
+              />
+            </View>
+            {advancedEnabled ? (
+              <View style={styles.advancedToolbar}>
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    highlightDescription && [
+                      styles.toolbarButtonActive,
+                      { backgroundColor: previewHighlightFill }
+                    ]
+                  ]}
+                  onPress={() => setHighlightDescription((prev) => !prev)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    highlightDescription
+                      ? 'Disable highlighted description'
+                      : 'Highlight description text'
+                  }
+                >
+                  <Ionicons
+                    name={highlightDescription ? 'color-wand' : 'color-wand-outline'}
+                    size={16}
+                    color={highlightDescription ? previewPrimary : themeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <Text style={[styles.toolbarLabel, { color: themeColors.textSecondary }]}>
+                  Highlight description
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.sectionLabel}>Location</Text>
             <TouchableOpacity
               style={[
@@ -235,7 +299,14 @@ export default function CreatePostModal({
                 returnKeyType="next"
               />
               <TextInput
-                style={[styles.previewBodyInput, { color: previewPrimary }]}
+                style={[
+                  styles.previewBodyInput,
+                  { color: previewPrimary },
+                  highlightDescription && [
+                    styles.previewBodyInputHighlighted,
+                    { backgroundColor: previewHighlightFill }
+                  ]
+                ]}
                 placeholder="Description (optional)"
                 placeholderTextColor={previewMuted}
                 multiline
@@ -327,6 +398,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       color: palette.textPrimary,
       marginBottom: 8
     },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8
+    },
     locationButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -395,6 +472,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '500',
       textAlignVertical: 'top'
     },
+    previewBodyInputHighlighted: {
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 8
+    },
     swatchRow: {
       flexDirection: 'row',
       flexWrap: 'wrap'
@@ -427,5 +509,28 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     submitButtonText: {
       fontSize: 16,
       fontWeight: '600'
+    },
+    advancedToolbar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16
+    },
+    toolbarButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.background
+    },
+    toolbarButtonActive: {
+      borderColor: 'transparent'
+    },
+    toolbarLabel: {
+      fontSize: 13,
+      fontWeight: '500',
+      marginLeft: 10
     }
   });

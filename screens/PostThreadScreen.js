@@ -231,7 +231,7 @@ export default function PostThreadScreen({ route, navigation }) {
   }, []);
 
   const handleSubmitEdit = useCallback(
-    ({ title: nextTitle, message: nextMessage, colorKey }) => {
+    ({ title: nextTitle, message: nextMessage, colorKey, highlightDescription }) => {
       const trimmedTitle = nextTitle?.trim?.() ?? '';
       const trimmedMessage = nextMessage?.trim?.() ?? '';
       const updates = {};
@@ -242,6 +242,13 @@ export default function PostThreadScreen({ route, navigation }) {
 
       if (trimmedMessage !== (post?.message ?? '').trim()) {
         updates.message = trimmedMessage;
+      }
+
+      if (
+        typeof highlightDescription === 'boolean' &&
+        highlightDescription !== !!post?.highlightDescription
+      ) {
+        updates.highlightDescription = highlightDescription;
       }
 
       if (colorKey && colorKey !== post?.colorKey) {
@@ -261,7 +268,7 @@ export default function PostThreadScreen({ route, navigation }) {
         setFeedbackMessage('Unable to update post');
       }
     },
-    [city, post?.colorKey, post?.message, post?.title, postId, updatePost]
+    [city, post?.colorKey, post?.highlightDescription, post?.message, post?.title, postId, updatePost]
   );
 
   const confirmDeletePost = useCallback(() => {
@@ -342,6 +349,23 @@ export default function PostThreadScreen({ route, navigation }) {
       const trimmedTitle = post?.title?.trim?.() ?? '';
       const trimmedDescription = post?.message?.trim?.() ?? '';
       const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+      const highlightFill =
+        post.highlightDescription
+          ? postPreset.highlightFill ??
+            (postPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)')
+          : null;
+      const descriptionStyle = post.highlightDescription
+        ? [
+            styles.postMessage,
+            {
+              color: headerTitleColor,
+              backgroundColor: highlightFill,
+              borderRadius: 14,
+              paddingHorizontal: 12,
+              paddingVertical: 10
+            }
+          ]
+        : [styles.postMessage, { color: headerTitleColor }];
 
       return (
         <View style={[styles.postCard, { backgroundColor: headerColor }]}>
@@ -429,7 +453,7 @@ export default function PostThreadScreen({ route, navigation }) {
 
           <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
           {trimmedDescription && trimmedDescription !== displayTitle ? (
-            <Text style={[styles.postMessage, { color: headerTitleColor }]}>{trimmedDescription}</Text>
+            <Text style={descriptionStyle}>{trimmedDescription}</Text>
           ) : null}
           <Text style={[styles.postMeta, { color: headerMetaColor }]}>
             {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
@@ -620,6 +644,7 @@ export default function PostThreadScreen({ route, navigation }) {
         initialAccentKey={post?.colorKey ?? accentPreset.key}
         initialMessage={post?.message ?? ''}
         initialTitle={post?.title ?? ''}
+        initialHighlightDescription={!!post?.highlightDescription}
         authorProfile={post?.author ?? {}}
         allowLocationChange={false}
         onSubmit={handleSubmitEdit}

@@ -26,6 +26,10 @@ export default function PostItem({
   const metaColor = preset.metaColor ?? (preset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
   const badgeBg = preset.badgeBackground ?? themeColors.primaryLight;
   const linkColor = preset.linkColor ?? themeColors.primaryDark;
+  const highlightFill =
+    post.highlightDescription
+      ? preset.highlightFill ?? (preset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)')
+      : null;
 
   const sharedFrom = post.sharedFrom;           // { city?: string }
   const upvotes = post.upvotes ?? 0;
@@ -97,7 +101,20 @@ export default function PostItem({
           {displayTitle}
         </Text>
         {trimmedDescription && trimmedDescription !== displayTitle ? (
-          <Text style={[styles.message, { color: primaryTextColor }]}>{trimmedDescription}</Text>
+          <Text
+            style={[
+              styles.message,
+              { color: primaryTextColor },
+              highlightFill && {
+                backgroundColor: highlightFill,
+                borderRadius: 12,
+                paddingHorizontal: 10,
+                paddingVertical: 8
+              }
+            ]}
+          >
+            {trimmedDescription}
+          </Text>
         ) : null}
 
         {/* Actions */}
