@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,10 +11,18 @@ import {
   ScrollView,
   Switch
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
+import {
+  EMAIL_ADDRESS_REGEX,
+  EMAIL_LABEL_PLACEHOLDER,
+  EMAIL_PLACEHOLDER,
+  MAILTO_PREFIX_LENGTH,
+  MAILTO_PREFIX_STRING,
+  hasRichFormatting
+} from '../utils/textFormatting';
 
 export default function CreatePostModal({
   visible,
@@ -51,11 +59,15 @@ export default function CreatePostModal({
   );
   const [advancedEnabled, setAdvancedEnabled] = useState(false);
   const [highlightDescription, setHighlightDescription] = useState(false);
+  const [messageSelection, setMessageSelection] = useState({ start: 0, end: 0 });
+  const messageInputRef = useRef(null);
 
   useEffect(() => {
     if (visible) {
-      setTitle(initialTitle ?? '');
-      setMessage(initialMessage ?? '');
+      const nextTitle = initialTitle ?? '';
+      const nextMessage = initialMessage ?? '';
+      setTitle(nextTitle);
+      setMessage(nextMessage);
       setSelectedColor(initialAccentKey ?? accentPresets[0].key);
       setSelectedLocation(
         initialLocation?.city
@@ -66,12 +78,17 @@ export default function CreatePostModal({
             }
           : null
       );
-      setAdvancedEnabled(initialHighlightDescription ?? false);
+      const shouldEnableAdvanced =
+        Boolean(initialHighlightDescription) || hasRichFormatting(nextMessage);
+      setAdvancedEnabled(shouldEnableAdvanced);
       setHighlightDescription(initialHighlightDescription ?? false);
+      const caret = nextMessage.length;
+      setMessageSelection({ start: caret, end: caret });
     } else {
       setLocationModalVisible(false);
       setAdvancedEnabled(false);
       setHighlightDescription(false);
+      setMessageSelection({ start: 0, end: 0 });
     }
   }, [
     visible,
@@ -115,7 +132,121 @@ export default function CreatePostModal({
     setLocationModalVisible(false);
     setAdvancedEnabled(false);
     setHighlightDescription(false);
+    setMessageSelection({ start: 0, end: 0 });
     onClose?.();
+  };
+
+  const focusDescriptionInput = () => {
+    messageInputRef.current?.focus?.();
+  };
+
+  const updateSelection = (nextSelection) => {
+    if (
+      typeof nextSelection?.start === 'number' &&
+      typeof nextSelection?.end === 'number'
+    ) {
+      setMessageSelection((prev) => {
+        if (prev.start === nextSelection.start && prev.end === nextSelection.end) {
+          return prev;
+        }
+        return nextSelection;
+      });
+    }
+  };
+
+  const wrapSelection = (wrap) => {
+    focusDescriptionInput();
+    const { start, end } = messageSelection;
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.max(0, end);
+    const before = message.slice(0, safeStart);
+    const selected = message.slice(safeStart, safeEnd);
+    const after = message.slice(safeEnd);
+
+    if (safeStart === safeEnd) {
+      const insertion = `${wrap}${wrap}`;
+      const nextMessage = `${before}${insertion}${after}`;
+      const caret = safeStart + wrap.length;
+      setMessage(nextMessage);
+      updateSelection({ start: caret, end: caret });
+      return;
+    }
+
+    const nextMessage = `${before}${wrap}${selected}${wrap}${after}`;
+    setMessage(nextMessage);
+    updateSelection({ start: safeStart + wrap.length, end: safeEnd + wrap.length });
+  };
+
+  const applyBoldFormatting = () => {
+    wrapSelection('**');
+  };
+
+  const applyBulletFormatting = () => {
+    focusDescriptionInput();
+    const { start, end } = messageSelection;
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.max(0, end);
+    const text = message;
+
+    const lineStart = text.lastIndexOf('\n', safeStart - 1) + 1;
+    const nextLineBreak = text.indexOf('\n', safeEnd);
+    const lineEnd = nextLineBreak === -1 ? text.length : nextLineBreak;
+    const segment = text.slice(lineStart, lineEnd);
+    const lines = segment.split('\n');
+    const bulletised = lines
+      .map((line) => {
+        const cleaned = line.replace(/^\s*[-*•]\s+/, '');
+        return cleaned ? `- ${cleaned}` : '- ';
+      })
+      .join('\n');
+
+    const nextMessage = `${text.slice(0, lineStart)}${bulletised}${text.slice(lineEnd)}`;
+    setMessage(nextMessage);
+    updateSelection({ start: lineStart, end: lineStart + bulletised.length });
+  };
+
+  const applyEmailFormatting = () => {
+    focusDescriptionInput();
+    const { start, end } = messageSelection;
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.max(0, end);
+    const before = message.slice(0, safeStart);
+    const selected = message.slice(safeStart, safeEnd);
+    const after = message.slice(safeEnd);
+    const leadingWhitespace = selected.match(/^\s*/)?.[0] ?? '';
+    const trailingWhitespace = selected.match(/\s*$/)?.[0] ?? '';
+    const trimmed = selected.slice(leadingWhitespace.length, selected.length - trailingWhitespace.length);
+    let label = trimmed || EMAIL_LABEL_PLACEHOLDER;
+    let address = trimmed;
+
+    if (!EMAIL_ADDRESS_REGEX.test(trimmed)) {
+      address = EMAIL_PLACEHOLDER;
+    }
+
+    const inserted = `[${label}](${MAILTO_PREFIX_STRING}${address})`;
+    const nextMessage = `${before}${leadingWhitespace}${inserted}${trailingWhitespace}${after}`;
+    setMessage(nextMessage);
+
+    const insertedStart = safeStart + leadingWhitespace.length;
+    const labelStart = insertedStart + 1;
+    const labelEnd = labelStart + label.length;
+    const addressStart = labelEnd + 2 + MAILTO_PREFIX_LENGTH;
+    const addressEnd = addressStart + address.length;
+
+    if (!trimmed) {
+      updateSelection({ start: labelStart, end: labelEnd });
+    } else if (!EMAIL_ADDRESS_REGEX.test(trimmed)) {
+      updateSelection({ start: addressStart, end: addressEnd });
+    } else {
+      updateSelection({ start: addressEnd, end: addressEnd });
+    }
+  };
+
+  const handleToggleAdvanced = (value) => {
+    setAdvancedEnabled(value);
+    if (!value) {
+      setHighlightDescription(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -133,6 +264,7 @@ export default function CreatePostModal({
     if (mode === 'create') {
       setTitle('');
       setMessage('');
+      setMessageSelection({ start: 0, end: 0 });
     }
     setLocationModalVisible(false);
   };
@@ -164,42 +296,12 @@ export default function CreatePostModal({
               <Text style={styles.sectionLabel}>Advanced options</Text>
               <Switch
                 value={advancedEnabled}
-                onValueChange={setAdvancedEnabled}
+                onValueChange={handleToggleAdvanced}
                 trackColor={{ false: themeColors.divider, true: advancedTrackOn }}
                 thumbColor={advancedEnabled ? advancedThumbOn : '#f4f3f4'}
                 ios_backgroundColor={themeColors.divider}
               />
             </View>
-            {advancedEnabled ? (
-              <View style={styles.advancedToolbar}>
-                <TouchableOpacity
-                  style={[
-                    styles.toolbarButton,
-                    highlightDescription && [
-                      styles.toolbarButtonActive,
-                      { backgroundColor: previewHighlightFill }
-                    ]
-                  ]}
-                  onPress={() => setHighlightDescription((prev) => !prev)}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    highlightDescription
-                      ? 'Disable highlighted description'
-                      : 'Highlight description text'
-                  }
-                >
-                  <Ionicons
-                    name={highlightDescription ? 'color-wand' : 'color-wand-outline'}
-                    size={16}
-                    color={highlightDescription ? previewPrimary : themeColors.textSecondary}
-                  />
-                </TouchableOpacity>
-                <Text style={[styles.toolbarLabel, { color: themeColors.textSecondary }]}>
-                  Highlight description
-                </Text>
-              </View>
-            ) : null}
 
             <Text style={styles.sectionLabel}>Location</Text>
             <TouchableOpacity
@@ -252,6 +354,73 @@ export default function CreatePostModal({
                 );
               })}
             </View>
+
+            {advancedEnabled ? (
+              <View style={styles.formatToolbar}>
+                <TouchableOpacity
+                  style={[
+                    styles.formatButton,
+                    highlightDescription && [
+                      styles.formatButtonActive,
+                      { backgroundColor: previewHighlightFill }
+                    ]
+                  ]}
+                  onPress={() => setHighlightDescription((prev) => !prev)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    highlightDescription
+                      ? 'Disable highlighted description'
+                      : 'Highlight description text'
+                  }
+                >
+                  <Ionicons
+                    name={highlightDescription ? 'color-wand' : 'color-wand-outline'}
+                    size={16}
+                    color={highlightDescription ? previewPrimary : themeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.formatButton}
+                  onPress={applyBoldFormatting}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Bold selected text"
+                >
+                  <MaterialCommunityIcons
+                    name="format-bold"
+                    size={18}
+                    color={themeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.formatButton}
+                  onPress={applyBulletFormatting}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Convert to bullet list"
+                >
+                  <MaterialCommunityIcons
+                    name="format-list-bulleted"
+                    size={18}
+                    color={themeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.formatButton}
+                  onPress={applyEmailFormatting}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Insert email link"
+                >
+                  <MaterialCommunityIcons
+                    name="email-outline"
+                    size={18}
+                    color={themeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Preview</Text>
             <View style={[styles.previewCard, { backgroundColor: previewBackground }]}>
@@ -313,6 +482,9 @@ export default function CreatePostModal({
                 value={message}
                 onChangeText={setMessage}
                 autoCapitalize="sentences"
+                ref={messageInputRef}
+                onSelectionChange={(event) => updateSelection(event?.nativeEvent?.selection)}
+                selection={messageSelection}
               />
             </View>
           </ScrollView>
@@ -510,27 +682,24 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 16,
       fontWeight: '600'
     },
-    advancedToolbar: {
+    formatToolbar: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 16
+      marginTop: 8,
+      marginBottom: 12
     },
-    toolbarButton: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
+    formatButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: palette.divider,
-      backgroundColor: palette.background
+      backgroundColor: palette.background,
+      marginRight: 10
     },
-    toolbarButtonActive: {
+    formatButtonActive: {
       borderColor: 'transparent'
-    },
-    toolbarLabel: {
-      fontSize: 13,
-      fontWeight: '500',
-      marginLeft: 10
     }
   });

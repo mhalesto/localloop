@@ -9,6 +9,7 @@ import {
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
+import RichText from '../components/RichText';
 
 const FILTERS = [
   { label: 'All', value: 'all' },
@@ -155,19 +156,21 @@ export default function MyCommentsScreen({ navigation }) {
                 {displayTitle}
               </Text>
               {trimmedDescription && trimmedDescription !== displayTitle ? (
-                <Text
+                <View
                   style={[
-                    styles.cardDescription,
-                    highlightFill && {
-                      backgroundColor: highlightFill,
-                      borderRadius: 12,
-                      paddingHorizontal: 10,
-                      paddingVertical: 8
-                    }
+                    styles.cardDescriptionContainer,
+                    highlightFill && [
+                      styles.cardDescriptionHighlight,
+                      { backgroundColor: highlightFill }
+                    ]
                   ]}
                 >
-                  {trimmedDescription}
-                </Text>
+                  <RichText
+                    text={trimmedDescription}
+                    textStyle={styles.cardDescription}
+                    linkStyle={{ color: themeColors.primaryDark }}
+                  />
+                </View>
               ) : null}
               <Text style={styles.cardSubtitle}>
                 Last replied {formatRelativeTime(item.lastComment.createdAt)}
@@ -274,10 +277,17 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     cardTitleTight: {
       marginBottom: 6,
     },
+    cardDescriptionContainer: {
+      marginBottom: 10,
+    },
+    cardDescriptionHighlight: {
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
     cardDescription: {
       fontSize: 14,
       color: palette.textPrimary,
-      marginBottom: 10,
       lineHeight: 20,
     },
     cardSubtitle: {
