@@ -28,6 +28,8 @@ import CreatePostModal from '../components/CreatePostModal';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
+import RichText from '../components/RichText';
+import { stripRichFormatting } from '../utils/textFormatting';
 
 /* Simple circular avatar (no arrow/tail) */
 function AvatarIcon({ tint, size = 32, style }) {
@@ -202,7 +204,7 @@ export default function PostThreadScreen({ route, navigation }) {
           shareLines.push(trimmedTitle);
         }
         if (trimmedMessage && trimmedMessage !== trimmedTitle) {
-          shareLines.push(trimmedMessage);
+          shareLines.push(stripRichFormatting(trimmedMessage));
         }
         shareLines.push(metaBits.join(' • '));
         await Share.share({
@@ -354,18 +356,13 @@ export default function PostThreadScreen({ route, navigation }) {
           ? postPreset.highlightFill ??
             (postPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)')
           : null;
-      const descriptionStyle = post.highlightDescription
+      const descriptionContainerStyle = post.highlightDescription
         ? [
-            styles.postMessage,
-            {
-              color: headerTitleColor,
-              backgroundColor: highlightFill,
-              borderRadius: 14,
-              paddingHorizontal: 12,
-              paddingVertical: 10
-            }
+            styles.postMessageContainer,
+            styles.postMessageHighlighted,
+            { backgroundColor: highlightFill }
           ]
-        : [styles.postMessage, { color: headerTitleColor }];
+        : styles.postMessageContainer;
 
       return (
         <View style={[styles.postCard, { backgroundColor: headerColor }]}>
@@ -452,9 +449,15 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
 
           <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
-          {trimmedDescription && trimmedDescription !== displayTitle ? (
-            <Text style={descriptionStyle}>{trimmedDescription}</Text>
-          ) : null}
+        {trimmedDescription && trimmedDescription !== displayTitle ? (
+          <View style={descriptionContainerStyle}>
+            <RichText
+              text={trimmedDescription}
+              textStyle={[styles.postMessage, { color: headerTitleColor }]}
+              linkStyle={{ color: linkColor }}
+            />
+          </View>
+        ) : null}
           <Text style={[styles.postMeta, { color: headerMetaColor }]}>
             {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
           </Text>
@@ -759,7 +762,9 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
     sharedBanner: { fontSize: 12, marginTop: 6 },
     postTitle: { fontSize: 22, marginTop: 6, marginBottom: 10, fontWeight: '700', lineHeight: 28 },
-    postMessage: { fontSize: 18, marginBottom: 18, fontWeight: '500', lineHeight: 24 },
+    postMessageContainer: { marginBottom: 18 },
+    postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
+    postMessage: { fontSize: 18, fontWeight: '500', lineHeight: 24 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
     actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },

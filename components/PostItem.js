@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import { useSettings } from '../contexts/SettingsContext';
+import RichText from './RichText';
 
 const presetMap = accentPresets.reduce((acc, p) => {
   acc[p.key] = p;
@@ -101,20 +102,21 @@ export default function PostItem({
           {displayTitle}
         </Text>
         {trimmedDescription && trimmedDescription !== displayTitle ? (
-          <Text
+          <View
             style={[
-              styles.message,
-              { color: primaryTextColor },
-              highlightFill && {
-                backgroundColor: highlightFill,
-                borderRadius: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 8
-              }
+              styles.messageContainer,
+              highlightFill && [
+                styles.messageHighlight,
+                { backgroundColor: highlightFill }
+              ]
             ]}
           >
-            {trimmedDescription}
-          </Text>
+            <RichText
+              text={trimmedDescription}
+              textStyle={[styles.message, { color: primaryTextColor }]}
+              linkStyle={{ color: linkColor }}
+            />
+          </View>
         ) : null}
 
         {/* Actions */}
@@ -249,10 +251,17 @@ const styles = StyleSheet.create({
   titleSolo: {
     marginBottom: 12,
   },
+  messageContainer: {
+    marginBottom: 12,
+  },
+  messageHighlight: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
   message: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 12,
     lineHeight: 22,
   },
 
