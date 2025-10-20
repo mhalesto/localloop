@@ -21,6 +21,9 @@ const PostsContext = createContext(null);
 const POSTS_CACHE_KEY = '@toilet.postsCache';
 const QUEUE_CACHE_KEY = '@toilet.postsQueue';
 const CLIENT_ID_KEY = '@toilet.clientId';
+const THREAD_READS_CACHE_KEY = '@toilet.threadReads';
+
+const makeThreadKey = (city, postId) => `${city}::${postId}`;
 
 function normalizeProfile(profile) {
   if (!profile) {
@@ -58,6 +61,7 @@ export function PostsProvider({ children }) {
   const [isOnline, setIsOnline] = useState(true);
   const [clientId, setClientId] = useState(null);
   const clientIdRef = useRef(null);
+  const [threadReads, setThreadReads] = useState({});
 
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
@@ -139,6 +143,12 @@ export function PostsProvider({ children }) {
     );
   }, []);
 
+  const persistThreadReads = useCallback((reads) => {
+    AsyncStorage.setItem(THREAD_READS_CACHE_KEY, JSON.stringify(reads)).catch((error) =>
+      console.warn('[PostsProvider] persistThreadReads failed', error)
+    );
+  }, []);
+
   const setPostsWithPersist = useCallback(
     (updater) => {
       setPostsByCity((prev) => {
@@ -180,6 +190,15 @@ export function PostsProvider({ children }) {
         }
       } catch (error) {
         console.warn('[PostsProvider] load queue cache failed', error);
+      }
+
+      try {
+        const cachedReads = await AsyncStorage.getItem(THREAD_READS_CACHE_KEY);
+        if (cachedReads) {
+          setThreadReads(JSON.parse(cachedReads));
+        }
+      } catch (error) {
+        console.warn('[PostsProvider] load thread reads failed', error);
       }
     };
 
@@ -510,21 +529,78 @@ export function PostsProvider({ children }) {
     [postsByCity]
   );
 
-  const getReplyNotificationCount = useCallback(() => {
-    let count = 0;
-    Object.values(postsByCity).forEach((posts) => {
-      posts.forEach((post) => {
-        const comments = post.comments ?? [];
-        const hasMyComment = comments.some((comment) => comment.createdByMe);
-        if (!hasMyComment) {
+  const getUnreadCommentCount = useCallback(
+    (city, postId) => {
+      const cityPosts = postsByCity[city] ?? [];
+      const post = cityPosts.find((item) => item.id === postId);
+      if (!post) {
+        return 0;
+      }
+
+      const comments = post.comments ?? [];
+      const key = makeThreadKey(city, postId);
+      const lastSeenAt = threadReads[key]?.lastSeenAt ?? 0;
+      const seenOtherCount = threadReads[key]?.seenOtherCount ?? 0;
+
+      let timeBased = 0;
+      let totalOtherComments = 0;
+      comments.forEach((comment) => {
+        if (comment.createdByMe) {
           return;
         }
-        const others = comments.filter((comment) => !comment.createdByMe).length;
-        count += others;
+        totalOtherComments += 1;
+        const createdAt = comment.createdAt ?? 0;
+        if (createdAt > lastSeenAt) {
+          timeBased += 1;
+        }
+      });
+
+      const countBasedOnTotal = Math.max(totalOtherComments - seenOtherCount, 0);
+      return Math.max(timeBased, countBasedOnTotal);
+    },
+    [postsByCity, threadReads]
+  );
+
+  const markThreadRead = useCallback(
+    (city, postId) => {
+      const key = makeThreadKey(city, postId);
+      setThreadReads((prev) => {
+        const comments = (postsByCity[city] ?? []).find((item) => item.id === postId)?.comments ?? [];
+        let latestCommentAt = 0;
+        let otherCount = 0;
+        comments.forEach((comment) => {
+          const createdAt = comment?.createdAt ?? 0;
+          latestCommentAt = Math.max(latestCommentAt, createdAt);
+          if (!comment?.createdByMe) {
+            otherCount += 1;
+          }
+        });
+        const next = {
+          ...prev,
+          [key]: {
+            lastSeenAt: Math.max(Date.now(), latestCommentAt),
+            seenOtherCount: otherCount
+          }
+        };
+        persistThreadReads(next);
+        return next;
+      });
+    },
+    [persistThreadReads, postsByCity]
+  );
+
+  const getReplyNotificationCount = useCallback(() => {
+    let count = 0;
+    Object.entries(postsByCity).forEach(([cityName, posts]) => {
+      posts.forEach((post) => {
+        if (!(post.comments ?? []).some((comment) => comment.createdByMe)) {
+          return;
+        }
+        count += getUnreadCommentCount(cityName, post.id);
       });
     });
     return count;
-  }, [postsByCity]);
+  }, [getUnreadCommentCount, postsByCity]);
 
   const sharePost = useCallback(
     (fromCity, postId, toCity, authorProfile = null) => {
@@ -728,13 +804,23 @@ export function PostsProvider({ children }) {
       });
 
       if (removed) {
+        const key = makeThreadKey(city, postId);
+        setThreadReads((prev) => {
+          if (!prev[key]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[key];
+          persistThreadReads(next);
+          return next;
+        });
         enqueueOperation({ type: 'deletePost', payload: { id: postId } });
         return true;
       }
 
       return false;
     },
-    [enqueueOperation, ensureClientId, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, persistThreadReads, setPostsWithPersist]
   );
 
   const value = useMemo(
@@ -748,6 +834,8 @@ export function PostsProvider({ children }) {
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,
+      getUnreadCommentCount,
+      markThreadRead,
       toggleVote,
       updatePost,
       refreshPosts: refreshFromRemote
@@ -762,6 +850,8 @@ export function PostsProvider({ children }) {
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,
+      getUnreadCommentCount,
+      markThreadRead,
       toggleVote,
       updatePost,
       refreshFromRemote

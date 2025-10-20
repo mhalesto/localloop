@@ -41,7 +41,7 @@ function formatRelativeTime(timestamp) {
 }
 
 export default function MyCommentsScreen({ navigation }) {
-  const { getAllPosts } = usePosts();
+  const { getAllPosts, getUnreadCommentCount } = usePosts();
   const [filter, setFilter] = useState('all');
   const { themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -59,17 +59,20 @@ export default function MyCommentsScreen({ navigation }) {
           comment.createdAt > latest.createdAt ? comment : latest
         );
 
+        const unreadCount = getUnreadCommentCount(post.city, post.id);
+
         return {
           ...post,
           myComments,
-          lastComment
+          lastComment,
+          unreadCount
         };
       })
       .filter(Boolean)
       .sort(
         (a, b) => b.lastComment.createdAt - a.lastComment.createdAt
       );
-  }, [getAllPosts]);
+  }, [getAllPosts, getUnreadCommentCount]);
 
   const filteredThreads = useMemo(() => {
     if (filter === 'all') {
@@ -145,6 +148,9 @@ export default function MyCommentsScreen({ navigation }) {
                   {item.myComments.length} {item.myComments.length === 1
                     ? 'reply'
                     : 'replies'}
+                  {item.unreadCount > 0 ? (
+                    <Text style={styles.cardMetaNew}> · {item.unreadCount} new</Text>
+                  ) : null}
                 </Text>
               </View>
               <Text
@@ -267,6 +273,10 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     cardMeta: {
       fontSize: 13,
       color: palette.textSecondary
+    },
+    cardMetaNew: {
+      color: palette.primary,
+      fontWeight: '600'
     },
     cardTitle: {
       fontSize: 17,

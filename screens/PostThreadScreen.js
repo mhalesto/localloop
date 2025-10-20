@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { useIsFocused } from '@react-navigation/native';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
@@ -43,10 +44,19 @@ function AvatarIcon({ tint, size = 32, style }) {
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId } = route.params;
-  const { addComment, deletePost, getPostById, sharePost, toggleVote, updatePost } = usePosts();
+  const {
+    addComment,
+    deletePost,
+    getPostById,
+    markThreadRead,
+    sharePost,
+    toggleVote,
+    updatePost
+  } = usePosts();
   const { accentPreset, userProfile, themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
 
   const [reply, setReply] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
@@ -64,6 +74,13 @@ export default function PostThreadScreen({ route, navigation }) {
 
   const post = getPostById(city, postId);
   const comments = useMemo(() => post?.comments ?? [], [post]);
+
+  useEffect(() => {
+    if (!post || !isFocused) {
+      return;
+    }
+    markThreadRead(city, post.id);
+  }, [city, comments.length, isFocused, markThreadRead, post?.id]);
 
   // --- Keyboard listeners (robust with absolute-positioned composer)
   useEffect(() => {
