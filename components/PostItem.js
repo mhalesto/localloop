@@ -38,6 +38,9 @@ export default function PostItem({
   const authorLocation = locationParts.join(', ');
   const avatarConfig = getAvatarConfig(post.author?.avatarKey);
   const avatarBackground = avatarConfig.backgroundColor ?? badgeBg;
+  const trimmedTitle = post.title?.trim?.() ?? '';
+  const trimmedDescription = post.message?.trim?.() ?? '';
+  const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.touchable}>
@@ -83,8 +86,19 @@ export default function PostItem({
           {/* No secondary header action */}
         </View>
 
-        {/* Message */}
-        <Text style={[styles.message, { color: primaryTextColor }]}>{post.message}</Text>
+        {/* Content */}
+        <Text
+          style={[
+            styles.title,
+            !trimmedDescription && styles.titleSolo,
+            { color: primaryTextColor },
+          ]}
+        >
+          {displayTitle}
+        </Text>
+        {trimmedDescription && trimmedDescription !== displayTitle ? (
+          <Text style={[styles.message, { color: primaryTextColor }]}>{trimmedDescription}</Text>
+        ) : null}
 
         {/* Actions */}
         <View style={styles.actionsRow}>
@@ -209,11 +223,20 @@ const styles = StyleSheet.create({
   },
 
   /* Body */
-  message: {
+  title: {
     fontSize: 22,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 6,
     letterSpacing: 0.2,
+  },
+  titleSolo: {
+    marginBottom: 12,
+  },
+  message: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 12,
+    lineHeight: 22,
   },
 
   /* Actions */

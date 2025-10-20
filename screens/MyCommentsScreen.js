@@ -117,31 +117,47 @@ export default function MyCommentsScreen({ navigation }) {
       <FlatList
         data={filteredThreads}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.85}
-            onPress={() =>
-              navigation.navigate('PostThread', {
-                city: item.city,
-                postId: item.id
-              })
-            }
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardBadge}>{item.city}</Text>
-              <Text style={styles.cardMeta}>
-                {item.myComments.length} {item.myComments.length === 1
-                  ? 'reply'
-                  : 'replies'}
+        renderItem={({ item }) => {
+          const trimmedTitle = item.title?.trim?.() ?? '';
+          const trimmedDescription = item.message?.trim?.() ?? '';
+          const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate('PostThread', {
+                  city: item.city,
+                  postId: item.id
+                })
+              }
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardBadge}>{item.city}</Text>
+                <Text style={styles.cardMeta}>
+                  {item.myComments.length} {item.myComments.length === 1
+                    ? 'reply'
+                    : 'replies'}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.cardTitle,
+                  !trimmedDescription && styles.cardTitleTight
+                ]}
+              >
+                {displayTitle}
               </Text>
-            </View>
-            <Text style={styles.cardTitle}>{item.message}</Text>
-            <Text style={styles.cardSubtitle}>
-              Last replied {formatRelativeTime(item.lastComment.createdAt)}
-            </Text>
-          </TouchableOpacity>
-        )}
+              {trimmedDescription && trimmedDescription !== displayTitle ? (
+                <Text style={styles.cardDescription}>{trimmedDescription}</Text>
+              ) : null}
+              <Text style={styles.cardSubtitle}>
+                Last replied {formatRelativeTime(item.lastComment.createdAt)}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           <Text style={styles.emptyState}>
             You haven&apos;t jumped into any threads yet. Reply to a post to
@@ -237,6 +253,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600',
       color: palette.textPrimary,
       marginBottom: 10
+    },
+    cardTitleTight: {
+      marginBottom: 6,
+    },
+    cardDescription: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      marginBottom: 10,
+      lineHeight: 20,
     },
     cardSubtitle: {
       fontSize: 13,

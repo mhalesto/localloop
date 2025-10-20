@@ -103,6 +103,13 @@ export function PostsProvider({ children }) {
           };
         });
 
+        const normalizedTitle =
+          typeof post.title === 'string' && post.title.trim().length > 0
+            ? post.title
+            : typeof post.message === 'string'
+            ? post.message
+            : '';
+
         return {
           ...post,
           votes: rawVotes,
@@ -110,6 +117,7 @@ export function PostsProvider({ children }) {
           downvotes,
           userVote,
           shareCount,
+          title: normalizedTitle,
           createdByMe: postClientId ? postClientId === localClientId : Boolean(post.createdByMe),
           comments: normalizedComments
         };
@@ -352,18 +360,21 @@ export function PostsProvider({ children }) {
   }, [isOnline, pendingQueue, persistQueue]);
 
   const addPost = useCallback(
-    (city, message, colorKey = 'royal', authorProfile = null) => {
-      const trimmed = message.trim();
-      if (!trimmed) {
+    (city, title, description = '', colorKey = 'royal', authorProfile = null) => {
+      const trimmedTitle = title?.trim?.();
+      if (!trimmedTitle) {
         return;
       }
+
+      const trimmedDescription = description?.trim?.() ?? '';
       const ownerId = ensureClientId();
       const author = normalizeProfile(authorProfile);
       const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const newPost = {
         id: newPostId,
         city,
-        message: trimmed,
+        title: trimmedTitle,
+        message: trimmedDescription,
         createdAt: Date.now(),
         createdByMe: true,
         clientId: ownerId,
