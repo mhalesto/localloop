@@ -468,13 +468,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       lineHeight: 18
     },
     chipColor0: {
-      backgroundColor: '#D8CEFF'
+      backgroundColor: isDarkMode ? '#4230A6' : '#D8CEFF'
     },
     chipColor1: {
-      backgroundColor: '#CFE1FF'
+      backgroundColor: isDarkMode ? '#1F3F73' : '#CFE1FF'
     },
     chipColor2: {
-      backgroundColor: '#EBD0FF'
+      backgroundColor: isDarkMode ? '#5A2783' : '#EBD0FF'
     },
     hotBadge: {
       position: 'absolute',
