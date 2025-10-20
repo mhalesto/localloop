@@ -25,7 +25,9 @@ export default function ShareLocationModal({
   accentColor,
   initialCountry,
   initialProvince,
-  title = 'Share to another room'
+  title = 'Share to another room',
+  onShareOutside = null,
+  shareBusy = false
 }) {
   const { themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -312,7 +314,26 @@ export default function ShareLocationModal({
     >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>{title}</Text>
+            {onShareOutside ? (
+              <TouchableOpacity
+                style={[styles.shareOutsideButton, shareBusy && styles.shareOutsideButtonDisabled]}
+                onPress={onShareOutside}
+                activeOpacity={0.75}
+                disabled={shareBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Share outside the app"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                {shareBusy ? (
+                  <ActivityIndicator size="small" color={effectiveAccentColor} />
+                ) : (
+                  <Ionicons name="share-social-outline" size={18} color={effectiveAccentColor} />
+                )}
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <Text style={styles.subtitle}>{shareStepTitle}</Text>
           {step !== 'country' ? (
             <TouchableOpacity style={styles.backButton} activeOpacity={0.7} onPress={handleBack}>
@@ -381,11 +402,18 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOffset: { width: 0, height: 6 },
       elevation: 6
     },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12
+    },
     title: {
       fontSize: 16,
       fontWeight: '600',
       color: palette.textPrimary,
-      marginBottom: 12
+      marginBottom: 0,
+      flex: 1
     },
     subtitle: {
       fontSize: 13,
@@ -398,6 +426,14 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       alignSelf: 'flex-start',
       marginBottom: 8
     },
+    shareOutsideButton: {
+      padding: 6,
+      borderRadius: 16,
+      marginLeft: 12,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    shareOutsideButtonDisabled: { opacity: 0.6 },
     backLabel: {
       fontSize: 13,
       fontWeight: '600',
