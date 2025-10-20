@@ -121,6 +121,11 @@ export default function MyCommentsScreen({ navigation }) {
           const trimmedTitle = item.title?.trim?.() ?? '';
           const trimmedDescription = item.message?.trim?.() ?? '';
           const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+          const highlightFill = item.highlightDescription
+            ? isDarkMode
+              ? 'rgba(255,255,255,0.12)'
+              : 'rgba(0,0,0,0.06)'
+            : null;
 
           return (
             <TouchableOpacity
@@ -150,7 +155,19 @@ export default function MyCommentsScreen({ navigation }) {
                 {displayTitle}
               </Text>
               {trimmedDescription && trimmedDescription !== displayTitle ? (
-                <Text style={styles.cardDescription}>{trimmedDescription}</Text>
+                <Text
+                  style={[
+                    styles.cardDescription,
+                    highlightFill && {
+                      backgroundColor: highlightFill,
+                      borderRadius: 12,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8
+                    }
+                  ]}
+                >
+                  {trimmedDescription}
+                </Text>
               ) : null}
               <Text style={styles.cardSubtitle}>
                 Last replied {formatRelativeTime(item.lastComment.createdAt)}

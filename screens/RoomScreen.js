@@ -105,7 +105,7 @@ export default function RoomScreen({ navigation, route }) {
   const handleAddPost = () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
-    addPost(city, trimmedTitle, message, selectedColorKey, userProfile);
+    addPost(city, trimmedTitle, message, selectedColorKey, userProfile, false);
     setTitle('');
     setMessage('');
   };

@@ -58,7 +58,7 @@ export default function ScreenLayout({
     () => getAvatarConfig(userProfile?.avatarKey),
     [userProfile?.avatarKey]
   );
-  const handleSubmitPost = ({ location, colorKey, title, message }) => {
+  const handleSubmitPost = ({ location, colorKey, title, message, highlightDescription }) => {
     if (!location?.city || !title?.trim?.()) {
       setComposerVisible(false);
       return;
@@ -73,7 +73,7 @@ export default function ScreenLayout({
       avatarKey: userProfile?.avatarKey ?? 'default'
     };
 
-    addPost(location.city, title, message, colorKey, mergedAuthor);
+    addPost(location.city, title, message, colorKey, mergedAuthor, highlightDescription);
 
     if (!userProfile?.city) {
       updateUserProfile?.({

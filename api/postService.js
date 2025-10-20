@@ -61,7 +61,8 @@ export async function fetchAllPostsRemote() {
       ...data,
       title: normalizedTitle,
       createdAt: normaliseTimestamp(data.createdAt),
-      comments
+      comments,
+      highlightDescription: !!data.highlightDescription
     });
   }
 
