@@ -46,10 +46,10 @@ export default function ScreenLayout({
     () =>
       userProfile?.city
         ? {
-            city: userProfile.city,
-            province: userProfile.province ?? '',
-            country: userProfile.country ?? ''
-          }
+          city: userProfile.city,
+          province: userProfile.province ?? '',
+          country: userProfile.country ?? ''
+        }
         : null,
     [userProfile]
   );

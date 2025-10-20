@@ -1,6 +1,6 @@
 // FooterMenu.js
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Mask, Rect, Path, Circle } from 'react-native-svg';
@@ -236,6 +236,7 @@ const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: 'transparent',
     paddingHorizontal: 16,
+    marginBottom: Platform.select({ ios: -50, android: -35, default: 0 })
   },
   barWrap: {
     height: BAR_HEIGHT,
