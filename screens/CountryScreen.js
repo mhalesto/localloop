@@ -20,6 +20,18 @@ const CHIP_ROW_MAX = 4;
 const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
 const COUNTRIES_CACHE_KEY = '@toilet.countriesCache';
 const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
+const FALLBACK_COUNTRIES = [
+  { name: 'United States', iso2: 'US', iso3: 'USA' },
+  { name: 'China', iso2: 'CN', iso3: 'CHN' },
+  { name: 'India', iso2: 'IN', iso3: 'IND' },
+  { name: 'Indonesia', iso2: 'ID', iso3: 'IDN' },
+  { name: 'Brazil', iso2: 'BR', iso3: 'BRA' },
+  { name: 'Pakistan', iso2: 'PK', iso3: 'PAK' },
+  { name: 'Nigeria', iso2: 'NG', iso3: 'NGA' },
+  { name: 'Bangladesh', iso2: 'BD', iso3: 'BGD' },
+  { name: 'Russia', iso2: 'RU', iso3: 'RUS' },
+  { name: 'Mexico', iso2: 'MX', iso3: 'MEX' }
+];
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
@@ -62,10 +74,15 @@ export default function CountryScreen({ navigation }) {
       }
 
       const isStale = parsed.savedAt && Date.now() - parsed.savedAt > COUNTRIES_CACHE_TTL;
+      const fromFallback = parsed.fallback === true;
       const sorted = [...parsed.items].sort((a, b) => (a?.name ?? '').localeCompare(b?.name ?? ''));
       setCountries(sorted);
-      setError('');
-      return { hasData: true, isFresh: !isStale };
+      if (fromFallback) {
+        setError('Unable to load the full list. Showing popular countries for now.');
+      } else {
+        setError('');
+      }
+      return { hasData: true, isFresh: !isStale, isFallback: fromFallback };
     } catch (err) {
       console.warn('[CountryScreen] load countries cache failed', err);
       return { hasData: false, isFresh: false };
@@ -85,14 +102,22 @@ export default function CountryScreen({ navigation }) {
 
       AsyncStorage.setItem(
         COUNTRIES_CACHE_KEY,
-        JSON.stringify({ savedAt: Date.now(), items: sorted })
+        JSON.stringify({ savedAt: Date.now(), items: sorted, fallback: false })
       ).catch((err) => console.warn('[CountryScreen] persist countries cache failed', err));
     } catch (err) {
       if (!isMounted.current) {
         return;
       }
       if (countriesRef.current === 0) {
-        setError('Unable to load countries. Pull to refresh or try again later.');
+        const fallback = [...FALLBACK_COUNTRIES];
+        setCountries(fallback);
+        setError('Unable to load the full list. Showing popular countries for now.');
+        AsyncStorage.setItem(
+          COUNTRIES_CACHE_KEY,
+          JSON.stringify({ savedAt: Date.now(), items: fallback, fallback: true })
+        ).catch((storageErr) => console.warn('[CountryScreen] persist fallback cache failed', storageErr));
+      } else {
+        setError('Unable to refresh countries. Pull to refresh or try again later.');
       }
     }
   }, []);

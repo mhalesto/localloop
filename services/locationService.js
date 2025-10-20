@@ -1,8 +1,20 @@
 const BASE_URL = 'https://countriesnow.space/api/v0.1';
 
-async function fetchJson(url, options) {
+const REQUEST_TIMEOUT_MS = 10000;
+
+async function fetchJson(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => {
+        controller.abort();
+      }, timeoutMs)
+    : null;
+
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(
+      url,
+      controller ? { ...options, signal: controller.signal } : options
+    );
     if (!response.ok) {
       throw new Error(`Request failed (${response.status})`);
     }
@@ -13,8 +25,18 @@ async function fetchJson(url, options) {
     }
     return payload.data;
   } catch (error) {
-    console.warn('locationService error:', error?.message ?? error);
-    throw error;
+    const normalizedError =
+      error?.name === 'AbortError'
+        ? new Error('Request timed out')
+        : error instanceof Error
+        ? error
+        : new Error(String(error));
+    console.warn('locationService error:', normalizedError?.message ?? normalizedError);
+    throw normalizedError;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
