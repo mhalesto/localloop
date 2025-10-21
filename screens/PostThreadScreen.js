@@ -482,18 +482,6 @@ export default function PostThreadScreen({ route, navigation }) {
 
             {!hideHeaderActions ? (
               <View style={styles.postHeaderActions}>
-                {showViewOriginal ? (
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
-                    }
-                    style={styles.viewOriginalButton}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.viewOriginalTop, { color: linkColor }]}>View original</Text>
-                  </TouchableOpacity>
-                ) : null}
-
                 <TouchableOpacity
                   onPress={handleToggleNotifications}
                   style={[styles.notificationButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
@@ -590,6 +578,17 @@ export default function PostThreadScreen({ route, navigation }) {
                 <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
               </TouchableOpacity>
             </View>
+            {!hideHeaderActions && showViewOriginal ? (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+                }
+                style={styles.viewOriginalBottomButton}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.viewOriginalBottomText, { color: linkColor }]}>View original</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
       );
@@ -881,8 +880,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
     actionCount: { fontSize: 12, marginLeft: 6 },
     actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
-    viewOriginalButton: { marginRight: 4, paddingVertical: 4, paddingHorizontal: 4 },
-    viewOriginalTop: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
+    viewOriginalBottomButton: {
+      alignSelf: 'flex-end',
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+      marginTop: 10,
+    },
+    viewOriginalBottomText: { fontSize: 12, fontWeight: '600' },
     ownerMenuTrigger: {
       paddingVertical: 4,
       paddingHorizontal: 6,
