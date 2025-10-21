@@ -54,7 +54,10 @@ export default function PostThreadScreen({ route, navigation }) {
     toggleVote,
     updatePost,
     isPostSubscribed,
-    togglePostSubscription
+    togglePostSubscription,
+    watchThread,
+    setTypingStatus,
+    observeTyping
   } = usePosts();
   const { accentPreset, userProfile, themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -72,15 +75,58 @@ export default function PostThreadScreen({ route, navigation }) {
   const [isSharingOutside, setIsSharingOutside] = useState(false);
   const [pendingFocusCommentId, setPendingFocusCommentId] = useState(routeFocusCommentId ?? null);
   const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const [typingUsers, setTypingUsers] = useState([]);
+
+  const typingActiveRef = useRef(false);
+  const typingTimeoutRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
+
+  const TYPING_THROTTLE_MS = 2000;
+  const TYPING_STOP_DELAY_MS = 4000;
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
   const [kbOffset, setKbOffset] = useState(0);
 
   const post = getPostById(city, postId);
+  const hasPost = Boolean(post);
   const comments = useMemo(() => post?.comments ?? [], [post]);
   const isSubscribed = useMemo(() => isPostSubscribed(city, postId), [city, postId, isPostSubscribed]);
   const commentsListRef = useRef(null);
+
+  useEffect(() => {
+    if (!hasPost) {
+      return;
+    }
+
+    const detach = watchThread(city, postId);
+    return () => detach?.();
+  }, [city, hasPost, postId, watchThread]);
+
+  useEffect(() => {
+    if (!hasPost) {
+      setTypingUsers([]);
+      return;
+    }
+
+    const unsubscribe = observeTyping(postId, (entries) => {
+      const seen = new Set();
+      const names = [];
+      entries.forEach((entry) => {
+        const label = entry.nickname?.trim?.() || 'Someone';
+        if (!seen.has(label)) {
+          seen.add(label);
+          names.push(label);
+        }
+      });
+      setTypingUsers(names);
+    });
+
+    return () => {
+      unsubscribe?.();
+      setTypingUsers([]);
+    };
+  }, [hasPost, observeTyping, postId]);
 
   useEffect(() => {
     if (!post || !isFocused) {
@@ -132,6 +178,64 @@ export default function PostThreadScreen({ route, navigation }) {
     return () => clearTimeout(timer);
   }, [highlightedCommentId]);
 
+  const sendTypingUpdate = useCallback(
+    (active) => {
+      if (!hasPost) {
+        return;
+      }
+
+      const now = Date.now();
+
+      if (active) {
+        if (!typingActiveRef.current || now - lastTypingSentRef.current >= TYPING_THROTTLE_MS) {
+          lastTypingSentRef.current = now;
+          typingActiveRef.current = true;
+          setTypingStatus(postId, true, userProfile);
+        }
+
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+          typingActiveRef.current = false;
+          setTypingStatus(postId, false, userProfile);
+        }, TYPING_STOP_DELAY_MS);
+      } else {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = null;
+        }
+        if (typingActiveRef.current) {
+          typingActiveRef.current = false;
+          setTypingStatus(postId, false, userProfile);
+        }
+      }
+    },
+    [hasPost, postId, setTypingStatus, userProfile]
+  );
+
+  useEffect(
+    () => () => {
+      if (!hasPost) {
+        return;
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingActiveRef.current = false;
+      setTypingStatus(postId, false, userProfile);
+    },
+    [hasPost, postId, setTypingStatus, userProfile]
+  );
+
+  const handleReplyChange = useCallback(
+    (text) => {
+      setReply(text);
+      sendTypingUpdate(text.trim().length > 0);
+    },
+    [sendTypingUpdate]
+  );
+
   // --- Keyboard listeners (robust with absolute-positioned composer)
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -157,6 +261,7 @@ export default function PostThreadScreen({ route, navigation }) {
     if (!t) return;
     addComment(city, postId, t, userProfile);
     setReply('');
+    sendTypingUpdate(false);
   };
 
   if (!post) {
@@ -197,6 +302,18 @@ export default function PostThreadScreen({ route, navigation }) {
   const authorLocation = authorLocationParts.join(', ');
   const authorAvatar = getAvatarConfig(post.author?.avatarKey);
   const authorAvatarBackground = authorAvatar.backgroundColor ?? badgeBackground;
+  const typingLabel = useMemo(() => {
+    if (!typingUsers.length) {
+      return '';
+    }
+    if (typingUsers.length === 1) {
+      return `${typingUsers[0]} is typing…`;
+    }
+    if (typingUsers.length === 2) {
+      return `${typingUsers[0]} and ${typingUsers[1]} are typing…`;
+    }
+    return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing…`;
+  }, [typingUsers]);
 
   const editInitialLocation = useMemo(() => {
     if (!post) {
@@ -700,10 +817,16 @@ export default function PostThreadScreen({ route, navigation }) {
         ]}
         onLayout={(e) => setComposerH(e.nativeEvent.layout.height)}
       >
+        {typingLabel ? (
+          <View style={styles.typingIndicator}>
+            <View style={[styles.typingDot, { backgroundColor: linkColor }]} />
+            <Text style={[styles.typingText, { color: themeColors.textSecondary }]}>{typingLabel}</Text>
+          </View>
+        ) : null}
         <View style={styles.composerInner}>
           <TextInput
             value={reply}
-            onChangeText={setReply}
+            onChangeText={handleReplyChange}
             placeholder="Share your thoughts…"
             placeholderTextColor={themeColors.textSecondary}
             style={styles.composerInput}
@@ -712,6 +835,7 @@ export default function PostThreadScreen({ route, navigation }) {
             returnKeyType="send"
             onSubmitEditing={handleAddComment}
             clearButtonMode="while-editing"
+            onBlur={() => sendTypingUpdate(false)}
           />
           <TouchableOpacity
             onPress={handleAddComment}
@@ -958,6 +1082,22 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingHorizontal: 8,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: palette.divider
+    },
+    typingIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+      marginHorizontal: 14
+    },
+    typingDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 8
+    },
+    typingText: {
+      fontSize: 13,
+      color: palette.textSecondary
     },
     composerInner: {
       flexDirection: 'row',

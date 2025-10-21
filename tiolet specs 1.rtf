@@ -1,0 +1,54 @@
+Overview
+The app centers on city-based discussion rooms surfaced through an Explore screen, a thread detail view, and supporting navigation chrome that ties together creation, notifications, and personal activity tracking.
+
+Post creation and editing
+Users craft or edit posts through a reusable modal that requires a title, lets them pick a room, choose card colors, preview the result, and reuse the same card when editing existing content.
+
+Advanced options add switches for highlighting the description and toolbar buttons that wrap selections with bold, bullet, or mailto formatting helpers while maintaining selection state and live previews.
+
+The modal integrates the location picker so authors can select or update the destination room, with the picker positioned beneath the advanced toggle as requested.
+
+Browsing rooms and choosing locations
+Explore shows cached or freshly fetched countries, trending chips, and personalized city shortcuts, automatically falling back to popular countries when the API fails and refreshing via pull-to-refresh.
+
+The multi-step location modal walks through country → province → city selection, caches results locally, exposes search, and can double as a sharing picker that hands back the chosen city or triggers external sharing.
+
+Location requests respect timeouts and gracefully fall back to curated province lists for key countries when the remote service is unavailable.
+
+Feed and card presentation
+Each post card shows avatars, author location, share provenance, vote counts, share metrics, and a “View original thread” link when applicable, while rendering highlighted or richly formatted descriptions via the shared rich text renderer.
+
+Inline actions let readers upvote/downvote, open the share modal, or jump back to the source thread for shared posts.
+
+Thread experience
+Thread headers mirror the card styling, expose toggles for per-thread notifications, owner menus with edit/delete controls, share buttons, and bottom-aligned “View original” links while reusing the same modal for in-place edits.
+
+Comments stream in via live listeners, highlight newly focused replies, and adapt the bubble styling for the author, with typing indicators showing who is actively composing above the fixed composer.
+
+Sharing supports reposting to another city room, capturing a clean post snapshot off-screen, and invoking either the native share sheet or an image-plus-text fallback when platform sharing isn’t available.
+
+Notifications and activity tracking
+The global header surfaces a badge that opens a notifications modal listing new comments or likes on subscribed threads, including relative timestamps, snippets, and deep links back into the relevant post or comment.
+
+Users can subscribe to individual posts via the bell icon; new votes and comments on subscribed threads generate stored notifications capped to 60 entries and marked read on demand.
+
+The My Replies screen aggregates every thread where the user has participated, shows unread-reply counts, supports time-based filters, and renders descriptions with the same rich text styling.
+
+Sharing and cross-posting
+Beyond reposting into other rooms, the app’s share modal feeds both internal cross-posting and export workflows, while the posts context bumps share counters locally and queues remote updates so counts stay consistent offline.
+
+Formatting and rich content
+RichText parses bold markers, bullet lists, and email links, converting them into interactive segments that open mail clients or render emphasis, while creation utilities detect existing formatting to auto-enable advanced mode.
+
+Location-aware sharing and fallbacks
+ShareLocationModal leverages cached country, province, and city data, throttles fetches, and surfaces helpful messaging when it falls back to limited datasets due to API errors or timeouts.
+
+Offline resilience and realtime sync
+PostsContext hydrates posts, queues, thread reads, subscriptions, and notifications from AsyncStorage on launch, generates a persistent client ID, monitors connectivity, and runs an operation queue that replays pending work when the device reconnects.
+
+It listens to Firestore for post metadata changes, cleans up removed threads, and keeps local caches in sync, while document listeners stream comments per thread and broadcast typing presence data.
+
+Thread read metadata and unread counters update whenever a thread is opened, and reply badges across the UI reflect unseen conversations in real time.
+
+Navigation and compositional layout
+ScreenLayout orchestrates the header, footer, drawer, composer shortcut, and modal stack, while FooterMenu renders the tab bar, floating action button, and My Replies badge, ensuring consistent navigation across Explore, My Replies, and Settings
