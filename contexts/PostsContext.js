@@ -13,7 +13,11 @@ import {
   deletePostRemote,
   fetchAllPostsRemote,
   saveCommentRemote,
-  savePostRemote
+  savePostRemote,
+  subscribeToAllPosts,
+  subscribeToPostComments,
+  subscribeToTypingPresence,
+  updateTypingPresence
 } from '../api/postService';
 
 const PostsContext = createContext(null);
@@ -26,6 +30,7 @@ const SUBSCRIPTIONS_CACHE_KEY = '@toilet.postSubscriptions';
 const NOTIFICATIONS_CACHE_KEY = '@toilet.postNotifications';
 
 const MAX_NOTIFICATIONS = 60;
+const TYPING_STALE_MS = 12000;
 
 const makeThreadKey = (city, postId) => `${city}::${postId}`;
 
@@ -70,6 +75,7 @@ export function PostsProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const prevPostsRef = useRef({});
   const hasHydratedPostsRef = useRef(false);
+  const threadListenersRef = useRef(new Map());
 
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
@@ -377,6 +383,131 @@ export function PostsProvider({ children }) {
     }
   }, [isOnline, refreshFromRemote]);
 
+  const cleanupRemovedPost = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return;
+      }
+
+      const key = makeThreadKey(city, postId);
+
+      const listener = threadListenersRef.current.get(key);
+      if (listener) {
+        listener.unsubscribe?.();
+        threadListenersRef.current.delete(key);
+      }
+
+      setThreadReads((prev) => {
+        if (!prev[key]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[key];
+        persistThreadReads(next);
+        return next;
+      });
+
+      setPostSubscriptions((prev) => {
+        if (!prev[key]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[key];
+        persistSubscriptions(next);
+        return next;
+      });
+
+      setNotifications((prevList) => {
+        const filtered = prevList.filter(
+          (item) => !(item.city === city && item.postId === postId)
+        );
+        if (filtered.length === prevList.length) {
+          return prevList;
+        }
+        persistNotifications(filtered);
+        return filtered;
+      });
+    },
+    [persistNotifications, persistSubscriptions, persistThreadReads]
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAllPosts((changes) => {
+      if (!Array.isArray(changes) || changes.length === 0) {
+        return;
+      }
+
+      const removedThreads = [];
+      setPostsWithPersist((prev) => {
+        let mutated = false;
+        const next = { ...prev };
+
+        changes.forEach(({ type, post }) => {
+          if (!post || !post.id) {
+            return;
+          }
+
+          const cityName = post.city ?? post.sourceCity ?? 'Unknown';
+          const list = Array.isArray(next[cityName]) ? [...next[cityName]] : [];
+          const existingIndex = list.findIndex((item) => item.id === post.id);
+
+          if (type === 'removed') {
+            if (existingIndex !== -1) {
+              list.splice(existingIndex, 1);
+              next[cityName] = list;
+              mutated = true;
+              removedThreads.push({ city: cityName, postId: post.id });
+            }
+            return;
+          }
+
+          const normalizedTitle =
+            typeof post.title === 'string' && post.title.trim().length > 0
+              ? post.title
+              : typeof post.message === 'string'
+              ? post.message
+              : '';
+
+          const previous = existingIndex !== -1 ? list[existingIndex] : null;
+          const merged = {
+            ...previous,
+            ...post,
+            title: normalizedTitle,
+            highlightDescription: !!post.highlightDescription
+          };
+
+          if (!merged.comments) {
+            merged.comments = previous?.comments ?? [];
+          }
+
+          if (!merged.votes || typeof merged.votes !== 'object' || Array.isArray(merged.votes)) {
+            merged.votes = previous?.votes ?? {};
+          }
+
+          if (existingIndex !== -1) {
+            list[existingIndex] = merged;
+          } else {
+            list.push(merged);
+          }
+
+          list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+          next[cityName] = list;
+          mutated = true;
+        });
+
+        return mutated ? next : prev;
+      });
+
+      if (removedThreads.length) {
+        removedThreads.forEach(({ city: cityName, postId }) => cleanupRemovedPost(cityName, postId));
+      }
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [cleanupRemovedPost, setPostsWithPersist]);
+
   useEffect(() => {
     if (!isOnline || pendingQueue.length === 0) return;
 
@@ -640,6 +771,140 @@ export function PostsProvider({ children }) {
     },
     [enqueueOperation, ensureClientId, setPostsWithPersist]
   );
+
+  const watchThread = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return () => {};
+      }
+
+      const key = makeThreadKey(city, postId);
+      const existing = threadListenersRef.current.get(key);
+      if (existing) {
+        existing.count += 1;
+        return () => {
+          const current = threadListenersRef.current.get(key);
+          if (!current) {
+            return;
+          }
+          current.count -= 1;
+          if (current.count <= 0) {
+            current.unsubscribe?.();
+            threadListenersRef.current.delete(key);
+          }
+        };
+      }
+
+      const unsubscribe = subscribeToPostComments(postId, (remoteComments) => {
+        const localClientId = clientIdRef.current;
+        setPostsWithPersist((prev) => {
+          const cityPosts = prev[city] ?? [];
+          const index = cityPosts.findIndex((post) => post.id === postId);
+          if (index === -1) {
+            return prev;
+          }
+
+          const mappedComments = remoteComments.map((comment) => {
+            const ownerId = comment.clientId ?? null;
+            return {
+              ...comment,
+              createdByMe: ownerId ? ownerId === localClientId : false
+            };
+          });
+
+          const existingComments = cityPosts[index].comments ?? [];
+          const sameLength = existingComments.length === mappedComments.length;
+          let commentsDiffer = !sameLength;
+          if (sameLength) {
+            for (let i = 0; i < mappedComments.length; i += 1) {
+              const prevComment = existingComments[i];
+              const nextComment = mappedComments[i];
+              if (
+                !prevComment ||
+                prevComment.id !== nextComment.id ||
+                prevComment.message !== nextComment.message ||
+                prevComment.createdAt !== nextComment.createdAt
+              ) {
+                commentsDiffer = true;
+                break;
+              }
+            }
+          }
+
+          if (!commentsDiffer) {
+            return prev;
+          }
+
+          const updatedPost = { ...cityPosts[index], comments: mappedComments };
+          const nextCityPosts = [...cityPosts];
+          nextCityPosts[index] = updatedPost;
+          return { ...prev, [city]: nextCityPosts };
+        });
+      });
+
+      threadListenersRef.current.set(key, { count: 1, unsubscribe });
+
+      return () => {
+        const current = threadListenersRef.current.get(key);
+        if (!current) {
+          return;
+        }
+        current.count -= 1;
+        if (current.count <= 0) {
+          current.unsubscribe?.();
+          threadListenersRef.current.delete(key);
+        }
+      };
+    },
+    [setPostsWithPersist]
+  );
+
+  const setTypingStatus = useCallback(
+    (postId, isTyping, authorProfile = null) => {
+      if (!postId) {
+        return;
+      }
+
+      const ownerId = ensureClientId();
+      const profile = normalizeProfile(authorProfile);
+      updateTypingPresence(postId, ownerId, {
+        nickname: profile.nickname,
+        isTyping: Boolean(isTyping)
+      });
+    },
+    [ensureClientId]
+  );
+
+  const observeTyping = useCallback((postId, handler) => {
+    if (!postId || typeof handler !== 'function') {
+      return () => {};
+    }
+
+    const unsubscribe = subscribeToTypingPresence(postId, (entries) => {
+      const now = Date.now();
+      const localClientId = clientIdRef.current;
+
+      const activeEntries = entries.filter((entry) => {
+        if (!entry) {
+          return false;
+        }
+        if (!entry.isTyping) {
+          return false;
+        }
+        if (entry.clientId && entry.clientId === localClientId) {
+          return false;
+        }
+        const updatedAt = entry.updatedAt ?? 0;
+        return now - updatedAt <= TYPING_STALE_MS;
+      });
+
+      handler(activeEntries);
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
 
   const getPostsForCity = useCallback(
     (city) => postsByCity[city] ?? [],
@@ -1148,7 +1413,10 @@ export function PostsProvider({ children }) {
       markThreadRead,
       toggleVote,
       updatePost,
-      refreshPosts: refreshFromRemote
+      refreshPosts: refreshFromRemote,
+      watchThread,
+      setTypingStatus,
+      observeTyping
     }),
     [
       addComment,
@@ -1170,7 +1438,10 @@ export function PostsProvider({ children }) {
       markThreadRead,
       toggleVote,
       updatePost,
-      refreshFromRemote
+      refreshFromRemote,
+      watchThread,
+      setTypingStatus,
+      observeTyping
     ]
   );
 

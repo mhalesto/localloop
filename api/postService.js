@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   setDoc
@@ -104,5 +105,140 @@ export async function deletePostRemote(postId) {
   const commentsSnapshot = await getDocs(collection(db, POSTS_COLLECTION, postId, 'comments'));
   await Promise.all(commentsSnapshot.docs.map((commentDoc) => deleteDoc(commentDoc.ref)));
   await deleteDoc(doc(db, POSTS_COLLECTION, postId));
+}
+
+export function subscribeToAllPosts(onChange) {
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] subscribeToAllPosts skipped:', error.message);
+    return () => {};
+  }
+
+  const unsubscribe = onSnapshot(
+    collection(db, POSTS_COLLECTION),
+    (snapshot) => {
+      const changes = snapshot.docChanges().map((change) => {
+        const data = change.doc.data();
+        return {
+          type: change.type,
+          post: {
+            id: change.doc.id,
+            ...data,
+            createdAt: normaliseTimestamp(data.createdAt),
+            highlightDescription: !!data.highlightDescription
+          }
+        };
+      });
+
+      if (changes.length > 0) {
+        onChange(changes);
+      }
+    },
+    (error) => {
+      console.warn('[postService] subscribeToAllPosts error', error);
+    }
+  );
+
+  return unsubscribe;
+}
+
+export function subscribeToPostComments(postId, onComments) {
+  if (!postId) {
+    return () => {};
+  }
+
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] subscribeToPostComments skipped:', error.message);
+    return () => {};
+  }
+
+  const commentsQuery = query(
+    collection(db, POSTS_COLLECTION, postId, 'comments'),
+    orderBy('createdAt', 'asc')
+  );
+
+  const unsubscribe = onSnapshot(
+    commentsQuery,
+    (snapshot) => {
+      const comments = snapshot.docs.map((commentDoc) => {
+        const data = commentDoc.data();
+        return {
+          id: commentDoc.id,
+          ...data,
+          createdAt: normaliseTimestamp(data.createdAt)
+        };
+      });
+
+      onComments(comments);
+    },
+    (error) => {
+      console.warn('[postService] subscribeToPostComments error', error);
+    }
+  );
+
+  return unsubscribe;
+}
+
+export async function updateTypingPresence(postId, clientId, payload) {
+  if (!postId || !clientId) {
+    return;
+  }
+
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] updateTypingPresence skipped:', error.message);
+    return;
+  }
+
+  const presenceRef = doc(collection(db, POSTS_COLLECTION, postId, 'presence'), clientId);
+  const { nickname = '', isTyping = false } = payload ?? {};
+  await setDoc(
+    presenceRef,
+    {
+      clientId,
+      nickname,
+      isTyping,
+      updatedAt: Date.now()
+    },
+    { merge: true }
+  );
+}
+
+export function subscribeToTypingPresence(postId, onPresence) {
+  if (!postId) {
+    return () => {};
+  }
+
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] subscribeToTypingPresence skipped:', error.message);
+    return () => {};
+  }
+
+  const unsubscribe = onSnapshot(
+    collection(db, POSTS_COLLECTION, postId, 'presence'),
+    (snapshot) => {
+      const entries = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          updatedAt: normaliseTimestamp(data.updatedAt)
+        };
+      });
+
+      onPresence(entries);
+    },
+    (error) => {
+      console.warn('[postService] subscribeToTypingPresence error', error);
+    }
+  );
+
+  return unsubscribe;
 }
 
