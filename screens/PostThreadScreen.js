@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useIsFocused } from '@react-navigation/native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { LongPressGestureHandler, State, Swipeable } from 'react-native-gesture-handler';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
@@ -133,13 +133,26 @@ const CommentListItem = React.memo(
       return nickname?.length ? nickname : name?.length ? name : '';
     }, [comment.author?.name, comment.author?.nickname]);
 
-    const handleLongPress = () => {
+    const handleLongPressActivated = React.useCallback(() => {
       if (showPicker) {
         onClosePicker();
       } else {
         onTogglePicker(commentId);
       }
-    };
+    }, [commentId, onClosePicker, onTogglePicker, showPicker]);
+
+    const handleLongPressStateChange = React.useCallback(
+      ({ nativeEvent }) => {
+        if (
+          nativeEvent.state === State.CANCELLED ||
+          nativeEvent.state === State.END ||
+          nativeEvent.state === State.FAILED
+        ) {
+          reactionPulse.setValue(1);
+        }
+      },
+      [reactionPulse]
+    );
 
     const handleSelectReaction = (emoji) => {
       onSelectReaction(commentId, emoji);
@@ -183,8 +196,15 @@ const CommentListItem = React.memo(
           )}
 
           <View style={[styles.commentBubbleWrapper, mine && styles.commentBubbleWrapperMine]}>
-            <TouchableWithoutFeedback onLongPress={handleLongPress} delayLongPress={180}>
-              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}> 
+            <LongPressGestureHandler
+              minDurationMs={2000}
+              maxDist={20}
+              onActivated={handleLongPressActivated}
+              onHandlerStateChange={handleLongPressStateChange}
+              simultaneousHandlers={swipeableRef}
+              shouldCancelWhenOutside={false}
+            >
+              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}>
                 {authorLabel ? (
                   <Text
                     style={[
@@ -226,7 +246,7 @@ const CommentListItem = React.memo(
 
                 <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
               </Animated.View>
-            </TouchableWithoutFeedback>
+            </LongPressGestureHandler>
 
             {showPicker ? (
               <Animated.View
