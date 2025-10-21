@@ -545,50 +545,52 @@ export default function PostThreadScreen({ route, navigation }) {
           </Text>
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleVote(city, postId, 'up')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
-                  size={20}
-                  color={post.userVote === 'up' ? linkColor : headerMetaColor}
-                />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
-              </TouchableOpacity>
+            <View style={styles.actionsFooterRow}>
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => toggleVote(city, postId, 'up')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={post.userVote === 'up' ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                    size={20}
+                    color={post.userVote === 'up' ? linkColor : headerMetaColor}
+                  />
+                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.upvotes ?? 0}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => toggleVote(city, postId, 'down')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
-                  size={20}
-                  color={post.userVote === 'down' ? linkColor : headerMetaColor}
-                />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => toggleVote(city, postId, 'down')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={post.userVote === 'down' ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                    size={20}
+                    color={post.userVote === 'down' ? linkColor : headerMetaColor}
+                  />
+                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.downvotes ?? 0}</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionButton} onPress={openShareModal} activeOpacity={0.7}>
-                <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
-                <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.shareCount ?? 0}</Text>
-                <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={openShareModal} activeOpacity={0.7}>
+                  <Ionicons name="paper-plane-outline" size={20} color={linkColor} />
+                  <Text style={[styles.actionCount, { color: headerMetaColor }]}>{post.shareCount ?? 0}</Text>
+                  <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
+                </TouchableOpacity>
+              </View>
+              {!hideHeaderActions && showViewOriginal ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
+                  }
+                  style={styles.viewOriginalBottomButton}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.viewOriginalBottomText, { color: linkColor }]}>View original</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-            {!hideHeaderActions && showViewOriginal ? (
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('PostThread', { city: post.sourceCity, postId: post.sourcePostId })
-                }
-                style={styles.viewOriginalBottomButton}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.viewOriginalBottomText, { color: linkColor }]}>View original</Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
         </View>
       );
@@ -876,15 +878,22 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postMessage: { fontSize: 18, fontWeight: '500', lineHeight: 24 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+    actionsFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+    },
     actionsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 0 },
     actionButton: { flexDirection: 'row', alignItems: 'center', marginRight: 24 },
     actionCount: { fontSize: 12, marginLeft: 6 },
     actionLabel: { fontSize: 12, fontWeight: '600', marginLeft: 6 },
     viewOriginalBottomButton: {
-      alignSelf: 'flex-end',
       paddingVertical: 6,
       paddingHorizontal: 4,
-      marginTop: 10,
+      marginLeft: 'auto',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     viewOriginalBottomText: { fontSize: 12, fontWeight: '600' },
     ownerMenuTrigger: {
