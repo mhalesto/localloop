@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useIsFocused } from '@react-navigation/native';
-import { TapGestureHandler, Swipeable } from 'react-native-gesture-handler';
+import { LongPressGestureHandler } from 'react-native-gesture-handler';
+import * as Clipboard from 'expo-clipboard';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
@@ -34,6 +35,7 @@ import RichText from '../components/RichText';
 import { stripRichFormatting } from '../utils/textFormatting';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
+
 
 const CommentListItem = React.memo(
   ({
@@ -53,11 +55,11 @@ const CommentListItem = React.memo(
     onSelectReaction,
     availableReactions,
     onReply,
+    onCopyComment,
   }) => {
     const bubbleScale = React.useRef(new Animated.Value(1)).current;
     const pickerOpacity = React.useRef(new Animated.Value(showPicker ? 1 : 0)).current;
     const reactionPulse = React.useRef(new Animated.Value(1)).current;
-    const swipeableRef = React.useRef(null);
 
     const reactionSignature = React.useMemo(() => {
       const counts = Object.entries(comment.reactions ?? {})
@@ -100,24 +102,6 @@ const CommentListItem = React.memo(
       }).start();
     }, [pickerOpacity, showPicker]);
 
-    const renderLeftActions = (progress) => {
-      const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] });
-      const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
-      return (
-        <Animated.View style={[styles.swipeReplyAction, { transform: [{ scale }], opacity }]}>
-          <Ionicons name="return-up-forward" size={18} color={linkColor} />
-          <Text style={[styles.swipeReplyText, { color: linkColor }]}>Reply</Text>
-        </Animated.View>
-      );
-    };
-
-    const handleSwipeOpen = (direction) => {
-      if (direction === 'left') {
-        swipeableRef.current?.close();
-        onReply(comment);
-      }
-    };
-
     const parentName = React.useMemo(() => {
       if (!parentComment) {
         return 'someone';
@@ -133,19 +117,25 @@ const CommentListItem = React.memo(
       return nickname?.length ? nickname : name?.length ? name : '';
     }, [comment.author?.name, comment.author?.nickname]);
 
-    const handleDoubleTap = React.useCallback(() => {
-      if (showPicker) {
-        onClosePicker();
-      } else {
-        onTogglePicker(commentId);
-      }
+    const handleHold = React.useCallback(() => {
+      onTogglePicker(commentId, true);
       reactionPulse.setValue(1);
-    }, [commentId, onClosePicker, onTogglePicker, reactionPulse, showPicker]);
+    }, [commentId, onTogglePicker, reactionPulse]);
 
     const handleSelectReaction = (emoji) => {
       onSelectReaction(commentId, emoji);
       onClosePicker();
     };
+
+    const handleReplyPress = React.useCallback(() => {
+      onReply(comment);
+      onClosePicker();
+    }, [comment, onClosePicker, onReply]);
+
+    const handleCopyPress = React.useCallback(() => {
+      onCopyComment(comment);
+      onClosePicker();
+    }, [comment, onClosePicker, onCopyComment]);
 
     const bubbleStyles = [styles.commentBubble];
     if (mine) {
@@ -163,77 +153,68 @@ const CommentListItem = React.memo(
 
     const pickerScale = pickerOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
     const pickerPosition = mine ? styles.reactionPickerRight : styles.reactionPickerLeft;
+    const actionPosition = mine ? styles.commentActionsSheetRight : styles.commentActionsSheetLeft;
     const authorLabel = mine ? 'You' : displayName;
 
     return (
-      <Swipeable
-        ref={swipeableRef}
-        renderLeftActions={renderLeftActions}
-        overshootLeft={false}
-        onSwipeableOpen={handleSwipeOpen}
-        friction={2.5}
-      >
-        <View style={[styles.commentRow, mine && styles.commentRowMine]}>
-          {!mine && (
-            <CommentAvatar
-              author={comment.author}
-              fallbackColor={badgeBackground}
-              styles={styles}
-              wrapperStyle={styles.commentAvatarLeft}
-            />
-          )}
+      <View style={[styles.commentRow, mine && styles.commentRowMine]}>
+        {!mine && (
+          <CommentAvatar
+            author={comment.author}
+            fallbackColor={badgeBackground}
+            styles={styles}
+            wrapperStyle={styles.commentAvatarLeft}
+          />
+        )}
 
-          <View style={[styles.commentBubbleWrapper, mine && styles.commentBubbleWrapperMine]}>
-            <TapGestureHandler
-              numberOfTaps={2}
-              onActivated={handleDoubleTap}
-              simultaneousHandlers={swipeableRef}
-            >
-              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}> 
-                {authorLabel ? (
+        <View style={[styles.commentBubbleWrapper, mine && styles.commentBubbleWrapperMine]}>
+          <LongPressGestureHandler minDurationMs={2000} onActivated={handleHold}>
+            <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}>
+              {authorLabel ? (
+                <Text
+                  style={[
+                    styles.commentAuthorLabel,
+                    mine ? { color: linkColor } : { color: themeColors.textSecondary },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {authorLabel}
+                </Text>
+              ) : null}
+
+              {parentComment ? (
+                <View style={styles.commentReplyReference}>
                   <Text
                     style={[
-                      styles.commentAuthorLabel,
-                      mine ? { color: linkColor } : { color: themeColors.textSecondary },
+                      styles.commentReplyReferenceLabel,
+                      { color: mine ? linkColor : themeColors.textSecondary },
                     ]}
+                  >
+                    Replying to {parentName}
+                  </Text>
+                  <Text
+                    style={[styles.commentReplyReferenceSnippet, { color: themeColors.textSecondary }]}
                     numberOfLines={1}
                   >
-                    {authorLabel}
+                    {parentComment.message}
                   </Text>
-                ) : null}
+                </View>
+              ) : comment.parentId ? (
+                <View style={styles.commentReplyReference}>
+                  <Text
+                    style={[styles.commentReplyReferenceLabel, { color: themeColors.textSecondary }]}
+                  >
+                    Replying to a comment
+                  </Text>
+                </View>
+              ) : null}
 
-                {parentComment ? (
-                  <View style={styles.commentReplyReference}>
-                    <Text
-                      style={[
-                        styles.commentReplyReferenceLabel,
-                        { color: mine ? linkColor : themeColors.textSecondary },
-                      ]}
-                    >
-                      Replying to {parentName}
-                    </Text>
-                    <Text
-                      style={[styles.commentReplyReferenceSnippet, { color: themeColors.textSecondary }]}
-                      numberOfLines={1}
-                    >
-                      {parentComment.message}
-                    </Text>
-                  </View>
-                ) : comment.parentId ? (
-                  <View style={styles.commentReplyReference}>
-                    <Text
-                      style={[styles.commentReplyReferenceLabel, { color: themeColors.textSecondary }]}
-                    >
-                      Replying to a comment
-                    </Text>
-                  </View>
-                ) : null}
+              <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
+            </Animated.View>
+          </LongPressGestureHandler>
 
-                <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
-              </Animated.View>
-            </TapGestureHandler>
-
-            {showPicker ? (
+          {showPicker ? (
+            <>
               <Animated.View
                 pointerEvents={showPicker ? 'auto' : 'none'}
                 style={[
@@ -276,19 +257,48 @@ const CommentListItem = React.memo(
                   </View>
                 </TouchableOpacity>
               </Animated.View>
-            ) : null}
-          </View>
 
-          {mine && (
-            <CommentAvatar
-              author={comment.author}
-              fallbackColor={badgeBackground}
-              styles={styles}
-              wrapperStyle={styles.commentAvatarRight}
-            />
-          )}
+              <Animated.View
+                pointerEvents={showPicker ? 'auto' : 'none'}
+                style={[
+                  styles.commentActionsSheet,
+                  actionPosition,
+                  { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={handleReplyPress}
+                  style={styles.commentActionButton}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="return-up-forward" size={18} color={themeColors.textSecondary} />
+                  <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Reply</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.commentActionDivider, { backgroundColor: themeColors.divider }]} />
+
+                <TouchableOpacity
+                  onPress={handleCopyPress}
+                  style={styles.commentActionButton}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="copy-outline" size={18} color={themeColors.textSecondary} />
+                  <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Copy</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </>
+          ) : null}
         </View>
-      </Swipeable>
+
+        {mine && (
+          <CommentAvatar
+            author={comment.author}
+            fallbackColor={badgeBackground}
+            styles={styles}
+            wrapperStyle={styles.commentAvatarRight}
+          />
+        )}
+      </View>
     );
   }
 );
@@ -525,8 +535,13 @@ export default function PostThreadScreen({ route, navigation }) {
     setReactionPickerCommentId(null);
   }, []);
 
-  const handleToggleReactionPicker = useCallback((commentId) => {
-    setReactionPickerCommentId((prev) => (prev === commentId ? null : commentId));
+  const handleToggleReactionPicker = useCallback((commentId, forceOpen = false) => {
+    setReactionPickerCommentId((prev) => {
+      if (forceOpen) {
+        return commentId;
+      }
+      return prev === commentId ? null : commentId;
+    });
   }, []);
 
   const handleSelectReaction = useCallback(
@@ -546,6 +561,26 @@ export default function PostThreadScreen({ route, navigation }) {
     setReplyingToComment(comment);
     setReactionPickerCommentId(null);
   }, []);
+
+  const handleCopyComment = useCallback(
+    async (comment) => {
+      const raw = comment?.message ?? '';
+      const text = stripRichFormatting(raw).trim();
+
+      if (!text.length) {
+        setFeedbackMessage('Nothing to copy');
+        return;
+      }
+
+      try {
+        await Clipboard.setStringAsync(text);
+        setFeedbackMessage('Copied to clipboard');
+      } catch (error) {
+        setFeedbackMessage('Unable to copy comment');
+      }
+    },
+    [setFeedbackMessage]
+  );
 
   const cancelReply = useCallback(() => {
     setReplyingToComment(null);
@@ -1117,6 +1152,7 @@ export default function PostThreadScreen({ route, navigation }) {
           onSelectReaction={handleSelectReaction}
           availableReactions={availableReactions}
           onReply={handleReplyToComment}
+          onCopyComment={handleCopyComment}
         />
       );
     },
@@ -1127,6 +1163,7 @@ export default function PostThreadScreen({ route, navigation }) {
       commentsById,
       commentHighlight,
       handleReplyToComment,
+      handleCopyComment,
       handleSelectReaction,
       handleToggleReactionPicker,
       highlightedCommentId,
@@ -1541,21 +1578,31 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       color: palette.textSecondary,
       textAlign: 'center'
     },
-    swipeReplyAction: {
+    commentActionsSheet: {
+      position: 'absolute',
+      top: '100%',
+      marginTop: 10,
+      minWidth: 148,
+      backgroundColor: palette.card,
+      borderRadius: 18,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.divider,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.24 : 0.12,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4
+    },
+    commentActionsSheetLeft: { left: 0 },
+    commentActionsSheetRight: { right: 0 },
+    commentActionButton: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 10,
-      backgroundColor: palette.card,
-      borderRadius: 18,
-      marginLeft: 12,
-      shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.22 : 0.1,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3
+      paddingVertical: 12
     },
-    swipeReplyText: { marginLeft: 6, fontSize: 13, fontWeight: '600' },
+    commentActionLabel: { marginLeft: 10, fontSize: 14, fontWeight: '600' },
+    commentActionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
     commentReplyReference: {
       marginBottom: 8,
       paddingHorizontal: 10,
