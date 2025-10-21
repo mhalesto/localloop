@@ -22,6 +22,10 @@ const POSTS_CACHE_KEY = '@toilet.postsCache';
 const QUEUE_CACHE_KEY = '@toilet.postsQueue';
 const CLIENT_ID_KEY = '@toilet.clientId';
 const THREAD_READS_CACHE_KEY = '@toilet.threadReads';
+const SUBSCRIPTIONS_CACHE_KEY = '@toilet.postSubscriptions';
+const NOTIFICATIONS_CACHE_KEY = '@toilet.postNotifications';
+
+const MAX_NOTIFICATIONS = 60;
 
 const makeThreadKey = (city, postId) => `${city}::${postId}`;
 
@@ -62,6 +66,10 @@ export function PostsProvider({ children }) {
   const [clientId, setClientId] = useState(null);
   const clientIdRef = useRef(null);
   const [threadReads, setThreadReads] = useState({});
+  const [postSubscriptions, setPostSubscriptions] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const prevPostsRef = useRef({});
+  const hasHydratedPostsRef = useRef(false);
 
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
@@ -143,6 +151,18 @@ export function PostsProvider({ children }) {
     );
   }, []);
 
+  const persistSubscriptions = useCallback((subscriptions) => {
+    AsyncStorage.setItem(SUBSCRIPTIONS_CACHE_KEY, JSON.stringify(subscriptions)).catch((error) =>
+      console.warn('[PostsProvider] persistSubscriptions failed', error)
+    );
+  }, []);
+
+  const persistNotifications = useCallback((items) => {
+    AsyncStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(items)).catch((error) =>
+      console.warn('[PostsProvider] persistNotifications failed', error)
+    );
+  }, []);
+
   const persistThreadReads = useCallback((reads) => {
     AsyncStorage.setItem(THREAD_READS_CACHE_KEY, JSON.stringify(reads)).catch((error) =>
       console.warn('[PostsProvider] persistThreadReads failed', error)
@@ -199,6 +219,24 @@ export function PostsProvider({ children }) {
         }
       } catch (error) {
         console.warn('[PostsProvider] load thread reads failed', error);
+      }
+
+      try {
+        const cachedSubscriptions = await AsyncStorage.getItem(SUBSCRIPTIONS_CACHE_KEY);
+        if (cachedSubscriptions) {
+          setPostSubscriptions(JSON.parse(cachedSubscriptions));
+        }
+      } catch (error) {
+        console.warn('[PostsProvider] load post subscriptions failed', error);
+      }
+
+      try {
+        const cachedNotifications = await AsyncStorage.getItem(NOTIFICATIONS_CACHE_KEY);
+        if (cachedNotifications) {
+          setNotifications(JSON.parse(cachedNotifications));
+        }
+      } catch (error) {
+        console.warn('[PostsProvider] load notifications failed', error);
       }
     };
 
@@ -378,6 +416,154 @@ export function PostsProvider({ children }) {
       cancelled = true;
     };
   }, [isOnline, pendingQueue, persistQueue]);
+
+  useEffect(() => {
+    if (!hasHydratedPostsRef.current) {
+      prevPostsRef.current = postsByCity;
+      hasHydratedPostsRef.current = true;
+      return;
+    }
+
+    const activeSubscriptions = Object.entries(postSubscriptions)
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([key]) => key);
+
+    if (!activeSubscriptions.length) {
+      prevPostsRef.current = postsByCity;
+      return;
+    }
+
+    const previous = prevPostsRef.current || {};
+    const localClientId = clientIdRef.current;
+    const newItems = [];
+
+    const resolveActorName = (post, clientId) => {
+      if (!clientId) {
+        return 'Someone';
+      }
+
+      const profiles = post?.voteProfiles;
+      if (profiles) {
+        if (Array.isArray(profiles)) {
+          const found = profiles.find(
+            (profile) => profile?.clientId === clientId || profile?.id === clientId
+          );
+          if (found) {
+            const name = found.nickname ?? found.name ?? '';
+            if (name && name.trim()) {
+              return name.trim();
+            }
+          }
+        } else if (typeof profiles === 'object') {
+          const profile = profiles[clientId];
+          if (profile) {
+            const name = profile.nickname ?? profile.name ?? '';
+            if (name && name.trim()) {
+              return name.trim();
+            }
+          }
+        }
+      }
+
+      const commentMatch = (post?.comments ?? []).find((comment) => comment.clientId === clientId);
+      const fallbackName = commentMatch?.author?.nickname ?? commentMatch?.author?.name ?? '';
+      return fallbackName && fallbackName.trim() ? fallbackName.trim() : 'Someone';
+    };
+
+    activeSubscriptions.forEach((threadKey) => {
+      const [cityName, postId] = threadKey.split('::');
+      if (!cityName || !postId) {
+        return;
+      }
+
+      const nextPosts = postsByCity[cityName] ?? [];
+      const nextPost = nextPosts.find((post) => post.id === postId);
+      if (!nextPost) {
+        return;
+      }
+
+      const prevPosts = previous[cityName] ?? [];
+      const prevPost = prevPosts.find((post) => post.id === postId);
+
+      const prevCommentIds = new Set((prevPost?.comments ?? []).map((comment) => comment?.id));
+      (nextPost.comments ?? []).forEach((comment) => {
+        if (!comment?.id || prevCommentIds.has(comment.id)) {
+          return;
+        }
+        if (comment.clientId && comment.clientId === localClientId) {
+          return;
+        }
+        if (comment.createdByMe) {
+          return;
+        }
+
+        const actorName = comment.author?.nickname?.trim?.() || comment.author?.name?.trim?.() || 'Someone';
+        newItems.push({
+          id: `comment-${cityName}-${postId}-${comment.id}`,
+          city: cityName,
+          postId,
+          type: 'comment',
+          commentId: comment.id,
+          actorName,
+          snippet: comment.message ?? '',
+          postTitle: nextPost.title ?? nextPost.message ?? '',
+          createdAt: comment.createdAt ?? Date.now(),
+          read: false,
+        });
+      });
+
+      const prevVotes = prevPost?.votes ?? {};
+      const nextVotes = nextPost.votes ?? {};
+      Object.entries(nextVotes).forEach(([voterId, value]) => {
+        if (voterId === localClientId) {
+          return;
+        }
+        const previousValue = prevVotes?.[voterId];
+        if (value === 'up' && previousValue !== 'up') {
+          const actorName = resolveActorName(nextPost, voterId);
+          newItems.push({
+            id: `like-${cityName}-${postId}-${voterId}`,
+            city: cityName,
+            postId,
+            type: 'like',
+            actorName,
+            snippet: nextPost.message ?? '',
+            postTitle: nextPost.title ?? nextPost.message ?? '',
+            createdAt: Date.now(),
+            read: false,
+          });
+        }
+      });
+    });
+
+    if (newItems.length) {
+      setNotifications((prevList) => {
+        const existingIds = new Set(prevList.map((item) => item.id));
+        let changed = false;
+        const combined = [...prevList];
+        newItems.forEach((item) => {
+          if (existingIds.has(item.id)) {
+            return;
+          }
+          combined.push(item);
+          existingIds.add(item.id);
+          changed = true;
+        });
+
+        if (!changed) {
+          return prevList;
+        }
+
+        const sorted = combined
+          .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+          .slice(0, MAX_NOTIFICATIONS);
+        persistNotifications(sorted);
+        return sorted;
+      });
+    }
+
+    prevPostsRef.current = postsByCity;
+  }, [clientId, postSubscriptions, postsByCity, persistNotifications]);
 
   const addPost = useCallback(
     (
@@ -602,6 +788,98 @@ export function PostsProvider({ children }) {
     return count;
   }, [getUnreadCommentCount, postsByCity]);
 
+  const isPostSubscribed = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return false;
+      }
+      return Boolean(postSubscriptions[makeThreadKey(city, postId)]);
+    },
+    [postSubscriptions]
+  );
+
+  const togglePostSubscription = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return false;
+      }
+
+      const key = makeThreadKey(city, postId);
+      let enabled = false;
+
+      setPostSubscriptions((prev) => {
+        const next = { ...prev };
+        if (next[key]) {
+          delete next[key];
+          enabled = false;
+        } else {
+          next[key] = true;
+          enabled = true;
+        }
+        persistSubscriptions(next);
+        return next;
+      });
+
+      if (enabled) {
+        prevPostsRef.current = postsByCity;
+      }
+
+      return enabled;
+    },
+    [persistSubscriptions, postsByCity]
+  );
+
+  const getNotificationCount = useCallback(() => {
+    return notifications.reduce((total, item) => (item.read ? total : total + 1), 0);
+  }, [notifications]);
+
+  const getNotifications = useCallback(() => {
+    return [...notifications].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  }, [notifications]);
+
+  const markNotificationsRead = useCallback(() => {
+    setNotifications((prevList) => {
+      let changed = false;
+      const next = prevList.map((item) => {
+        if (item.read) {
+          return item;
+        }
+        changed = true;
+        return { ...item, read: true };
+      });
+      if (changed) {
+        persistNotifications(next);
+        return next;
+      }
+      return prevList;
+    });
+  }, [persistNotifications]);
+
+  const markNotificationsForThreadRead = useCallback(
+    (city, postId) => {
+      if (!city || !postId) {
+        return;
+      }
+
+      setNotifications((prevList) => {
+        let changed = false;
+        const next = prevList.map((item) => {
+          if (item.city === city && item.postId === postId && !item.read) {
+            changed = true;
+            return { ...item, read: true };
+          }
+          return item;
+        });
+        if (changed) {
+          persistNotifications(next);
+          return next;
+        }
+        return prevList;
+      });
+    },
+    [persistNotifications]
+  );
+
   const sharePost = useCallback(
     (fromCity, postId, toCity, authorProfile = null) => {
       if (fromCity === toCity) {
@@ -814,13 +1092,39 @@ export function PostsProvider({ children }) {
           persistThreadReads(next);
           return next;
         });
+        setPostSubscriptions((prev) => {
+          if (!prev[key]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[key];
+          persistSubscriptions(next);
+          return next;
+        });
+        setNotifications((prevList) => {
+          const filtered = prevList.filter(
+            (item) => !(item.city === city && item.postId === postId)
+          );
+          if (filtered.length === prevList.length) {
+            return prevList;
+          }
+          persistNotifications(filtered);
+          return filtered;
+        });
         enqueueOperation({ type: 'deletePost', payload: { id: postId } });
         return true;
       }
 
       return false;
     },
-    [enqueueOperation, ensureClientId, persistThreadReads, setPostsWithPersist]
+    [
+      enqueueOperation,
+      ensureClientId,
+      persistNotifications,
+      persistSubscriptions,
+      persistThreadReads,
+      setPostsWithPersist
+    ]
   );
 
   const value = useMemo(
@@ -835,6 +1139,12 @@ export function PostsProvider({ children }) {
       getRecentCityActivity,
       getReplyNotificationCount,
       getUnreadCommentCount,
+      getNotificationCount,
+      getNotifications,
+      isPostSubscribed,
+      togglePostSubscription,
+      markNotificationsRead,
+      markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
       updatePost,
@@ -851,6 +1161,12 @@ export function PostsProvider({ children }) {
       getRecentCityActivity,
       getReplyNotificationCount,
       getUnreadCommentCount,
+      getNotificationCount,
+      getNotifications,
+      isPostSubscribed,
+      togglePostSubscription,
+      markNotificationsRead,
+      markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
       updatePost,
