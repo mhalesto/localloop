@@ -53,14 +53,226 @@ function normalizeProfile(profile) {
   };
 }
 
-function createComment(message, clientId, authorProfile = null) {
+function sanitizeReactorsMap(map) {
+  if (!map || typeof map !== 'object') {
+    return {};
+  }
+  const sanitized = {};
+  Object.entries(map).forEach(([reactorId, value]) => {
+    if (!reactorId) {
+      return;
+    }
+    if (value && value !== 'false') {
+      sanitized[reactorId] = true;
+    }
+  });
+  return sanitized;
+}
+
+function normalizeCommentForClient(comment, localClientId) {
+  if (!comment || typeof comment !== 'object') {
+    return comment;
+  }
+
+  const ownerId = comment.clientId ?? null;
+  const mine = ownerId ? ownerId === localClientId : Boolean(comment.createdByMe);
+
+  const rawReactions = comment.reactions && typeof comment.reactions === 'object' ? comment.reactions : {};
+  const normalizedReactions = {};
+  let userReaction = null;
+
+  Object.entries(rawReactions).forEach(([emoji, payload]) => {
+    if (!emoji) {
+      return;
+    }
+
+    let reactors = {};
+    let count = 0;
+
+    if (Array.isArray(payload)) {
+      payload.forEach((entry) => {
+        if (typeof entry === 'string') {
+          reactors[entry] = true;
+        } else if (entry && typeof entry === 'object' && entry.clientId) {
+          reactors[entry.clientId] = true;
+        }
+      });
+      count = Object.keys(reactors).length;
+    } else if (payload && typeof payload === 'object') {
+      if (payload.reactors && typeof payload.reactors === 'object') {
+        reactors = sanitizeReactorsMap(payload.reactors);
+        const providedCount = Number(payload.count);
+        count = Number.isFinite(providedCount) ? providedCount : Object.keys(reactors).length;
+      } else {
+        reactors = sanitizeReactorsMap(payload);
+        count = Object.keys(reactors).length;
+      }
+    } else if (typeof payload === 'number') {
+      count = payload;
+      reactors = {};
+    }
+
+    const reactorIds = Object.keys(reactors);
+    if (!count && reactorIds.length) {
+      count = reactorIds.length;
+    }
+
+    if (count > 0 || reactorIds.length > 0) {
+      normalizedReactions[emoji] = {
+        count,
+        reactors
+      };
+      if (!userReaction && localClientId && reactors[localClientId]) {
+        userReaction = emoji;
+      }
+    }
+  });
+
+  return {
+    ...comment,
+    createdByMe: mine,
+    clientId: ownerId,
+    reactions: normalizedReactions,
+    userReaction: userReaction ?? null,
+    parentId: comment.parentId ?? null
+  };
+}
+
+function prepareCommentForRemote(comment) {
+  if (!comment || typeof comment !== 'object') {
+    return comment;
+  }
+
+  const { userReaction, reactions = {}, ...rest } = comment;
+  const payloadReactions = {};
+
+  Object.entries(reactions).forEach(([emoji, data]) => {
+    if (!emoji || !data) {
+      return;
+    }
+    const reactors = sanitizeReactorsMap(data.reactors);
+    const reactorIds = Object.keys(reactors);
+    const count = Math.max(Number(data.count) || 0, reactorIds.length);
+    if (count > 0 || reactorIds.length > 0) {
+      payloadReactions[emoji] = {
+        reactors,
+        count
+      };
+    }
+  });
+
+  if (Object.keys(payloadReactions).length > 0) {
+    return { ...rest, reactions: payloadReactions };
+  }
+
+  const { reactions: _ignored, ...withoutReactions } = rest;
+  return withoutReactions;
+}
+
+function applyReactionToggle(comment, emoji, clientId) {
+  if (!comment || !emoji || !clientId) {
+    return { nextComment: comment, changed: false };
+  }
+
+  const nextReactions = {};
+  Object.entries(comment.reactions ?? {}).forEach(([key, data]) => {
+    if (!key || !data) {
+      return;
+    }
+    const reactors = sanitizeReactorsMap(data.reactors);
+    nextReactions[key] = {
+      reactors,
+      count: Math.max(Number(data.count) || 0, Object.keys(reactors).length)
+    };
+  });
+
+  let changed = false;
+  let nextUserReaction = comment.userReaction ?? null;
+
+  const ensureEntry = (key) => {
+    if (!nextReactions[key]) {
+      nextReactions[key] = { reactors: {}, count: 0 };
+    }
+    return nextReactions[key];
+  };
+
+  const removeReaction = (key) => {
+    const entry = nextReactions[key];
+    if (!entry) {
+      return;
+    }
+    if (entry.reactors && entry.reactors[clientId]) {
+      delete entry.reactors[clientId];
+      entry.count = Math.max(0, Object.keys(entry.reactors).length);
+      if (entry.count === 0) {
+        delete nextReactions[key];
+      }
+      changed = true;
+    }
+  };
+
+  if (nextUserReaction && nextUserReaction !== emoji) {
+    removeReaction(nextUserReaction);
+    nextUserReaction = null;
+  }
+
+  const currentEntry = ensureEntry(emoji);
+  const hasReacted = Boolean(currentEntry.reactors?.[clientId]);
+
+  if (hasReacted) {
+    removeReaction(emoji);
+    nextUserReaction = null;
+  } else {
+    currentEntry.reactors = sanitizeReactorsMap(currentEntry.reactors);
+    if (!currentEntry.reactors[clientId]) {
+      currentEntry.reactors[clientId] = true;
+      currentEntry.count = Math.max(Object.keys(currentEntry.reactors).length, Number(currentEntry.count) || 0, 0);
+      nextReactions[emoji] = currentEntry;
+      nextUserReaction = emoji;
+      changed = true;
+    }
+  }
+
+  const cleanedReactions = {};
+  Object.entries(nextReactions).forEach(([key, data]) => {
+    if (!key) {
+      return;
+    }
+    const reactors = sanitizeReactorsMap(data.reactors);
+    const count = Math.max(Object.keys(reactors).length, Number(data.count) || 0);
+    if (count > 0) {
+      cleanedReactions[key] = {
+        reactors,
+        count
+      };
+    }
+  });
+
+  if (!changed) {
+    return { nextComment: comment, changed: false };
+  }
+
+  return {
+    nextComment: {
+      ...comment,
+      reactions: cleanedReactions,
+      userReaction: nextUserReaction
+    },
+    changed: true
+  };
+}
+
+function createComment(message, clientId, authorProfile = null, parentId = null) {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     message,
     createdAt: Date.now(),
     createdByMe: true,
     clientId,
-    author: normalizeProfile(authorProfile)
+    author: normalizeProfile(authorProfile),
+    parentId: parentId ?? null,
+    reactions: {},
+    userReaction: null
   };
 }
 
@@ -111,15 +323,9 @@ export function PostsProvider({ children }) {
         const shareCountNumber = Number(shareCountRaw);
         const shareCount = Number.isFinite(shareCountNumber) ? shareCountNumber : 0;
 
-        const normalizedComments = (post.comments ?? []).map((comment) => {
-          const ownerId = comment.clientId ?? null;
-          const mine = ownerId ? ownerId === localClientId : false;
-          return {
-            ...comment,
-            createdByMe: mine,
-            clientId: ownerId
-          };
-        });
+        const normalizedComments = (post.comments ?? []).map((comment) =>
+          normalizeCommentForClient(comment, localClientId)
+        );
 
         const normalizedTitle =
           typeof post.title === 'string' && post.title.trim().length > 0
@@ -524,6 +730,8 @@ export function PostsProvider({ children }) {
             await saveCommentRemote(operation.payload.postId, operation.payload.comment);
           } else if (operation.type === 'updatePost') {
             await savePostRemote(operation.payload.post);
+          } else if (operation.type === 'updateComment') {
+            await saveCommentRemote(operation.payload.postId, operation.payload.comment);
           } else if (operation.type === 'deletePost') {
             await deletePostRemote(operation.payload.id);
           }
@@ -747,14 +955,14 @@ export function PostsProvider({ children }) {
   );
 
   const addComment = useCallback(
-    (city, postId, message, authorProfile = null) => {
+    (city, postId, message, authorProfile = null, parentId = null) => {
       const trimmed = message.trim();
       if (!trimmed) {
         return;
       }
 
       const ownerId = ensureClientId();
-      const newComment = createComment(trimmed, ownerId, authorProfile);
+      const newComment = createComment(trimmed, ownerId, authorProfile, parentId);
 
       setPostsWithPersist((prev) => {
         const cityPosts = prev[city] ?? [];
@@ -767,7 +975,65 @@ export function PostsProvider({ children }) {
         return { ...prev, [city]: updatedPosts };
       });
 
-      enqueueOperation({ type: 'addComment', payload: { city, postId, comment: newComment } });
+      enqueueOperation({
+        type: 'addComment',
+        payload: { city, postId, comment: prepareCommentForRemote(newComment) }
+      });
+    },
+    [enqueueOperation, ensureClientId, setPostsWithPersist]
+  );
+
+  const toggleCommentReaction = useCallback(
+    (city, postId, commentId, emoji) => {
+      if (!city || !postId || !commentId || !emoji) {
+        return;
+      }
+
+      const ownerId = ensureClientId();
+      let updatedCommentForQueue = null;
+
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        let didChange = false;
+
+        const nextCityPosts = cityPosts.map((post) => {
+          if (post.id !== postId) {
+            return post;
+          }
+
+          const nextComments = (post.comments ?? []).map((comment) => {
+            if (comment.id !== commentId) {
+              return comment;
+            }
+
+            const { nextComment, changed } = applyReactionToggle(comment, emoji, ownerId);
+            if (changed) {
+              didChange = true;
+              updatedCommentForQueue = prepareCommentForRemote(nextComment);
+              return nextComment;
+            }
+            return comment;
+          });
+
+          if (didChange) {
+            return { ...post, comments: nextComments };
+          }
+          return post;
+        });
+
+        if (!didChange) {
+          return prev;
+        }
+
+        return { ...prev, [city]: nextCityPosts };
+      });
+
+      if (updatedCommentForQueue) {
+        enqueueOperation({
+          type: 'updateComment',
+          payload: { city, postId, comment: updatedCommentForQueue }
+        });
+      }
     },
     [enqueueOperation, ensureClientId, setPostsWithPersist]
   );
@@ -804,13 +1070,9 @@ export function PostsProvider({ children }) {
             return prev;
           }
 
-          const mappedComments = remoteComments.map((comment) => {
-            const ownerId = comment.clientId ?? null;
-            return {
-              ...comment,
-              createdByMe: ownerId ? ownerId === localClientId : false
-            };
-          });
+          const mappedComments = remoteComments.map((comment) =>
+            normalizeCommentForClient(comment, localClientId)
+          );
 
           const existingComments = cityPosts[index].comments ?? [];
           const sameLength = existingComments.length === mappedComments.length;
@@ -823,7 +1085,11 @@ export function PostsProvider({ children }) {
                 !prevComment ||
                 prevComment.id !== nextComment.id ||
                 prevComment.message !== nextComment.message ||
-                prevComment.createdAt !== nextComment.createdAt
+                prevComment.createdAt !== nextComment.createdAt ||
+                prevComment.parentId !== nextComment.parentId ||
+                prevComment.userReaction !== nextComment.userReaction ||
+                JSON.stringify(prevComment.reactions ?? {}) !==
+                  JSON.stringify(nextComment.reactions ?? {})
               ) {
                 commentsDiffer = true;
                 break;
@@ -1412,6 +1678,7 @@ export function PostsProvider({ children }) {
       markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
+      toggleCommentReaction,
       updatePost,
       refreshPosts: refreshFromRemote,
       watchThread,
@@ -1437,6 +1704,7 @@ export function PostsProvider({ children }) {
       markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
+      toggleCommentReaction,
       updatePost,
       refreshFromRemote,
       watchThread,
