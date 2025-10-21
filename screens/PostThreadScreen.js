@@ -17,7 +17,6 @@ import {
   Dimensions,
   Share,
 } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
@@ -53,7 +52,7 @@ const CommentListItem = React.memo(
     onClosePicker,
     onSelectReaction,
     availableReactions,
-    onReply
+    onReply,
   }) => {
     const bubbleScale = React.useRef(new Animated.Value(1)).current;
     const pickerOpacity = React.useRef(new Animated.Value(showPicker ? 1 : 0)).current;
@@ -67,6 +66,14 @@ const CommentListItem = React.memo(
         .join('|');
       return `${counts}|${comment.userReaction ?? ''}`;
     }, [comment.reactions, comment.userReaction]);
+
+    const reactionCounts = React.useMemo(() => {
+      const counts = new Map();
+      Object.entries(comment.reactions ?? {}).forEach(([emoji, data]) => {
+        counts.set(emoji, data?.count ?? 0);
+      });
+      return counts;
+    }, [comment.reactions]);
 
     React.useEffect(() => {
       bubbleScale.setValue(0.94);
@@ -97,7 +104,7 @@ const CommentListItem = React.memo(
       const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] });
       const opacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
       return (
-        <Animated.View style={[styles.swipeReplyAction, { transform: [{ scale }], opacity }]}> 
+        <Animated.View style={[styles.swipeReplyAction, { transform: [{ scale }], opacity }]}>
           <Ionicons name="return-up-forward" size={18} color={linkColor} />
           <Text style={[styles.swipeReplyText, { color: linkColor }]}>Reply</Text>
         </Animated.View>
@@ -120,13 +127,18 @@ const CommentListItem = React.memo(
       return trimmed && trimmed.length ? trimmed : 'someone';
     }, [parentComment]);
 
-    const reactionEntries = React.useMemo(() => {
-      const entries = Object.entries(comment.reactions ?? {});
-      return entries.sort((a, b) => (b[1]?.count ?? 0) - (a[1]?.count ?? 0));
-    }, [comment.reactions]);
+    const displayName = React.useMemo(() => {
+      const nickname = comment.author?.nickname?.trim?.();
+      const name = comment.author?.name?.trim?.();
+      return nickname?.length ? nickname : name?.length ? name : '';
+    }, [comment.author?.name, comment.author?.nickname]);
 
-    const handleTogglePicker = () => {
-      onTogglePicker(commentId);
+    const handleLongPress = () => {
+      if (showPicker) {
+        onClosePicker();
+      } else {
+        onTogglePicker(commentId);
+      }
     };
 
     const handleSelectReaction = (emoji) => {
@@ -139,10 +151,18 @@ const CommentListItem = React.memo(
       bubbleStyles.push({ backgroundColor: commentHighlightColor, borderColor: linkColor, borderWidth: 1 });
     }
     if (isHighlighted) {
-      bubbleStyles.push(styles.commentBubbleHighlighted, { borderColor: linkColor, backgroundColor: commentHighlightColor });
+      bubbleStyles.push(
+        styles.commentBubbleHighlighted,
+        {
+          borderColor: linkColor,
+          backgroundColor: commentHighlightColor,
+        },
+      );
     }
 
     const pickerScale = pickerOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
+    const pickerPosition = mine ? styles.reactionPickerRight : styles.reactionPickerLeft;
+    const authorLabel = mine ? 'You' : displayName;
 
     return (
       <Swipeable
@@ -153,122 +173,143 @@ const CommentListItem = React.memo(
         friction={2.5}
       >
         <View style={[styles.commentRow, mine && styles.commentRowMine]}>
-          {!mine && <AvatarIcon tint={badgeBackground} style={styles.commentAvatarLeft} />}
-          <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}> 
-            {parentComment ? (
-              <View style={styles.commentReplyReference}>
-                <Text
-                  style={[
-                    styles.commentReplyReferenceLabel,
-                    { color: mine ? linkColor : themeColors.textSecondary },
-                  ]}
-                >
-                  Replying to {parentName}
-                </Text>
-                <Text
-                  style={[styles.commentReplyReferenceSnippet, { color: themeColors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {parentComment.message}
-                </Text>
-              </View>
-            ) : comment.parentId ? (
-              <View style={styles.commentReplyReference}>
-                <Text
-                  style={[styles.commentReplyReferenceLabel, { color: themeColors.textSecondary }]}
-                >
-                  Replying to a comment
-                </Text>
-              </View>
-            ) : null}
+          {!mine && (
+            <CommentAvatar
+              author={comment.author}
+              fallbackColor={badgeBackground}
+              style={styles.commentAvatarLeft}
+            />
+          )}
 
-            <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
+          <View style={[styles.commentBubbleWrapper, mine && styles.commentBubbleWrapperMine]}>
+            <TouchableWithoutFeedback onLongPress={handleLongPress} delayLongPress={180}>
+              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}> 
+                {authorLabel ? (
+                  <Text
+                    style={[
+                      styles.commentAuthorLabel,
+                      mine ? { color: linkColor } : { color: themeColors.textSecondary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {authorLabel}
+                  </Text>
+                ) : null}
 
-            <View style={styles.commentFooterRow}>
-              <View style={styles.commentReactionsRow}>
-                {reactionEntries.map(([emoji, data]) => {
-                  const active = comment.userReaction === emoji;
-                  return (
-                    <TouchableOpacity
-                      key={emoji}
-                      onPress={() => handleSelectReaction(emoji)}
-                      activeOpacity={0.85}
+                {parentComment ? (
+                  <View style={styles.commentReplyReference}>
+                    <Text
+                      style={[
+                        styles.commentReplyReferenceLabel,
+                        { color: mine ? linkColor : themeColors.textSecondary },
+                      ]}
                     >
-                      <Animated.View
-                        style={[
-                          styles.commentReactionPill,
-                          active && [styles.commentReactionPillActive, { borderColor: linkColor }],
-                          active ? { transform: [{ scale: reactionPulse }] } : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.commentReactionText,
-                            active && { color: linkColor },
-                          ]}
-                        >
-                          {emoji} {data?.count ?? 0}
-                        </Text>
-                      </Animated.View>
-                    </TouchableOpacity>
-                  );
-                })}
+                      Replying to {parentName}
+                    </Text>
+                    <Text
+                      style={[styles.commentReplyReferenceSnippet, { color: themeColors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {parentComment.message}
+                    </Text>
+                  </View>
+                ) : comment.parentId ? (
+                  <View style={styles.commentReplyReference}>
+                    <Text
+                      style={[styles.commentReplyReferenceLabel, { color: themeColors.textSecondary }]}
+                    >
+                      Replying to a comment
+                    </Text>
+                  </View>
+                ) : null}
 
-                <TouchableOpacity
-                  onPress={() => (showPicker ? onClosePicker() : handleTogglePicker())}
-                  style={styles.commentAddReaction}
-                  activeOpacity={0.85}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons
-                    name={showPicker ? 'close-circle-outline' : 'happy-outline'}
-                    size={18}
-                    color={showPicker ? linkColor : themeColors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-              {mine ? (
-                <Text style={[styles.commentMeta, { color: linkColor }]}>You</Text>
-              ) : null}
-            </View>
+                <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
+              </Animated.View>
+            </TouchableWithoutFeedback>
 
             {showPicker ? (
               <Animated.View
                 pointerEvents={showPicker ? 'auto' : 'none'}
                 style={[
                   styles.reactionPicker,
+                  pickerPosition,
                   { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
                 ]}
               >
-                {availableReactions.map((emoji, index) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    onPress={() => handleSelectReaction(emoji)}
-                    style={index === availableReactions.length - 1 ? null : styles.reactionPickerButton}
-                    activeOpacity={0.85}
-                  >
-                    <Animated.Text style={styles.reactionPickerEmoji}>{emoji}</Animated.Text>
-                  </TouchableOpacity>
-                ))}
+                {availableReactions.map((emoji) => {
+                  const count = reactionCounts.get(emoji) ?? 0;
+                  const active = comment.userReaction === emoji;
+                  return (
+                    <TouchableOpacity
+                      key={emoji}
+                      onPress={() => handleSelectReaction(emoji)}
+                      style={styles.reactionOptionTouchable}
+                      activeOpacity={0.85}
+                    >
+                      <Animated.View
+                        style={[
+                          styles.reactionOption,
+                          active && [styles.reactionOptionActive, { borderColor: linkColor }],
+                          active ? { transform: [{ scale: reactionPulse }] } : null,
+                        ]}
+                      >
+                        <Animated.Text style={styles.reactionOptionEmoji}>{emoji}</Animated.Text>
+                        {count ? <Text style={styles.reactionOptionCount}>{count}</Text> : null}
+                      </Animated.View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <TouchableOpacity
+                  onPress={onClosePicker}
+                  style={styles.reactionOptionTouchable}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.reactionOption}>
+                    <Ionicons name="close" size={16} color={themeColors.textSecondary} />
+                  </View>
+                </TouchableOpacity>
               </Animated.View>
             ) : null}
-          </Animated.View>
-          {mine && <AvatarIcon tint={badgeBackground} style={styles.commentAvatarRight} />}
+          </View>
+
+          {mine && (
+            <CommentAvatar
+              author={comment.author}
+              fallbackColor={badgeBackground}
+              style={styles.commentAvatarRight}
+            />
+          )}
         </View>
       </Swipeable>
     );
   }
 );
 
-/* Simple circular avatar (no arrow/tail) */
-function AvatarIcon({ tint, size = 32, style }) {
+const CommentAvatar = React.memo(({ author, fallbackColor, style }) => {
+  const avatarConfig = React.useMemo(() => getAvatarConfig(author?.avatarKey), [author?.avatarKey]);
+  const backgroundColor = avatarConfig.backgroundColor ?? fallbackColor;
+  const foregroundColor = avatarConfig.foregroundColor ?? '#fff';
+
   return (
-    <Svg width={size} height={size} viewBox="0 0 64 64" style={style}>
-      <Circle cx="32" cy="24" r="12" fill={tint} />
-      <Path d="M16 54C16 43.954 24.954 36 35 36H29C39.046 36 48 43.954 48 54" fill={tint} />
-    </Svg>
+    <View style={[styles.commentAvatarShell, style]}>
+      <View style={[styles.commentAvatarCircle, { backgroundColor }]}> 
+        {avatarConfig.emoji ? (
+          <Text style={[styles.commentAvatarEmoji, { color: foregroundColor }]}>{avatarConfig.emoji}</Text>
+        ) : avatarConfig.icon ? (
+          <Ionicons
+            name={avatarConfig.icon.name}
+            size={18}
+            color={avatarConfig.icon.color ?? foregroundColor}
+          />
+        ) : (
+          <Text style={[styles.commentAvatarEmoji, { color: foregroundColor }]}>🙂</Text>
+        )}
+      </View>
+    </View>
   );
-}
+});
+
 
 export default function PostThreadScreen({ route, navigation }) {
   const { city, postId, focusCommentId: routeFocusCommentId = null } = route.params;
@@ -1398,6 +1439,36 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     commentRowMine: { justifyContent: 'flex-end' },
     commentAvatarLeft: { marginRight: 10 },
     commentAvatarRight: { marginLeft: 10 },
+    commentAvatarShell: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.18 : 0.1,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2
+    },
+    commentAvatarCircle: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)'
+    },
+    commentAvatarEmoji: { fontSize: 18 },
+    commentBubbleWrapper: {
+      flexShrink: 1,
+      flexGrow: 1,
+      position: 'relative',
+      alignItems: 'flex-start'
+    },
+    commentBubbleWrapperMine: { alignItems: 'flex-end' },
     commentBubble: {
       maxWidth: '92%',
       flexShrink: 1,
@@ -1416,46 +1487,53 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderWidth: 1.2,
       backgroundColor: 'transparent'
     },
-    commentMessage: { fontSize: 16, color: palette.textPrimary },
-    commentMeta: { marginTop: 6, fontSize: 12, fontWeight: '600' },
-    commentFooterRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 10
-    },
-    commentReactionsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginRight: 8 },
-    commentReactionPill: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 16,
-      marginRight: 8,
-      marginBottom: 6,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
-    },
-    commentReactionPillActive: {
-      borderWidth: 1,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'
-    },
-    commentReactionText: { fontSize: 13, fontWeight: '600', color: palette.textSecondary },
-    commentAddReaction: { paddingHorizontal: 6, paddingVertical: 4, marginBottom: 6 },
+    commentAuthorLabel: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
+    commentMessage: { fontSize: 16, color: palette.textPrimary, lineHeight: 21 },
     reactionPicker: {
-      marginTop: 10,
+      position: 'absolute',
+      bottom: '100%',
+      marginBottom: 10,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+      backgroundColor: palette.card,
       paddingHorizontal: 12,
       paddingVertical: 8,
-      borderRadius: 18,
+      borderRadius: 22,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.divider,
       shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.2 : 0.08,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 3,
-      alignSelf: 'flex-start'
+      shadowOpacity: isDarkMode ? 0.24 : 0.12,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4
     },
-    reactionPickerButton: { marginRight: 8 },
-    reactionPickerEmoji: { fontSize: 20 },
+    reactionPickerLeft: { left: 0 },
+    reactionPickerRight: { right: 0 },
+    reactionOptionTouchable: { marginHorizontal: 4 },
+    reactionOption: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      borderWidth: 1,
+      borderColor: 'transparent'
+    },
+    reactionOptionActive: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)'
+    },
+    reactionOptionEmoji: { fontSize: 22 },
+    reactionOptionCount: {
+      position: 'absolute',
+      bottom: 6,
+      left: 0,
+      right: 0,
+      fontSize: 11,
+      fontWeight: '600',
+      color: palette.textSecondary,
+      textAlign: 'center'
+    },
     swipeReplyAction: {
       flexDirection: 'row',
       alignItems: 'center',
