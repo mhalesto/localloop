@@ -133,16 +133,15 @@ const CommentListItem = React.memo(
       return nickname?.length ? nickname : name?.length ? name : '';
     }, [comment.author?.name, comment.author?.nickname]);
 
-    const handleLongPressActivated = React.useCallback(() => {
-      if (showPicker) {
-        onClosePicker();
-      } else {
-        onTogglePicker(commentId);
-      }
-    }, [commentId, onClosePicker, onTogglePicker, showPicker]);
-
     const handleLongPressStateChange = React.useCallback(
       ({ nativeEvent }) => {
+        if (nativeEvent.state === State.ACTIVE) {
+          if (showPicker) {
+            onClosePicker();
+          } else {
+            onTogglePicker(commentId);
+          }
+        }
         if (
           nativeEvent.state === State.CANCELLED ||
           nativeEvent.state === State.END ||
@@ -151,7 +150,7 @@ const CommentListItem = React.memo(
           reactionPulse.setValue(1);
         }
       },
-      [reactionPulse]
+      [commentId, onClosePicker, onTogglePicker, reactionPulse, showPicker]
     );
 
     const handleSelectReaction = (emoji) => {
@@ -199,7 +198,6 @@ const CommentListItem = React.memo(
             <LongPressGestureHandler
               minDurationMs={2000}
               maxDist={20}
-              onActivated={handleLongPressActivated}
               onHandlerStateChange={handleLongPressStateChange}
               simultaneousHandlers={swipeableRef}
               shouldCancelWhenOutside={false}
