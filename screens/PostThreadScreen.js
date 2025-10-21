@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useIsFocused } from '@react-navigation/native';
-import { LongPressGestureHandler, State, Swipeable } from 'react-native-gesture-handler';
+import { TapGestureHandler, Swipeable } from 'react-native-gesture-handler';
 
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
@@ -133,26 +133,14 @@ const CommentListItem = React.memo(
       return nickname?.length ? nickname : name?.length ? name : '';
     }, [comment.author?.name, comment.author?.nickname]);
 
-    const handleLongPressActivated = React.useCallback(() => {
+    const handleDoubleTap = React.useCallback(() => {
       if (showPicker) {
         onClosePicker();
       } else {
         onTogglePicker(commentId);
       }
-    }, [commentId, onClosePicker, onTogglePicker, showPicker]);
-
-    const handleLongPressStateChange = React.useCallback(
-      ({ nativeEvent }) => {
-        if (
-          nativeEvent.state === State.CANCELLED ||
-          nativeEvent.state === State.END ||
-          nativeEvent.state === State.FAILED
-        ) {
-          reactionPulse.setValue(1);
-        }
-      },
-      [reactionPulse]
-    );
+      reactionPulse.setValue(1);
+    }, [commentId, onClosePicker, onTogglePicker, reactionPulse, showPicker]);
 
     const handleSelectReaction = (emoji) => {
       onSelectReaction(commentId, emoji);
@@ -196,15 +184,12 @@ const CommentListItem = React.memo(
           )}
 
           <View style={[styles.commentBubbleWrapper, mine && styles.commentBubbleWrapperMine]}>
-            <LongPressGestureHandler
-              minDurationMs={2000}
-              maxDist={20}
-              onActivated={handleLongPressActivated}
-              onHandlerStateChange={handleLongPressStateChange}
+            <TapGestureHandler
+              numberOfTaps={2}
+              onActivated={handleDoubleTap}
               simultaneousHandlers={swipeableRef}
-              shouldCancelWhenOutside={false}
             >
-              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}>
+              <Animated.View style={[...bubbleStyles, { transform: [{ scale: bubbleScale }] }]}> 
                 {authorLabel ? (
                   <Text
                     style={[
@@ -246,7 +231,7 @@ const CommentListItem = React.memo(
 
                 <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
               </Animated.View>
-            </LongPressGestureHandler>
+            </TapGestureHandler>
 
             {showPicker ? (
               <Animated.View
