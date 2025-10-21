@@ -43,15 +43,18 @@ function AvatarIcon({ tint, size = 32, style }) {
 }
 
 export default function PostThreadScreen({ route, navigation }) {
-  const { city, postId } = route.params;
+  const { city, postId, focusCommentId: routeFocusCommentId = null } = route.params;
   const {
     addComment,
     deletePost,
     getPostById,
     markThreadRead,
+    markNotificationsForThreadRead,
     sharePost,
     toggleVote,
-    updatePost
+    updatePost,
+    isPostSubscribed,
+    togglePostSubscription
   } = usePosts();
   const { accentPreset, userProfile, themeColors, isDarkMode } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -67,6 +70,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const ownerMenuAnchorRef = useRef(null);
   const sharePreviewRef = useRef(null);
   const [isSharingOutside, setIsSharingOutside] = useState(false);
+  const [pendingFocusCommentId, setPendingFocusCommentId] = useState(routeFocusCommentId ?? null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
 
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
@@ -74,13 +79,58 @@ export default function PostThreadScreen({ route, navigation }) {
 
   const post = getPostById(city, postId);
   const comments = useMemo(() => post?.comments ?? [], [post]);
+  const isSubscribed = useMemo(() => isPostSubscribed(city, postId), [city, postId, isPostSubscribed]);
+  const commentsListRef = useRef(null);
 
   useEffect(() => {
     if (!post || !isFocused) {
       return;
     }
     markThreadRead(city, post.id);
-  }, [city, comments.length, isFocused, markThreadRead, post?.id]);
+    markNotificationsForThreadRead(city, post.id);
+  }, [city, comments.length, isFocused, markNotificationsForThreadRead, markThreadRead, post?.id]);
+
+  useEffect(() => {
+    if (!routeFocusCommentId) {
+      return;
+    }
+    setPendingFocusCommentId(routeFocusCommentId);
+  }, [routeFocusCommentId]);
+
+  useEffect(() => {
+    if (!pendingFocusCommentId) {
+      return;
+    }
+    const index = comments.findIndex((comment) => comment.id === pendingFocusCommentId);
+    if (index === -1) {
+      return;
+    }
+
+    const scrollTimer = setTimeout(() => {
+      if (commentsListRef.current?.scrollToIndex) {
+        try {
+          commentsListRef.current.scrollToIndex({ index, animated: true, viewPosition: 0.1 });
+        } catch (error) {
+          commentsListRef.current?.scrollToEnd?.({ animated: true });
+        }
+      }
+      setHighlightedCommentId(pendingFocusCommentId);
+      setPendingFocusCommentId(null);
+      if (routeFocusCommentId) {
+        navigation.setParams({ focusCommentId: null });
+      }
+    }, 200);
+
+    return () => clearTimeout(scrollTimer);
+  }, [comments, navigation, pendingFocusCommentId, routeFocusCommentId]);
+
+  useEffect(() => {
+    if (!highlightedCommentId) {
+      return;
+    }
+    const timer = setTimeout(() => setHighlightedCommentId(null), 4000);
+    return () => clearTimeout(timer);
+  }, [highlightedCommentId]);
 
   // --- Keyboard listeners (robust with absolute-positioned composer)
   useEffect(() => {
@@ -248,6 +298,16 @@ export default function PostThreadScreen({ route, navigation }) {
   const closeEditModal = useCallback(() => {
     setEditModalVisible(false);
   }, []);
+
+  const handleToggleNotifications = useCallback(() => {
+    const enabled = togglePostSubscription(city, postId);
+    setFeedbackMessage(
+      enabled ? 'Notifications enabled for this post' : 'Notifications turned off'
+    );
+    if (enabled) {
+      markNotificationsForThreadRead(city, postId);
+    }
+  }, [city, markNotificationsForThreadRead, postId, togglePostSubscription]);
 
   const handleSubmitEdit = useCallback(
     ({ title: nextTitle, message: nextMessage, colorKey, highlightDescription }) => {
@@ -435,8 +495,25 @@ export default function PostThreadScreen({ route, navigation }) {
                 ) : null}
 
                 <TouchableOpacity
+                  onPress={handleToggleNotifications}
+                  style={[styles.notificationButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isSubscribed ? 'Disable notifications for this post' : 'Enable notifications for this post'
+                  }
+                >
+                  <Ionicons
+                    name={isSubscribed ? 'notifications' : 'notifications-outline'}
+                    size={18}
+                    color={isSubscribed ? linkColor : headerMetaColor}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={handleShareOutside}
-                  style={[styles.shareExternalButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                  style={[styles.shareExternalButton, styles.shareExternalButtonWithLabel]}
                   activeOpacity={0.7}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
@@ -526,6 +603,7 @@ export default function PostThreadScreen({ route, navigation }) {
       city,
       comments.length,
       dividerColor,
+      handleToggleNotifications,
       handleShareOutside,
       headerColor,
       headerMetaColor,
@@ -538,6 +616,7 @@ export default function PostThreadScreen({ route, navigation }) {
       post,
       postId,
       showViewOriginal,
+      isSubscribed,
       toggleVote,
       styles,
     ]
@@ -569,6 +648,7 @@ export default function PostThreadScreen({ route, navigation }) {
 
       {/* Comments list with sticky header. Padding grows with composer+keyboard */}
       <FlatList
+        ref={commentsListRef}
         data={comments}
         keyExtractor={(item) => String(item.id)}
         ListHeaderComponent={Header}
@@ -577,6 +657,11 @@ export default function PostThreadScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => {
           const mine = item.createdByMe;
+          const isHighlighted = item.id === highlightedCommentId;
+          const bubbleHighlight =
+            isHighlighted
+              ? { backgroundColor: commentHighlight, borderColor: linkColor, borderWidth: 1 }
+              : null;
           return (
             <View style={[styles.commentRow, mine && styles.commentRowMine]}>
               {/* left avatar only for others */}
@@ -587,6 +672,7 @@ export default function PostThreadScreen({ route, navigation }) {
                 style={[
                   styles.commentBubble,
                   mine && { backgroundColor: commentHighlight, borderColor: linkColor, borderWidth: 1 },
+                  bubbleHighlight,
                 ]}
               >
                 <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{item.message}</Text>
@@ -746,6 +832,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       justifyContent: 'flex-end',
       maxWidth: '45%',
       marginLeft: 12,
+    },
+    notificationButton: {
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     shareExternalButton: {
       paddingVertical: 4,

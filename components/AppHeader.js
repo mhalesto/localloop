@@ -24,7 +24,8 @@ export default function AppHeader({
   onSearchChange,
   searchValue,
   wrapperStyle,
-  accent = defaultAccent
+  accent = defaultAccent,
+  rightBadgeCount = 0
 }) {
   let {
     background = defaultAccent.background,
@@ -78,11 +79,20 @@ export default function AppHeader({
           disabled={!onRightPress}
           activeOpacity={0.8}
         >
-          <Ionicons
-            name={rightIcon ?? 'notifications-outline'}
-            size={22}
-            color={iconTint}
-          />
+          <View style={styles.iconWithBadge}>
+            <Ionicons
+              name={rightIcon ?? 'notifications-outline'}
+              size={22}
+              color={iconTint}
+            />
+            {rightBadgeCount ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText} numberOfLines={1}>
+                  {rightBadgeCount > 99 ? '99+' : rightBadgeCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -130,6 +140,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)'
+  },
+  iconWithBadge: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FF6B6B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   titleBlock: {
     flex: 1,

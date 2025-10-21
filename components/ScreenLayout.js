@@ -9,6 +9,7 @@ import { usePosts } from '../contexts/PostsContext';
 import CreatePostModal from './CreatePostModal';
 import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
+import NotificationsModal from './NotificationsModal';
 
 export default function ScreenLayout({
   children,
@@ -35,11 +36,19 @@ export default function ScreenLayout({
     themeColors,
     isDarkMode
   } = useSettings();
-  const { addPost, getReplyNotificationCount } = usePosts();
+  const {
+    addPost,
+    getReplyNotificationCount,
+    getNotificationCount,
+    getNotifications,
+    markNotificationsRead,
+    markNotificationsForThreadRead
+  } = usePosts();
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
   const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
   const [composerVisible, setComposerVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
   const initialLocation = useMemo(
@@ -127,6 +136,38 @@ export default function ScreenLayout({
     }
   };
 
+  const headerNotificationCount = getNotificationCount ? getNotificationCount() : 0;
+  const headerNotifications = useMemo(
+    () => (getNotifications ? getNotifications() : []),
+    [getNotifications]
+  );
+  const defaultRightIcon = rightIcon ?? (headerNotificationCount > 0 ? 'notifications' : 'notifications-outline');
+  const handleHeaderRightPress = onRightPress ?? (() => {
+    setNotificationsVisible(true);
+    markNotificationsRead?.();
+  });
+  const headerBadgeCount = onRightPress ? undefined : headerNotificationCount;
+
+  const handleCloseNotifications = () => {
+    setNotificationsVisible(false);
+  };
+
+  const handleSelectNotification = (notification) => {
+    setNotificationsVisible(false);
+    if (!notification) {
+      return;
+    }
+    markNotificationsForThreadRead?.(notification.city, notification.postId);
+    if (!navigation) {
+      return;
+    }
+    navigation.navigate('PostThread', {
+      city: notification.city,
+      postId: notification.postId,
+      focusCommentId: notification.commentId ?? null,
+    });
+  };
+
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
@@ -141,8 +182,9 @@ export default function ScreenLayout({
           subtitle={subtitle}
           onBack={onBack}
           onMenu={!onBack ? handleMenuPress : undefined}
-          rightIcon={rightIcon}
-          onRightPress={onRightPress}
+          rightIcon={defaultRightIcon}
+          onRightPress={handleHeaderRightPress}
+          rightBadgeCount={headerBadgeCount}
           showSearch={showSearch}
           searchPlaceholder={searchPlaceholder}
           searchValue={searchValue}
@@ -155,17 +197,17 @@ export default function ScreenLayout({
         />
         <View style={[styles.content, contentStyle]}>{children}</View>
         {showFooter ? (
-          <FooterMenu
-            activeTab={activeTab}
-            onPressTab={handleTabPress}
-            onAddPostShortcut={handleFooterShortcut}
-            showShortcut={showAddShortcut}
-            accent={accentPreset}
-            myRepliesBadge={myRepliesBadge}
-          />
-        ) : null}
+        <FooterMenu
+          activeTab={activeTab}
+          onPressTab={handleTabPress}
+          onAddPostShortcut={handleFooterShortcut}
+          showShortcut={showAddShortcut}
+          accent={accentPreset}
+          myRepliesBadge={myRepliesBadge}
+        />
+      ) : null}
 
-        <CreatePostModal
+      <CreatePostModal
           visible={composerVisible}
           onClose={() => setComposerVisible(false)}
           initialLocation={initialLocation}
@@ -203,6 +245,15 @@ export default function ScreenLayout({
             <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)} />
           </View>
         </Modal>
+
+        <NotificationsModal
+          visible={notificationsVisible}
+          onClose={handleCloseNotifications}
+          notifications={headerNotifications}
+          accent={accentPreset}
+          themeColors={themeColors}
+          onSelectNotification={handleSelectNotification}
+        />
       </View>
     </SafeAreaView>
   );
