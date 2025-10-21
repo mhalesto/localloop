@@ -177,7 +177,8 @@ const CommentListItem = React.memo(
             <CommentAvatar
               author={comment.author}
               fallbackColor={badgeBackground}
-              style={styles.commentAvatarLeft}
+              styles={styles}
+              wrapperStyle={styles.commentAvatarLeft}
             />
           )}
 
@@ -277,7 +278,8 @@ const CommentListItem = React.memo(
             <CommentAvatar
               author={comment.author}
               fallbackColor={badgeBackground}
-              style={styles.commentAvatarRight}
+              styles={styles}
+              wrapperStyle={styles.commentAvatarRight}
             />
           )}
         </View>
@@ -286,14 +288,14 @@ const CommentListItem = React.memo(
   }
 );
 
-const CommentAvatar = React.memo(({ author, fallbackColor, style }) => {
+const CommentAvatar = React.memo(({ author, fallbackColor, styles, wrapperStyle }) => {
   const avatarConfig = React.useMemo(() => getAvatarConfig(author?.avatarKey), [author?.avatarKey]);
   const backgroundColor = avatarConfig.backgroundColor ?? fallbackColor;
   const foregroundColor = avatarConfig.foregroundColor ?? '#fff';
 
   return (
-    <View style={[styles.commentAvatarShell, style]}>
-      <View style={[styles.commentAvatarCircle, { backgroundColor }]}> 
+    <View style={[styles.commentAvatarShell, wrapperStyle]}>
+      <View style={[styles.commentAvatarCircle, { backgroundColor }]}>
         {avatarConfig.emoji ? (
           <Text style={[styles.commentAvatarEmoji, { color: foregroundColor }]}>{avatarConfig.emoji}</Text>
         ) : avatarConfig.icon ? (
