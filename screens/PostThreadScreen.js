@@ -36,7 +36,7 @@ import { stripRichFormatting } from '../utils/textFormatting';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
-const HEADER_BACKDROP_EXTRA = 36;
+const HEADER_BACKDROP_EXTRA = 84;
 
 
 const CommentListItem = React.memo(
@@ -534,6 +534,15 @@ export default function PostThreadScreen({ route, navigation }) {
         extrapolate: 'clamp',
       }),
     [collapsedBackdropHeight, headerReveal]
+  );
+  const headerBackdropCapHeight = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, collapsedBackdropInset],
+        extrapolate: 'clamp',
+      }),
+    [collapsedBackdropInset, headerReveal]
   );
   const headerBackdropTop = useMemo(
     () =>
@@ -1438,6 +1447,17 @@ export default function PostThreadScreen({ route, navigation }) {
       <Animated.View
         pointerEvents="none"
         style={[
+          styles.stickyHeaderBackdropCap,
+          {
+            height: headerBackdropCapHeight,
+            backgroundColor: headerColor,
+            top: headerBackdropTop,
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
           styles.stickyHeaderBackdrop,
           {
             height: headerBackdropHeight,
@@ -1456,7 +1476,7 @@ export default function PostThreadScreen({ route, navigation }) {
         wrapperStyle: {
           borderRadius: headerCardBorderRadius,
           marginBottom: headerCardMarginBottom,
-          zIndex: 1,
+          zIndex: 2,
         },
       })}
     </Animated.View>
@@ -1704,10 +1724,17 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       zIndex: 30,
       elevation: 6,
     },
+    stickyHeaderBackdropCap: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 0,
+    },
     stickyHeaderBackdrop: {
       position: 'absolute',
       top: 0,
-      zIndex: 0,
+      zIndex: 1,
     },
     shareCaptureContainer: { position: 'absolute', top: -10000, left: 0, right: 0 },
     shareCaptureShot: { alignSelf: 'stretch' },
