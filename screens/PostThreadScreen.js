@@ -518,9 +518,13 @@ export default function PostThreadScreen({ route, navigation }) {
       }),
     [headerReveal]
   );
-  const collapsedBackdropHeight = useMemo(
-    () => HEADER_SCROLL_DISTANCE + Math.max(insets.top || 0, 24) + HEADER_BACKDROP_EXTRA,
+  const collapsedBackdropInset = useMemo(
+    () => Math.max(insets.top || 0, 24) + HEADER_BACKDROP_EXTRA,
     [insets.top]
+  );
+  const collapsedBackdropHeight = useMemo(
+    () => HEADER_SCROLL_DISTANCE + collapsedBackdropInset,
+    [collapsedBackdropInset]
   );
   const headerBackdropHeight = useMemo(
     () =>
@@ -530,6 +534,15 @@ export default function PostThreadScreen({ route, navigation }) {
         extrapolate: 'clamp',
       }),
     [collapsedBackdropHeight, headerReveal]
+  );
+  const headerBackdropTop = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -collapsedBackdropInset],
+        extrapolate: 'clamp',
+      }),
+    [collapsedBackdropInset, headerReveal]
   );
   const handleAnimatedScroll = useMemo(
     () =>
@@ -1433,6 +1446,7 @@ export default function PostThreadScreen({ route, navigation }) {
             borderBottomLeftRadius: headerCardBorderRadius,
             borderBottomRightRadius: headerCardBorderRadius,
             backgroundColor: headerColor,
+            top: headerBackdropTop,
           },
         ]}
       />
