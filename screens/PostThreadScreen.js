@@ -554,6 +554,15 @@ export default function PostThreadScreen({ route, navigation }) {
       }),
     [collapsedBackdropInset, headerReveal]
   );
+  const headerUnderlayOpacity = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 0.95, 1],
+        outputRange: [0, 0, 1],
+        extrapolate: 'clamp',
+      }),
+    [headerReveal]
+  );
   const handleAnimatedScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -1544,6 +1553,7 @@ export default function PostThreadScreen({ route, navigation }) {
         backgroundColor: headerColor,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
+        opacity: headerUnderlayOpacity,
       }}
     >
       <View style={styles.shareCaptureContainer} pointerEvents="none" accessible={false}>
