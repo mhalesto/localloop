@@ -455,12 +455,22 @@ export default function PostThreadScreen({ route, navigation }) {
   const commentsListRef = useRef(null);
   const availableReactions = useMemo(() => REACTION_OPTIONS, []);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollYValueRef = useRef(0);
+  useEffect(() => {
+    const listenerId = scrollY.addListener(({ value }) => {
+      scrollYValueRef.current = value;
+    });
+    return () => {
+      scrollY.removeListener(listenerId);
+    };
+  }, [scrollY]);
+
   const clampedScrollY = useMemo(() => Animated.diffClamp(scrollY, 0, HEADER_SCROLL_DISTANCE), [scrollY]);
   const headerTranslateY = useMemo(
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [0, -(HEADER_SCROLL_DISTANCE - 24)],
+        outputRange: [0, -(HEADER_SCROLL_DISTANCE - 16)],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -469,7 +479,7 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [24, 8],
+        outputRange: [24, 14],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -478,7 +488,7 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [20, 0],
+        outputRange: [20, 12],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -496,17 +506,61 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [12, 4],
+        outputRange: [12, 0],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
   );
   const handleAnimatedScroll = useMemo(
-    () =>
+      () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
         useNativeDriver: false,
       }),
     [scrollY]
+  );
+
+  const isMomentumScrollingRef = useRef(false);
+  const maybeSnapHeader = useCallback(
+    (offset) => {
+      const currentOffset = typeof offset === 'number' ? offset : scrollYValueRef.current;
+      const clampedOffset = Math.min(Math.max(currentOffset, 0), HEADER_SCROLL_DISTANCE);
+      const snapPoint = clampedOffset < HEADER_SCROLL_DISTANCE / 2 ? 0 : HEADER_SCROLL_DISTANCE;
+      if (Math.abs(snapPoint - clampedOffset) < 1) {
+        return;
+      }
+      const list = commentsListRef.current;
+      if (!list) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        list.scrollToOffset({ offset: snapPoint, animated: true });
+      });
+    },
+    []
+  );
+
+  const handleScrollBeginDrag = useCallback(() => {
+    isMomentumScrollingRef.current = false;
+    closeReactionPicker();
+  }, [closeReactionPicker]);
+
+  const handleMomentumScrollBegin = useCallback(() => {
+    isMomentumScrollingRef.current = true;
+  }, []);
+
+  const handleMomentumScrollEnd = useCallback(() => {
+    isMomentumScrollingRef.current = false;
+    maybeSnapHeader();
+  }, [maybeSnapHeader]);
+
+  const handleScrollEndDrag = useCallback(
+    (event) => {
+      if (isMomentumScrollingRef.current) {
+        return;
+      }
+      maybeSnapHeader(event?.nativeEvent?.contentOffset?.y ?? scrollYValueRef.current);
+    },
+    [maybeSnapHeader]
   );
 
   useEffect(() => {
@@ -1399,13 +1453,16 @@ export default function PostThreadScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         renderItem={renderCommentItem}
         extraData={[highlightedCommentId, reactionPickerCommentId]}
-        onScrollBeginDrag={closeReactionPicker}
+        onScrollBeginDrag={handleScrollBeginDrag}
         ListEmptyComponent={<Text style={styles.emptyState}>No comments yet. Be the first to reply.</Text>}
         contentContainerStyle={{
           paddingHorizontal: 0,
           paddingBottom: composerH + kbOffset + (insets.bottom || 8) + 12,
         }}
         onScroll={handleAnimatedScroll}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         scrollEventThrottle={16}
       />
 
