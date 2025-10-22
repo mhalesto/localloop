@@ -37,6 +37,7 @@ import { stripRichFormatting } from '../utils/textFormatting';
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
 const HEADER_BACKDROP_EXTRA = 84;
+const APP_HEADER_BASE_HEIGHT = 82;
 
 
 const CommentListItem = React.memo(
@@ -908,6 +909,10 @@ export default function PostThreadScreen({ route, navigation }) {
   // Palette pulled from the post's preset, falling back to the screen preset
   const postPreset = accentPresets.find((p) => p.key === post.colorKey) ?? accentPreset;
   const headerColor = postPreset.background;
+  const headerUnderlayHeight = useMemo(
+    () => (insets.top || 0) + APP_HEADER_BASE_HEIGHT,
+    [insets.top]
+  );
   const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : themeColors.textPrimary);
   const headerMetaColor =
     postPreset.metaColor ?? (postPreset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
@@ -1534,6 +1539,12 @@ export default function PostThreadScreen({ route, navigation }) {
       activeTab="home"
       showFooter={false}
       contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
+      headerBackgroundStyle={{
+        height: headerUnderlayHeight,
+        backgroundColor: headerColor,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+      }}
     >
       <View style={styles.shareCaptureContainer} pointerEvents="none" accessible={false}>
         <ViewShot
