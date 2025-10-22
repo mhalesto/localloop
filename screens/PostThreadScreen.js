@@ -234,72 +234,83 @@ const CommentListItem = React.memo(
           </LongPressGestureHandler>
 
           {showPicker ? (
-            <Animated.View
-              pointerEvents="auto"
-              style={[
-                styles.commentPopoverContainer,
-                popoverAlignment,
-                { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
-              ]}
-            >
-              <View style={styles.commentPopoverReactions}>
-                {availableReactions.map((emoji) => {
-                  const count = reactionCounts.get(emoji) ?? 0;
-                  const active = comment.userReaction === emoji;
-                  return (
-                    <TouchableOpacity
-                      key={emoji}
-                      onPress={() => handleSelectReaction(emoji)}
-                      style={styles.reactionOptionTouchable}
-                      activeOpacity={0.85}
-                    >
-                      <Animated.View
-                        style={[
-                          styles.reactionOption,
-                          active && [styles.reactionOptionActive, { borderColor: linkColor }],
-                          active ? { transform: [{ scale: reactionPulse }] } : null,
-                        ]}
+            <>
+              <Animated.View
+                pointerEvents="auto"
+                style={[
+                  styles.commentPopoverContainer,
+                  popoverAlignment,
+                  { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
+                ]}
+              >
+                <View style={styles.commentPopoverReactions}>
+                  {availableReactions.map((emoji) => {
+                    const count = reactionCounts.get(emoji) ?? 0;
+                    const active = comment.userReaction === emoji;
+                    return (
+                      <TouchableOpacity
+                        key={emoji}
+                        onPress={() => handleSelectReaction(emoji)}
+                        style={styles.reactionOptionTouchable}
+                        activeOpacity={0.85}
                       >
-                        <Animated.Text style={styles.reactionOptionEmoji}>{emoji}</Animated.Text>
-                        {count ? <Text style={styles.reactionOptionCount}>{count}</Text> : null}
-                      </Animated.View>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <Animated.View
+                          style={[
+                            styles.reactionOption,
+                            active && [styles.reactionOptionActive, { borderColor: linkColor }],
+                            active ? { transform: [{ scale: reactionPulse }] } : null,
+                          ]}
+                        >
+                          <Animated.Text style={styles.reactionOptionEmoji}>{emoji}</Animated.Text>
+                          {count ? <Text style={styles.reactionOptionCount}>{count}</Text> : null}
+                        </Animated.View>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-                <TouchableOpacity
-                  onPress={onClosePicker}
-                  style={styles.reactionOptionTouchable}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.reactionOption}>
-                    <Ionicons name="close" size={16} color={themeColors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
-              </View>
+                  <TouchableOpacity
+                    onPress={onClosePicker}
+                    style={styles.reactionOptionTouchable}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.reactionOption}>
+                      <Ionicons name="close" size={16} color={themeColors.textSecondary} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
 
-              <View style={styles.commentActionsSheet}>
-                <TouchableOpacity
-                  onPress={handleReplyPress}
-                  style={styles.commentActionButton}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="return-up-forward" size={18} color={themeColors.textSecondary} />
-                  <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Reply</Text>
-                </TouchableOpacity>
+              <Animated.View
+                pointerEvents="auto"
+                style={[
+                  styles.commentActionsPopover,
+                  popoverAlignment,
+                  { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
+                ]}
+              >
+                <View style={styles.commentActionsSheet}>
+                  <TouchableOpacity
+                    onPress={handleReplyPress}
+                    style={styles.commentActionButton}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="return-up-forward" size={18} color={themeColors.textSecondary} />
+                    <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Reply</Text>
+                  </TouchableOpacity>
 
-                <View style={[styles.commentActionDivider, { backgroundColor: themeColors.divider }]} />
+                  <View style={[styles.commentActionDivider, { backgroundColor: themeColors.divider }]} />
 
-                <TouchableOpacity
-                  onPress={handleCopyPress}
-                  style={styles.commentActionButton}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="copy-outline" size={18} color={themeColors.textSecondary} />
-                  <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Copy</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
+                  <TouchableOpacity
+                    onPress={handleCopyPress}
+                    style={styles.commentActionButton}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="copy-outline" size={18} color={themeColors.textSecondary} />
+                    <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Copy</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </>
           ) : null}
 
           {hasReactions ? (
@@ -1578,6 +1589,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     commentPopoverLeft: { left: 0, alignItems: 'flex-start' },
     commentPopoverRight: { right: 0, alignItems: 'flex-end' },
+    commentActionsPopover: {
+      position: 'absolute',
+      top: '100%',
+      marginTop: 12,
+      alignItems: 'flex-start',
+    },
     commentPopoverReactions: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1619,7 +1636,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       textAlign: 'center'
     },
     commentActionsSheet: {
-      marginTop: 12,
       minWidth: 148,
       backgroundColor: palette.card,
       borderRadius: 18,
