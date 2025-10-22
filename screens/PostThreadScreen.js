@@ -77,6 +77,27 @@ const CommentListItem = React.memo(
       return counts;
     }, [comment.reactions]);
 
+    const reactionEntries = React.useMemo(() => {
+      const entries = Object.entries(comment.reactions ?? {})
+        .map(([emoji, data]) => ({
+          emoji,
+          count: Math.max(Number(data?.count) || 0, 0),
+          active: comment.userReaction === emoji,
+        }))
+        .filter((entry) => entry.count > 0);
+
+      entries.sort((a, b) => {
+        if (b.count === a.count) {
+          return a.emoji.localeCompare(b.emoji);
+        }
+        return b.count - a.count;
+      });
+
+      return entries;
+    }, [comment.reactions, comment.userReaction]);
+
+    const hasReactions = reactionEntries.length > 0;
+
     React.useEffect(() => {
       bubbleScale.setValue(0.94);
       Animated.spring(bubbleScale, {
@@ -152,8 +173,7 @@ const CommentListItem = React.memo(
     }
 
     const pickerScale = pickerOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
-    const pickerPosition = mine ? styles.reactionPickerRight : styles.reactionPickerLeft;
-    const actionPosition = mine ? styles.commentActionsSheetRight : styles.commentActionsSheetLeft;
+    const popoverAlignment = mine ? styles.commentPopoverRight : styles.commentPopoverLeft;
     const authorLabel = mine ? 'You' : displayName;
 
     return (
@@ -214,15 +234,15 @@ const CommentListItem = React.memo(
           </LongPressGestureHandler>
 
           {showPicker ? (
-            <>
-              <Animated.View
-                pointerEvents={showPicker ? 'auto' : 'none'}
-                style={[
-                  styles.reactionPicker,
-                  pickerPosition,
-                  { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
-                ]}
-              >
+            <Animated.View
+              pointerEvents="auto"
+              style={[
+                styles.commentPopoverContainer,
+                popoverAlignment,
+                { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
+              ]}
+            >
+              <View style={styles.commentPopoverReactions}>
                 {availableReactions.map((emoji) => {
                   const count = reactionCounts.get(emoji) ?? 0;
                   const active = comment.userReaction === emoji;
@@ -256,16 +276,9 @@ const CommentListItem = React.memo(
                     <Ionicons name="close" size={16} color={themeColors.textSecondary} />
                   </View>
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
 
-              <Animated.View
-                pointerEvents={showPicker ? 'auto' : 'none'}
-                style={[
-                  styles.commentActionsSheet,
-                  actionPosition,
-                  { opacity: pickerOpacity, transform: [{ scale: pickerScale }] },
-                ]}
-              >
+              <View style={styles.commentActionsSheet}>
                 <TouchableOpacity
                   onPress={handleReplyPress}
                   style={styles.commentActionButton}
@@ -285,8 +298,32 @@ const CommentListItem = React.memo(
                   <Ionicons name="copy-outline" size={18} color={themeColors.textSecondary} />
                   <Text style={[styles.commentActionLabel, { color: themeColors.textPrimary }]}>Copy</Text>
                 </TouchableOpacity>
-              </Animated.View>
-            </>
+              </View>
+            </Animated.View>
+          ) : null}
+
+          {hasReactions ? (
+            <View
+              style={[
+                styles.commentReactionList,
+                mine ? styles.commentReactionListRight : styles.commentReactionListLeft,
+              ]}
+            >
+              {reactionEntries.map((entry) => (
+                <View
+                  key={entry.emoji}
+                  style={[
+                    styles.commentReactionChip,
+                    entry.active && [styles.commentReactionChipActive, { borderColor: linkColor }],
+                  ]}
+                >
+                  <Text style={styles.commentReactionChipEmoji}>{entry.emoji}</Text>
+                  <Text style={[styles.commentReactionChipCount, { color: themeColors.textSecondary }]}>
+                    {entry.count}
+                  </Text>
+                </View>
+              ))}
+            </View>
           ) : null}
         </View>
 
@@ -1533,10 +1570,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     commentAuthorLabel: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
     commentMessage: { fontSize: 16, color: palette.textPrimary, lineHeight: 21 },
-    reactionPicker: {
+    commentPopoverContainer: {
       position: 'absolute',
       bottom: '100%',
-      marginBottom: 10,
+      marginBottom: 12,
+      alignItems: 'flex-start',
+    },
+    commentPopoverLeft: { left: 0, alignItems: 'flex-start' },
+    commentPopoverRight: { right: 0, alignItems: 'flex-end' },
+    commentPopoverReactions: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: palette.card,
@@ -1549,10 +1591,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOpacity: isDarkMode ? 0.24 : 0.12,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 4 },
-      elevation: 4
+      elevation: 4,
     },
-    reactionPickerLeft: { left: 0 },
-    reactionPickerRight: { right: 0 },
     reactionOptionTouchable: { marginHorizontal: 4 },
     reactionOption: {
       width: 44,
@@ -1579,9 +1619,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       textAlign: 'center'
     },
     commentActionsSheet: {
-      position: 'absolute',
-      top: '100%',
-      marginTop: 10,
+      marginTop: 12,
       minWidth: 148,
       backgroundColor: palette.card,
       borderRadius: 18,
@@ -1591,10 +1629,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOpacity: isDarkMode ? 0.24 : 0.12,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 4
+      elevation: 4,
     },
-    commentActionsSheetLeft: { left: 0 },
-    commentActionsSheetRight: { right: 0 },
     commentActionButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1603,6 +1639,30 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     commentActionLabel: { marginLeft: 10, fontSize: 14, fontWeight: '600' },
     commentActionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
+    commentReactionList: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: 6,
+    },
+    commentReactionListLeft: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
+    commentReactionListRight: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
+    commentReactionChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+      borderRadius: 14,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'transparent',
+      marginRight: 6,
+      marginTop: 4,
+    },
+    commentReactionChipActive: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
+    },
+    commentReactionChipEmoji: { fontSize: 14, marginRight: 4 },
+    commentReactionChipCount: { fontSize: 12, fontWeight: '600' },
     commentReplyReference: {
       marginBottom: 8,
       paddingHorizontal: 10,
