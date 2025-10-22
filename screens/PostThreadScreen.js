@@ -1672,7 +1672,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     commentReactionList: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      marginTop: 6,
+      marginTop: -4,
+      paddingTop: 6,
     },
     commentReactionListLeft: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
     commentReactionListRight: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
@@ -1686,7 +1687,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: 'transparent',
       marginRight: 6,
-      marginTop: 4,
+      marginTop: 0,
     },
     commentReactionChipActive: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
