@@ -36,6 +36,7 @@ import { stripRichFormatting } from '../utils/textFormatting';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
+const HEADER_BACKDROP_EXTRA = 36;
 
 
 const CommentListItem = React.memo(
@@ -516,6 +517,19 @@ export default function PostThreadScreen({ route, navigation }) {
         extrapolate: 'clamp',
       }),
     [headerReveal]
+  );
+  const collapsedBackdropHeight = useMemo(
+    () => HEADER_SCROLL_DISTANCE + Math.max(insets.top || 0, 24) + HEADER_BACKDROP_EXTRA,
+    [insets.top]
+  );
+  const headerBackdropHeight = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, collapsedBackdropHeight],
+        extrapolate: 'clamp',
+      }),
+    [collapsedBackdropHeight, headerReveal]
   );
   const handleAnimatedScroll = useMemo(
     () =>
@@ -1408,12 +1422,27 @@ export default function PostThreadScreen({ route, navigation }) {
         },
       ]}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.stickyHeaderBackdrop,
+          {
+            height: headerBackdropHeight,
+            left: headerPaddingHorizontal,
+            right: headerPaddingHorizontal,
+            borderBottomLeftRadius: headerCardBorderRadius,
+            borderBottomRightRadius: headerCardBorderRadius,
+            backgroundColor: headerColor,
+          },
+        ]}
+      />
       {renderPostCard({
         hideHeaderActions: false,
         WrapperComponent: Animated.View,
         wrapperStyle: {
           borderRadius: headerCardBorderRadius,
           marginBottom: headerCardMarginBottom,
+          zIndex: 1,
         },
       })}
     </Animated.View>
@@ -1660,6 +1689,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingHorizontal: 20,
       zIndex: 30,
       elevation: 6,
+    },
+    stickyHeaderBackdrop: {
+      position: 'absolute',
+      top: 0,
+      zIndex: 0,
     },
     shareCaptureContainer: { position: 'absolute', top: -10000, left: 0, right: 0 },
     shareCaptureShot: { alignSelf: 'stretch' },
