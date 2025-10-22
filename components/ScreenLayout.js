@@ -26,7 +26,8 @@ export default function ScreenLayout({
   activeTab = 'home',
   navigation,
   showFooter = true,
-  headerStyle
+  headerStyle,
+  headerBackgroundStyle,
 }) {
   const {
     showAddShortcut,
@@ -177,6 +178,9 @@ export default function ScreenLayout({
     <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
       <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
       <View style={styles.safeOverlay}>
+        {headerBackgroundStyle ? (
+          <View pointerEvents="none" style={[styles.headerBackground, headerBackgroundStyle]} />
+        ) : null}
         <AppHeader
           title={title}
           subtitle={subtitle}
@@ -266,7 +270,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     safeOverlay: {
       flex: 1,
-      backgroundColor: palette.background
+      backgroundColor: palette.background,
+      position: 'relative'
+    },
+    headerBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 0,
     },
     content: {
       flex: 1,
