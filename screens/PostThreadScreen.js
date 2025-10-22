@@ -460,7 +460,7 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [0, -HEADER_SCROLL_DISTANCE],
+        outputRange: [0, -(HEADER_SCROLL_DISTANCE - 24)],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -469,7 +469,7 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [12, 0],
+        outputRange: [24, 8],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -496,7 +496,7 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       clampedScrollY.interpolate({
         inputRange: [0, HEADER_SCROLL_DISTANCE],
-        outputRange: [8, 0],
+        outputRange: [12, 4],
         extrapolate: 'clamp',
       }),
     [clampedScrollY]
@@ -504,7 +504,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const handleAnimatedScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     [scrollY]
   );
@@ -1374,7 +1374,7 @@ export default function PostThreadScreen({ route, navigation }) {
       navigation={navigation}
       activeTab="home"
       showFooter={false}
-      contentStyle={{ paddingHorizontal: 0 }}
+      contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
     >
       <View style={styles.shareCaptureContainer} pointerEvents="none" accessible={false}>
         <ViewShot
@@ -1556,7 +1556,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       width: '100%',
       alignSelf: 'stretch',
       backgroundColor: palette.background,
-      paddingTop: 12,
+      paddingTop: 24,
       paddingBottom: 12,
       paddingHorizontal: 20,
       zIndex: 30,
@@ -1571,7 +1571,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderRadius: 24,
       paddingVertical: 20,
       paddingHorizontal: 18,
-      marginBottom: 8,
+      marginBottom: 12,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.24 : 0.1,
       shadowRadius: 4,
