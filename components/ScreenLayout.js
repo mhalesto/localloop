@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from './AppHeader';
@@ -179,7 +179,7 @@ export default function ScreenLayout({
       <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
       <View style={styles.safeOverlay}>
         {headerBackgroundStyle ? (
-          <View pointerEvents="none" style={[styles.headerBackground, headerBackgroundStyle]} />
+          <Animated.View pointerEvents="none" style={[styles.headerBackground, headerBackgroundStyle]} />
         ) : null}
         <AppHeader
           title={title}
