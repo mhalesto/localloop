@@ -326,18 +326,26 @@ const CommentListItem = React.memo(
               ]}
             >
               {reactionEntries.map((entry) => (
-                <View
+                <TouchableOpacity
                   key={entry.emoji}
-                  style={[
-                    styles.commentReactionChip,
-                    entry.active && [styles.commentReactionChipActive, { borderColor: linkColor }],
-                  ]}
+                  onPress={() => onSelectReaction(commentId, entry.emoji)}
+                  activeOpacity={0.85}
+                  style={styles.commentReactionChipTouchable}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Toggle ${entry.emoji} reaction`}
                 >
-                  <Text style={styles.commentReactionChipEmoji}>{entry.emoji}</Text>
-                  <Text style={[styles.commentReactionChipCount, { color: themeColors.textSecondary }]}>
-                    {entry.count}
-                  </Text>
-                </View>
+                  <View
+                    style={[
+                      styles.commentReactionChip,
+                      entry.active && [styles.commentReactionChipActive, { borderColor: linkColor }],
+                    ]}
+                  >
+                    <Text style={styles.commentReactionChipEmoji}>{entry.emoji}</Text>
+                    <Text style={[styles.commentReactionChipCount, { color: themeColors.textSecondary }]}>
+                      {entry.count}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               ))}
             </View>
           ) : null}
@@ -1677,6 +1685,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     commentReactionListLeft: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
     commentReactionListRight: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
+    commentReactionChipTouchable: {
+      marginRight: 6,
+      marginTop: -5.5,
+      borderRadius: 18,
+    },
     commentReactionChip: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1686,8 +1699,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingVertical: 4,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: 'transparent',
-      marginRight: 6,
-      marginTop: -5.5,
     },
     commentReactionChipActive: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
