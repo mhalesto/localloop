@@ -7,7 +7,6 @@ import {
   Modal,
   View,
   Text,
-  FlatList,
   ScrollView,
   TextInput,
   StyleSheet,
@@ -36,6 +35,7 @@ import RichText from '../components/RichText';
 import { stripRichFormatting } from '../utils/textFormatting';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
+const HEADER_SCROLL_DISTANCE = 96;
 
 
 const CommentListItem = React.memo(
@@ -454,6 +454,60 @@ export default function PostThreadScreen({ route, navigation }) {
   const isSubscribed = useMemo(() => isPostSubscribed(city, postId), [city, postId, isPostSubscribed]);
   const commentsListRef = useRef(null);
   const availableReactions = useMemo(() => REACTION_OPTIONS, []);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const clampedScrollY = useMemo(() => Animated.diffClamp(scrollY, 0, HEADER_SCROLL_DISTANCE), [scrollY]);
+  const headerTranslateY = useMemo(
+    () =>
+      clampedScrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [0, -HEADER_SCROLL_DISTANCE],
+        extrapolate: 'clamp',
+      }),
+    [clampedScrollY]
+  );
+  const headerPaddingTop = useMemo(
+    () =>
+      clampedScrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [12, 0],
+        extrapolate: 'clamp',
+      }),
+    [clampedScrollY]
+  );
+  const headerPaddingHorizontal = useMemo(
+    () =>
+      clampedScrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [20, 0],
+        extrapolate: 'clamp',
+      }),
+    [clampedScrollY]
+  );
+  const headerCardBorderRadius = useMemo(
+    () =>
+      clampedScrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [24, 12],
+        extrapolate: 'clamp',
+      }),
+    [clampedScrollY]
+  );
+  const headerCardMarginBottom = useMemo(
+    () =>
+      clampedScrollY.interpolate({
+        inputRange: [0, HEADER_SCROLL_DISTANCE],
+        outputRange: [8, 0],
+        extrapolate: 'clamp',
+      }),
+    [clampedScrollY]
+  );
+  const handleAnimatedScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollY]
+  );
 
   useEffect(() => {
     if (reactionPickerCommentId && !commentsById.has(reactionPickerCommentId)) {
@@ -992,7 +1046,7 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [post?.message]);
 
   const renderPostCard = useCallback(
-    ({ hideHeaderActions = false, forceExpanded = false } = {}) => {
+    ({ hideHeaderActions = false, forceExpanded = false, WrapperComponent = View, wrapperStyle } = {}) => {
       if (!post) {
         return null;
       }
@@ -1024,7 +1078,7 @@ export default function PostThreadScreen({ route, navigation }) {
         : styles.postMessageContainer;
 
       return (
-        <View style={[styles.postCard, { backgroundColor: headerColor }]}>
+        <WrapperComponent style={[styles.postCard, { backgroundColor: headerColor }, wrapperStyle]}>
           <View style={styles.postHeaderRow}>
             <View style={styles.postHeader}>
               <View style={[styles.avatar, { backgroundColor: authorAvatarBackground }]}>
@@ -1213,7 +1267,7 @@ export default function PostThreadScreen({ route, navigation }) {
               ) : null}
             </View>
           </View>
-        </View>
+        </WrapperComponent>
       );
     },
     [
@@ -1248,7 +1302,25 @@ export default function PostThreadScreen({ route, navigation }) {
 
   /** ---------- Sticky Post Header (ListHeaderComponent) ---------- */
   const Header = (
-    <View style={styles.stickyHeaderWrap}>{renderPostCard({ hideHeaderActions: false })}</View>
+    <Animated.View
+      style={[
+        styles.stickyHeaderWrap,
+        {
+          transform: [{ translateY: headerTranslateY }],
+          paddingTop: headerPaddingTop,
+          paddingHorizontal: headerPaddingHorizontal,
+        },
+      ]}
+    >
+      {renderPostCard({
+        hideHeaderActions: false,
+        WrapperComponent: Animated.View,
+        wrapperStyle: {
+          borderRadius: headerCardBorderRadius,
+          marginBottom: headerCardMarginBottom,
+        },
+      })}
+    </Animated.View>
   );
 
   const renderCommentItem = useCallback(
@@ -1302,6 +1374,7 @@ export default function PostThreadScreen({ route, navigation }) {
       navigation={navigation}
       activeTab="home"
       showFooter={false}
+      contentStyle={{ paddingHorizontal: 0 }}
     >
       <View style={styles.shareCaptureContainer} pointerEvents="none" accessible={false}>
         <ViewShot
@@ -1316,7 +1389,7 @@ export default function PostThreadScreen({ route, navigation }) {
       </View>
 
       {/* Comments list with sticky header. Padding grows with composer+keyboard */}
-      <FlatList
+      <Animated.FlatList
         ref={commentsListRef}
         data={comments}
         keyExtractor={(item) => String(item.id)}
@@ -1332,6 +1405,8 @@ export default function PostThreadScreen({ route, navigation }) {
           paddingHorizontal: 0,
           paddingBottom: composerH + kbOffset + (insets.bottom || 8) + 12,
         }}
+        onScroll={handleAnimatedScroll}
+        scrollEventThrottle={16}
       />
 
       {/* Fixed bottom composer pinned above the keyboard */}
@@ -1477,17 +1552,25 @@ export default function PostThreadScreen({ route, navigation }) {
 const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
     /* Sticky header wrapper so the pinned card blends with background */
-    stickyHeaderWrap: { backgroundColor: palette.background, paddingTop: 4, paddingBottom: 12 },
+    stickyHeaderWrap: {
+      width: '100%',
+      alignSelf: 'stretch',
+      backgroundColor: palette.background,
+      paddingTop: 12,
+      paddingBottom: 12,
+      paddingHorizontal: 20,
+      zIndex: 30,
+      elevation: 6,
+    },
     shareCaptureContainer: { position: 'absolute', top: -10000, left: 0, right: 0 },
     shareCaptureShot: { alignSelf: 'stretch' },
 
     /* Post card (wider) */
     postCard: {
+      width: '100%',
       borderRadius: 24,
       paddingVertical: 20,
       paddingHorizontal: 18,
-      marginHorizontal: 0, // matches composer spacing
-      marginTop: 0,
       marginBottom: 8,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.24 : 0.1,
