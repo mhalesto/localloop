@@ -8,6 +8,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   TextInput,
   StyleSheet,
   TouchableOpacity,
@@ -984,14 +985,31 @@ export default function PostThreadScreen({ route, navigation }) {
     }
   }, [ownerMenuVisible, post?.createdByMe]);
 
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+  }, [post?.message]);
+
   const renderPostCard = useCallback(
-    ({ hideHeaderActions = false } = {}) => {
+    ({ hideHeaderActions = false, forceExpanded = false } = {}) => {
       if (!post) {
         return null;
       }
       const trimmedTitle = post?.title?.trim?.() ?? '';
       const trimmedDescription = post?.message?.trim?.() ?? '';
       const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+      const strippedDescription = stripRichFormatting(trimmedDescription)
+        ?.replace(/\s+/g, ' ')
+        ?.trim?.();
+      const collapsedPreviewText = strippedDescription?.length
+        ? strippedDescription
+        : trimmedDescription;
+      const canToggleDescription =
+        trimmedDescription && trimmedDescription !== displayTitle && collapsedPreviewText?.length;
+      const isExpanded = forceExpanded || isDescriptionExpanded;
+      const showToggleControls = canToggleDescription && !forceExpanded;
+      const toggleHitSlop = StyleSheet.flatten(styles.postMessageToggleHitSlop);
       const highlightFill =
         post.highlightDescription
           ? postPreset.highlightFill ??
@@ -1097,11 +1115,50 @@ export default function PostThreadScreen({ route, navigation }) {
           <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
           {trimmedDescription && trimmedDescription !== displayTitle ? (
             <View style={descriptionContainerStyle}>
-              <RichText
-                text={trimmedDescription}
-                textStyle={[styles.postMessage, { color: headerTitleColor }]}
-                linkStyle={{ color: linkColor }}
-              />
+              {!isExpanded && collapsedPreviewText ? (
+                <View style={styles.postMessagePreviewRow}>
+                  <Text
+                    style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
+                    numberOfLines={1}
+                  >
+                    {collapsedPreviewText}
+                  </Text>
+                  {showToggleControls ? (
+                    <TouchableOpacity
+                      onPress={() => setIsDescriptionExpanded(true)}
+                      activeOpacity={0.7}
+                      style={styles.postMessageToggle}
+                      hitSlop={toggleHitSlop}
+                    >
+                      <Text style={[styles.postMessageToggleText, { color: linkColor }]}>Show more</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : (
+                <>
+                  <ScrollView
+                    style={styles.postMessageExpandedScroll}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <RichText
+                      text={trimmedDescription}
+                      textStyle={[styles.postMessage, { color: headerTitleColor }]}
+                      linkStyle={{ color: linkColor }}
+                    />
+                  </ScrollView>
+                  {showToggleControls ? (
+                    <TouchableOpacity
+                      onPress={() => setIsDescriptionExpanded(false)}
+                      activeOpacity={0.7}
+                      style={[styles.postMessageToggle, styles.postMessageToggleExpanded]}
+                      hitSlop={toggleHitSlop}
+                    >
+                      <Text style={[styles.postMessageToggleText, { color: linkColor }]}>Show less</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </>
+              )}
             </View>
           ) : null}
           <Text style={[styles.postMeta, { color: headerMetaColor }]}>
@@ -1179,11 +1236,13 @@ export default function PostThreadScreen({ route, navigation }) {
       openOwnerMenu,
       openShareModal,
       post,
+      postPreset,
       postId,
       showViewOriginal,
       isSubscribed,
       toggleVote,
       styles,
+      isDescriptionExpanded,
     ]
   );
 
@@ -1250,7 +1309,9 @@ export default function PostThreadScreen({ route, navigation }) {
           options={{ format: 'png', quality: 1, result: 'tmpfile' }}
           style={styles.shareCaptureShot}
         >
-          <View style={styles.stickyHeaderWrap}>{renderPostCard({ hideHeaderActions: true })}</View>
+          <View style={styles.stickyHeaderWrap}>
+            {renderPostCard({ hideHeaderActions: true, forceExpanded: true })}
+          </View>
         </ViewShot>
       </View>
 
@@ -1487,6 +1548,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postMessageContainer: { marginBottom: 18 },
     postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
     postMessage: { fontSize: 18, fontWeight: '500', lineHeight: 24 },
+    postMessagePreviewRow: { flexDirection: 'row', alignItems: 'center' },
+    postMessagePreviewText: { flex: 1, fontSize: 18, fontWeight: '500', lineHeight: 24 },
+    postMessageExpandedScroll: { maxHeight: 200 },
+    postMessageToggle: { marginLeft: 12 },
+    postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' },
+    postMessageToggleText: { fontSize: 14, fontWeight: '600' },
+    postMessageToggleHitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
     actionsFooterRow: {
