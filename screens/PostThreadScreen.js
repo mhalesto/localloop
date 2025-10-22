@@ -176,8 +176,13 @@ const CommentListItem = React.memo(
     const popoverAlignment = mine ? styles.commentPopoverRight : styles.commentPopoverLeft;
     const authorLabel = mine ? 'You' : displayName;
 
+    const rowStyles = [styles.commentRow, mine && styles.commentRowMine];
+    if (showPicker) {
+      rowStyles.push(styles.commentRowActive);
+    }
+
     return (
-      <View style={[styles.commentRow, mine && styles.commentRowMine]}>
+      <View style={rowStyles}>
         {!mine && (
           <CommentAvatar
             author={comment.author}
@@ -1526,7 +1531,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       alignItems: 'flex-end',
       marginBottom: 14,
       paddingHorizontal: 8, // tighter margins → wider bubbles
-      overflow: 'visible'
+      overflow: 'visible',
+      position: 'relative',
+    },
+    commentRowActive: {
+      zIndex: 30,
+      elevation: 8,
     },
     commentRowMine: { justifyContent: 'flex-end' },
     commentAvatarLeft: { marginRight: 10 },
@@ -1586,6 +1596,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       bottom: '100%',
       marginBottom: 12,
       alignItems: 'flex-start',
+      zIndex: 40,
+      elevation: 6,
     },
     commentPopoverLeft: { left: 0, alignItems: 'flex-start' },
     commentPopoverRight: { right: 0, alignItems: 'flex-end' },
@@ -1594,6 +1606,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       top: '100%',
       marginTop: 12,
       alignItems: 'flex-start',
+      zIndex: 35,
+      elevation: 5,
     },
     commentPopoverReactions: {
       flexDirection: 'row',
