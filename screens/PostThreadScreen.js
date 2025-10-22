@@ -1687,7 +1687,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: 'transparent',
       marginRight: 6,
-      marginTop: 0,
+      marginTop: -5.5,
     },
     commentReactionChipActive: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
