@@ -987,14 +987,14 @@ export default function PostThreadScreen({ route, navigation }) {
       const highlightFill =
         post.highlightDescription
           ? postPreset.highlightFill ??
-            (postPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)')
+          (postPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)')
           : null;
       const descriptionContainerStyle = post.highlightDescription
         ? [
-            styles.postMessageContainer,
-            styles.postMessageHighlighted,
-            { backgroundColor: highlightFill }
-          ]
+          styles.postMessageContainer,
+          styles.postMessageHighlighted,
+          { backgroundColor: highlightFill }
+        ]
         : styles.postMessageContainer;
 
       return (
@@ -1087,15 +1087,15 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
 
           <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
-        {trimmedDescription && trimmedDescription !== displayTitle ? (
-          <View style={descriptionContainerStyle}>
-            <RichText
-              text={trimmedDescription}
-              textStyle={[styles.postMessage, { color: headerTitleColor }]}
-              linkStyle={{ color: linkColor }}
-            />
-          </View>
-        ) : null}
+          {trimmedDescription && trimmedDescription !== displayTitle ? (
+            <View style={descriptionContainerStyle}>
+              <RichText
+                text={trimmedDescription}
+                textStyle={[styles.postMessage, { color: headerTitleColor }]}
+                linkStyle={{ color: linkColor }}
+              />
+            </View>
+          ) : null}
           <Text style={[styles.postMeta, { color: headerMetaColor }]}>
             {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
           </Text>
@@ -1687,7 +1687,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: 'transparent',
       marginRight: 6,
-      marginTop: 0,
+      marginTop: -5.5,
     },
     commentReactionChipActive: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)',
