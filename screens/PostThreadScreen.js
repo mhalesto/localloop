@@ -468,6 +468,10 @@ export default function PostThreadScreen({ route, navigation }) {
     };
   }, [scrollY]);
 
+  const collapsedHeaderHorizontalPadding = useMemo(
+    () => Math.max(insets.left || 0, insets.right || 0),
+    [insets.left, insets.right]
+  );
   const headerTranslateY = useMemo(
     () =>
       headerReveal.interpolate({
@@ -490,10 +494,10 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       headerReveal.interpolate({
         inputRange: [0, 1],
-        outputRange: [20, 12],
+        outputRange: [20, collapsedHeaderHorizontalPadding],
         extrapolate: 'clamp',
       }),
-    [headerReveal]
+    [collapsedHeaderHorizontalPadding, headerReveal]
   );
   const headerCardBorderRadius = useMemo(
     () =>
