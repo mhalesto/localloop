@@ -455,7 +455,10 @@ export default function PostThreadScreen({ route, navigation }) {
   const commentsListRef = useRef(null);
   const availableReactions = useMemo(() => REACTION_OPTIONS, []);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const headerReveal = useRef(new Animated.Value(0)).current;
   const scrollYValueRef = useRef(0);
+  const isSnappingHeaderRef = useRef(false);
+  const headerSnapAnimationRef = useRef(null);
   useEffect(() => {
     const listenerId = scrollY.addListener(({ value }) => {
       scrollYValueRef.current = value;
@@ -465,58 +468,66 @@ export default function PostThreadScreen({ route, navigation }) {
     };
   }, [scrollY]);
 
-  const clampedScrollY = useMemo(() => Animated.diffClamp(scrollY, 0, HEADER_SCROLL_DISTANCE), [scrollY]);
   const headerTranslateY = useMemo(
     () =>
-      clampedScrollY.interpolate({
-        inputRange: [0, HEADER_SCROLL_DISTANCE],
+      headerReveal.interpolate({
+        inputRange: [0, 1],
         outputRange: [0, -(HEADER_SCROLL_DISTANCE - 16)],
         extrapolate: 'clamp',
       }),
-    [clampedScrollY]
+    [headerReveal]
   );
   const headerPaddingTop = useMemo(
     () =>
-      clampedScrollY.interpolate({
-        inputRange: [0, HEADER_SCROLL_DISTANCE],
+      headerReveal.interpolate({
+        inputRange: [0, 1],
         outputRange: [24, 14],
         extrapolate: 'clamp',
       }),
-    [clampedScrollY]
+    [headerReveal]
   );
   const headerPaddingHorizontal = useMemo(
     () =>
-      clampedScrollY.interpolate({
-        inputRange: [0, HEADER_SCROLL_DISTANCE],
+      headerReveal.interpolate({
+        inputRange: [0, 1],
         outputRange: [20, 12],
         extrapolate: 'clamp',
       }),
-    [clampedScrollY]
+    [headerReveal]
   );
   const headerCardBorderRadius = useMemo(
     () =>
-      clampedScrollY.interpolate({
-        inputRange: [0, HEADER_SCROLL_DISTANCE],
+      headerReveal.interpolate({
+        inputRange: [0, 1],
         outputRange: [24, 12],
         extrapolate: 'clamp',
       }),
-    [clampedScrollY]
+    [headerReveal]
   );
   const headerCardMarginBottom = useMemo(
     () =>
-      clampedScrollY.interpolate({
-        inputRange: [0, HEADER_SCROLL_DISTANCE],
+      headerReveal.interpolate({
+        inputRange: [0, 1],
         outputRange: [12, 0],
         extrapolate: 'clamp',
       }),
-    [clampedScrollY]
+    [headerReveal]
   );
   const handleAnimatedScroll = useMemo(
-      () =>
+    () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
         useNativeDriver: false,
+        listener: (event) => {
+          const offset = event?.nativeEvent?.contentOffset?.y ?? 0;
+          scrollYValueRef.current = offset;
+          if (isSnappingHeaderRef.current) {
+            return;
+          }
+          const clamped = Math.min(Math.max(offset, 0), HEADER_SCROLL_DISTANCE);
+          headerReveal.setValue(clamped / HEADER_SCROLL_DISTANCE);
+        },
       }),
-    [scrollY]
+    [headerReveal, scrollY]
   );
 
   const isMomentumScrollingRef = useRef(false);
@@ -528,21 +539,48 @@ export default function PostThreadScreen({ route, navigation }) {
       if (Math.abs(snapPoint - clampedOffset) < 1) {
         return;
       }
-      const list = commentsListRef.current;
-      if (!list) {
-        return;
+      const targetProgress = snapPoint / HEADER_SCROLL_DISTANCE;
+      if (headerSnapAnimationRef.current?.stop) {
+        headerSnapAnimationRef.current.stop();
+        headerSnapAnimationRef.current = null;
       }
-      requestAnimationFrame(() => {
-        list.scrollToOffset({ offset: snapPoint, animated: true });
+      headerReveal.stopAnimation();
+      const list = commentsListRef.current;
+      if (list) {
+        list.scrollToOffset({ offset: snapPoint, animated: false });
+      }
+      scrollY.stopAnimation();
+      scrollY.setValue(snapPoint);
+      scrollYValueRef.current = snapPoint;
+      isSnappingHeaderRef.current = true;
+      const animation = Animated.spring(headerReveal, {
+        toValue: targetProgress,
+        tension: 210,
+        friction: 26,
+        useNativeDriver: false,
+      });
+      headerSnapAnimationRef.current = animation;
+      animation.start(() => {
+        headerReveal.setValue(targetProgress);
+        isSnappingHeaderRef.current = false;
+        headerSnapAnimationRef.current = null;
       });
     },
-    []
+    [headerReveal, scrollY]
   );
 
   const handleScrollBeginDrag = useCallback(() => {
+    if (headerSnapAnimationRef.current?.stop) {
+      headerSnapAnimationRef.current.stop();
+      headerSnapAnimationRef.current = null;
+    }
+    headerReveal.stopAnimation();
+    const clamped = Math.min(Math.max(scrollYValueRef.current, 0), HEADER_SCROLL_DISTANCE);
+    headerReveal.setValue(clamped / HEADER_SCROLL_DISTANCE);
+    isSnappingHeaderRef.current = false;
     isMomentumScrollingRef.current = false;
     closeReactionPicker();
-  }, [closeReactionPicker]);
+  }, [closeReactionPicker, headerReveal]);
 
   const handleMomentumScrollBegin = useCallback(() => {
     isMomentumScrollingRef.current = true;
