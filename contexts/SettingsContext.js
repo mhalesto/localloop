@@ -367,6 +367,7 @@ export function SettingsProvider({ children }) {
   const [premiumDescriptionFontSize, setPremiumDescriptionFontSize] = useState(
     DEFAULT_DESCRIPTION_FONT_SIZE
   );
+  const [premiumSummariesEnabled, setPremiumSummariesEnabled] = useState(false);
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -427,6 +428,10 @@ export function SettingsProvider({ children }) {
   );
   const updatePremiumDescriptionFontSizeEnabled = useCallback(
     (enabled) => setPremiumDescriptionFontSizeEnabled(Boolean(enabled)),
+    []
+  );
+  const updatePremiumSummariesEnabled = useCallback(
+    (enabled) => setPremiumSummariesEnabled(Boolean(enabled)),
     []
   );
   const updatePremiumTitleFontSize = useCallback((size) => {
@@ -501,6 +506,8 @@ export function SettingsProvider({ children }) {
       setPremiumTitleFontSize: updatePremiumTitleFontSize,
       premiumDescriptionFontSize,
       setPremiumDescriptionFontSize: updatePremiumDescriptionFontSize,
+      premiumSummariesEnabled,
+      setPremiumSummariesEnabled: updatePremiumSummariesEnabled,
       themeColors
     }),
     [
@@ -533,6 +540,8 @@ export function SettingsProvider({ children }) {
       updatePremiumTitleFontSize,
       premiumDescriptionFontSize,
       updatePremiumDescriptionFontSize,
+      premiumSummariesEnabled,
+      updatePremiumSummariesEnabled,
       themeColors
     ]
   );

@@ -57,7 +57,9 @@ export default function SettingsScreen({ navigation }) {
     premiumTitleFontSize,
     setPremiumTitleFontSize,
     premiumDescriptionFontSize,
-    setPremiumDescriptionFontSize
+    setPremiumDescriptionFontSize,
+    premiumSummariesEnabled,
+    setPremiumSummariesEnabled
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
@@ -128,6 +130,10 @@ export default function SettingsScreen({ navigation }) {
 
   const handleToggleDescriptionSizeOverride = (value) => {
     setPremiumDescriptionFontSizeEnabled(value);
+  };
+
+  const handleTogglePremiumSummaries = (value) => {
+    setPremiumSummariesEnabled(value);
   };
 
   const handleNicknameChange = (value) => {
@@ -512,6 +518,27 @@ export default function SettingsScreen({ navigation }) {
           <View style={styles.premiumDivider} />
           <View style={styles.item}>
             <View>
+              <Text style={styles.itemTitle}>AI description summaries</Text>
+              <Text style={styles.itemSubtitle}>
+                Let BART condense long descriptions while composing posts.
+              </Text>
+            </View>
+            <Switch
+              value={premiumSummariesEnabled}
+              onValueChange={handleTogglePremiumSummaries}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={premiumSummariesEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          {premiumSummariesEnabled ? (
+            <Text style={[styles.sectionHint, styles.premiumHintSpacing]}>
+              Summaries appear in the composer as a premium-only action.
+            </Text>
+          ) : null}
+          <View style={styles.premiumDivider} />
+          <View style={styles.item}>
+            <View>
               <Text style={styles.itemTitle}>Premium themes</Text>
               <Text style={styles.itemSubtitle}>
                 Access exclusive palettes and brighten them to match your vibe.
@@ -821,6 +848,10 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 6,
       fontSize: 12,
       color: palette.textSecondary
+    },
+    premiumHintSpacing: {
+      marginTop: -8,
+      marginBottom: 12
     },
     premiumDivider: {
       height: StyleSheet.hairlineWidth,
