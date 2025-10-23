@@ -51,6 +51,7 @@ export default function SettingsScreen({ navigation }) {
   const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
   const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';
+  const activeThumbColor = '#ffffff';
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
@@ -151,7 +152,7 @@ export default function SettingsScreen({ navigation }) {
               value={locationEnabled}
               onValueChange={handleToggleLocation}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
-              thumbColor={locationEnabled ? accentSwitchColor : inactiveThumbColor}
+              thumbColor={locationEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
@@ -166,7 +167,7 @@ export default function SettingsScreen({ navigation }) {
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
-              thumbColor={notificationsEnabled ? accentSwitchColor : inactiveThumbColor}
+              thumbColor={notificationsEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
@@ -185,7 +186,7 @@ export default function SettingsScreen({ navigation }) {
               value={showAddShortcut}
               onValueChange={setShowAddShortcut}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
-              thumbColor={showAddShortcut ? accentSwitchColor : inactiveThumbColor}
+              thumbColor={showAddShortcut ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
@@ -204,7 +205,7 @@ export default function SettingsScreen({ navigation }) {
               value={isDarkMode}
               onValueChange={setIsDarkMode}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
-              thumbColor={isDarkMode ? accentSwitchColor : inactiveThumbColor}
+              thumbColor={isDarkMode ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
@@ -219,7 +220,7 @@ export default function SettingsScreen({ navigation }) {
               value={dreamyScrollIndicatorEnabled}
               onValueChange={setDreamyScrollIndicatorEnabled}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
-              thumbColor={dreamyScrollIndicatorEnabled ? accentSwitchColor : inactiveThumbColor}
+              thumbColor={dreamyScrollIndicatorEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
