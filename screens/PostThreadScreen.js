@@ -1009,20 +1009,18 @@ export default function PostThreadScreen({ route, navigation }) {
     () => Math.max(descriptionIndicatorTrackHeight - descriptionIndicatorThumbHeight, 0),
     [descriptionIndicatorThumbHeight, descriptionIndicatorTrackHeight]
   );
+  const canRenderDescriptionIndicator = dreamyScrollIndicatorEnabled && isDescriptionExpanded;
   const shouldShowDescriptionIndicator = useMemo(
     () =>
-      dreamyScrollIndicatorEnabled &&
-      isDescriptionExpanded &&
-      descriptionScrollableRange > 12 &&
-      descriptionIndicatorTrackHeight > 40 &&
-      descriptionIndicatorThumbHeight > 0 &&
-      descriptionIndicatorThumbHeight < descriptionIndicatorTrackHeight,
+      canRenderDescriptionIndicator &&
+      descriptionScrollableRange > 8 &&
+      descriptionIndicatorTrackHeight > 24 &&
+      descriptionIndicatorThumbHeight > 0,
     [
+      canRenderDescriptionIndicator,
       descriptionIndicatorThumbHeight,
       descriptionIndicatorTrackHeight,
       descriptionScrollableRange,
-      dreamyScrollIndicatorEnabled,
-      isDescriptionExpanded,
     ]
   );
   const descriptionIndicatorTranslateY = useMemo(
@@ -1108,7 +1106,7 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [descriptionIndicatorPulse]);
 
   const showDescriptionIndicator = useCallback(() => {
-    if (!descriptionIndicatorShouldShowRef.current) {
+    if (!descriptionIndicatorShouldShowRef.current && !shouldShowDescriptionIndicator) {
       return;
     }
     cancelDescriptionIndicatorFade();
@@ -1123,12 +1121,13 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [
     cancelDescriptionIndicatorFade,
     descriptionIndicatorOpacity,
+    shouldShowDescriptionIndicator,
     startDescriptionIndicatorPulse,
   ]);
 
   const scheduleDescriptionIndicatorFadeOut = useCallback(
     (delay = 600) => {
-      if (!descriptionIndicatorShouldShowRef.current) {
+      if (!descriptionIndicatorShouldShowRef.current && !shouldShowDescriptionIndicator) {
         return;
       }
       cancelDescriptionIndicatorFade();
@@ -1143,7 +1142,12 @@ export default function PostThreadScreen({ route, navigation }) {
         });
       }, delay);
     },
-    [cancelDescriptionIndicatorFade, descriptionIndicatorOpacity, stopDescriptionIndicatorPulse]
+    [
+      cancelDescriptionIndicatorFade,
+      descriptionIndicatorOpacity,
+      shouldShowDescriptionIndicator,
+      stopDescriptionIndicatorPulse,
+    ]
   );
 
   useLayoutEffect(() => {
@@ -1178,7 +1182,7 @@ export default function PostThreadScreen({ route, navigation }) {
       Animated.event([{ nativeEvent: { contentOffset: { y: descriptionScrollY } } }], {
         useNativeDriver: true,
         listener: () => {
-          if (!descriptionIndicatorShouldShowRef.current) {
+          if (!descriptionIndicatorShouldShowRef.current && !shouldShowDescriptionIndicator) {
             return;
           }
           showDescriptionIndicator();
@@ -1188,6 +1192,7 @@ export default function PostThreadScreen({ route, navigation }) {
     [
       descriptionScrollY,
       scheduleDescriptionIndicatorFadeOut,
+      shouldShowDescriptionIndicator,
       showDescriptionIndicator,
     ]
   );
@@ -1633,13 +1638,15 @@ export default function PostThreadScreen({ route, navigation }) {
                         linkStyle={{ color: linkColor }}
                       />
                     </Animated.ScrollView>
-                    {shouldShowDescriptionIndicator ? (
+                    {canRenderDescriptionIndicator ? (
                       <Animated.View
                         pointerEvents="none"
                         style={[
                           styles.scrollIndicatorHost,
                           styles.postDescriptionIndicatorHost,
-                          { opacity: descriptionIndicatorOpacity },
+                          shouldShowDescriptionIndicator
+                            ? { opacity: descriptionIndicatorOpacity }
+                            : { opacity: 0 },
                         ]}
                       >
                         <Animated.View
