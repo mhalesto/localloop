@@ -105,6 +105,7 @@ export function SettingsProvider({ children }) {
   const [accentKey, setAccentKey] = useState(accentPresets[0].key);
   const [locationPermissionStatus, setLocationPermissionStatus] = useState('undetermined');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [dreamyScrollIndicatorEnabled, setDreamyScrollIndicatorEnabled] = useState(false);
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -119,6 +120,10 @@ export function SettingsProvider({ children }) {
   );
   const updateAccentKey = useCallback((key) => setAccentKey(key), []);
   const updateIsDarkMode = useCallback((enabled) => setIsDarkMode(Boolean(enabled)), []);
+  const updateDreamyScrollIndicatorEnabled = useCallback(
+    (enabled) => setDreamyScrollIndicatorEnabled(Boolean(enabled)),
+    []
+  );
   const updateUserProfile = useCallback(
     (patch) =>
       setUserProfile((prev) => ({
@@ -148,6 +153,8 @@ export function SettingsProvider({ children }) {
       setLocationPermissionStatus,
       isDarkMode,
       setIsDarkMode: updateIsDarkMode,
+      dreamyScrollIndicatorEnabled,
+      setDreamyScrollIndicatorEnabled: updateDreamyScrollIndicatorEnabled,
       themeColors
     }),
     [
@@ -162,6 +169,8 @@ export function SettingsProvider({ children }) {
       setLocationPermissionStatus,
       isDarkMode,
       updateIsDarkMode,
+      dreamyScrollIndicatorEnabled,
+      updateDreamyScrollIndicatorEnabled,
       themeColors
     ]
   );
