@@ -7,6 +7,18 @@ import React, {
 } from 'react';
 import { darkColors, lightColors } from '../constants/colors';
 
+const clampNumber = (value, min, max) => {
+  if (Number.isNaN(Number(value))) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, Math.round(Number(value))));
+};
+
+export const DEFAULT_TITLE_FONT_SIZE = 22;
+export const DEFAULT_DESCRIPTION_FONT_SIZE = 18;
+export const PREMIUM_TITLE_FONT_SIZE_RANGE = Object.freeze({ min: 18, max: 28 });
+export const PREMIUM_DESCRIPTION_FONT_SIZE_RANGE = Object.freeze({ min: 16, max: 24 });
+
 export const accentPresets = [
   {
     key: 'royal',
@@ -106,6 +118,13 @@ export function SettingsProvider({ children }) {
   const [locationPermissionStatus, setLocationPermissionStatus] = useState('undetermined');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [dreamyScrollIndicatorEnabled, setDreamyScrollIndicatorEnabled] = useState(false);
+  const [premiumTypographyEnabled, setPremiumTypographyEnabled] = useState(false);
+  const [premiumTitleFontSizeEnabled, setPremiumTitleFontSizeEnabled] = useState(false);
+  const [premiumDescriptionFontSizeEnabled, setPremiumDescriptionFontSizeEnabled] = useState(false);
+  const [premiumTitleFontSize, setPremiumTitleFontSize] = useState(DEFAULT_TITLE_FONT_SIZE);
+  const [premiumDescriptionFontSize, setPremiumDescriptionFontSize] = useState(
+    DEFAULT_DESCRIPTION_FONT_SIZE
+  );
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -124,6 +143,38 @@ export function SettingsProvider({ children }) {
     (enabled) => setDreamyScrollIndicatorEnabled(Boolean(enabled)),
     []
   );
+  const updatePremiumTypographyEnabled = useCallback(
+    (enabled) => setPremiumTypographyEnabled(Boolean(enabled)),
+    []
+  );
+  const updatePremiumTitleFontSizeEnabled = useCallback(
+    (enabled) => setPremiumTitleFontSizeEnabled(Boolean(enabled)),
+    []
+  );
+  const updatePremiumDescriptionFontSizeEnabled = useCallback(
+    (enabled) => setPremiumDescriptionFontSizeEnabled(Boolean(enabled)),
+    []
+  );
+  const updatePremiumTitleFontSize = useCallback((size) => {
+    setPremiumTitleFontSize((prev) => {
+      if (size === undefined || size === null || Number.isNaN(Number(size))) {
+        return prev;
+      }
+      return clampNumber(size, PREMIUM_TITLE_FONT_SIZE_RANGE.min, PREMIUM_TITLE_FONT_SIZE_RANGE.max);
+    });
+  }, []);
+  const updatePremiumDescriptionFontSize = useCallback((size) => {
+    setPremiumDescriptionFontSize((prev) => {
+      if (size === undefined || size === null || Number.isNaN(Number(size))) {
+        return prev;
+      }
+      return clampNumber(
+        size,
+        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min,
+        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max
+      );
+    });
+  }, []);
   const updateUserProfile = useCallback(
     (patch) =>
       setUserProfile((prev) => ({
@@ -155,6 +206,16 @@ export function SettingsProvider({ children }) {
       setIsDarkMode: updateIsDarkMode,
       dreamyScrollIndicatorEnabled,
       setDreamyScrollIndicatorEnabled: updateDreamyScrollIndicatorEnabled,
+      premiumTypographyEnabled,
+      setPremiumTypographyEnabled: updatePremiumTypographyEnabled,
+      premiumTitleFontSizeEnabled,
+      setPremiumTitleFontSizeEnabled: updatePremiumTitleFontSizeEnabled,
+      premiumDescriptionFontSizeEnabled,
+      setPremiumDescriptionFontSizeEnabled: updatePremiumDescriptionFontSizeEnabled,
+      premiumTitleFontSize,
+      setPremiumTitleFontSize: updatePremiumTitleFontSize,
+      premiumDescriptionFontSize,
+      setPremiumDescriptionFontSize: updatePremiumDescriptionFontSize,
       themeColors
     }),
     [
@@ -171,6 +232,16 @@ export function SettingsProvider({ children }) {
       updateIsDarkMode,
       dreamyScrollIndicatorEnabled,
       updateDreamyScrollIndicatorEnabled,
+      premiumTypographyEnabled,
+      updatePremiumTypographyEnabled,
+      premiumTitleFontSizeEnabled,
+      updatePremiumTitleFontSizeEnabled,
+      premiumDescriptionFontSizeEnabled,
+      updatePremiumDescriptionFontSizeEnabled,
+      premiumTitleFontSize,
+      updatePremiumTitleFontSize,
+      premiumDescriptionFontSize,
+      updatePremiumDescriptionFontSize,
       themeColors
     ]
   );
