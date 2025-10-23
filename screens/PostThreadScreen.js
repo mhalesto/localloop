@@ -436,6 +436,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const [typingUsers, setTypingUsers] = useState([]);
   const [replyingToComment, setReplyingToComment] = useState(null);
   const [reactionPickerCommentId, setReactionPickerCommentId] = useState(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const typingActiveRef = useRef(false);
   const typingTimeoutRef = useRef(null);
@@ -449,6 +450,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const [kbOffset, setKbOffset] = useState(0);
   const [listLayoutHeight, setListLayoutHeight] = useState(0);
   const [listContentHeight, setListContentHeight] = useState(0);
+  const [descriptionLayoutHeight, setDescriptionLayoutHeight] = useState(0);
+  const [descriptionContentHeight, setDescriptionContentHeight] = useState(0);
 
   const post = getPostById(city, postId);
   const hasPost = Boolean(post);
@@ -475,6 +478,12 @@ export default function PostThreadScreen({ route, navigation }) {
   const dreamyIndicatorHideTimeoutRef = useRef(null);
   const dreamyIndicatorAnimationRef = useRef(null);
   const dreamyIndicatorShouldShowRef = useRef(false);
+  const descriptionScrollY = useRef(new Animated.Value(0)).current;
+  const descriptionIndicatorOpacity = useRef(new Animated.Value(0)).current;
+  const descriptionIndicatorPulse = useRef(new Animated.Value(0)).current;
+  const descriptionIndicatorHideTimeoutRef = useRef(null);
+  const descriptionIndicatorAnimationRef = useRef(null);
+  const descriptionIndicatorShouldShowRef = useRef(false);
   useEffect(() => {
     const listenerId = scrollY.addListener(({ value }) => {
       scrollYValueRef.current = value;
@@ -615,6 +624,56 @@ export default function PostThreadScreen({ route, navigation }) {
       dreamyScrollableRange,
     ]
   );
+  const descriptionIndicatorTrackHeight = useMemo(
+    () => Math.max(descriptionLayoutHeight - 4, 0),
+    [descriptionLayoutHeight]
+  );
+  const descriptionScrollableRange = useMemo(
+    () => Math.max(descriptionContentHeight - descriptionLayoutHeight, 0),
+    [descriptionContentHeight, descriptionLayoutHeight]
+  );
+  const descriptionIndicatorThumbHeight = useMemo(() => {
+    if (descriptionIndicatorTrackHeight <= 0) {
+      return 0;
+    }
+    if (
+      descriptionContentHeight <= 0 ||
+      descriptionContentHeight <= descriptionLayoutHeight
+    ) {
+      return descriptionIndicatorTrackHeight;
+    }
+    const visibleRatio = descriptionLayoutHeight / descriptionContentHeight;
+    const minThumb = Math.min(descriptionIndicatorTrackHeight, 40);
+    const computed = descriptionIndicatorTrackHeight * visibleRatio;
+    return Math.max(
+      Math.min(computed, descriptionIndicatorTrackHeight),
+      minThumb
+    );
+  }, [
+    descriptionContentHeight,
+    descriptionIndicatorTrackHeight,
+    descriptionLayoutHeight,
+  ]);
+  const descriptionIndicatorTravelRange = useMemo(
+    () =>
+      Math.max(descriptionIndicatorTrackHeight - descriptionIndicatorThumbHeight, 0),
+    [descriptionIndicatorThumbHeight, descriptionIndicatorTrackHeight]
+  );
+  const shouldShowDescriptionIndicator = useMemo(
+    () =>
+      dreamyScrollIndicatorEnabled &&
+      isDescriptionExpanded &&
+      descriptionScrollableRange > 8 &&
+      descriptionIndicatorTrackHeight > 20 &&
+      descriptionIndicatorThumbHeight > 0,
+    [
+      descriptionIndicatorThumbHeight,
+      descriptionIndicatorTrackHeight,
+      descriptionScrollableRange,
+      dreamyScrollIndicatorEnabled,
+      isDescriptionExpanded,
+    ]
+  );
   const dreamyIndicatorTranslateY = useMemo(
     () =>
       scrollY.interpolate({
@@ -656,10 +715,61 @@ export default function PostThreadScreen({ route, navigation }) {
       }),
     [dreamyIndicatorPulse]
   );
+  const descriptionIndicatorTranslateY = useMemo(
+    () =>
+      descriptionScrollY.interpolate({
+        inputRange: [0, Math.max(descriptionScrollableRange, 1)],
+        outputRange: [0, descriptionIndicatorTravelRange],
+        extrapolate: 'clamp',
+      }),
+    [
+      descriptionIndicatorTravelRange,
+      descriptionScrollableRange,
+      descriptionScrollY,
+    ]
+  );
+  const descriptionIndicatorScale = useMemo(
+    () =>
+      descriptionIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.92, 1.08],
+      }),
+    [descriptionIndicatorPulse]
+  );
+  const descriptionIndicatorHaloScale = useMemo(
+    () =>
+      descriptionIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.14],
+      }),
+    [descriptionIndicatorPulse]
+  );
+  const descriptionIndicatorGlowOpacity = useMemo(
+    () =>
+      descriptionIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.22, 0.6],
+      }),
+    [descriptionIndicatorPulse]
+  );
+  const descriptionIndicatorHaloOpacity = useMemo(
+    () =>
+      descriptionIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.16, 0.32],
+      }),
+    [descriptionIndicatorPulse]
+  );
   const cancelDreamyIndicatorFade = useCallback(() => {
     if (dreamyIndicatorHideTimeoutRef.current) {
       clearTimeout(dreamyIndicatorHideTimeoutRef.current);
       dreamyIndicatorHideTimeoutRef.current = null;
+    }
+  }, []);
+  const cancelDescriptionIndicatorFade = useCallback(() => {
+    if (descriptionIndicatorHideTimeoutRef.current) {
+      clearTimeout(descriptionIndicatorHideTimeoutRef.current);
+      descriptionIndicatorHideTimeoutRef.current = null;
     }
   }, []);
   const startDreamyIndicatorPulse = useCallback(() => {
@@ -685,6 +795,29 @@ export default function PostThreadScreen({ route, navigation }) {
     dreamyIndicatorAnimationRef.current = animation;
     animation.start();
   }, [dreamyIndicatorPulse]);
+  const startDescriptionIndicatorPulse = useCallback(() => {
+    if (descriptionIndicatorAnimationRef.current) {
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(descriptionIndicatorPulse, {
+          toValue: 1,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(descriptionIndicatorPulse, {
+          toValue: 0,
+          duration: 2200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    descriptionIndicatorAnimationRef.current = animation;
+    animation.start();
+  }, [descriptionIndicatorPulse]);
   const stopDreamyIndicatorPulse = useCallback(() => {
     if (dreamyIndicatorAnimationRef.current?.stop) {
       dreamyIndicatorAnimationRef.current.stop();
@@ -693,6 +826,14 @@ export default function PostThreadScreen({ route, navigation }) {
     dreamyIndicatorPulse.stopAnimation();
     dreamyIndicatorPulse.setValue(0);
   }, [dreamyIndicatorPulse]);
+  const stopDescriptionIndicatorPulse = useCallback(() => {
+    if (descriptionIndicatorAnimationRef.current?.stop) {
+      descriptionIndicatorAnimationRef.current.stop();
+      descriptionIndicatorAnimationRef.current = null;
+    }
+    descriptionIndicatorPulse.stopAnimation();
+    descriptionIndicatorPulse.setValue(0);
+  }, [descriptionIndicatorPulse]);
   const showDreamyIndicator = useCallback(() => {
     if (!dreamyIndicatorShouldShowRef.current) {
       return;
@@ -710,6 +851,24 @@ export default function PostThreadScreen({ route, navigation }) {
     cancelDreamyIndicatorFade,
     dreamyIndicatorOpacity,
     startDreamyIndicatorPulse,
+  ]);
+  const showDescriptionIndicator = useCallback(() => {
+    if (!descriptionIndicatorShouldShowRef.current) {
+      return;
+    }
+    cancelDescriptionIndicatorFade();
+    startDescriptionIndicatorPulse();
+    Animated.spring(descriptionIndicatorOpacity, {
+      toValue: 1,
+      stiffness: 320,
+      damping: 28,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [
+    cancelDescriptionIndicatorFade,
+    descriptionIndicatorOpacity,
+    startDescriptionIndicatorPulse,
   ]);
   const scheduleDreamyIndicatorFadeOut = useCallback(
     (delay = 600) => {
@@ -734,6 +893,29 @@ export default function PostThreadScreen({ route, navigation }) {
       stopDreamyIndicatorPulse,
     ]
   );
+  const scheduleDescriptionIndicatorFadeOut = useCallback(
+    (delay = 600) => {
+      if (!descriptionIndicatorShouldShowRef.current) {
+        return;
+      }
+      cancelDescriptionIndicatorFade();
+      descriptionIndicatorHideTimeoutRef.current = setTimeout(() => {
+        Animated.timing(descriptionIndicatorOpacity, {
+          toValue: 0,
+          duration: 360,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }).start(() => {
+          stopDescriptionIndicatorPulse();
+        });
+      }, delay);
+    },
+    [
+      cancelDescriptionIndicatorFade,
+      descriptionIndicatorOpacity,
+      stopDescriptionIndicatorPulse,
+    ]
+  );
   useLayoutEffect(() => {
     dreamyIndicatorShouldShowRef.current = shouldShowDreamyIndicator;
     if (!shouldShowDreamyIndicator) {
@@ -747,6 +929,19 @@ export default function PostThreadScreen({ route, navigation }) {
     shouldShowDreamyIndicator,
     stopDreamyIndicatorPulse,
   ]);
+  useLayoutEffect(() => {
+    descriptionIndicatorShouldShowRef.current = shouldShowDescriptionIndicator;
+    if (!shouldShowDescriptionIndicator) {
+      cancelDescriptionIndicatorFade();
+      stopDescriptionIndicatorPulse();
+      descriptionIndicatorOpacity.setValue(0);
+    }
+  }, [
+    cancelDescriptionIndicatorFade,
+    descriptionIndicatorOpacity,
+    shouldShowDescriptionIndicator,
+    stopDescriptionIndicatorPulse,
+  ]);
   useEffect(
     () => () => {
       cancelDreamyIndicatorFade();
@@ -754,6 +949,27 @@ export default function PostThreadScreen({ route, navigation }) {
     },
     [cancelDreamyIndicatorFade, stopDreamyIndicatorPulse]
   );
+  useEffect(
+    () => () => {
+      cancelDescriptionIndicatorFade();
+      stopDescriptionIndicatorPulse();
+    },
+    [cancelDescriptionIndicatorFade, stopDescriptionIndicatorPulse]
+  );
+  useEffect(() => {
+    if (!isDescriptionExpanded) {
+      cancelDescriptionIndicatorFade();
+      stopDescriptionIndicatorPulse();
+      descriptionIndicatorOpacity.setValue(0);
+      descriptionScrollY.setValue(0);
+    }
+  }, [
+    cancelDescriptionIndicatorFade,
+    descriptionIndicatorOpacity,
+    descriptionScrollY,
+    isDescriptionExpanded,
+    stopDescriptionIndicatorPulse,
+  ]);
   const handleAnimatedScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -779,6 +995,34 @@ export default function PostThreadScreen({ route, navigation }) {
       showDreamyIndicator,
     ]
   );
+  const handleDescriptionScroll = useMemo(
+    () =>
+      Animated.event(
+        [{ nativeEvent: { contentOffset: { y: descriptionScrollY } } }],
+        {
+          useNativeDriver: true,
+          listener: () => {
+            if (descriptionIndicatorShouldShowRef.current) {
+              showDescriptionIndicator();
+              scheduleDescriptionIndicatorFadeOut(800);
+            }
+          },
+        }
+      ),
+    [
+      descriptionScrollY,
+      scheduleDescriptionIndicatorFadeOut,
+      showDescriptionIndicator,
+    ]
+  );
+  const handleDescriptionScrollBegin = useCallback(() => {
+    if (descriptionIndicatorShouldShowRef.current) {
+      showDescriptionIndicator();
+    }
+  }, [showDescriptionIndicator]);
+  const handleDescriptionScrollEnd = useCallback(() => {
+    scheduleDescriptionIndicatorFadeOut(700);
+  }, [scheduleDescriptionIndicatorFadeOut]);
 
   const isMomentumScrollingRef = useRef(false);
   const maybeSnapHeader = useCallback(
@@ -1389,11 +1633,22 @@ export default function PostThreadScreen({ route, navigation }) {
     }
   }, [ownerMenuVisible, post?.createdByMe]);
 
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-
   useEffect(() => {
     setIsDescriptionExpanded(false);
   }, [post?.message]);
+  const handleDescriptionLayout = useCallback(({ nativeEvent }) => {
+    const measured = nativeEvent?.layout?.height ?? 0;
+    const nextHeight = Number.isFinite(measured) ? measured : 0;
+    setDescriptionLayoutHeight((prev) =>
+      Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight
+    );
+  }, []);
+  const handleDescriptionContentSizeChange = useCallback((_, height) => {
+    const nextHeight = Number.isFinite(height) ? height : 0;
+    setDescriptionContentHeight((prev) =>
+      Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight
+    );
+  }, []);
 
   const renderPostCard = useCallback(
     ({ hideHeaderActions = false, forceExpanded = false, WrapperComponent = View, wrapperStyle } = {}) => {
@@ -1523,7 +1778,8 @@ export default function PostThreadScreen({ route, navigation }) {
                 <View style={styles.postMessagePreviewRow}>
                   <Text
                     style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
-                    numberOfLines={1}
+                    numberOfLines={3}
+                    ellipsizeMode="tail"
                   >
                     {collapsedPreviewText}
                   </Text>
@@ -1540,18 +1796,102 @@ export default function PostThreadScreen({ route, navigation }) {
                 </View>
               ) : (
                 <>
-                  <ScrollView
-                    style={styles.postMessageExpandedScroll}
-                    contentContainerStyle={styles.postMessageExpandedContent}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                  >
-                    <RichText
-                      text={trimmedDescription}
-                      textStyle={[styles.postMessage, { color: headerTitleColor }]}
-                      linkStyle={{ color: linkColor }}
-                    />
-                  </ScrollView>
+                  {forceExpanded ? (
+                    <ScrollView
+                      style={styles.postMessageExpandedScroll}
+                      contentContainerStyle={styles.postMessageExpandedContent}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <RichText
+                        text={trimmedDescription}
+                        textStyle={[styles.postMessage, { color: headerTitleColor }]}
+                        linkStyle={{ color: linkColor }}
+                      />
+                    </ScrollView>
+                  ) : (
+                    <View style={styles.postMessageExpandedWrapper}>
+                      <Animated.ScrollView
+                        style={styles.postMessageExpandedScroll}
+                        contentContainerStyle={[
+                          styles.postMessageExpandedContent,
+                          styles.postMessageExpandedContentIndicator,
+                        ]}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                        onLayout={handleDescriptionLayout}
+                        onContentSizeChange={handleDescriptionContentSizeChange}
+                        onScroll={handleDescriptionScroll}
+                        scrollEventThrottle={16}
+                        onScrollBeginDrag={handleDescriptionScrollBegin}
+                        onScrollEndDrag={handleDescriptionScrollEnd}
+                        onMomentumScrollBegin={handleDescriptionScrollBegin}
+                        onMomentumScrollEnd={handleDescriptionScrollEnd}
+                      >
+                        <RichText
+                          text={trimmedDescription}
+                          textStyle={[styles.postMessage, { color: headerTitleColor }]}
+                          linkStyle={{ color: linkColor }}
+                        />
+                      </Animated.ScrollView>
+                      {dreamyScrollIndicatorEnabled ? (
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.scrollIndicatorHost,
+                            styles.descriptionScrollIndicatorHost,
+                            shouldShowDescriptionIndicator
+                              ? { opacity: descriptionIndicatorOpacity }
+                              : { opacity: 0 },
+                          ]}
+                        >
+                          <Animated.View
+                            style={[
+                              styles.scrollIndicatorHalo,
+                              {
+                                height: descriptionIndicatorThumbHeight,
+                                backgroundColor: linkColor,
+                                opacity: descriptionIndicatorHaloOpacity,
+                                transform: [
+                                  { translateY: descriptionIndicatorTranslateY },
+                                  { scaleX: descriptionIndicatorHaloScale },
+                                  { scaleY: descriptionIndicatorHaloScale },
+                                ],
+                              },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.scrollIndicatorTrack,
+                              { height: descriptionIndicatorTrackHeight },
+                            ]}
+                          />
+                          <Animated.View
+                            style={[
+                              styles.scrollIndicatorThumb,
+                              {
+                                height: descriptionIndicatorThumbHeight,
+                                backgroundColor: linkColor,
+                                shadowColor: linkColor,
+                                transform: [
+                                  { translateY: descriptionIndicatorTranslateY },
+                                  { scaleX: descriptionIndicatorScale },
+                                  { scaleY: descriptionIndicatorScale },
+                                ],
+                              },
+                            ]}
+                          >
+                            <Animated.View
+                              style={[
+                                styles.scrollIndicatorGlow,
+                                { opacity: descriptionIndicatorGlowOpacity },
+                              ]}
+                            />
+                          </Animated.View>
+                        </Animated.View>
+                      ) : null}
+                    </View>
+                  )}
                   {showToggleControls ? (
                     <TouchableOpacity
                       onPress={() => setIsDescriptionExpanded(false)}
@@ -1648,6 +1988,20 @@ export default function PostThreadScreen({ route, navigation }) {
       toggleVote,
       styles,
       isDescriptionExpanded,
+      dreamyScrollIndicatorEnabled,
+      handleDescriptionContentSizeChange,
+      handleDescriptionLayout,
+      handleDescriptionScroll,
+      handleDescriptionScrollBegin,
+      handleDescriptionScrollEnd,
+      shouldShowDescriptionIndicator,
+      descriptionIndicatorGlowOpacity,
+      descriptionIndicatorHaloOpacity,
+      descriptionIndicatorHaloScale,
+      descriptionIndicatorScale,
+      descriptionIndicatorThumbHeight,
+      descriptionIndicatorTrackHeight,
+      descriptionIndicatorTranslateY,
     ]
   );
 
@@ -2108,11 +2462,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postMessageContainer: { marginBottom: 18 },
     postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
     postMessage: { fontSize: 18, fontWeight: '500', lineHeight: 24 },
-    postMessagePreviewRow: { flexDirection: 'row', alignItems: 'center' },
+    postMessagePreviewRow: { flexDirection: 'row', alignItems: 'flex-start' },
     postMessagePreviewText: { flex: 1, fontSize: 18, fontWeight: '500', lineHeight: 24 },
+    postMessageExpandedWrapper: { position: 'relative' },
     postMessageExpandedScroll: { maxHeight: 220 },
     postMessageExpandedContent: {
       paddingRight: 0,
+    },
+    postMessageExpandedContentIndicator: {
+      paddingRight: 18,
     },
     postMessageToggle: { marginLeft: 12 },
     postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' },
@@ -2361,6 +2719,12 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       bottom: 16,
       right: 6,
       width: 22,
+    },
+    descriptionScrollIndicatorHost: {
+      top: 6,
+      bottom: 6,
+      right: 4,
+      width: 20,
     },
     scrollIndicatorTrack: {
       position: 'absolute',
