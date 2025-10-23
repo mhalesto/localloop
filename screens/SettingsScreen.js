@@ -31,7 +31,9 @@ export default function SettingsScreen({ navigation }) {
     setLocationPermissionStatus,
     isDarkMode,
     setIsDarkMode,
-    themeColors
+    themeColors,
+    dreamyScrollIndicatorEnabled,
+    setDreamyScrollIndicatorEnabled
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
@@ -203,6 +205,21 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={setIsDarkMode}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={isDarkMode ? accentSwitchColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Dreamy scroll indicator</Text>
+              <Text style={styles.itemSubtitle}>
+                Adds a floating accent scroll thumb to long post descriptions.
+              </Text>
+            </View>
+            <Switch
+              value={dreamyScrollIndicatorEnabled}
+              onValueChange={setDreamyScrollIndicatorEnabled}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={dreamyScrollIndicatorEnabled ? accentSwitchColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
