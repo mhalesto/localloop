@@ -12,7 +12,13 @@ import {
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
-import { useSettings } from '../contexts/SettingsContext';
+import {
+  useSettings,
+  DEFAULT_TITLE_FONT_SIZE,
+  DEFAULT_DESCRIPTION_FONT_SIZE,
+  PREMIUM_TITLE_FONT_SIZE_RANGE,
+  PREMIUM_DESCRIPTION_FONT_SIZE_RANGE
+} from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
 
@@ -33,13 +39,27 @@ export default function SettingsScreen({ navigation }) {
     setIsDarkMode,
     themeColors,
     dreamyScrollIndicatorEnabled,
-    setDreamyScrollIndicatorEnabled
+    setDreamyScrollIndicatorEnabled,
+    premiumTypographyEnabled,
+    setPremiumTypographyEnabled,
+    premiumTitleFontSizeEnabled,
+    setPremiumTitleFontSizeEnabled,
+    premiumDescriptionFontSizeEnabled,
+    setPremiumDescriptionFontSizeEnabled,
+    premiumTitleFontSize,
+    setPremiumTitleFontSize,
+    premiumDescriptionFontSize,
+    setPremiumDescriptionFontSize
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const avatarConfig = getAvatarConfig(userProfile.avatarKey);
   const locationEnabled = locationPermissionStatus === 'granted';
+  const [titleSizeDraft, setTitleSizeDraft] = useState(String(premiumTitleFontSize));
+  const [descriptionSizeDraft, setDescriptionSizeDraft] = useState(
+    String(premiumDescriptionFontSize)
+  );
 
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
@@ -48,6 +68,7 @@ export default function SettingsScreen({ navigation }) {
     return `Ghost #${Math.floor(Math.random() * 999)}`;
   }, [userProfile.nickname]);
 
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
   const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';
@@ -61,10 +82,94 @@ export default function SettingsScreen({ navigation }) {
     setNicknameDraft(userProfile.nickname ?? '');
   }, [userProfile.nickname]);
 
+  useEffect(() => {
+    setTitleSizeDraft(String(premiumTitleFontSize));
+  }, [premiumTitleFontSize]);
+
+  useEffect(() => {
+    setDescriptionSizeDraft(String(premiumDescriptionFontSize));
+  }, [premiumDescriptionFontSize]);
+
+  const handleTogglePremiumTypography = (value) => {
+    setPremiumTypographyEnabled(value);
+  };
+
+  const handleToggleTitleSizeOverride = (value) => {
+    setPremiumTitleFontSizeEnabled(value);
+  };
+
+  const handleToggleDescriptionSizeOverride = (value) => {
+    setPremiumDescriptionFontSizeEnabled(value);
+  };
+
   const handleNicknameChange = (value) => {
     const trimmedValue = value.slice(0, 32);
     setNicknameDraft(trimmedValue);
     updateUserProfile({ nickname: trimmedValue });
+  };
+
+  const handleTitleSizeChange = (value) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    setTitleSizeDraft(sanitized);
+    if (!sanitized) {
+      return;
+    }
+    const numeric = parseInt(sanitized, 10);
+    if (!Number.isNaN(numeric)) {
+      const clamped = clamp(
+        numeric,
+        PREMIUM_TITLE_FONT_SIZE_RANGE.min,
+        PREMIUM_TITLE_FONT_SIZE_RANGE.max
+      );
+      setPremiumTitleFontSize(clamped);
+    }
+  };
+
+  const handleTitleSizeBlur = () => {
+    const numeric = parseInt(titleSizeDraft, 10);
+    if (Number.isNaN(numeric)) {
+      setTitleSizeDraft(String(premiumTitleFontSize));
+      return;
+    }
+    const clampedValue = clamp(
+      numeric,
+      PREMIUM_TITLE_FONT_SIZE_RANGE.min,
+      PREMIUM_TITLE_FONT_SIZE_RANGE.max
+    );
+    setPremiumTitleFontSize(clampedValue);
+    setTitleSizeDraft(String(clampedValue));
+  };
+
+  const handleDescriptionSizeChange = (value) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    setDescriptionSizeDraft(sanitized);
+    if (!sanitized) {
+      return;
+    }
+    const numeric = parseInt(sanitized, 10);
+    if (!Number.isNaN(numeric)) {
+      const clamped = clamp(
+        numeric,
+        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min,
+        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max
+      );
+      setPremiumDescriptionFontSize(clamped);
+    }
+  };
+
+  const handleDescriptionSizeBlur = () => {
+    const numeric = parseInt(descriptionSizeDraft, 10);
+    if (Number.isNaN(numeric)) {
+      setDescriptionSizeDraft(String(premiumDescriptionFontSize));
+      return;
+    }
+    const clampedValue = clamp(
+      numeric,
+      PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min,
+      PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max
+    );
+    setPremiumDescriptionFontSize(clampedValue);
+    setDescriptionSizeDraft(String(clampedValue));
   };
 
   const handleSelectLocation = (cityName, meta = {}) => {
@@ -258,6 +363,119 @@ export default function SettingsScreen({ navigation }) {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Premium</Text>
+          <Text style={styles.sectionHint}>
+            Adjust post typography to suit your vibe. These tweaks only affect your device.
+          </Text>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Premium typography</Text>
+              <Text style={styles.itemSubtitle}>
+                Unlock custom font sizes for post titles and descriptions.
+              </Text>
+            </View>
+            <Switch
+              value={premiumTypographyEnabled}
+              onValueChange={handleTogglePremiumTypography}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={premiumTypographyEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View
+            style={[
+              styles.item,
+              styles.premiumControlRow,
+              !premiumTypographyEnabled && styles.itemDisabledSimple
+            ]}
+          >
+            <View>
+              <Text style={styles.itemTitle}>Custom title size</Text>
+              <Text style={styles.itemSubtitle}>
+                {premiumTitleFontSizeEnabled
+                  ? `Currently ${premiumTitleFontSize} pt.`
+                  : `Use default ${DEFAULT_TITLE_FONT_SIZE} pt titles.`}
+              </Text>
+            </View>
+            <Switch
+              value={premiumTitleFontSizeEnabled}
+              onValueChange={handleToggleTitleSizeOverride}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={premiumTitleFontSizeEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+              disabled={!premiumTypographyEnabled}
+            />
+          </View>
+          {premiumTypographyEnabled && premiumTitleFontSizeEnabled ? (
+            <View style={styles.premiumInputBlock}>
+              <View style={styles.premiumInputRow}>
+                <Text style={styles.premiumInputLabel}>Title font size</Text>
+                <TextInput
+                  value={titleSizeDraft}
+                  onChangeText={handleTitleSizeChange}
+                  onBlur={handleTitleSizeBlur}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  maxLength={2}
+                  onSubmitEditing={handleTitleSizeBlur}
+                  style={styles.premiumInput}
+                />
+              </View>
+              <Text style={styles.premiumInputHint}>
+                {`${PREMIUM_TITLE_FONT_SIZE_RANGE.min}-${PREMIUM_TITLE_FONT_SIZE_RANGE.max} pt range.`}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.premiumDivider} />
+          <View
+            style={[
+              styles.itemLast,
+              styles.premiumControlRow,
+              !premiumTypographyEnabled && styles.itemDisabledSimple
+            ]}
+          >
+            <View>
+              <Text style={styles.itemTitle}>Custom description size</Text>
+              <Text style={styles.itemSubtitle}>
+                {premiumDescriptionFontSizeEnabled
+                  ? `Currently ${premiumDescriptionFontSize} pt.`
+                  : `Use default ${DEFAULT_DESCRIPTION_FONT_SIZE} pt descriptions.`}
+              </Text>
+            </View>
+            <Switch
+              value={premiumDescriptionFontSizeEnabled}
+              onValueChange={handleToggleDescriptionSizeOverride}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={
+                premiumDescriptionFontSizeEnabled ? activeThumbColor : inactiveThumbColor
+              }
+              ios_backgroundColor={inactiveTrackColor}
+              disabled={!premiumTypographyEnabled}
+            />
+          </View>
+          {premiumTypographyEnabled && premiumDescriptionFontSizeEnabled ? (
+            <View style={[styles.premiumInputBlock, styles.premiumInputSpacing]}>
+              <View style={styles.premiumInputRow}>
+                <Text style={styles.premiumInputLabel}>Description font size</Text>
+                <TextInput
+                  value={descriptionSizeDraft}
+                  onChangeText={handleDescriptionSizeChange}
+                  onBlur={handleDescriptionSizeBlur}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  maxLength={2}
+                  onSubmitEditing={handleDescriptionSizeBlur}
+                  style={styles.premiumInput}
+                />
+              </View>
+              <Text style={styles.premiumInputHint}>
+                {`${PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min}-${PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max} pt range.`}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile</Text>
           <Text style={styles.sectionHint}>
             Set a playful nickname and your home base. This information never leaves your device—it simply helps personalize rooms.
@@ -434,6 +652,51 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     itemDisabled: {
       opacity: 0.6,
       marginTop: 16
+    },
+    itemDisabledSimple: {
+      opacity: 0.45
+    },
+    premiumControlRow: {
+      alignItems: 'flex-start'
+    },
+    premiumInputBlock: {
+      marginBottom: 20
+    },
+    premiumInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    },
+    premiumInputLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.textSecondary
+    },
+    premiumInput: {
+      width: 72,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.14)',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      textAlign: 'center',
+      fontSize: 16,
+      fontWeight: '600',
+      color: palette.textPrimary,
+      backgroundColor: isDarkMode ? palette.background : '#ffffff'
+    },
+    premiumInputHint: {
+      marginTop: 6,
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    premiumDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: palette.divider,
+      marginBottom: 20
+    },
+    premiumInputSpacing: {
+      marginBottom: 0
     },
     itemTitle: {
       fontSize: 15,

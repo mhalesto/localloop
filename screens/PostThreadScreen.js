@@ -29,7 +29,12 @@ import * as Clipboard from 'expo-clipboard';
 import { usePosts } from '../contexts/PostsContext';
 import ScreenLayout from '../components/ScreenLayout';
 import CreatePostModal from '../components/CreatePostModal';
-import { useSettings, accentPresets } from '../contexts/SettingsContext';
+import {
+  useSettings,
+  accentPresets,
+  DEFAULT_TITLE_FONT_SIZE,
+  DEFAULT_DESCRIPTION_FONT_SIZE
+} from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 import RichText from '../components/RichText';
@@ -417,8 +422,29 @@ export default function PostThreadScreen({ route, navigation }) {
     themeColors,
     isDarkMode,
     dreamyScrollIndicatorEnabled,
+    premiumTypographyEnabled,
+    premiumTitleFontSizeEnabled,
+    premiumDescriptionFontSizeEnabled,
+    premiumTitleFontSize,
+    premiumDescriptionFontSize
   } = useSettings();
-  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+  const effectiveTitleFontSize =
+    premiumTypographyEnabled && premiumTitleFontSizeEnabled
+      ? premiumTitleFontSize
+      : DEFAULT_TITLE_FONT_SIZE;
+  const effectiveDescriptionFontSize =
+    premiumTypographyEnabled && premiumDescriptionFontSizeEnabled
+      ? premiumDescriptionFontSize
+      : DEFAULT_DESCRIPTION_FONT_SIZE;
+  const styles = useMemo(
+    () =>
+      createStyles(themeColors, {
+        isDarkMode,
+        titleFontSize: effectiveTitleFontSize,
+        descriptionFontSize: effectiveDescriptionFontSize
+      }),
+    [themeColors, isDarkMode, effectiveTitleFontSize, effectiveDescriptionFontSize]
+  );
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
 
@@ -2367,8 +2393,16 @@ export default function PostThreadScreen({ route, navigation }) {
 }
 
 
-const createStyles = (palette, { isDarkMode } = {}) =>
-  StyleSheet.create({
+const createStyles = (
+  palette,
+  { isDarkMode, titleFontSize, descriptionFontSize } = {}
+) => {
+  const resolvedTitleFontSize = titleFontSize ?? DEFAULT_TITLE_FONT_SIZE;
+  const resolvedDescriptionFontSize = descriptionFontSize ?? DEFAULT_DESCRIPTION_FONT_SIZE;
+  const resolvedTitleLineHeight = Math.round(resolvedTitleFontSize * 1.27);
+  const resolvedDescriptionLineHeight = Math.round(resolvedDescriptionFontSize * 1.33);
+
+  return StyleSheet.create({
     /* Sticky header wrapper so the pinned card blends with background */
     stickyHeaderWrap: {
       width: '100%',
@@ -2458,12 +2492,27 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     postBadge: { fontSize: 16, fontWeight: '700' },
     postCity: { fontSize: 12, marginTop: 4, maxWidth: '80%' },
     sharedBanner: { fontSize: 12, marginTop: 6 },
-    postTitle: { fontSize: 22, marginTop: 6, marginBottom: 10, fontWeight: '700', lineHeight: 28 },
+    postTitle: {
+      fontSize: resolvedTitleFontSize,
+      marginTop: 6,
+      marginBottom: 10,
+      fontWeight: '700',
+      lineHeight: resolvedTitleLineHeight
+    },
     postMessageContainer: { marginBottom: 18 },
     postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
-    postMessage: { fontSize: 18, fontWeight: '500', lineHeight: 24 },
+    postMessage: {
+      fontSize: resolvedDescriptionFontSize,
+      fontWeight: '500',
+      lineHeight: resolvedDescriptionLineHeight
+    },
     postMessagePreviewRow: { flexDirection: 'row', alignItems: 'flex-start' },
-    postMessagePreviewText: { flex: 1, fontSize: 18, fontWeight: '500', lineHeight: 24 },
+    postMessagePreviewText: {
+      flex: 1,
+      fontSize: resolvedDescriptionFontSize,
+      fontWeight: '500',
+      lineHeight: resolvedDescriptionLineHeight
+    },
     postMessageExpandedWrapper: { position: 'relative' },
     postMessageExpandedScroll: { maxHeight: 220 },
     postMessageExpandedContent: {
@@ -2873,3 +2922,4 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     notice: { fontSize: 16, marginBottom: 16, color: palette.textPrimary, textAlign: 'center' }
   });
+};
