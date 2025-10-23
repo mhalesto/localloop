@@ -16,6 +16,7 @@ import {
   Platform,
   Dimensions,
   Share,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -440,6 +441,8 @@ export default function PostThreadScreen({ route, navigation }) {
   // UI state: composer height & keyboard offset (so composer sits above keyboard)
   const [composerH, setComposerH] = useState(68);
   const [kbOffset, setKbOffset] = useState(0);
+  const [listLayoutHeight, setListLayoutHeight] = useState(0);
+  const [listContentHeight, setListContentHeight] = useState(0);
 
   const post = getPostById(city, postId);
   const hasPost = Boolean(post);
@@ -461,6 +464,11 @@ export default function PostThreadScreen({ route, navigation }) {
   const scrollYValueRef = useRef(0);
   const isSnappingHeaderRef = useRef(false);
   const headerSnapAnimationRef = useRef(null);
+  const scrollIndicatorOpacity = useRef(new Animated.Value(0)).current;
+  const scrollIndicatorPulse = useRef(new Animated.Value(0)).current;
+  const indicatorHideTimeoutRef = useRef(null);
+  const indicatorPulseAnimationRef = useRef(null);
+  const indicatorShouldShowRef = useRef(false);
   useEffect(() => {
     const listenerId = scrollY.addListener(({ value }) => {
       scrollYValueRef.current = value;
@@ -630,16 +638,19 @@ export default function PostThreadScreen({ route, navigation }) {
     isSnappingHeaderRef.current = false;
     isMomentumScrollingRef.current = false;
     closeReactionPicker();
-  }, [closeReactionPicker, headerReveal]);
+    showScrollIndicator();
+  }, [closeReactionPicker, headerReveal, showScrollIndicator]);
 
   const handleMomentumScrollBegin = useCallback(() => {
     isMomentumScrollingRef.current = true;
-  }, []);
+    showScrollIndicator();
+  }, [showScrollIndicator]);
 
   const handleMomentumScrollEnd = useCallback(() => {
     isMomentumScrollingRef.current = false;
     maybeSnapHeader();
-  }, [maybeSnapHeader]);
+    scheduleScrollIndicatorFadeOut();
+  }, [maybeSnapHeader, scheduleScrollIndicatorFadeOut]);
 
   const handleScrollEndDrag = useCallback(
     (event) => {
@@ -647,8 +658,9 @@ export default function PostThreadScreen({ route, navigation }) {
         return;
       }
       maybeSnapHeader(event?.nativeEvent?.contentOffset?.y ?? scrollYValueRef.current);
+      scheduleScrollIndicatorFadeOut();
     },
-    [maybeSnapHeader]
+    [maybeSnapHeader, scheduleScrollIndicatorFadeOut]
   );
 
   useEffect(() => {
@@ -962,6 +974,177 @@ export default function PostThreadScreen({ route, navigation }) {
     }
     return 'someone';
   }, [replyingToComment]);
+
+  const indicatorTrackHeight = useMemo(
+    () => Math.max(listLayoutHeight - 24, 0),
+    [listLayoutHeight]
+  );
+  const indicatorScrollableRange = useMemo(
+    () => Math.max(listContentHeight - listLayoutHeight, 0),
+    [listContentHeight, listLayoutHeight]
+  );
+  const indicatorThumbHeight = useMemo(() => {
+    if (indicatorTrackHeight <= 0) {
+      return 0;
+    }
+    if (listContentHeight <= 0 || listContentHeight <= listLayoutHeight) {
+      return indicatorTrackHeight;
+    }
+    const visibleRatio = listLayoutHeight / listContentHeight;
+    const minThumb = Math.min(indicatorTrackHeight, 48);
+    const computed = indicatorTrackHeight * visibleRatio;
+    return Math.max(Math.min(computed, indicatorTrackHeight), minThumb);
+  }, [indicatorTrackHeight, listContentHeight, listLayoutHeight]);
+  const indicatorTravelRange = useMemo(
+    () => Math.max(indicatorTrackHeight - indicatorThumbHeight, 0),
+    [indicatorThumbHeight, indicatorTrackHeight]
+  );
+  const shouldShowScrollIndicator = useMemo(
+    () =>
+      indicatorScrollableRange > 16 &&
+      indicatorTrackHeight > 40 &&
+      indicatorThumbHeight > 0 &&
+      indicatorThumbHeight < indicatorTrackHeight,
+    [indicatorScrollableRange, indicatorTrackHeight, indicatorThumbHeight]
+  );
+  const scrollIndicatorTranslateY = useMemo(
+    () =>
+      scrollY.interpolate({
+        inputRange: [0, Math.max(indicatorScrollableRange, 1)],
+        outputRange: [0, indicatorTravelRange],
+        extrapolate: 'clamp',
+      }),
+    [indicatorScrollableRange, indicatorTravelRange, scrollY]
+  );
+  const indicatorScale = useMemo(
+    () =>
+      scrollIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.06],
+      }),
+    [scrollIndicatorPulse]
+  );
+  const indicatorHaloScale = useMemo(
+    () =>
+      scrollIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.16],
+      }),
+    [scrollIndicatorPulse]
+  );
+  const indicatorGlowOpacity = useMemo(
+    () =>
+      scrollIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.25, 0.65],
+      }),
+    [scrollIndicatorPulse]
+  );
+  const indicatorHaloOpacity = useMemo(
+    () =>
+      scrollIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.18, 0.34],
+      }),
+    [scrollIndicatorPulse]
+  );
+
+  const cancelScrollIndicatorFade = useCallback(() => {
+    if (indicatorHideTimeoutRef.current) {
+      clearTimeout(indicatorHideTimeoutRef.current);
+      indicatorHideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startScrollIndicatorPulse = useCallback(() => {
+    if (indicatorPulseAnimationRef.current) {
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scrollIndicatorPulse, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrollIndicatorPulse, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    indicatorPulseAnimationRef.current = animation;
+    animation.start();
+  }, [scrollIndicatorPulse]);
+
+  const stopScrollIndicatorPulse = useCallback(() => {
+    if (indicatorPulseAnimationRef.current?.stop) {
+      indicatorPulseAnimationRef.current.stop();
+      indicatorPulseAnimationRef.current = null;
+    }
+    scrollIndicatorPulse.stopAnimation();
+    scrollIndicatorPulse.setValue(0);
+  }, [scrollIndicatorPulse]);
+
+  const showScrollIndicator = useCallback(() => {
+    if (!indicatorShouldShowRef.current) {
+      return;
+    }
+    cancelScrollIndicatorFade();
+    startScrollIndicatorPulse();
+    Animated.spring(scrollIndicatorOpacity, {
+      toValue: 1,
+      stiffness: 320,
+      damping: 28,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [cancelScrollIndicatorFade, scrollIndicatorOpacity, startScrollIndicatorPulse]);
+
+  const scheduleScrollIndicatorFadeOut = useCallback(
+    (delay = 600) => {
+      if (!indicatorShouldShowRef.current) {
+        return;
+      }
+      cancelScrollIndicatorFade();
+      indicatorHideTimeoutRef.current = setTimeout(() => {
+        Animated.timing(scrollIndicatorOpacity, {
+          toValue: 0,
+          duration: 360,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }).start(() => {
+          stopScrollIndicatorPulse();
+        });
+      }, delay);
+    },
+    [cancelScrollIndicatorFade, scrollIndicatorOpacity, stopScrollIndicatorPulse]
+  );
+
+  useEffect(() => {
+    indicatorShouldShowRef.current = shouldShowScrollIndicator;
+    if (!shouldShowScrollIndicator) {
+      cancelScrollIndicatorFade();
+      Animated.timing(scrollIndicatorOpacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        stopScrollIndicatorPulse();
+      });
+    }
+  }, [cancelScrollIndicatorFade, scrollIndicatorOpacity, shouldShowScrollIndicator, stopScrollIndicatorPulse]);
+
+  useEffect(
+    () => () => {
+      cancelScrollIndicatorFade();
+      stopScrollIndicatorPulse();
+    },
+    [cancelScrollIndicatorFade, stopScrollIndicatorPulse]
+  );
 
   const editInitialLocation = useMemo(() => {
     if (!post) {
@@ -1569,28 +1752,93 @@ export default function PostThreadScreen({ route, navigation }) {
       </View>
 
       {/* Comments list with sticky header. Padding grows with composer+keyboard */}
-      <Animated.FlatList
-        ref={commentsListRef}
-        data={comments}
-        keyExtractor={(item) => String(item.id)}
-        ListHeaderComponent={Header}
-        stickyHeaderIndices={[0]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        renderItem={renderCommentItem}
-        extraData={[highlightedCommentId, reactionPickerCommentId]}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        ListEmptyComponent={<Text style={styles.emptyState}>No comments yet. Be the first to reply.</Text>}
-        contentContainerStyle={{
-          paddingHorizontal: 0,
-          paddingBottom: composerH + kbOffset + (insets.bottom || 8) + 12,
+      <View
+        style={styles.commentsListContainer}
+        onLayout={({ nativeEvent }) => {
+          const measured = nativeEvent?.layout?.height;
+          const nextHeight = Number.isFinite(measured) ? measured : 0;
+          setListLayoutHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
         }}
-        onScroll={handleAnimatedScroll}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        scrollEventThrottle={16}
-      />
+      >
+        <Animated.FlatList
+          ref={commentsListRef}
+          data={comments}
+          keyExtractor={(item) => String(item.id)}
+          ListHeaderComponent={Header}
+          stickyHeaderIndices={[0]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          renderItem={renderCommentItem}
+          extraData={[highlightedCommentId, reactionPickerCommentId]}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          ListEmptyComponent={<Text style={styles.emptyState}>No comments yet. Be the first to reply.</Text>}
+          contentContainerStyle={{
+            paddingHorizontal: 0,
+            paddingBottom: composerH + kbOffset + (insets.bottom || 8) + 12,
+          }}
+          style={{ flex: 1 }}
+          onScroll={handleAnimatedScroll}
+          onScrollEndDrag={handleScrollEndDrag}
+          onMomentumScrollBegin={handleMomentumScrollBegin}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          onContentSizeChange={(_, height) => {
+            const nextHeight = Number.isFinite(height) ? height : 0;
+            setListContentHeight((prev) => (Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight));
+          }}
+          scrollEventThrottle={16}
+        />
+
+        {indicatorTrackHeight > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.scrollIndicatorHost,
+              { opacity: shouldShowScrollIndicator ? scrollIndicatorOpacity : 0 },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.scrollIndicatorHalo,
+                {
+                  height: indicatorThumbHeight,
+                  backgroundColor: linkColor,
+                  opacity: indicatorHaloOpacity,
+                  transform: [
+                    { translateY: scrollIndicatorTranslateY },
+                    { scaleX: indicatorHaloScale },
+                    { scaleY: indicatorHaloScale },
+                  ],
+                },
+              ]}
+            />
+            <View style={[styles.scrollIndicatorTrack, { height: indicatorTrackHeight }]} />
+            <Animated.View
+              style={[
+                styles.scrollIndicatorThumb,
+                {
+                  height: indicatorThumbHeight,
+                  backgroundColor: linkColor,
+                  shadowColor: linkColor,
+                  transform: [
+                    { translateY: scrollIndicatorTranslateY },
+                    { scaleX: indicatorScale },
+                    { scaleY: indicatorScale },
+                  ],
+                },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.scrollIndicatorGlow,
+                  {
+                    opacity: indicatorGlowOpacity,
+                  },
+                ]}
+              />
+            </Animated.View>
+          </Animated.View>
+        ) : null}
+      </View>
 
       {/* Fixed bottom composer pinned above the keyboard */}
       <View
@@ -1759,6 +2007,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     shareCaptureContainer: { position: 'absolute', top: -10000, left: 0, right: 0 },
     shareCaptureShot: { alignSelf: 'stretch' },
+    commentsListContainer: { flex: 1 },
 
     /* Post card (wider) */
     postCard: {
@@ -2061,6 +2310,47 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     commentReplyReferenceLabel: { fontSize: 12, fontWeight: '600' },
     commentReplyReferenceSnippet: { fontSize: 12, marginTop: 2 },
     emptyState: { paddingHorizontal: 12, paddingVertical: 40, color: palette.textSecondary, textAlign: 'center' },
+    scrollIndicatorHost: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      right: 6,
+      zIndex: 40,
+      width: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    scrollIndicatorTrack: {
+      position: 'absolute',
+      top: 12,
+      width: 10,
+      borderRadius: 999,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+      overflow: 'hidden',
+    },
+    scrollIndicatorThumb: {
+      position: 'absolute',
+      top: 12,
+      width: 16,
+      borderRadius: 999,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.35 : 0.18,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    scrollIndicatorGlow: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: '#ffffff',
+    },
+    scrollIndicatorHalo: {
+      position: 'absolute',
+      top: 12,
+      width: 24,
+      borderRadius: 999,
+    },
 
     /* Fixed bottom composer */
     composerWrap: {
