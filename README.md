@@ -6,9 +6,10 @@ The premium composer now supports AI-assisted summaries backed by a lightweight 
 
 ### Running the server
 
-1. Install dependencies if you haven’t already: `npm install`
-2. Start the summarization service: `npm run server`
-3. The server defaults to `http://localhost:4000` and exposes `POST /summaries`
+1. Install Expo app dependencies: `npm install`
+2. Install backend dependencies: `npm run server:install`
+3. Start the summarization service: `npm run server`
+4. The server defaults to `http://localhost:4000` and exposes `POST /summaries`
 
 ### Expo client configuration
 
