@@ -17,7 +17,8 @@ import {
   DEFAULT_TITLE_FONT_SIZE,
   DEFAULT_DESCRIPTION_FONT_SIZE,
   PREMIUM_TITLE_FONT_SIZE_RANGE,
-  PREMIUM_DESCRIPTION_FONT_SIZE_RANGE
+  PREMIUM_DESCRIPTION_FONT_SIZE_RANGE,
+  PREMIUM_ACCENT_BRIGHTNESS_RANGE
 } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
@@ -31,6 +32,13 @@ export default function SettingsScreen({ navigation }) {
     accentKey,
     setAccentKey,
     accentPreset,
+    premiumAccentOptions,
+    premiumAccentEnabled,
+    setPremiumAccentEnabled,
+    premiumAccentKey,
+    setPremiumAccentKey,
+    premiumAccentBrightness,
+    setPremiumAccentBrightness,
     userProfile,
     updateUserProfile,
     locationPermissionStatus,
@@ -77,6 +85,14 @@ export default function SettingsScreen({ navigation }) {
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
   );
+  const brightnessSteps = useMemo(() => {
+    const steps = [0, 10, 20, 30, 40];
+    return steps.filter(
+      (step) =>
+        step >= PREMIUM_ACCENT_BRIGHTNESS_RANGE.min &&
+        step <= PREMIUM_ACCENT_BRIGHTNESS_RANGE.max
+    );
+  }, []);
 
   useEffect(() => {
     setNicknameDraft(userProfile.nickname ?? '');
@@ -89,6 +105,18 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     setDescriptionSizeDraft(String(premiumDescriptionFontSize));
   }, [premiumDescriptionFontSize]);
+
+  const handleTogglePremiumAccent = (value) => {
+    setPremiumAccentEnabled(value);
+  };
+
+  const handleSelectPremiumAccent = (key) => {
+    setPremiumAccentKey(key);
+  };
+
+  const handleSelectBrightness = (value) => {
+    setPremiumAccentBrightness(value);
+  };
 
   const handleTogglePremiumTypography = (value) => {
     setPremiumTypographyEnabled(value);
@@ -332,8 +360,11 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.sectionHint}>
             Pick the accent color used across the app.
           </Text>
-          <View style={styles.accentRow}>
-            {accentOptions.map((option, index) => {
+          <View
+            style={[styles.accentRow, premiumAccentEnabled && styles.accentRowDisabled]}
+            pointerEvents={premiumAccentEnabled ? 'none' : 'auto'}
+          >
+            {accentOptions.map((option) => {
               const isActive = option.key === accentKey;
 
               return (
@@ -360,6 +391,11 @@ export default function SettingsScreen({ navigation }) {
               );
             })}
           </View>
+          {premiumAccentEnabled ? (
+            <Text style={styles.accentPremiumNotice}>
+              Premium themes override the accent while enabled.
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -472,6 +508,102 @@ export default function SettingsScreen({ navigation }) {
                 {`${PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min}-${PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max} pt range.`}
               </Text>
             </View>
+          ) : null}
+          <View style={styles.premiumDivider} />
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Premium themes</Text>
+              <Text style={styles.itemSubtitle}>
+                Access exclusive palettes and brighten them to match your vibe.
+              </Text>
+            </View>
+            <Switch
+              value={premiumAccentEnabled}
+              onValueChange={handleTogglePremiumAccent}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={premiumAccentEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          {premiumAccentEnabled ? (
+            <>
+              <Text style={styles.sectionHint}>Choose your premium accent.</Text>
+              <View style={styles.premiumAccentGrid}>
+                {premiumAccentOptions.map((option) => {
+                  const isActive = option.key === premiumAccentKey;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      activeOpacity={0.85}
+                      onPress={() => handleSelectPremiumAccent(option.key)}
+                      style={[
+                        styles.premiumAccentSwatch,
+                        {
+                          backgroundColor: isActive ? option.background : themeColors.card,
+                          borderColor: isActive
+                            ? accentSwitchColor
+                            : themeColors.divider
+                        },
+                        isActive && styles.premiumAccentSwatchActive
+                      ]}
+                    >
+                      <View
+                        style={[styles.accentDot, { backgroundColor: option.background }]}
+                      />
+                      <Text
+                        style={[
+                          styles.premiumAccentLabel,
+                          isActive && option.onPrimary
+                            ? { color: option.onPrimary }
+                            : null
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.premiumBrightnessBlock}>
+                <View style={styles.premiumBrightnessHeader}>
+                  <Text style={styles.premiumBrightnessTitle}>Theme brightness</Text>
+                  <Text style={styles.premiumBrightnessValue}>
+                    {premiumAccentBrightness ? `+${premiumAccentBrightness}%` : 'Original'}
+                  </Text>
+                </View>
+                <View style={styles.premiumBrightnessOptions}>
+                  {brightnessSteps.map((step) => {
+                    const isActive = step === premiumAccentBrightness;
+                    return (
+                      <TouchableOpacity
+                        key={step}
+                        onPress={() => handleSelectBrightness(step)}
+                        style={[
+                          styles.brightnessChip,
+                          {
+                            backgroundColor: isActive ? accentSwitchColor : themeColors.card,
+                            borderColor: isActive ? accentSwitchColor : themeColors.divider
+                          }
+                        ]}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.brightnessChipText,
+                            { color: isActive ? activeThumbColor : themeColors.textPrimary }
+                          ]}
+                        >
+                          {step ? `+${step}%` : 'Original'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.premiumInputHint}>
+                  Dial up to {PREMIUM_ACCENT_BRIGHTNESS_RANGE.max}% for a softer glow.
+                </Text>
+              </View>
+            </>
           ) : null}
         </View>
 
@@ -809,6 +941,14 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       flexWrap: 'wrap',
       justifyContent: 'space-between'
     },
+    accentRowDisabled: {
+      opacity: 0.4
+    },
+    accentPremiumNotice: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginTop: 4
+    },
     accentSwatch: {
       borderRadius: 16,
       paddingVertical: 12,
@@ -837,5 +977,73 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       height: 20,
       borderRadius: 10,
       marginRight: 12
+    },
+    premiumAccentGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginTop: 16
+    },
+    premiumAccentSwatch: {
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderWidth: 2,
+      borderColor: palette.divider,
+      flexBasis: '48%',
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center'
+    },
+    premiumAccentSwatchActive: {
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.4 : 0.16,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4
+    },
+    premiumAccentLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    premiumBrightnessBlock: {
+      marginTop: 8,
+      paddingVertical: 8
+    },
+    premiumBrightnessHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12
+    },
+    premiumBrightnessTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    premiumBrightnessValue: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: palette.textSecondary
+    },
+    premiumBrightnessOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 8
+    },
+    brightnessChip: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: palette.divider,
+      backgroundColor: palette.card,
+      marginRight: 8,
+      marginBottom: 8
+    },
+    brightnessChipText: {
+      fontSize: 13,
+      fontWeight: '600'
     }
   });
