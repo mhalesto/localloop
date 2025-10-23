@@ -120,7 +120,7 @@ export default function CreatePostModal({
     selectedPreset.highlightFill ??
     (selectedPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)');
   const advancedTrackOn = themeColors.primaryLight ?? themeColors.primaryDark;
-  const advancedThumbOn = themeColors.primaryDark ?? '#ffffff';
+  const advancedThumbOn = '#ffffff';
   const previewAvatarConfig = useMemo(
     () => authorProfile.avatarConfig ?? getAvatarConfig(authorProfile.avatarKey),
     [authorProfile.avatarConfig, authorProfile.avatarKey]
