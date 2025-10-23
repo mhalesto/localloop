@@ -1,5 +1,5 @@
 // screens/PostThreadScreen.js
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -1146,7 +1146,7 @@ export default function PostThreadScreen({ route, navigation }) {
     [cancelDescriptionIndicatorFade, descriptionIndicatorOpacity, stopDescriptionIndicatorPulse]
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     descriptionIndicatorShouldShowRef.current = shouldShowDescriptionIndicator;
     if (!shouldShowDescriptionIndicator) {
       cancelDescriptionIndicatorFade();
@@ -1177,8 +1177,19 @@ export default function PostThreadScreen({ route, navigation }) {
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: descriptionScrollY } } }], {
         useNativeDriver: true,
+        listener: () => {
+          if (!descriptionIndicatorShouldShowRef.current) {
+            return;
+          }
+          showDescriptionIndicator();
+          scheduleDescriptionIndicatorFadeOut(700);
+        },
       }),
-    [descriptionScrollY]
+    [
+      descriptionScrollY,
+      scheduleDescriptionIndicatorFadeOut,
+      showDescriptionIndicator,
+    ]
   );
 
   const handleDescriptionScrollBeginDrag = useCallback(() => {
