@@ -8,6 +8,7 @@ The premium composer now supports AI-assisted summaries backed by a lightweight 
 
 1. Install Expo app dependencies: `npm install`
 2. Start the summarization service (the script installs backend dependencies on first run): `npm run server`
+   - If you prefer working from the backend folder directly, run `npm run server` after `cd backend`.
 3. The server defaults to `http://localhost:4000` and exposes `POST /summaries`
 
 If you prefer to prime the backend ahead of time, run `npm run server:install` before starting it.
