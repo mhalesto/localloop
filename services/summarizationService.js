@@ -7,15 +7,9 @@ const SUMMARY_PATH = '/summaries';
 let cachedBaseUrl = null;
 
 const sanitizeHost = (value) => {
-  if (typeof value !== 'string' || !value) {
-    return null;
-  }
-
+  if (typeof value !== 'string' || !value) return null;
   const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
+  if (!trimmed) return null;
   const hasProtocol = /:\/\//.test(trimmed);
   try {
     const url = hasProtocol ? new URL(trimmed) : new URL(`http://${trimmed}`);
@@ -28,19 +22,21 @@ const sanitizeHost = (value) => {
 };
 
 const resolveBaseUrl = () => {
-  if (cachedBaseUrl) {
-    return cachedBaseUrl;
-  }
+  if (cachedBaseUrl) return cachedBaseUrl;
 
+  // 1) Env override (supports Expo extra)
+  const extra = (Constants?.expoConfig?.extra || {});
   const envUrl =
     (typeof process !== 'undefined' &&
       (process.env?.EXPO_PUBLIC_SUMMARY_API_URL || process.env?.SUMMARY_API_URL)) ||
+    extra.EXPO_PUBLIC_SUMMARY_API_URL ||
     null;
   if (envUrl) {
-    cachedBaseUrl = envUrl;
+    cachedBaseUrl = String(envUrl).replace(/\/$/, '');
     return cachedBaseUrl;
   }
 
+  // 2) Web: use window location
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window?.location?.protocol && window.location.hostname) {
       cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
@@ -50,6 +46,7 @@ const resolveBaseUrl = () => {
     return cachedBaseUrl;
   }
 
+  // 3) Expo host candidates
   const hostCandidates = [
     Constants?.expoConfig?.hostUri,
     Constants?.expoGoConfig?.hostUri,
@@ -58,19 +55,26 @@ const resolveBaseUrl = () => {
   ];
 
   for (const candidate of hostCandidates) {
-    const host = sanitizeHost(candidate);
+    let host = sanitizeHost(candidate);
     if (host) {
+      // Android emulator maps host to 10.0.2.2
+      if (Platform.OS === 'android' && (host === 'localhost' || host === '127.0.0.1')) {
+        host = '10.0.2.2';
+      }
       cachedBaseUrl = `http://${host}:${DEFAULT_PORT}`;
       return cachedBaseUrl;
     }
   }
 
+  // 4) Final fallback
   if (typeof window !== 'undefined' && window?.location?.hostname) {
     cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
     return cachedBaseUrl;
   }
 
-  cachedBaseUrl = `http://127.0.0.1:${DEFAULT_PORT}`;
+  cachedBaseUrl = Platform.OS === 'android'
+    ? `http://10.0.2.2:${DEFAULT_PORT}`
+    : `http://127.0.0.1:${DEFAULT_PORT}`;
   return cachedBaseUrl;
 };
 
@@ -82,7 +86,7 @@ const buildEndpoint = (path) => {
 
 export async function summarizePostDescription(
   description,
-  { signal, lengthPreference } = {}
+  { signal, lengthPreference, timeoutMs = 20000 } = {}
 ) {
   const text = typeof description === 'string' ? description.trim() : '';
   if (!text) {
@@ -99,14 +103,19 @@ export async function summarizePostDescription(
     bodyPayload.options = requestOptions;
   }
 
+  // Auto-timeout unless caller supplies a signal
+  const controller = !signal && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timer = null;
+  if (!signal && controller) {
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  }
+
   try {
     const response = await fetch(buildEndpoint(SUMMARY_PATH), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bodyPayload),
-      signal
+      signal: signal ?? controller?.signal
     });
 
     const payload = await response.json();
@@ -122,15 +131,17 @@ export async function summarizePostDescription(
 
     return {
       summary: String(payload.summary).trim(),
-      model: payload.model ?? 'facebook/bart-large-cnn',
+      model: payload.model ?? 'Xenova/distilbart-cnn-6-6',
       options: payload.options || null,
       fallback: Boolean(payload.fallback)
     };
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw error;
+      throw new Error('Summary request timed out. Please try again.');
     }
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(message || 'Failed to summarize description.');
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

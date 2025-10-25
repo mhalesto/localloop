@@ -12,6 +12,7 @@ import {
   ScrollView,
   Switch
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
@@ -49,6 +50,7 @@ export default function CreatePostModal({
     premiumSummaryLength
   } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState(
@@ -58,19 +60,22 @@ export default function CreatePostModal({
   const [selectedLocation, setSelectedLocation] = useState(
     initialLocation?.city
       ? {
-          city: initialLocation.city,
-          province: initialLocation.province ?? '',
-          country: initialLocation.country ?? ''
-        }
+        city: initialLocation.city,
+        province: initialLocation.province ?? '',
+        country: initialLocation.country ?? ''
+      }
       : null
   );
   const [advancedEnabled, setAdvancedEnabled] = useState(false);
   const [highlightDescription, setHighlightDescription] = useState(false);
   const [messageSelection, setMessageSelection] = useState({ start: 0, end: 0 });
+
   const messageInputRef = useRef(null);
   const summarizationControllerRef = useRef(null);
+
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState('');
+  const [aiSummary, setAiSummary] = useState(''); // NEW: hold AI summary separately
 
   useEffect(() => {
     if (visible) {
@@ -82,10 +87,10 @@ export default function CreatePostModal({
       setSelectedLocation(
         initialLocation?.city
           ? {
-              city: initialLocation.city,
-              province: initialLocation.province ?? '',
-              country: initialLocation.country ?? ''
-            }
+            city: initialLocation.city,
+            province: initialLocation.province ?? '',
+            country: initialLocation.country ?? ''
+          }
           : null
       );
       const shouldEnableAdvanced =
@@ -96,6 +101,7 @@ export default function CreatePostModal({
       setMessageSelection({ start: caret, end: caret });
       setSummaryError('');
       setIsSummarizing(false);
+      setAiSummary(''); // NEW: clear previous summary
       if (summarizationControllerRef.current) {
         summarizationControllerRef.current.abort?.();
         summarizationControllerRef.current = null;
@@ -107,6 +113,7 @@ export default function CreatePostModal({
       setMessageSelection({ start: 0, end: 0 });
       setSummaryError('');
       setIsSummarizing(false);
+      setAiSummary(''); // NEW
       if (summarizationControllerRef.current) {
         summarizationControllerRef.current.abort?.();
         summarizationControllerRef.current = null;
@@ -171,6 +178,7 @@ export default function CreatePostModal({
     setMessageSelection({ start: 0, end: 0 });
     setIsSummarizing(false);
     setSummaryError('');
+    setAiSummary('');
     if (summarizationControllerRef.current) {
       summarizationControllerRef.current.abort?.();
       summarizationControllerRef.current = null;
@@ -305,9 +313,7 @@ export default function CreatePostModal({
   };
 
   const handleSummarizeDescription = async () => {
-    if (isSummarizing) {
-      return;
-    }
+    if (isSummarizing) return;
 
     const trimmed = message.trim();
     if (!trimmed) {
@@ -325,17 +331,18 @@ export default function CreatePostModal({
 
     setSummaryError('');
     setIsSummarizing(true);
+    setAiSummary(''); // clear previous preview
 
     try {
       const { summary } = await summarizePostDescription(trimmed, {
         signal: controller?.signal,
-        lengthPreference: premiumSummaryLength
+        lengthPreference: premiumSummaryLength,
+        timeoutMs: 20000, // ensure we don’t spin forever
       });
-      const nextMessage = summary ?? '';
-      updateMessageValue(nextMessage);
-      const caret = nextMessage.length;
-      focusDescriptionInput();
-      updateSelection({ start: caret, end: caret });
+
+      // Do NOT overwrite the description automatically:
+      setAiSummary(summary ?? '');
+
     } catch (error) {
       if (error?.name === 'AbortError') {
         return;
@@ -351,16 +358,34 @@ export default function CreatePostModal({
     }
   };
 
+  const acceptSummary = () => {
+    if (!aiSummary) return;
+    const nextMessage = aiSummary;
+    updateMessageValue(nextMessage);
+    const caret = nextMessage.length;
+    focusDescriptionInput();
+    updateSelection({ start: caret, end: caret });
+    setAiSummary('');
+  };
+
+  const copySummary = async () => {
+    if (!aiSummary) return;
+    await Clipboard.setStringAsync(aiSummary);
+  };
+
+  const dismissSummary = () => setAiSummary('');
+
   const handleSubmit = () => {
     if (submitDisabled) {
       return;
     }
+    const trimmed = message.trim();
     submitHandler({
       location: selectedLocation,
       colorKey: selectedColor,
       title: trimmedTitle,
-      message: trimmedMessage,
-      description: trimmedMessage,
+      message: trimmed,
+      description: trimmed,
       highlightDescription
     });
     if (mode === 'create') {
@@ -614,8 +639,28 @@ export default function CreatePostModal({
                     <Text style={styles.summarizeSubtitle}>Premium · BART AI</Text>
                   </View>
                 </TouchableOpacity>
+
                 {summaryError ? (
                   <Text style={styles.summarizeErrorText}>{summaryError}</Text>
+                ) : null}
+
+                {/* NEW: AI Summary Preview Card */}
+                {!!aiSummary && !isSummarizing ? (
+                  <View style={styles.aiSummaryCard}>
+                    <Text style={styles.aiSummaryTitle}>AI Summary</Text>
+                    <Text style={styles.aiSummaryBody}>{aiSummary}</Text>
+                    <View style={styles.aiSummaryRow}>
+                      <TouchableOpacity onPress={acceptSummary} style={[styles.aiSummaryBtn, styles.aiPrimaryBtn]} activeOpacity={0.85}>
+                        <Text style={styles.aiSummaryBtnText}>Use as description</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={copySummary} style={[styles.aiSummaryBtn, styles.aiSecondaryBtn]} activeOpacity={0.85}>
+                        <Text style={styles.aiSummaryBtnText}>Copy</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={dismissSummary} style={[styles.aiSummaryBtn, styles.aiMutedBtn]} activeOpacity={0.85}>
+                        <Text style={styles.aiSummaryBtnText}>Dismiss</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 ) : null}
               </View>
             ) : null}
@@ -865,5 +910,38 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     formatButtonActive: {
       borderColor: 'transparent'
-    }
+    },
+
+    // NEW: AI Summary preview styles
+    aiSummaryCard: {
+      marginTop: 12,
+      backgroundColor: '#F7F7FB',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#ECECF2',
+      padding: 12,
+      gap: 8
+    },
+    aiSummaryTitle: {
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    aiSummaryBody: {
+      color: palette.textPrimary,
+      lineHeight: 20
+    },
+    aiSummaryRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 4
+    },
+    aiSummaryBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10
+    },
+    aiPrimaryBtn: { backgroundColor: '#7C3AED' },
+    aiSecondaryBtn: { backgroundColor: '#EDE9FE' },
+    aiMutedBtn: { backgroundColor: '#EFEFEF' },
+    aiSummaryBtnText: { color: '#111' }
   });
