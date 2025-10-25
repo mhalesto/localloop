@@ -80,10 +80,23 @@ const buildEndpoint = (path) => {
   return `${trimmedBase}${path}`;
 };
 
-export async function summarizePostDescription(description, { signal } = {}) {
+export async function summarizePostDescription(
+  description,
+  { signal, lengthPreference } = {}
+) {
   const text = typeof description === 'string' ? description.trim() : '';
   if (!text) {
     throw new Error('Add a description before requesting a summary.');
+  }
+
+  const requestOptions = {};
+  if (typeof lengthPreference === 'string' && lengthPreference) {
+    requestOptions.lengthPreference = lengthPreference;
+  }
+
+  const bodyPayload = { text };
+  if (Object.keys(requestOptions).length) {
+    bodyPayload.options = requestOptions;
   }
 
   try {
@@ -92,7 +105,7 @@ export async function summarizePostDescription(description, { signal } = {}) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(bodyPayload),
       signal
     });
 
@@ -109,7 +122,9 @@ export async function summarizePostDescription(description, { signal } = {}) {
 
     return {
       summary: String(payload.summary).trim(),
-      model: payload.model ?? 'facebook/bart-large-cnn'
+      model: payload.model ?? 'facebook/bart-large-cnn',
+      options: payload.options || null,
+      fallback: Boolean(payload.fallback)
     };
   } catch (error) {
     if (error?.name === 'AbortError') {

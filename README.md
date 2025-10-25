@@ -24,3 +24,6 @@ EXPO_PUBLIC_SUMMARY_API_URL="http://localhost:4000" npm run web
 ```
 
 With the service running, premium users can tap **Summarize description** in the composer to generate condensed copy via BART.
+When model downloads are unavailable the backend falls back to an on-device extractive summarizer that respects the same
+length preferences. Premium members can choose between *Shorter*, *Balanced*, or *Longer* summaries from the **AI description
+summaries** section in Settings to control how much detail the assistant retains.
