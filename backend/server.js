@@ -8,6 +8,72 @@ const MAX_SUMMARY_LENGTH = 180;
 
 let summarizerLoaderPromise = null;
 let summarizerInstancePromise = null;
+let transformerErrorLogged = false;
+
+const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+const splitIntoSentences = (value) => {
+  const normalized = normalizeWhitespace(value);
+  const matches = normalized.match(/[^.!?]+[.!?]?/g);
+
+  if (!matches) {
+    return normalized ? [normalized] : [];
+  }
+
+  return matches.map((sentence) => sentence.trim()).filter(Boolean);
+};
+
+const truncateSummary = (summary, maxLength) => {
+  if (summary.length <= maxLength) {
+    return summary;
+  }
+
+  const trimmed = summary.slice(0, Math.max(0, maxLength - 1)).trimEnd();
+  return `${trimmed}…`;
+};
+
+const buildExtractiveSummary = (text, summaryConfig) => {
+  const sentences = splitIntoSentences(text);
+  const minLength = summaryConfig?.min_length ?? MIN_SUMMARY_LENGTH;
+  const maxLength = summaryConfig?.max_length ?? MAX_SUMMARY_LENGTH;
+
+  if (!sentences.length) {
+    return truncateSummary(normalizeWhitespace(text).slice(0, maxLength), maxLength);
+  }
+
+  const chosenSentences = [];
+  let totalLength = 0;
+
+  for (const sentence of sentences) {
+    const candidateLength = sentence.length;
+
+    if (!chosenSentences.length || totalLength < minLength) {
+      chosenSentences.push(sentence);
+      totalLength += candidateLength + (chosenSentences.length > 1 ? 1 : 0);
+      continue;
+    }
+
+    if (totalLength + candidateLength + 1 > maxLength) {
+      break;
+    }
+
+    chosenSentences.push(sentence);
+    totalLength += candidateLength + 1;
+  }
+
+  let summary = chosenSentences.join(' ');
+
+  if (!summary) {
+    summary = normalizeWhitespace(text).slice(0, maxLength);
+  }
+
+  if (summary.length < minLength) {
+    const normalized = normalizeWhitespace(text);
+    summary = normalized.slice(0, Math.min(normalized.length, maxLength));
+  }
+
+  return truncateSummary(summary.trim(), maxLength);
+};
 
 async function loadPipelineFactory() {
   if (!summarizerLoaderPromise) {
@@ -23,9 +89,12 @@ async function loadPipelineFactory() {
 
 async function getSummarizer() {
   if (!summarizerInstancePromise) {
-    summarizerInstancePromise = loadPipelineFactory().then((createPipeline) =>
-      createPipeline('summarization', 'facebook/bart-large-cnn')
-    );
+    summarizerInstancePromise = loadPipelineFactory()
+      .then((createPipeline) => createPipeline('summarization', 'facebook/bart-large-cnn'))
+      .catch((error) => {
+        summarizerInstancePromise = null;
+        throw error;
+      });
   }
   return summarizerInstancePromise;
 }
@@ -70,9 +139,10 @@ app.post('/summaries', async (req, res) => {
     });
   }
 
+  const summaryConfig = buildSummaryConfig(content.length, options);
+
   try {
     const summarizer = await getSummarizer();
-    const summaryConfig = buildSummaryConfig(content.length, options);
     const result = await summarizer(content, summaryConfig);
     const summaryText = Array.isArray(result) ? result[0]?.summary_text ?? '' : '';
 
@@ -86,10 +156,28 @@ app.post('/summaries', async (req, res) => {
       options: summaryConfig,
     });
   } catch (error) {
-    console.error('[summaries] error:', error);
-    res.status(500).json({
-      error: 'Failed to generate summary.',
-      details: error?.message ?? String(error),
+    if (!transformerErrorLogged) {
+      console.error('[summaries] transformer error, enabling extractive fallback:', error);
+      transformerErrorLogged = true;
+    }
+
+    console.warn('[summaries] using extractive fallback summarizer.');
+
+    const fallbackSummary = buildExtractiveSummary(content, summaryConfig);
+
+    if (!fallbackSummary) {
+      console.error('[summaries] fallback summarizer produced no content.');
+      return res.status(500).json({
+        error: 'Failed to generate summary.',
+        details: error?.message ?? String(error),
+      });
+    }
+
+    res.json({
+      summary: fallbackSummary,
+      model: 'extractive-fallback',
+      options: summaryConfig,
+      fallback: true,
     });
   }
 });
