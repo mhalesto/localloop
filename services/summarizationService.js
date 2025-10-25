@@ -1,10 +1,82 @@
-const DEFAULT_BASE_URL =
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUMMARY_API_URL) ||
-  'http://localhost:4000';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+const DEFAULT_PORT = 4000;
 const SUMMARY_PATH = '/summaries';
 
+let cachedBaseUrl = null;
+
+const sanitizeHost = (value) => {
+  if (typeof value !== 'string' || !value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const hasProtocol = /:\/\//.test(trimmed);
+  try {
+    const url = hasProtocol ? new URL(trimmed) : new URL(`http://${trimmed}`);
+    return url.hostname || null;
+  } catch (_error) {
+    const withoutPath = trimmed.split('/')[0];
+    const withoutPort = withoutPath.split(':')[0];
+    return withoutPort || null;
+  }
+};
+
+const resolveBaseUrl = () => {
+  if (cachedBaseUrl) {
+    return cachedBaseUrl;
+  }
+
+  const envUrl =
+    (typeof process !== 'undefined' &&
+      (process.env?.EXPO_PUBLIC_SUMMARY_API_URL || process.env?.SUMMARY_API_URL)) ||
+    null;
+  if (envUrl) {
+    cachedBaseUrl = envUrl;
+    return cachedBaseUrl;
+  }
+
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window?.location?.protocol && window.location.hostname) {
+      cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
+    } else {
+      cachedBaseUrl = `http://localhost:${DEFAULT_PORT}`;
+    }
+    return cachedBaseUrl;
+  }
+
+  const hostCandidates = [
+    Constants?.expoConfig?.hostUri,
+    Constants?.expoGoConfig?.hostUri,
+    Constants?.manifest2?.extra?.expoClient?.hostUri,
+    Constants?.manifest?.hostUri
+  ];
+
+  for (const candidate of hostCandidates) {
+    const host = sanitizeHost(candidate);
+    if (host) {
+      cachedBaseUrl = `http://${host}:${DEFAULT_PORT}`;
+      return cachedBaseUrl;
+    }
+  }
+
+  if (typeof window !== 'undefined' && window?.location?.hostname) {
+    cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
+    return cachedBaseUrl;
+  }
+
+  cachedBaseUrl = `http://127.0.0.1:${DEFAULT_PORT}`;
+  return cachedBaseUrl;
+};
+
 const buildEndpoint = (path) => {
-  const trimmedBase = DEFAULT_BASE_URL.replace(/\/$/, '');
+  const baseUrl = resolveBaseUrl();
+  const trimmedBase = baseUrl.replace(/\/$/, '');
   return `${trimmedBase}${path}`;
 };
 
