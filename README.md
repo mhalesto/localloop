@@ -15,7 +15,9 @@ If you prefer to prime the backend ahead of time, run `npm run server:install` b
 
 ### Expo client configuration
 
-The mobile client reads the backend URL from `EXPO_PUBLIC_SUMMARY_API_URL`. When this variable is not set it falls back to `http://localhost:4000`.
+The mobile client reads the backend URL from `EXPO_PUBLIC_SUMMARY_API_URL`. When this variable is not set the app now inspects the Expo host information and automatically points native builds to the Metro server's LAN IP (e.g. `http://192.168.0.42:4000`). This means the summarizer works out of the box on physical devices without any additional setup. The web build still defaults to `http://localhost:4000`.
+
+You can always override the detection logic explicitly:
 
 ```bash
 EXPO_PUBLIC_SUMMARY_API_URL="http://localhost:4000" npm run web
