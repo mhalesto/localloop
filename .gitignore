@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# AI models (do not commit)
+backend/models/
+backend/.cache/
+backend/.cache/transformers/

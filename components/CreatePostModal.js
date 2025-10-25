@@ -12,6 +12,7 @@ import {
   ScrollView,
   Switch
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard'; // [AI-SUMMARY]
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
@@ -24,7 +25,17 @@ import {
   MAILTO_PREFIX_STRING,
   hasRichFormatting
 } from '../utils/textFormatting';
-import { summarizePostDescription } from '../services/summarizationService';
+import { summarizePostDescription } from '../services/summarizationService'; // or ../api/summaryApi if that’s your path
+
+const LENGTH_STEPS = ['concise', 'balanced', 'detailed']; // [AI-SUMMARY]
+const SUMMARY_CACHE_DEFAULT = Object.freeze({
+  text: '',
+  length: '',
+  quality: '',
+  summary: '',
+  meta: null
+});
+const toLengthLabel = (value) => (value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : '');
 
 export default function CreatePostModal({
   visible,
@@ -50,43 +61,34 @@ export default function CreatePostModal({
   } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
-  // ----- state -----
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState(initialAccentKey ?? accentPresets[0].key);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(
-    initialLocation?.city
-      ? {
-        city: initialLocation.city,
-        province: initialLocation.province ?? '',
-        country: initialLocation.country ?? ''
-      }
-      : null
+    initialLocation?.city ? {
+      city: initialLocation.city,
+      province: initialLocation.province ?? '',
+      country: initialLocation.country ?? ''
+    } : null
   );
   const [advancedEnabled, setAdvancedEnabled] = useState(false);
   const [highlightDescription, setHighlightDescription] = useState(false);
   const [messageSelection, setMessageSelection] = useState({ start: 0, end: 0 });
+  const messageInputRef = useRef(null);
+
+  // [AI-SUMMARY] summarizer workflow state
+  const summarizationControllerRef = useRef(null);
+  const summaryCacheRef = useRef({ ...SUMMARY_CACHE_DEFAULT });
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState('');
-  const [aiSummary, setAiSummary] = useState('');
-
-  // ----- refs -----
-  const messageInputRef = useRef(null);
-  const summarizationControllerRef = useRef(null);
-
-  // NEW: for auto-scroll
-  const scrollRef = useRef(null);
-  const aiSummaryYRef = useRef(0);
-
-  // helper: smooth scroll to AI summary card
-  const scrollToAiSummary = () => {
-    const y = Math.max(0, (aiSummaryYRef.current || 0) - 16);
-    // ScrollView
-    if (scrollRef.current?.scrollTo) {
-      scrollRef.current.scrollTo({ y, animated: true });
-    }
-  };
+  const [summaryText, setSummaryText] = useState('');               // preview text
+  const [summaryVisible, setSummaryVisible] = useState(false);      // show preview card
+  const [summaryMeta, setSummaryMeta] = useState(null);
+  const [summaryLength, setSummaryLength] = useState(premiumSummaryLength || 'balanced');
+  const [summaryQuality, setSummaryQuality] = useState('fast');     // 'fast' | 'best'
+  const scrollRef = useRef(null);                                   // for auto-scroll
+  const [summaryCardY, setSummaryCardY] = useState(0);              // y-pos to scroll to
 
   useEffect(() => {
     if (visible) {
@@ -95,24 +97,26 @@ export default function CreatePostModal({
       setTitle(nextTitle);
       setMessage(nextMessage);
       setSelectedColor(initialAccentKey ?? accentPresets[0].key);
-      setSelectedLocation(
-        initialLocation?.city
-          ? {
-            city: initialLocation.city,
-            province: initialLocation.province ?? '',
-            country: initialLocation.country ?? ''
-          }
-          : null
-      );
-      const shouldEnableAdvanced =
-        Boolean(initialHighlightDescription) || hasRichFormatting(nextMessage);
+      setSelectedLocation(initialLocation?.city ? {
+        city: initialLocation.city,
+        province: initialLocation.province ?? '',
+        country: initialLocation.country ?? ''
+      } : null);
+      const shouldEnableAdvanced = Boolean(initialHighlightDescription) || hasRichFormatting(nextMessage);
       setAdvancedEnabled(shouldEnableAdvanced);
       setHighlightDescription(initialHighlightDescription ?? false);
       const caret = nextMessage.length;
       setMessageSelection({ start: caret, end: caret });
+
+      // [AI-SUMMARY] reset summary UI each open
       setSummaryError('');
       setIsSummarizing(false);
-      setAiSummary('');
+      setSummaryText('');
+      setSummaryVisible(false);
+      setSummaryMeta(null);
+      setSummaryLength(premiumSummaryLength || 'balanced');
+      setSummaryQuality('fast');        // default each time
+      summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
       if (summarizationControllerRef.current) {
         summarizationControllerRef.current.abort?.();
         summarizationControllerRef.current = null;
@@ -122,9 +126,14 @@ export default function CreatePostModal({
       setAdvancedEnabled(false);
       setHighlightDescription(false);
       setMessageSelection({ start: 0, end: 0 });
+
+      // [AI-SUMMARY] cleanup
       setSummaryError('');
       setIsSummarizing(false);
-      setAiSummary('');
+      setSummaryText('');
+      setSummaryVisible(false);
+      setSummaryMeta(null);
+      summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
       if (summarizationControllerRef.current) {
         summarizationControllerRef.current.abort?.();
         summarizationControllerRef.current = null;
@@ -136,7 +145,8 @@ export default function CreatePostModal({
     initialLocation,
     initialMessage,
     initialTitle,
-    initialHighlightDescription
+    initialHighlightDescription,
+    premiumSummaryLength
   ]);
 
   useEffect(() => () => {
@@ -145,17 +155,6 @@ export default function CreatePostModal({
       summarizationControllerRef.current = null;
     }
   }, []);
-
-  // NEW: when a summary arrives, auto-scroll to the AI Summary card
-  useEffect(() => {
-    if (aiSummary) {
-      // let layout settle, then scroll; call twice to be extra safe across platforms
-      requestAnimationFrame(() => {
-        scrollToAiSummary();
-        setTimeout(scrollToAiSummary, 40);
-      });
-    }
-  }, [aiSummary]);
 
   const computedTitle = titleText ?? (mode === 'edit' ? 'Edit post' : 'Create a post');
   const computedSubmitLabel = submitLabel ?? (mode === 'edit' ? 'Save changes' : 'Publish');
@@ -195,9 +194,13 @@ export default function CreatePostModal({
     setAdvancedEnabled(false);
     setHighlightDescription(false);
     setMessageSelection({ start: 0, end: 0 });
+
+    // [AI-SUMMARY]
     setIsSummarizing(false);
     setSummaryError('');
-    setAiSummary('');
+    setSummaryText('');
+    setSummaryVisible(false);
+
     if (summarizationControllerRef.current) {
       summarizationControllerRef.current.abort?.();
       summarizationControllerRef.current = null;
@@ -213,27 +216,29 @@ export default function CreatePostModal({
     updateMessageValue(value);
   };
 
+  const clearSummaryState = (clearCache = true) => {
+    setSummaryVisible(false);
+    setSummaryText('');
+    setSummaryMeta(null);
+    if (clearCache) {
+      summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
+    }
+  };
+
   const updateSelection = (nextSelection) => {
-    if (
-      typeof nextSelection?.start === 'number' &&
-      typeof nextSelection?.end === 'number'
-    ) {
-      setMessageSelection((prev) => {
-        if (prev.start === nextSelection.start && prev.end === nextSelection.end) return prev;
-        return nextSelection;
-      });
+    if (typeof nextSelection?.start === 'number' && typeof nextSelection?.end === 'number') {
+      setMessageSelection((prev) => (prev.start === nextSelection.start && prev.end === nextSelection.end ? prev : nextSelection));
     }
   };
 
   const updateMessageValue = (nextValue) => {
     setSummaryError('');
-    if (typeof nextValue === 'function') {
-      setMessage((prev) => nextValue(prev));
-      return;
-    }
-    setMessage(nextValue);
+    clearSummaryState();
+    if (typeof nextValue === 'function') setMessage((prev) => nextValue(prev));
+    else setMessage(nextValue);
   };
 
+  // ----- simple formatting toolbar -----
   const wrapSelection = (wrap) => {
     focusDescriptionInput();
     const { start, end } = messageSelection;
@@ -296,10 +301,7 @@ export default function CreatePostModal({
     const trimmed = selected.slice(leadingWhitespace.length, selected.length - trailingWhitespace.length);
     let label = trimmed || EMAIL_LABEL_PLACEHOLDER;
     let address = trimmed;
-
-    if (!EMAIL_ADDRESS_REGEX.test(trimmed)) {
-      address = EMAIL_PLACEHOLDER;
-    }
+    if (!EMAIL_ADDRESS_REGEX.test(trimmed)) address = EMAIL_PLACEHOLDER;
 
     const inserted = `[${label}](${MAILTO_PREFIX_STRING}${address})`;
     const nextMessage = `${before}${leadingWhitespace}${inserted}${trailingWhitespace}${after}`;
@@ -311,13 +313,9 @@ export default function CreatePostModal({
     const addressStart = labelEnd + 2 + MAILTO_PREFIX_LENGTH;
     const addressEnd = addressStart + address.length;
 
-    if (!trimmed) {
-      updateSelection({ start: labelStart, end: labelEnd });
-    } else if (!EMAIL_ADDRESS_REGEX.test(trimmed)) {
-      updateSelection({ start: addressStart, end: addressEnd });
-    } else {
-      updateSelection({ start: addressEnd, end: addressEnd });
-    }
+    if (!trimmed) updateSelection({ start: labelStart, end: labelEnd });
+    else if (!EMAIL_ADDRESS_REGEX.test(trimmed)) updateSelection({ start: addressStart, end: addressEnd });
+    else updateSelection({ start: addressEnd, end: addressEnd });
   };
 
   const handleToggleAdvanced = (value) => {
@@ -325,12 +323,48 @@ export default function CreatePostModal({
     if (!value) setHighlightDescription(false);
   };
 
-  const handleSummarizeDescription = async () => {
-    if (isSummarizing) return;
+  const sanitizeDescriptionForSummary = (value) =>
+    String(value ?? '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\uFFFD/g, '')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/\t+/g, ' ')
+      .replace(/ {2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
 
-    const trimmed = message.trim();
-    if (!trimmed) {
+  const scrollSummaryIntoView = () => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (scrollRef.current?.scrollTo) {
+          scrollRef.current.scrollTo({ y: Math.max(summaryCardY - 16, 0), animated: true });
+        }
+      }, 12);
+    });
+  };
+
+  // --------- Summarize + Expand ----------
+  const runSummarize = async (lengthPref, quality) => {
+    if (isSummarizing) return;
+    const sanitized = sanitizeDescriptionForSummary(message);
+    if (!sanitized) {
       setSummaryError('Add a description before requesting a summary.');
+      return;
+    }
+
+    const cached = summaryCacheRef.current;
+    if (
+      cached.text === sanitized &&
+      cached.length === lengthPref &&
+      cached.quality === quality &&
+      cached.summary
+    ) {
+      setSummaryError('');
+      setSummaryText(cached.summary);
+      setSummaryMeta(cached.meta);
+      setSummaryVisible(true);
+      scrollSummaryIntoView();
       return;
     }
 
@@ -344,21 +378,36 @@ export default function CreatePostModal({
 
     setSummaryError('');
     setIsSummarizing(true);
-    setAiSummary('');
 
     try {
-      const { summary } = await summarizePostDescription(trimmed, {
+      const { summary, model, fallback, quality: resolvedQuality } = await summarizePostDescription(sanitized, {
         signal: controller?.signal,
-        lengthPreference: premiumSummaryLength,
-        timeoutMs: 20000,
+        lengthPreference: lengthPref,
+        quality
       });
 
-      // keep separate; don't overwrite user text
-      setAiSummary((summary || '').normalize('NFC'));
+      const nextSummary = (summary ?? '').trim();
+      const nextMeta = {
+        model: model || '',
+        fallback: Boolean(fallback),
+        quality: resolvedQuality || quality
+      };
+
+      setSummaryText(nextSummary);
+      setSummaryVisible(true);
+      setSummaryMeta(nextMeta);
+      summaryCacheRef.current = {
+        text: sanitized,
+        length: lengthPref,
+        quality: nextMeta.quality,
+        summary: nextSummary,
+        meta: nextMeta
+      };
+
+      scrollSummaryIntoView();
     } catch (error) {
       if (error?.name === 'AbortError') return;
-      const fallback = error instanceof Error ? error.message : 'Unable to generate a summary right now.';
-      setSummaryError(fallback);
+      setSummaryError(error instanceof Error ? error.message : 'Unable to generate a summary right now.');
     } finally {
       if (summarizationControllerRef.current === controller) {
         summarizationControllerRef.current = null;
@@ -367,8 +416,33 @@ export default function CreatePostModal({
     }
   };
 
+  const handleSummarizeDescription = () => runSummarize(summaryLength, summaryQuality);
+
+  const expandOnce = () => {
+    const idx = LENGTH_STEPS.indexOf(summaryLength);
+    if (idx >= 0 && idx < LENGTH_STEPS.length - 1) {
+      const next = LENGTH_STEPS[idx + 1];
+      setSummaryLength(next);
+      runSummarize(next, summaryQuality);
+    }
+  };
+
+  const useSummaryAsDescription = () => {
+    if (!summaryText) return;
+    updateMessageValue(summaryText);
+    const caret = summaryText.length;
+    focusDescriptionInput();
+    setMessageSelection({ start: caret, end: caret });
+  };
+
+  const copySummary = async () => {
+    if (!summaryText) return;
+    try { await Clipboard.setStringAsync(summaryText); } catch { }
+  };
+
   const handleSubmit = () => {
     if (submitDisabled) return;
+    const trimmedMessage = message.trim();
     submitHandler({
       location: selectedLocation,
       colorKey: selectedColor,
@@ -381,16 +455,16 @@ export default function CreatePostModal({
       setTitle('');
       updateMessageValue('');
       setMessageSelection({ start: 0, end: 0 });
+      setSummaryVisible(false);
+      setSummaryText('');
     }
     setLocationModalVisible(false);
   };
 
+  // ---------- UI ----------
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.title}>{computedTitle}</Text>
@@ -400,7 +474,7 @@ export default function CreatePostModal({
           </View>
 
           <ScrollView
-            ref={scrollRef}                 // <-- needed for auto-scroll
+            ref={scrollRef} // [AI-SUMMARY]
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
@@ -417,21 +491,11 @@ export default function CreatePostModal({
 
             <Text style={styles.sectionLabel}>Location</Text>
             <TouchableOpacity
-              style={[
-                styles.locationButton,
-                !canChangeLocation && styles.locationButtonDisabled
-              ]}
+              style={[styles.locationButton, !canChangeLocation && styles.locationButtonDisabled]}
               activeOpacity={canChangeLocation ? 0.85 : 1}
-              onPress={() => {
-                if (canChangeLocation) setLocationModalVisible(true);
-              }}
+              onPress={() => { if (canChangeLocation) setLocationModalVisible(true); }}
             >
-              <Ionicons
-                name="location-outline"
-                size={18}
-                color={themeColors.primaryDark}
-                style={{ marginRight: 8 }}
-              />
+              <Ionicons name="location-outline" size={18} color={themeColors.primaryDark} style={{ marginRight: 8 }} />
               <Text style={styles.locationButtonText}>
                 {selectedLocation?.city
                   ? `${selectedLocation.city}${selectedLocation.province ? `, ${selectedLocation.province}` : ''}${selectedLocation.country ? `, ${selectedLocation.country}` : ''}`
@@ -468,19 +532,12 @@ export default function CreatePostModal({
                 <TouchableOpacity
                   style={[
                     styles.formatButton,
-                    highlightDescription && [
-                      styles.formatButtonActive,
-                      { backgroundColor: previewHighlightFill }
-                    ]
+                    highlightDescription && [styles.formatButtonActive, { backgroundColor: previewHighlightFill }]
                   ]}
                   onPress={() => setHighlightDescription((prev) => !prev)}
                   activeOpacity={0.75}
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    highlightDescription
-                      ? 'Disable highlighted description'
-                      : 'Highlight description text'
-                  }
+                  accessibilityLabel={highlightDescription ? 'Disable highlighted description' : 'Highlight description text'}
                 >
                   <Ionicons
                     name={highlightDescription ? 'color-wand' : 'color-wand-outline'}
@@ -488,31 +545,13 @@ export default function CreatePostModal({
                     color={highlightDescription ? previewPrimary : themeColors.textSecondary}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.formatButton}
-                  onPress={applyBoldFormatting}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Bold selected text"
-                >
+                <TouchableOpacity style={styles.formatButton} onPress={applyBoldFormatting} activeOpacity={0.75}>
                   <MaterialCommunityIcons name="format-bold" size={18} color={themeColors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.formatButton}
-                  onPress={applyBulletFormatting}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Convert to bullet list"
-                >
+                <TouchableOpacity style={styles.formatButton} onPress={applyBulletFormatting} activeOpacity={0.75}>
                   <MaterialCommunityIcons name="format-list-bulleted" size={18} color={themeColors.textSecondary} />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.formatButton}
-                  onPress={applyEmailFormatting}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Insert email link"
-                >
+                <TouchableOpacity style={styles.formatButton} onPress={applyEmailFormatting} activeOpacity={0.75}>
                   <MaterialCommunityIcons name="email-outline" size={18} color={themeColors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -528,11 +567,7 @@ export default function CreatePostModal({
                   ]}
                 >
                   {previewAvatarConfig.icon ? (
-                    <Ionicons
-                      name={previewAvatarConfig.icon.name}
-                      size={18}
-                      color={previewAvatarConfig.icon.color ?? '#fff'}
-                    />
+                    <Ionicons name={previewAvatarConfig.icon.name} size={18} color={previewAvatarConfig.icon.color ?? '#fff'} />
                   ) : (
                     <Text style={[styles.previewAvatarEmoji, { color: previewAvatarConfig.foregroundColor ?? '#fff' }]}>
                       {previewAvatarConfig.emoji ?? '🙂'}
@@ -550,6 +585,7 @@ export default function CreatePostModal({
                   </Text>
                 </View>
               </View>
+
               <TextInput
                 style={[styles.previewTitleInput, { color: previewPrimary }]}
                 placeholder="Post title"
@@ -563,10 +599,7 @@ export default function CreatePostModal({
                 style={[
                   styles.previewBodyInput,
                   { color: previewPrimary },
-                  highlightDescription && [
-                    styles.previewBodyInputHighlighted,
-                    { backgroundColor: previewHighlightFill }
-                  ]
+                  highlightDescription && [styles.previewBodyInputHighlighted, { backgroundColor: previewHighlightFill }]
                 ]}
                 placeholder="Description (optional)"
                 placeholderTextColor={previewMuted}
@@ -575,116 +608,174 @@ export default function CreatePostModal({
                 onChangeText={handleMessageChange}
                 autoCapitalize="sentences"
                 ref={messageInputRef}
-                onSelectionChange={(event) => updateSelection(event?.nativeEvent?.selection)}
+                onSelectionChange={(e) => updateSelection(e?.nativeEvent?.selection)}
                 selection={messageSelection}
               />
             </View>
 
             {premiumSummariesEnabled ? (
-              <View style={styles.summarizeBlock}>
-                <TouchableOpacity
-                  style={[
-                    styles.summarizeButton,
-                    { backgroundColor: summaryButtonBackground },
-                    (isSummarizing || !trimmedMessage) && styles.summarizeButtonDisabled
-                  ]}
-                  onPress={handleSummarizeDescription}
-                  disabled={isSummarizing || !trimmedMessage}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel="Summarize description with BART"
-                >
-                  {isSummarizing ? (
-                    <ActivityIndicator size="small" color={summaryAccentColor} />
-                  ) : (
-                    <Ionicons name="sparkles-outline" size={18} color={summaryAccentColor} />
-                  )}
-                  <View style={styles.summarizeTextBlock}>
-                    <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Summarize description</Text>
-                    <Text style={styles.summarizeSubtitle}>Premium · BART AI</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {summaryError ? <Text style={styles.summarizeErrorText}>{summaryError}</Text> : null}
-
-                {!!aiSummary && !isSummarizing ? (
-                  <View
-                    // capture y-position for auto-scroll when it mounts
-                    onLayout={(e) => { aiSummaryYRef.current = e.nativeEvent.layout.y; }}
-                    style={{
-                      marginTop: 12,
-                      backgroundColor: '#F7F7FB',
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: '#ECECF2',
-                      padding: 12
-                    }}
-                  >
-                    <Text style={{ fontWeight: '700', marginBottom: 6, color: themeColors.textPrimary }}>
-                      AI Summary
-                    </Text>
-                    <Text style={{ color: themeColors.textPrimary, lineHeight: 20 }}>
-                      {aiSummary}
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const next = aiSummary;
-                          updateMessageValue(next);
-                          const caret = next.length;
-                          messageInputRef.current?.focus?.();
-                          setMessageSelection({ start: caret, end: caret });
-                          setAiSummary('');
-                        }}
-                        style={{ backgroundColor: '#7C3AED', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 }}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={{ color: '#fff' }}>Use as description</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={async () => {
-                          const { setStringAsync } = await import('expo-clipboard');
-                          await setStringAsync(aiSummary);
-                        }}
-                        style={{ backgroundColor: '#EDE9FE', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 }}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={{ color: '#111' }}>Copy</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => setAiSummary('')}
-                        style={{ backgroundColor: '#EFEFEF', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 }}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={{ color: '#111' }}>Dismiss</Text>
-                      </TouchableOpacity>
+              <>
+                {/* [AI-SUMMARY] Controls row: Length + Quality */}
+                <View style={styles.summaryControlsRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.sectionLabel, { marginBottom: 0, marginRight: 10 }]}>Length</Text>
+                    <View style={styles.segmentRow}>
+                      {LENGTH_STEPS.map((k) => (
+                        <TouchableOpacity
+                          key={k}
+                          onPress={() => setSummaryLength(k)}
+                          style={[
+                            styles.segmentItem,
+                            summaryLength === k && [styles.segmentItemActive, { borderColor: summaryAccentColor }]
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.segmentText,
+                              { color: summaryLength === k ? summaryAccentColor : themeColors.textSecondary }
+                            ]}
+                          >
+                            {toLengthLabel(k)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                    <Text style={[styles.sectionLabel, { marginBottom: 0, marginRight: 10 }]}>Quality</Text>
+                    <View style={styles.segmentRow}>
+                      {['fast', 'best'].map((q) => (
+                        <TouchableOpacity
+                          key={q}
+                          onPress={() => setSummaryQuality(q)}
+                          style={[
+                            styles.segmentItemSmall,
+                            summaryQuality === q && [styles.segmentItemActive, { borderColor: summaryAccentColor }]
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.segmentText,
+                              { color: summaryQuality === q ? summaryAccentColor : themeColors.textSecondary }
+                            ]}
+                          >
+                            {q === 'fast' ? 'Fast' : 'Best'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Summarize button */}
+                <View style={styles.summarizeBlock}>
+                  <TouchableOpacity
+                    style={[
+                      styles.summarizeButton,
+                      { backgroundColor: summaryButtonBackground },
+                      (isSummarizing || !trimmedMessage) && styles.summarizeButtonDisabled
+                    ]}
+                    onPress={handleSummarizeDescription}
+                    disabled={isSummarizing || !trimmedMessage}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Summarize description"
+                  >
+                    {isSummarizing ? (
+                      <ActivityIndicator size="small" color={summaryAccentColor} />
+                    ) : (
+                      <Ionicons name="sparkles-outline" size={18} color={summaryAccentColor} />
+                    )}
+                    <View style={styles.summarizeTextBlock}>
+                      <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Summarize description</Text>
+                      <Text style={styles.summarizeSubtitle}>
+                        Premium · {summaryQuality === 'best' ? 'Best quality' : 'Fast mode'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  {summaryError ? <Text style={styles.summarizeErrorText}>{summaryError}</Text> : null}
+                </View>
+
+                {/* Summary preview card */}
+                {summaryVisible ? (
+                  <View
+                    onLayout={(e) => setSummaryCardY(e.nativeEvent.layout.y)}
+                    style={styles.aiSummaryCard}
+                  >
+                    <Text style={styles.aiSummaryTitle}>AI Summary</Text>
+                    {summaryMeta ? (
+                      <View style={styles.aiSummaryMetaRow}>
+                        <Text
+                          style={[
+                            styles.aiSummaryBadge,
+                            summaryMeta.fallback ? styles.aiSummaryBadgeFallback : styles.aiSummaryBadgePrimary
+                          ]}
+                        >
+                          {summaryMeta.fallback ? 'Extractive fallback' : 'Transformer'}
+                        </Text>
+                        {summaryMeta.model ? (
+                          <Text style={styles.aiSummaryMetaText}>
+                            {summaryMeta.model.replace(/^Xenova\//, '')}
+                          </Text>
+                        ) : null}
+                        {summaryMeta.quality ? (
+                          <Text style={styles.aiSummaryMetaText}>
+                            {summaryMeta.quality === 'best' ? 'Best quality' : 'Fast mode'}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
+                    {summaryMeta?.fallback ? (
+                      <Text style={styles.aiSummaryHelper}>
+                        Neural summarizer unavailable; showing extractive fallback.
+                      </Text>
+                    ) : null}
+                    <Text style={styles.aiSummaryText}>{summaryText}</Text>
+
+                    <View style={styles.aiSummaryButtonsRow}>
+                      <TouchableOpacity style={[styles.aiButton, { backgroundColor: summaryAccentColor }]} onPress={useSummaryAsDescription}>
+                        <Text style={[styles.aiButtonText, { color: '#fff' }]}>Use as description</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity style={styles.aiButtonGhost} onPress={copySummary}>
+                        <Text style={[styles.aiButtonText, { color: themeColors.textPrimary }]}>Copy</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity style={styles.aiButtonGhost} onPress={() => setSummaryVisible(false)}>
+                        <Text style={[styles.aiButtonText, { color: themeColors.textPrimary }]}>Dismiss</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Expand to next length */}
+                    {summaryLength !== 'detailed' ? (
+                      <TouchableOpacity
+                        style={styles.expandButton}
+                        onPress={expandOnce}
+                        disabled={isSummarizing}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={[styles.expandButtonText, { color: summaryAccentColor }]}>
+                          Expand to {toLengthLabel(LENGTH_STEPS[LENGTH_STEPS.indexOf(summaryLength) + 1])}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 ) : null}
-              </View>
+              </>
             ) : null}
           </ScrollView>
 
           <TouchableOpacity
             style={[
               styles.submitButton,
-              {
-                backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark,
-                opacity: submitDisabled ? 0.6 : 1
-              }
+              { backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark, opacity: submitDisabled ? 0.6 : 1 }
             ]}
             onPress={handleSubmit}
             activeOpacity={0.85}
             disabled={submitDisabled}
           >
-            <Text
-              style={[
-                styles.submitButtonText,
-                { color: selectedPreset.buttonForeground ?? '#fff' }
-              ]}
-            >
+            <Text style={[styles.submitButtonText, { color: selectedPreset.buttonForeground ?? '#fff' }]}>
               {computedSubmitLabel}
             </Text>
           </TouchableOpacity>
@@ -695,11 +786,7 @@ export default function CreatePostModal({
         visible={locationModalVisible}
         onClose={() => setLocationModalVisible(false)}
         onSelectCity={(cityName, meta) => {
-          setSelectedLocation({
-            city: cityName,
-            province: meta.province ?? '',
-            country: meta.country ?? ''
-          });
+          setSelectedLocation({ city: cityName, province: meta.province ?? '', country: meta.country ?? '' });
           setLocationModalVisible(false);
         }}
         originCity={selectedLocation?.city}
@@ -714,121 +801,100 @@ export default function CreatePostModal({
 
 const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
-      justifyContent: 'flex-end'
-    },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
     card: {
-      backgroundColor: palette.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      padding: 20,
-      maxHeight: '85%',
-      shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.35 : 0.12,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 10
+      backgroundColor: palette.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%',
+      shadowColor: '#000', shadowOpacity: isDarkMode ? 0.35 : 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 10
     },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12
-    },
-    title: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: palette.textPrimary
-    },
-    sectionLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: palette.textPrimary,
-      marginBottom: 8
-    },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 8
-    },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    title: { fontSize: 18, fontWeight: '700', color: palette.textPrimary },
+    sectionLabel: { fontSize: 13, fontWeight: '600', color: palette.textPrimary, marginBottom: 8 },
+    sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
     locationButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: palette.divider,
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      backgroundColor: isDarkMode ? palette.background : '#ffffff'
+      flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: palette.divider, borderRadius: 12,
+      paddingVertical: 12, paddingHorizontal: 14, backgroundColor: isDarkMode ? palette.background : '#ffffff'
     },
     locationButtonDisabled: { opacity: 0.6 },
     locationButtonText: { fontSize: 14, color: palette.textPrimary, flexShrink: 1 },
     helperText: { marginTop: 6, fontSize: 12, color: palette.textSecondary },
     previewCard: {
-      borderRadius: 18,
-      padding: 18,
-      marginTop: 4,
-      shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.35 : 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3
+      borderRadius: 18, padding: 18, marginTop: 4,
+      shadowColor: '#000', shadowOpacity: isDarkMode ? 0.35 : 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 4 }, elevation: 3
     },
     previewHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    previewAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 10
-    },
+    previewAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
     previewAvatarEmoji: { fontSize: 18 },
     previewTitle: { fontSize: 16, fontWeight: '700' },
     previewMeta: { fontSize: 12, marginTop: 4 },
     previewTitleInput: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
     previewBodyInput: { minHeight: 80, fontSize: 16, fontWeight: '500', textAlignVertical: 'top' },
     previewBodyInputHighlighted: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+
     summarizeBlock: { marginTop: 16 },
-    summarizeButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 14,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      alignSelf: 'flex-start'
-    },
+    summarizeButton: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, alignSelf: 'flex-start' },
     summarizeButtonDisabled: { opacity: 0.6 },
     summarizeTextBlock: { marginLeft: 12, maxWidth: 220 },
     summarizeTitle: { fontSize: 14, fontWeight: '700' },
     summarizeSubtitle: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
     summarizeErrorText: { marginTop: 8, fontSize: 12, color: '#D64545' },
+
     swatchRow: { flexDirection: 'row', flexWrap: 'wrap' },
     swatch: {
-      width: 44, height: 44, borderRadius: 22,
-      alignItems: 'center', justifyContent: 'center',
-      marginRight: 12, marginBottom: 12,
-      borderWidth: 2, borderColor: 'transparent'
+      width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+      marginRight: 12, marginBottom: 12, borderWidth: 2, borderColor: 'transparent'
     },
     swatchActive: {
       borderColor: '#fff',
-      shadowColor: '#000',
-      shadowOpacity: 0.18,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 3
+      shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 3
     },
+
     submitButton: { marginTop: 16, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     submitButtonText: { fontSize: 16, fontWeight: '600' },
+
     formatToolbar: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 12 },
     formatButton: {
-      width: 36, height: 36, borderRadius: 12,
-      alignItems: 'center', justifyContent: 'center',
-      borderWidth: 1, borderColor: palette.divider,
-      backgroundColor: palette.background, marginRight: 10
+      width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.background, marginRight: 10
     },
-    formatButtonActive: { borderColor: 'transparent' }
+    formatButtonActive: { borderColor: 'transparent' },
+
+    // [AI-SUMMARY] New controls & card
+    summaryControlsRow: { marginTop: 16 },
+    segmentRow: { flexDirection: 'row', alignItems: 'center' },
+    segmentItem: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: palette.divider, marginRight: 8 },
+    segmentItemSmall: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: palette.divider, marginRight: 8 },
+    segmentItemActive: { backgroundColor: 'transparent' },
+    segmentText: { fontSize: 12, fontWeight: '600' },
+
+    aiSummaryCard: {
+      marginTop: 12,
+      padding: 16,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? palette.background : '#fff',
+      borderWidth: 1,
+      borderColor: palette.divider
+    },
+    aiSummaryTitle: { fontSize: 16, fontWeight: '700', color: palette.textPrimary, marginBottom: 8 },
+    aiSummaryMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
+    aiSummaryBadge: {
+      fontSize: 12,
+      fontWeight: '700',
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+      marginRight: 8,
+      marginBottom: 6,
+      color: '#fff'
+    },
+    aiSummaryBadgePrimary: { backgroundColor: palette.primaryDark ?? '#6C4DF4' },
+    aiSummaryBadgeFallback: { backgroundColor: '#D64545' },
+    aiSummaryMetaText: { fontSize: 12, color: palette.textSecondary, marginRight: 12, marginBottom: 6 },
+    aiSummaryHelper: { fontSize: 12, color: palette.textSecondary, marginBottom: 8 },
+    aiSummaryText: { fontSize: 14, color: palette.textPrimary, lineHeight: 20 },
+    aiSummaryButtonsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+    aiButton: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, marginRight: 10 },
+    aiButtonGhost: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.divider, marginRight: 10 },
+    aiButtonText: { fontSize: 14, fontWeight: '700' },
+    expandButton: { marginTop: 6, alignSelf: 'flex-start' },
+    expandButtonText: { fontSize: 13, fontWeight: '700' },
   });

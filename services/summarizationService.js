@@ -24,7 +24,6 @@ const sanitizeHost = (value) => {
 const resolveBaseUrl = () => {
   if (cachedBaseUrl) return cachedBaseUrl;
 
-  // 1) explicit env overrides
   const extra = (Constants?.expoConfig?.extra || {});
   const envUrl =
     (typeof process !== 'undefined' &&
@@ -38,7 +37,6 @@ const resolveBaseUrl = () => {
     return cachedBaseUrl;
   }
 
-  // 2) web
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window?.location?.protocol && window.location.hostname) {
       cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
@@ -49,7 +47,6 @@ const resolveBaseUrl = () => {
     return cachedBaseUrl;
   }
 
-  // 3) Expo Go host candidates
   const hostCandidates = [
     Constants?.expoConfig?.hostUri,
     Constants?.expoGoConfig?.hostUri,
@@ -69,7 +66,6 @@ const resolveBaseUrl = () => {
     }
   }
 
-  // 4) last fallbacks
   if (typeof window !== 'undefined' && window?.location?.hostname) {
     cachedBaseUrl = `${window.location.protocol}//${window.location.hostname}:${DEFAULT_PORT}`;
     if (__DEV__) console.log('[summaryApi] base (window host):', cachedBaseUrl);
@@ -92,29 +88,48 @@ export const getSummaryBaseUrl = () => resolveBaseUrl();
 
 const clean = (s) =>
   String(s)
-    .replace(/\uFFFD/g, '')                    // replacement char
-    .replace(/[\u200B-\u200D\u2060]/g, '')     // zero-widths
-    .replace(/\s{2,}/g, ' ')                   // collapse spaces
+    .replace(/\uFFFD/g, '')
+    .replace(/[\u200B-\u200D\u2060]/g, '')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 
+const normalizeDescription = (value) =>
+  String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\uFFFD/g, '')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\t+/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+/**
+ * Summarize post description
+ * @param {string} description
+ * @param {{ signal?: AbortSignal, lengthPreference?: 'concise'|'balanced'|'detailed', quality?: 'fast'|'best', model?: string, timeoutMs?: number }} opts
+ */
 export async function summarizePostDescription(
   description,
-  { signal, lengthPreference, timeoutMs = 20000 } = {}
+  { signal, lengthPreference, quality, model, timeoutMs = 20000 } = {}
 ) {
-  const text = typeof description === 'string' ? description.trim() : '';
+  const text = normalizeDescription(description);
   if (!text) {
     throw new Error('Add a description before requesting a summary.');
   }
 
-  const requestOptions = {};
+  const options = {};
   if (typeof lengthPreference === 'string' && lengthPreference) {
-    requestOptions.lengthPreference = lengthPreference;
+    options.lengthPreference = lengthPreference;
+  }
+  if (typeof quality === 'string' && quality) {
+    options.quality = quality; // 'fast'|'best'
+  }
+  if (typeof model === 'string' && model) {
+    options.model = model; // overrides quality selection on server
   }
 
-  const bodyPayload = { text };
-  if (Object.keys(requestOptions).length) {
-    bodyPayload.options = requestOptions;
-  }
+  const body = Object.keys(options).length ? { text, options } : { text };
 
   const controller = !signal && typeof AbortController !== 'undefined' ? new AbortController() : null;
   let timer = null;
@@ -124,19 +139,17 @@ export async function summarizePostDescription(
 
   try {
     const endpoint = buildEndpoint(SUMMARY_PATH);
-    if (__DEV__) console.log('[summaryApi] POST', endpoint);
+    if (__DEV__) console.log('[summaryApi] POST', endpoint, options);
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bodyPayload),
+      body: JSON.stringify(body),
       signal: signal ?? controller?.signal,
     });
 
     let payload = null;
-    try {
-      payload = await response.json();
-    } catch (_) { }
+    try { payload = await response.json(); } catch { }
 
     if (!response.ok) {
       const message = payload?.error || `Request failed (${response.status})`;
@@ -152,6 +165,7 @@ export async function summarizePostDescription(
       model: payload.model ?? 'Xenova/distilbart-cnn-6-6',
       options: payload.options || null,
       fallback: Boolean(payload.fallback),
+      quality: payload.quality || options.quality || null,
     };
   } catch (error) {
     if (error?.name === 'AbortError') {
