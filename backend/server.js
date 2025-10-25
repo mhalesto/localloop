@@ -17,6 +17,9 @@ const SUMMARY_SENTENCE_COUNTS = Object.freeze({
   detailed: { min: 4, max: 6 }
 });
 
+const DEFAULT_TRANSFORMER_MODEL_ID = 'Xenova/distilbart-cnn-6-6';
+const DEFAULT_TRANSFORMER_MODEL_OPTIONS = Object.freeze({ quantized: true });
+
 let summarizerLoaderPromise = null;
 let summarizerInstancePromise = null;
 let transformerErrorLogged = false;
@@ -394,10 +397,40 @@ async function loadPipelineFactory() {
   return summarizerLoaderPromise;
 }
 
+const resolveModelOptions = () => {
+  const quantizedPreference = process.env.SUMMARIZER_MODEL_QUANTIZED;
+
+  if (typeof quantizedPreference === 'string' && quantizedPreference.trim() !== '') {
+    const normalized = quantizedPreference.trim().toLowerCase();
+
+    if (normalized === 'false' || normalized === '0') {
+      return { quantized: false };
+    }
+
+    if (normalized === 'true' || normalized === '1') {
+      return { quantized: true };
+    }
+  }
+
+  return { ...DEFAULT_TRANSFORMER_MODEL_OPTIONS };
+};
+
+const resolveModelIdentifier = () => {
+  const override = normalizeWhitespace(process.env.SUMMARIZER_MODEL_ID);
+
+  if (override) {
+    return override;
+  }
+
+  return DEFAULT_TRANSFORMER_MODEL_ID;
+};
+
 async function getSummarizer() {
   if (!summarizerInstancePromise) {
     summarizerInstancePromise = loadPipelineFactory()
-      .then((createPipeline) => createPipeline('summarization', 'facebook/bart-large-cnn'))
+      .then((createPipeline) =>
+        createPipeline('summarization', resolveModelIdentifier(), resolveModelOptions())
+      )
       .catch((error) => {
         summarizerInstancePromise = null;
         throw error;
