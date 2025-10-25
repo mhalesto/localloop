@@ -4,7 +4,13 @@ const cors = require('cors');
 const DEFAULT_PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 const MAX_INPUT_LENGTH = 4000;
 const MIN_SUMMARY_LENGTH = 30;
-const MAX_SUMMARY_LENGTH = 180;
+const MAX_SUMMARY_LENGTH = 320;
+const DEFAULT_SUMMARY_LENGTH_PREFERENCE = 'balanced';
+const SUMMARY_LENGTH_PREFERENCES = Object.freeze({
+  concise: { maxRatio: 0.24, minRatio: 0.5 },
+  balanced: { maxRatio: 0.35, minRatio: 0.65 },
+  detailed: { maxRatio: 0.55, minRatio: 0.8 }
+});
 
 let summarizerLoaderPromise = null;
 let summarizerInstancePromise = null;
@@ -46,19 +52,28 @@ const buildExtractiveSummary = (text, summaryConfig) => {
 
   for (const sentence of sentences) {
     const candidateLength = sentence.length;
+    const separatorLength = chosenSentences.length > 0 ? 1 : 0;
 
     if (!chosenSentences.length || totalLength < minLength) {
       chosenSentences.push(sentence);
-      totalLength += candidateLength + (chosenSentences.length > 1 ? 1 : 0);
+      totalLength += candidateLength + separatorLength;
       continue;
     }
 
-    if (totalLength + candidateLength + 1 > maxLength) {
+    if (totalLength + candidateLength + separatorLength > maxLength) {
+      const remaining = maxLength - totalLength - separatorLength;
+      if (remaining > 0) {
+        const truncated = sentence.slice(0, remaining).trim();
+        if (truncated) {
+          chosenSentences.push(truncated);
+          totalLength += truncated.length + separatorLength;
+        }
+      }
       break;
     }
 
     chosenSentences.push(sentence);
-    totalLength += candidateLength + 1;
+    totalLength += candidateLength + separatorLength;
   }
 
   let summary = chosenSentences.join(' ');
@@ -106,14 +121,56 @@ const clampNumber = (value, min, max) => {
   return Math.min(max, Math.max(min, Number(value)));
 };
 
-const buildSummaryConfig = (inputLength, overrides = {}) => {
-  const estimatedMax = clampNumber(Math.round(inputLength * 0.35), MIN_SUMMARY_LENGTH, MAX_SUMMARY_LENGTH);
-  const maxLength = clampNumber(overrides.max_length ?? overrides.maxLength ?? estimatedMax, MIN_SUMMARY_LENGTH, MAX_SUMMARY_LENGTH);
-  const estimatedMin = Math.max(MIN_SUMMARY_LENGTH, Math.round(maxLength * 0.6));
-  const minLengthCandidate = overrides.min_length ?? overrides.minLength ?? estimatedMin;
-  const minLength = clampNumber(minLengthCandidate, MIN_SUMMARY_LENGTH, Math.max(MIN_SUMMARY_LENGTH, maxLength - 10));
+const resolveLengthPreference = (value) => {
+  if (!value) {
+    return DEFAULT_SUMMARY_LENGTH_PREFERENCE;
+  }
 
-  return { min_length: minLength, max_length: Math.max(minLength + 5, maxLength) };
+  const normalized = String(value).trim().toLowerCase();
+  if (SUMMARY_LENGTH_PREFERENCES[normalized]) {
+    return normalized;
+  }
+
+  return DEFAULT_SUMMARY_LENGTH_PREFERENCE;
+};
+
+const buildSummaryConfig = (inputLength, overrides = {}) => {
+  const requestedPreference =
+    overrides.lengthPreference ?? overrides.length_preference ?? overrides.preference ?? overrides.style;
+  const lengthPreference = resolveLengthPreference(requestedPreference);
+  const fallbackPreferenceConfig = SUMMARY_LENGTH_PREFERENCES[DEFAULT_SUMMARY_LENGTH_PREFERENCE];
+  const preferenceConfig = SUMMARY_LENGTH_PREFERENCES[lengthPreference] ?? fallbackPreferenceConfig;
+  const maxRatio = preferenceConfig?.maxRatio ?? fallbackPreferenceConfig?.maxRatio ?? 0.35;
+
+  const estimatedMax = clampNumber(
+    Math.round(inputLength * maxRatio),
+    MIN_SUMMARY_LENGTH,
+    MAX_SUMMARY_LENGTH
+  );
+
+  let maxLength = clampNumber(
+    overrides.max_length ?? overrides.maxLength ?? estimatedMax,
+    MIN_SUMMARY_LENGTH,
+    MAX_SUMMARY_LENGTH
+  );
+
+  const minRatio = preferenceConfig?.minRatio ?? fallbackPreferenceConfig?.minRatio ?? 0.6;
+  const defaultMinCandidate = Math.round(maxLength * minRatio);
+  const minLengthCandidate = overrides.min_length ?? overrides.minLength ?? defaultMinCandidate;
+  const minLength = clampNumber(
+    minLengthCandidate,
+    MIN_SUMMARY_LENGTH,
+    Math.max(MIN_SUMMARY_LENGTH, maxLength - 10)
+  );
+
+  const normalizedMax = Math.max(minLength + 5, maxLength);
+
+  return {
+    min_length: minLength,
+    max_length: normalizedMax,
+    length_preference: lengthPreference,
+    lengthPreference
+  };
 };
 
 const app = express();
@@ -143,7 +200,10 @@ app.post('/summaries', async (req, res) => {
 
   try {
     const summarizer = await getSummarizer();
-    const result = await summarizer(content, summaryConfig);
+    const result = await summarizer(content, {
+      min_length: summaryConfig.min_length,
+      max_length: summaryConfig.max_length
+    });
     const summaryText = Array.isArray(result) ? result[0]?.summary_text ?? '' : '';
 
     if (!summaryText) {

@@ -42,7 +42,12 @@ export default function CreatePostModal({
   submitLabel,
   allowLocationChange,
 }) {
-  const { themeColors, isDarkMode, premiumSummariesEnabled } = useSettings();
+  const {
+    themeColors,
+    isDarkMode,
+    premiumSummariesEnabled,
+    premiumSummaryLength
+  } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -323,7 +328,8 @@ export default function CreatePostModal({
 
     try {
       const { summary } = await summarizePostDescription(trimmed, {
-        signal: controller?.signal
+        signal: controller?.signal,
+        lengthPreference: premiumSummaryLength
       });
       const nextMessage = summary ?? '';
       updateMessageValue(nextMessage);
