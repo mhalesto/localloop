@@ -4,20 +4,22 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
+// ---------------- Config ----------------
 const DEFAULT_PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 const MAX_INPUT_LENGTH = 4000;
 const MIN_SUMMARY_LENGTH = 30;
 const MAX_SUMMARY_LENGTH = 560;
+
 const DEFAULT_SUMMARY_LENGTH_PREFERENCE = 'balanced';
 const SUMMARY_LENGTH_PREFERENCES = Object.freeze({
-  concise: { maxRatio: 0.24, minRatio: 0.5 },
+  concise: { maxRatio: 0.24, minRatio: 0.50 },
   balanced: { maxRatio: 0.35, minRatio: 0.65 },
-  detailed: { maxRatio: 0.55, minRatio: 0.8 }
+  detailed: { maxRatio: 0.55, minRatio: 0.80 },
 });
 const SUMMARY_SENTENCE_COUNTS = Object.freeze({
   concise: { min: 2, max: 4 },
   balanced: { min: 3, max: 5 },
-  detailed: { min: 4, max: 6 }
+  detailed: { min: 4, max: 6 },
 });
 
 // ---------------- Utility ----------------
@@ -69,7 +71,7 @@ if (transformerState.disabled && transformerState.forced) {
   fallbackNoticeLogged = true;
 }
 
-// ---------------- Text helpers (your original) ----------------
+// ---------------- Text helpers ----------------
 const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
 const splitIntoSentences = (value) => {
@@ -156,6 +158,7 @@ const truncateSentenceAtWordBoundary = (sentence, maxLength) => {
   return clipped.slice(0, lastSpace).trim();
 };
 
+// ---- Extractive fallback (your original scoring, unchanged) ----
 const buildExtractiveSummary = (text, summaryConfig) => {
   const paragraphEntries = splitIntoParagraphSentences(text);
   const sentences = paragraphEntries.map((entry) => entry.sentence);
@@ -267,7 +270,7 @@ const buildExtractiveSummary = (text, summaryConfig) => {
     selectedEntries.push({ sentence: sentences[0], index: 0, score: 0 });
   }
 
-  while (selectedIndexSet.size < sentenceRange.min) {
+  while (selectedIndexSet.size < SUMMARY_SENTENCE_COUNTS[summaryConfig.lengthPreference].min) {
     const candidate = rankedByScore.find((entry) => !selectedIndexSet.has(entry.index));
     if (!candidate) break;
     selectedIndexSet.add(candidate.index);
@@ -335,7 +338,7 @@ const buildExtractiveSummary = (text, summaryConfig) => {
   return truncateSummary(summary.trim(), maxLength);
 };
 
-// ---------------- Transformers.js loader (updated) ----------------
+// ---------------- Transformers.js loader ----------------
 async function loadPipelineFactory() {
   if (transformerState.disabled) {
     throw new Error(transformerState.reason || 'Transformer summarizer disabled.');
@@ -352,9 +355,9 @@ async function loadPipelineFactory() {
       } catch (_) { }
 
       // Configure Transformers.js environment
-      env.allowRemoteModels = true;          // fetch models from HF Hub
-      env.allowLocalModels = true;           // also allow local (if you later clone into models/)
-      env.cacheDir = cacheDir;               // cache location (writeable)
+      env.allowRemoteModels = true;
+      env.allowLocalModels = true;
+      env.cacheDir = cacheDir;
 
       if (typeof pipeline !== 'function') {
         throw new Error('Unable to load summarization pipeline.');
@@ -415,7 +418,7 @@ const attemptTransformerSummary = async (content, summaryConfig) => {
   }
 };
 
-// ---------------- Config helpers (your original) ----------------
+// ---------------- Length & post-processing helpers ----------------
 const clampNumber = (value, min, max) => {
   if (Number.isNaN(Number(value))) return min;
   return Math.min(max, Math.max(min, Number(value)));
@@ -428,10 +431,19 @@ const resolveLengthPreference = (value) => {
   return DEFAULT_SUMMARY_LENGTH_PREFERENCE;
 };
 
+// Heuristic: if no explicit preference, choose based on input size.
+const inferLengthPreference = (inputLength, requestedPref) => {
+  if (requestedPref) return resolveLengthPreference(requestedPref);
+  if (inputLength >= 1500) return 'concise';
+  if (inputLength <= 700) return 'balanced';
+  return DEFAULT_SUMMARY_LENGTH_PREFERENCE;
+};
+
 const buildSummaryConfig = (inputLength, overrides = {}) => {
   const requestedPreference =
     overrides.lengthPreference ?? overrides.length_preference ?? overrides.preference ?? overrides.style;
-  const lengthPreference = resolveLengthPreference(requestedPreference);
+
+  const lengthPreference = inferLengthPreference(inputLength, requestedPreference);
   const fallbackPreferenceConfig = SUMMARY_LENGTH_PREFERENCES[DEFAULT_SUMMARY_LENGTH_PREFERENCE];
   const preferenceConfig = SUMMARY_LENGTH_PREFERENCES[lengthPreference] ?? fallbackPreferenceConfig;
   const maxRatio = preferenceConfig?.maxRatio ?? fallbackPreferenceConfig?.maxRatio ?? 0.35;
@@ -451,6 +463,7 @@ const buildSummaryConfig = (inputLength, overrides = {}) => {
   const minRatio = preferenceConfig?.minRatio ?? fallbackPreferenceConfig?.minRatio ?? 0.6;
   const defaultMinCandidate = Math.round(maxLength * minRatio);
   const minLengthCandidate = overrides.min_length ?? overrides.minLength ?? defaultMinCandidate;
+
   const minLength = clampNumber(
     minLengthCandidate,
     MIN_SUMMARY_LENGTH,
@@ -467,8 +480,57 @@ const buildSummaryConfig = (inputLength, overrides = {}) => {
   };
 };
 
+// Post-processor: normalize quotes/punctuation, remove near-dups, tidy endings
+function polishSummary(raw) {
+  let s = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .trim();
+
+  // collapse repeated punctuation like "..", "!!"
+  s = s.replace(/([.!?])\s*(?=\1)/g, '');
+
+  // split to sentences
+  const sentences = s.split(/(?<=[.!?])\s+/).filter(Boolean);
+
+  // simple near-dup key (lowercase, strip punctuation & common stopwords)
+  const STOP = /\b(?:the|a|an|and|or|to|of|in|on|by|for|with|as|that|this|was|were|is|are|be|been|has|have|had)\b/gi;
+  const seen = new Set();
+  const uniq = [];
+  for (const sent of sentences) {
+    const key = sent
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(STOP, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniq.push(sent);
+  }
+
+  let out = uniq.join(' ')
+    .replace(/\s*'\s*s\b/g, "'s") // fix " ’ s" → "'s"
+    .replace(/\s*\.\./g, '.')     // remove double periods
+    .trim();
+
+  return out;
+}
+
+// Ensure summary stays within the sentence range for chosen preference
+function clipToSentenceRange(text, preferenceKey) {
+  const range = SUMMARY_SENTENCE_COUNTS[preferenceKey] ?? SUMMARY_SENTENCE_COUNTS[DEFAULT_SUMMARY_LENGTH_PREFERENCE];
+  const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (parts.length <= range.max) return text;
+  return parts.slice(0, range.max).join(' ').trim();
+}
+
 // ---------------- Express app & routes ----------------
 const app = express();
+
 // Force UTF-8 for all JSON responses (prevents mojibake)
 app.use((_, res, next) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -499,46 +561,49 @@ app.post('/summaries', async (req, res) => {
 
   const transformerOutcome = await attemptTransformerSummary(content, summaryConfig);
 
-  if (transformerOutcome.summary) {
-    return res.json({
-      summary: transformerOutcome.summary,
-      model: transformerOutcome.model ?? DEFAULT_MODEL,
-      options: summaryConfig,
-    });
-  }
+  let rawSummary = transformerOutcome.summary;
+  let model = transformerOutcome.model ?? DEFAULT_MODEL;
+  let fallback = false;
 
-  if (transformerOutcome.error && !transformerErrorLogged) {
-    console.error('[summaries] transformer error, enabling extractive fallback:', transformerOutcome.error);
-    transformerErrorLogged = true;
-  }
-
-  if (!fallbackNoticeLogged) {
-    if (transformerOutcome.error) {
-      console.warn('[summaries] using extractive fallback summarizer.');
-    } else if (transformerState.forced) {
-      console.info('[summaries] transformer summarizer disabled by configuration. Using extractive summarizer.');
-    } else {
-      console.warn('[summaries] using extractive fallback summarizer.');
+  if (!rawSummary) {
+    if (transformerOutcome.error && !transformerErrorLogged) {
+      console.error('[summaries] transformer error, enabling extractive fallback:', transformerOutcome.error);
+      transformerErrorLogged = true;
     }
-    fallbackNoticeLogged = true;
+
+    if (!fallbackNoticeLogged) {
+      if (transformerOutcome.error) {
+        console.warn('[summaries] using extractive fallback summarizer.');
+      } else if (transformerState.forced) {
+        console.info('[summaries] transformer summarizer disabled by configuration. Using extractive summarizer.');
+      } else {
+        console.warn('[summaries] using extractive fallback summarizer.');
+      }
+      fallbackNoticeLogged = true;
+    }
+
+    rawSummary = buildExtractiveSummary(content, summaryConfig);
+    model = 'extractive-fallback';
+    fallback = true;
+
+    if (!rawSummary) {
+      console.error('[summaries] fallback summarizer produced no content.');
+      return res.status(500).json({
+        error: 'Failed to generate summary.',
+        details: transformerOutcome.error?.message ?? String(transformerOutcome.error),
+      });
+    }
   }
 
-  const fallbackSummary = buildExtractiveSummary(content, summaryConfig);
+  // Post-process: polish & sentence cap
+  const polished = clipToSentenceRange(polishSummary(rawSummary), summaryConfig.lengthPreference);
 
-  if (!fallbackSummary) {
-    console.error('[summaries] fallback summarizer produced no content.');
-    return res.status(500).json({
-      error: 'Failed to generate summary.',
-      details: transformerOutcome.error?.message ?? String(transformerOutcome.error),
-    });
-  }
-
-  res.json({
-    summary: fallbackSummary,
-    model: 'extractive-fallback',
+  return res.json({
+    summary: polished,
+    model,
     options: summaryConfig,
-    fallback: true,
-    fallbackReason: transformerOutcome.error ? 'transformer-unavailable' : 'transformer-disabled',
+    fallback,
+    fallbackReason: !fallback ? undefined : (transformerOutcome.error ? 'transformer-unavailable' : 'transformer-disabled'),
   });
 });
 
