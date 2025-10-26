@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -22,9 +22,27 @@ import {
 } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
+import { SIGNUP_BONUS_POINTS } from '../constants/authConfig';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const {
+    user,
+    profile: authProfile,
+    startGoogleSignIn,
+    signOut: signOutAccount,
+    isSigningIn,
+    isRedeeming,
+    authError,
+    hasActivePremium: premiumUnlocked,
+    pointsToNextPremium,
+    premiumDayCost,
+    premiumAccessDurationMs,
+    canUseGoogleSignIn,
+    redeemPremiumDay,
+    clearAuthError
+  } = useAuth();
   const {
     showAddShortcut,
     setShowAddShortcut,
@@ -73,6 +91,7 @@ export default function SettingsScreen({ navigation }) {
   const [descriptionSizeDraft, setDescriptionSizeDraft] = useState(
     String(premiumDescriptionFontSize)
   );
+  const [signingOut, setSigningOut] = useState(false);
 
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
@@ -98,6 +117,24 @@ export default function SettingsScreen({ navigation }) {
         step <= PREMIUM_ACCENT_BRIGHTNESS_RANGE.max
     );
   }, []);
+  const pointsBalance = authProfile?.points ?? 0;
+  const premiumExpiryLabel = useMemo(() => {
+    if (!authProfile?.premiumExpiresAt) {
+      return null;
+    }
+    try {
+      return new Date(authProfile.premiumExpiresAt).toLocaleString();
+    } catch (error) {
+      return null;
+    }
+  }, [authProfile?.premiumExpiresAt]);
+  const redeemDisabled = !user || pointsBalance < premiumDayCost || isRedeeming;
+  const googleButtonDisabled = isSigningIn; // let startGoogleSignIn() surface config/init errors
+  const hoursOfPremium = useMemo(
+    () => Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1),
+    [premiumAccessDurationMs]
+  );
+  const pointsGap = Math.max(pointsToNextPremium, 0);
 
   useEffect(() => {
     setNicknameDraft(userProfile.nickname ?? '');
@@ -111,37 +148,103 @@ export default function SettingsScreen({ navigation }) {
     setDescriptionSizeDraft(String(premiumDescriptionFontSize));
   }, [premiumDescriptionFontSize]);
 
+  useEffect(() => () => clearAuthError(), [clearAuthError]);
+
+  const showPremiumRequiredAlert = useCallback(
+    () =>
+      Alert.alert(
+        'Premium required',
+        'Redeem a premium day from the Account section to unlock this feature.'
+      ),
+    []
+  );
+
+  const handleGoogleSignInPress = useCallback(async () => {
+    await startGoogleSignIn();
+  }, [startGoogleSignIn]);
+
+  const handleSignOut = useCallback(async () => {
+    setSigningOut(true);
+    try {
+      await signOutAccount();
+    } finally {
+      setSigningOut(false);
+    }
+  }, [signOutAccount]);
+
+  const handleRedeemPremium = useCallback(async () => {
+    const result = await redeemPremiumDay();
+    if (result?.ok) {
+      Alert.alert(
+        'Premium activated',
+        `Enjoy premium features for the next ${hoursOfPremium} hours.`
+      );
+    }
+  }, [redeemPremiumDay, hoursOfPremium]);
+
   const handleTogglePremiumAccent = (value) => {
+    if (value && !premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumAccentEnabled(value);
   };
 
   const handleSelectPremiumAccent = (key) => {
+    if (!premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumAccentKey(key);
   };
 
   const handleSelectBrightness = (value) => {
+    if (!premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumAccentBrightness(value);
   };
 
   const handleSelectSummaryLength = (value) => {
+    if (!premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumSummaryLength(value);
   };
 
   const summaryLengthOptions = premiumSummaryLengthOptions ?? [];
 
   const handleTogglePremiumTypography = (value) => {
+    if (value && !premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumTypographyEnabled(value);
   };
 
   const handleToggleTitleSizeOverride = (value) => {
+    if (value && !premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumTitleFontSizeEnabled(value);
   };
 
   const handleToggleDescriptionSizeOverride = (value) => {
+    if (value && !premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumDescriptionFontSizeEnabled(value);
   };
 
   const handleTogglePremiumSummaries = (value) => {
+    if (value && !premiumUnlocked) {
+      showPremiumRequiredAlert();
+      return;
+    }
     setPremiumSummariesEnabled(value);
   };
 
@@ -288,6 +391,105 @@ export default function SettingsScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          {user ? (
+            <>
+              <Text style={styles.sectionHint}>
+                Signed in with Google. Your rewards travel with you.
+              </Text>
+              <View style={styles.item}>
+                <View>
+                  <Text style={styles.itemTitle}>
+                    {authProfile?.displayName || user.displayName || 'Mystery guest'}
+                  </Text>
+                  <Text style={styles.itemSubtitle}>
+                    {authProfile?.email || user.email || 'Signed in with Google'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.authButton,
+                    styles.signOutButton,
+                    signingOut && styles.authButtonDisabled
+                  ]}
+                  onPress={handleSignOut}
+                  activeOpacity={0.85}
+                  disabled={signingOut}
+                >
+                  <Text style={styles.authButtonText}>
+                    {signingOut ? 'Signing out...' : 'Sign out'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.rewardsCard}>
+                <View style={styles.rewardsHeader}>
+                  <Text style={styles.rewardsLabel}>Point balance</Text>
+                  <Text style={styles.rewardsPoints}>{pointsBalance} pts</Text>
+                </View>
+                <Text style={styles.rewardsMeta}>
+                  {premiumUnlocked
+                    ? premiumExpiryLabel
+                      ? `Premium active | expires ${premiumExpiryLabel}`
+                      : 'Premium active - enjoy the perks!'
+                    : `Collect ${premiumDayCost} points to unlock a day of premium access.`}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.redeemButton,
+                    redeemDisabled && styles.redeemButtonDisabled
+                  ]}
+                  onPress={handleRedeemPremium}
+                  activeOpacity={0.85}
+                  disabled={redeemDisabled}
+                >
+                  <Text
+                    style={[
+                      styles.redeemButtonLabel,
+                      redeemDisabled && styles.redeemButtonLabelDisabled
+                    ]}
+                  >
+                    {isRedeeming
+                      ? 'Activating...'
+                      : premiumUnlocked
+                        ? `Extend premium (${premiumDayCost} pts)`
+                        : `Unlock premium (${premiumDayCost} pts)`}
+                  </Text>
+                </TouchableOpacity>
+                {!premiumUnlocked && pointsGap > 0 ? (
+                  <Text style={styles.rewardsProgress}>{`${pointsGap} pts to go`}</Text>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionHint}>
+                Sign in to stash your nickname and start with {SIGNUP_BONUS_POINTS} reward points.
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.googleButton,
+                  googleButtonDisabled && styles.googleButtonDisabled
+                ]}
+                onPress={handleGoogleSignInPress}
+                activeOpacity={0.85}
+                disabled={googleButtonDisabled}
+              >
+                <Ionicons name="logo-google" size={20} style={styles.googleIcon} />
+                <Text style={styles.googleButtonLabel}>
+                  {isSigningIn ? 'Connecting...' : 'Continue with Google'}
+                </Text>
+              </TouchableOpacity>
+              {!canUseGoogleSignIn ? (
+                <Text style={styles.configNotice}>
+                  Add your Google OAuth client IDs in constants/authConfig.js.
+                </Text>
+              ) : null}
+            </>
+          )}
+          {authError ? <Text style={styles.authErrorText}>{authError}</Text> : null}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Permissions</Text>
           <View style={styles.item}>
             <View>
@@ -431,6 +633,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumTypographyEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
+              disabled={!premiumUnlocked}
             />
           </View>
           <View
@@ -454,7 +657,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumTitleFontSizeEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumTypographyEnabled}
+              disabled={!premiumUnlocked || !premiumTypographyEnabled}
             />
           </View>
           {premiumTypographyEnabled && premiumTitleFontSizeEnabled ? (
@@ -501,7 +704,7 @@ export default function SettingsScreen({ navigation }) {
                 premiumDescriptionFontSizeEnabled ? activeThumbColor : inactiveThumbColor
               }
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumTypographyEnabled}
+              disabled={!premiumUnlocked || !premiumTypographyEnabled}
             />
           </View>
           {premiumTypographyEnabled && premiumDescriptionFontSizeEnabled ? (
@@ -538,6 +741,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumSummariesEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
+              disabled={!premiumUnlocked}
             />
           </View>
           {premiumSummariesEnabled ? (
@@ -616,6 +820,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumAccentEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
+              disabled={!premiumUnlocked}
             />
           </View>
           {premiumAccentEnabled ? (
@@ -863,6 +1068,57 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       color: palette.textSecondary,
       marginBottom: 16
     },
+    authButton: {
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderWidth: 1.5,
+      borderColor: palette.primary,
+      backgroundColor: 'transparent'
+    },
+    authButtonDisabled: {
+      opacity: 0.6
+    },
+    authButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primary
+    },
+    signOutButton: {
+      marginLeft: 12
+    },
+    googleButton: {
+      marginTop: 16,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#4285F4'
+    },
+    googleButtonDisabled: {
+      opacity: 0.6
+    },
+    googleIcon: {
+      color: '#ffffff',
+      marginRight: 12
+    },
+    googleButtonLabel: {
+      color: '#ffffff',
+      fontSize: 14,
+      fontWeight: '600'
+    },
+    configNotice: {
+      marginTop: 12,
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    authErrorText: {
+      marginTop: 12,
+      fontSize: 12,
+      color: '#ef4444'
+    },
     item: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -873,6 +1129,60 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center'
+    },
+    rewardsCard: {
+      backgroundColor: isDarkMode ? palette.background : '#eef0ff',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      marginTop: 12
+    },
+    rewardsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8
+    },
+    rewardsLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.textSecondary
+    },
+    rewardsPoints: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: palette.primary
+    },
+    rewardsMeta: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      lineHeight: 18
+    },
+    rewardsProgress: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: '600',
+      color: palette.textSecondary
+    },
+    redeemButton: {
+      marginTop: 16,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.primary
+    },
+    redeemButtonDisabled: {
+      backgroundColor: palette.divider
+    },
+    redeemButtonLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#ffffff'
+    },
+    redeemButtonLabelDisabled: {
+      color: palette.textSecondary
     },
     itemDisabled: {
       opacity: 0.6,

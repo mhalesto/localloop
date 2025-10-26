@@ -2,10 +2,12 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState
 } from 'react';
 import { darkColors, lightColors } from '../constants/colors';
+import { useAuth } from './AuthContext';
 
 const clampNumber = (value, min, max) => {
   if (Number.isNaN(Number(value))) {
@@ -396,6 +398,19 @@ export function SettingsProvider({ children }) {
     city: '',
     avatarKey: 'default'
   });
+  const { hasActivePremium } = useAuth();
+
+  useEffect(() => {
+    if (hasActivePremium) {
+      return;
+    }
+    setPremiumAccentEnabled(false);
+    setAccentKey(baseAccentKey);
+    setPremiumTypographyEnabled(false);
+    setPremiumTitleFontSizeEnabled(false);
+    setPremiumDescriptionFontSizeEnabled(false);
+    setPremiumSummariesEnabled(false);
+  }, [hasActivePremium, baseAccentKey]);
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
@@ -412,48 +427,81 @@ export function SettingsProvider({ children }) {
   const updatePremiumAccentEnabled = useCallback(
     (enabled) => {
       const nextEnabled = Boolean(enabled);
+      if (!hasActivePremium && nextEnabled) {
+        return;
+      }
       setPremiumAccentEnabled(nextEnabled);
       setAccentKey(nextEnabled ? premiumAccentKey : baseAccentKey);
     },
-    [baseAccentKey, premiumAccentKey]
+    [hasActivePremium, baseAccentKey, premiumAccentKey]
   );
   const updatePremiumAccentKey = useCallback(
     (key) => {
       setPremiumAccentKey(key);
-      if (premiumAccentEnabled) {
+      if (premiumAccentEnabled && hasActivePremium) {
         setAccentKey(key);
       }
     },
-    [premiumAccentEnabled]
+    [premiumAccentEnabled, hasActivePremium]
   );
-  const updatePremiumAccentBrightness = useCallback((value) => {
-    setPremiumAccentBrightness((prev) => {
-      if (value === undefined || value === null) {
-        return prev;
+  const updatePremiumAccentBrightness = useCallback(
+    (value) => {
+      if (!hasActivePremium) {
+        return;
       }
-      return clampWithinRange(value, PREMIUM_ACCENT_BRIGHTNESS_RANGE);
-    });
-  }, []);
+      setPremiumAccentBrightness((prev) => {
+        if (value === undefined || value === null) {
+          return prev;
+        }
+        return clampWithinRange(value, PREMIUM_ACCENT_BRIGHTNESS_RANGE);
+      });
+    },
+    [hasActivePremium]
+  );
   const updateIsDarkMode = useCallback((enabled) => setIsDarkMode(Boolean(enabled)), []);
   const updateDreamyScrollIndicatorEnabled = useCallback(
     (enabled) => setDreamyScrollIndicatorEnabled(Boolean(enabled)),
     []
   );
   const updatePremiumTypographyEnabled = useCallback(
-    (enabled) => setPremiumTypographyEnabled(Boolean(enabled)),
-    []
+    (enabled) => {
+      const nextEnabled = Boolean(enabled);
+      if (nextEnabled && !hasActivePremium) {
+        return;
+      }
+      setPremiumTypographyEnabled(nextEnabled);
+    },
+    [hasActivePremium]
   );
   const updatePremiumTitleFontSizeEnabled = useCallback(
-    (enabled) => setPremiumTitleFontSizeEnabled(Boolean(enabled)),
-    []
+    (enabled) => {
+      const nextEnabled = Boolean(enabled);
+      if (nextEnabled && !hasActivePremium) {
+        return;
+      }
+      setPremiumTitleFontSizeEnabled(nextEnabled);
+    },
+    [hasActivePremium]
   );
   const updatePremiumDescriptionFontSizeEnabled = useCallback(
-    (enabled) => setPremiumDescriptionFontSizeEnabled(Boolean(enabled)),
-    []
+    (enabled) => {
+      const nextEnabled = Boolean(enabled);
+      if (nextEnabled && !hasActivePremium) {
+        return;
+      }
+      setPremiumDescriptionFontSizeEnabled(nextEnabled);
+    },
+    [hasActivePremium]
   );
   const updatePremiumSummariesEnabled = useCallback(
-    (enabled) => setPremiumSummariesEnabled(Boolean(enabled)),
-    []
+    (enabled) => {
+      const nextEnabled = Boolean(enabled);
+      if (nextEnabled && !hasActivePremium) {
+        return;
+      }
+      setPremiumSummariesEnabled(nextEnabled);
+    },
+    [hasActivePremium]
   );
   const updatePremiumSummaryLength = useCallback((value) => {
     setPremiumSummaryLength(() => {
@@ -467,26 +515,42 @@ export function SettingsProvider({ children }) {
       return PREMIUM_SUMMARY_LENGTH_DEFAULT;
     });
   }, []);
-  const updatePremiumTitleFontSize = useCallback((size) => {
-    setPremiumTitleFontSize((prev) => {
-      if (size === undefined || size === null || Number.isNaN(Number(size))) {
-        return prev;
+  const updatePremiumTitleFontSize = useCallback(
+    (size) => {
+      if (!hasActivePremium) {
+        return;
       }
-      return clampNumber(size, PREMIUM_TITLE_FONT_SIZE_RANGE.min, PREMIUM_TITLE_FONT_SIZE_RANGE.max);
-    });
-  }, []);
-  const updatePremiumDescriptionFontSize = useCallback((size) => {
-    setPremiumDescriptionFontSize((prev) => {
-      if (size === undefined || size === null || Number.isNaN(Number(size))) {
-        return prev;
+      setPremiumTitleFontSize((prev) => {
+        if (size === undefined || size === null || Number.isNaN(Number(size))) {
+          return prev;
+        }
+        return clampNumber(
+          size,
+          PREMIUM_TITLE_FONT_SIZE_RANGE.min,
+          PREMIUM_TITLE_FONT_SIZE_RANGE.max
+        );
+      });
+    },
+    [hasActivePremium]
+  );
+  const updatePremiumDescriptionFontSize = useCallback(
+    (size) => {
+      if (!hasActivePremium) {
+        return;
       }
-      return clampNumber(
-        size,
-        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min,
-        PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max
-      );
-    });
-  }, []);
+      setPremiumDescriptionFontSize((prev) => {
+        if (size === undefined || size === null || Number.isNaN(Number(size))) {
+          return prev;
+        }
+        return clampNumber(
+          size,
+          PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.min,
+          PREMIUM_DESCRIPTION_FONT_SIZE_RANGE.max
+        );
+      });
+    },
+    [hasActivePremium]
+  );
   const updateUserProfile = useCallback(
     (patch) =>
       setUserProfile((prev) => ({
@@ -544,7 +608,8 @@ export function SettingsProvider({ children }) {
       premiumSummaryLength,
       setPremiumSummaryLength: updatePremiumSummaryLength,
       premiumSummaryLengthOptions: PREMIUM_SUMMARY_LENGTH_OPTIONS,
-      themeColors
+      themeColors,
+      hasActivePremium
     }),
     [
       showAddShortcut,
@@ -580,7 +645,8 @@ export function SettingsProvider({ children }) {
       updatePremiumSummariesEnabled,
       premiumSummaryLength,
       updatePremiumSummaryLength,
-      themeColors
+      themeColors,
+      hasActivePremium
     ]
   );
 
