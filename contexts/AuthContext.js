@@ -21,6 +21,10 @@ import {
   onAuthStateChanged,
   signInWithCredential,
   signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
 } from 'firebase/auth';
 import {
   doc,
@@ -34,7 +38,6 @@ import { auth as sharedAuth, db } from '../api/firebaseClient';
 import {
   googleAuthConfig,
   isGoogleAuthConfigured,
-  APP_SCHEME,
   EXPO_USERNAME,
   EXPO_SLUG,
   SIGNUP_BONUS_POINTS,
@@ -49,6 +52,27 @@ const log = (...args) => console.log('[auth]', ...args);
 const warn = (...args) => console.warn('[auth]', ...args);
 
 const AuthContext = createContext(null);
+
+const toFriendlyAuthError = (error, fallback = 'Unable to complete that request. Please try again.') => {
+  const code = error?.code ?? '';
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'That email address looks incorrect.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'Incorrect email or password. Please try again.';
+    case 'auth/weak-password':
+      return 'Choose a stronger password (at least 6 characters).';
+    case 'auth/email-already-in-use':
+      return 'An account already exists for that email address.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/network-request-failed':
+      return 'Network error while contacting the server. Check your connection and try again.';
+    default:
+      return error?.message ?? fallback;
+  }
+};
 
 // ---------- helpers ----------
 const ts = (v) =>
@@ -71,10 +95,20 @@ export function AuthProvider({ children }) {
   const googleConfigured = useMemo(() => isGoogleAuthConfigured(), []);
 
   // We **force** the Expo proxy redirect for Expo Go
+  // const redirectUri = useMemo(() => {
+  //   const forced = `https://auth.expo.io/@${EXPO_USERNAME}/${EXPO_SLUG}`;
+  //   log('redirectUri (forced):', forced);
+  //   return forced;
+  // }, []);
   const redirectUri = useMemo(() => {
-    const forced = `https://auth.expo.io/@${EXPO_USERNAME}/${EXPO_SLUG}`;
-    log('redirectUri (forced):', forced);
-    return forced;
+    const projectNameForProxy = `@${EXPO_USERNAME}/${EXPO_SLUG}`;
+    log('proxy config', { EXPO_USERNAME, EXPO_SLUG, projectNameForProxy });
+    const uri = makeRedirectUri({
+      useProxy: true,
+      projectNameForProxy,
+    });
+    log('redirectUri (proxy):', uri);
+    return uri;
   }, []);
 
   // Show the exact client IDs we’ll use
@@ -100,6 +134,7 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [signInInFlight, setSignInInFlight] = useState(false);
   const [redeemInFlight, setRedeemInFlight] = useState(false);
+  const [resetInFlight, setResetInFlight] = useState(false);
 
   const urlSeenRef = useRef(0);
 
@@ -306,6 +341,80 @@ export function AuthProvider({ children }) {
     }
   }, [googleConfigured, request, promptAsync, redirectUri]);
 
+  const signInWithEmail = useCallback(
+    async ({ email, password }) => {
+      if (!auth) {
+        setAuthError('Auth is still initializing. Please try again.');
+        return { ok: false, error: 'auth_unavailable' };
+      }
+      setAuthError(null);
+      setSignInInFlight(true);
+      try {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+        return { ok: true };
+      } catch (e) {
+        warn('Email sign-in failed', e);
+        setAuthError(toFriendlyAuthError(e, 'Unable to sign in with email right now.'));
+        return { ok: false, error: e.code ?? e.message };
+      } finally {
+        setSignInInFlight(false);
+      }
+    },
+    [auth]
+  );
+
+  const signUpWithEmail = useCallback(
+    async ({ email, password, displayName }) => {
+      if (!auth) {
+        setAuthError('Auth is still initializing. Please try again.');
+        return { ok: false, error: 'auth_unavailable' };
+      }
+      setAuthError(null);
+      setSignInInFlight(true);
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const wantsDisplayName = displayName?.trim();
+        if (wantsDisplayName) {
+          try {
+            await updateProfile(cred.user, { displayName: wantsDisplayName });
+          } catch (updateError) {
+            warn('Failed to update profile display name', updateError);
+          }
+        }
+        return { ok: true };
+      } catch (e) {
+        warn('Email sign-up failed', e);
+        setAuthError(toFriendlyAuthError(e, 'Unable to create an account right now.'));
+        return { ok: false, error: e.code ?? e.message };
+      } finally {
+        setSignInInFlight(false);
+      }
+    },
+    [auth]
+  );
+
+  const sendResetEmail = useCallback(
+    async (email) => {
+      if (!auth) {
+        setAuthError('Auth is still initializing. Please try again.');
+        return { ok: false, error: 'auth_unavailable' };
+      }
+      setAuthError(null);
+      setResetInFlight(true);
+      try {
+        await sendPasswordResetEmail(auth, email.trim());
+        return { ok: true };
+      } catch (e) {
+        warn('Password reset email failed', e);
+        setAuthError(toFriendlyAuthError(e, 'Unable to send password reset email.'));
+        return { ok: false, error: e.code ?? e.message };
+      } finally {
+        setResetInFlight(false);
+      }
+    },
+    [auth]
+  );
+
   const signOut = useCallback(async () => {
     if (!auth) return;
     try {
@@ -394,6 +503,10 @@ export function AuthProvider({ children }) {
       premiumAccessDurationMs: PREMIUM_ACCESS_DURATION_MS,
       canUseGoogleSignIn: googleConfigured && Boolean(request),
       startGoogleSignIn,
+      signInWithEmail,
+      signUpWithEmail,
+      sendPasswordReset: sendResetEmail,
+      isResettingPassword: resetInFlight,
       signOut,
       redeemPremiumDay,
       clearAuthError,
@@ -404,12 +517,16 @@ export function AuthProvider({ children }) {
       initializing,
       signInInFlight,
       redeemInFlight,
+      resetInFlight,
       authError,
       hasActivePremium,
       pointsToNextPremium,
       googleConfigured,
       request,
       startGoogleSignIn,
+      signInWithEmail,
+      signUpWithEmail,
+      sendResetEmail,
       signOut,
       redeemPremiumDay,
       clearAuthError,

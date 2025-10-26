@@ -7,7 +7,12 @@ import {
   TouchableOpacity,
   View,
   StyleSheet,
-  TextInput
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  ActivityIndicator
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +38,7 @@ export default function SettingsScreen({ navigation }) {
     startGoogleSignIn,
     signOut: signOutAccount,
     isSigningIn,
+    isResettingPassword,
     isRedeeming,
     authError,
     hasActivePremium: premiumUnlocked,
@@ -40,6 +46,9 @@ export default function SettingsScreen({ navigation }) {
     premiumDayCost,
     premiumAccessDurationMs,
     canUseGoogleSignIn,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
     redeemPremiumDay,
     clearAuthError
   } = useAuth();
@@ -92,6 +101,73 @@ export default function SettingsScreen({ navigation }) {
     String(premiumDescriptionFontSize)
   );
   const [signingOut, setSigningOut] = useState(false);
+  const [emailAuthVisible, setEmailAuthVisible] = useState(false);
+  const [emailAuthMode, setEmailAuthMode] = useState('signIn');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [displayNameInput, setDisplayNameInput] = useState('');
+  const [emailLocalError, setEmailLocalError] = useState('');
+  const [emailStatusMessage, setEmailStatusMessage] = useState('');
+
+  const isEmailBusy = isSigningIn || isResettingPassword;
+
+  const emailModeTitle = useMemo(() => {
+    switch (emailAuthMode) {
+      case 'signUp':
+        return 'Create your account';
+      case 'reset':
+        return 'Reset password';
+      default:
+        return 'Sign in with email';
+    }
+  }, [emailAuthMode]);
+
+  const emailPrimaryButtonLabel = useMemo(() => {
+    switch (emailAuthMode) {
+      case 'signUp':
+        return isEmailBusy ? 'Creating account...' : 'Create account';
+      case 'reset':
+        return isEmailBusy ? 'Sending reset email...' : 'Send reset email';
+      default:
+        return isEmailBusy ? 'Signing in...' : 'Sign in';
+    }
+  }, [emailAuthMode, isEmailBusy]);
+
+  const resetEmailForm = useCallback(() => {
+    setEmailInput('');
+    setPasswordInput('');
+    setConfirmPasswordInput('');
+    setDisplayNameInput('');
+  }, []);
+
+  const updateEmailMode = useCallback(
+    (mode) => {
+      setEmailAuthMode(mode);
+      setEmailLocalError('');
+      setEmailStatusMessage('');
+      clearAuthError();
+    },
+    [clearAuthError]
+  );
+
+  const closeEmailAuth = useCallback(() => {
+    setEmailAuthVisible(false);
+    resetEmailForm();
+    setEmailLocalError('');
+    setEmailStatusMessage('');
+    clearAuthError();
+    updateEmailMode('signIn');
+  }, [clearAuthError, resetEmailForm, updateEmailMode]);
+
+  const openEmailAuth = useCallback(
+    (mode = 'signIn') => {
+      resetEmailForm();
+      updateEmailMode(mode);
+      setEmailAuthVisible(true);
+    },
+    [resetEmailForm, updateEmailMode]
+  );
 
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
@@ -150,6 +226,12 @@ export default function SettingsScreen({ navigation }) {
 
   useEffect(() => () => clearAuthError(), [clearAuthError]);
 
+  useEffect(() => {
+    if (user && emailAuthVisible) {
+      closeEmailAuth();
+    }
+  }, [user, emailAuthVisible, closeEmailAuth]);
+
   const showPremiumRequiredAlert = useCallback(
     () =>
       Alert.alert(
@@ -162,6 +244,84 @@ export default function SettingsScreen({ navigation }) {
   const handleGoogleSignInPress = useCallback(async () => {
     await startGoogleSignIn();
   }, [startGoogleSignIn]);
+
+  const handleEmailAuthSubmit = useCallback(async () => {
+    const trimmedEmail = emailInput.trim();
+    setEmailLocalError('');
+    setEmailStatusMessage('');
+    clearAuthError();
+
+    const emailPattern = /.+@.+\..+/;
+    if (!trimmedEmail || !emailPattern.test(trimmedEmail)) {
+      setEmailLocalError('Enter a valid email address.');
+      return;
+    }
+
+    if (emailAuthMode === 'signIn') {
+      if (!passwordInput) {
+        setEmailLocalError('Enter your password to continue.');
+        return;
+      }
+      const result = await signInWithEmail({ email: trimmedEmail, password: passwordInput });
+      if (result?.ok) {
+        resetEmailForm();
+        setEmailStatusMessage('Signed in successfully.');
+      }
+      return;
+    }
+
+    if (emailAuthMode === 'signUp') {
+      if (!displayNameInput.trim()) {
+        setEmailLocalError('Add a display name so friends recognize you.');
+        return;
+      }
+      if (passwordInput.length < 6) {
+        setEmailLocalError('Passwords must be at least 6 characters.');
+        return;
+      }
+      if (passwordInput !== confirmPasswordInput) {
+        setEmailLocalError('Passwords do not match.');
+        return;
+      }
+      const result = await signUpWithEmail({
+        email: trimmedEmail,
+        password: passwordInput,
+        displayName: displayNameInput,
+      });
+      if (result?.ok) {
+        resetEmailForm();
+        setEmailStatusMessage('Account created! You are ready to explore.');
+      }
+      return;
+    }
+
+    // reset password flow
+    const result = await sendPasswordReset(trimmedEmail);
+    if (result?.ok) {
+      setEmailStatusMessage('Password reset email sent. Check your inbox.');
+    }
+  }, [
+    emailInput,
+    passwordInput,
+    confirmPasswordInput,
+    displayNameInput,
+    emailAuthMode,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
+    resetEmailForm,
+    clearAuthError,
+  ]);
+
+  const handleSwitchToMode = useCallback(
+    (mode) => {
+      updateEmailMode(mode);
+      if (mode !== 'reset') {
+        setEmailStatusMessage('');
+      }
+    },
+    [updateEmailMode]
+  );
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
@@ -385,6 +545,134 @@ export default function SettingsScreen({ navigation }) {
       showFooter
       contentStyle={styles.screenContent}
     >
+      <Modal
+        visible={emailAuthVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEmailAuth}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.emailModalBackdrop}
+        >
+          <TouchableWithoutFeedback onPress={closeEmailAuth}>
+            <View style={styles.emailModalOverlay} />
+          </TouchableWithoutFeedback>
+          <View style={styles.emailModalCard}>
+            <View style={styles.emailModalHeader}>
+              <Text style={styles.emailModalTitle}>{emailModeTitle}</Text>
+              <TouchableOpacity
+                onPress={closeEmailAuth}
+                style={styles.emailCloseButton}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close" size={20} color={themeColors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.emailModalHint}>
+              {emailAuthMode === 'signIn'
+                ? 'Sign in to sync your nickname and pick up right where you left off.'
+                : emailAuthMode === 'signUp'
+                  ? 'Create an account to stash rewards and customize your experience.'
+                  : 'Enter your account email and we will send reset instructions.'}
+            </Text>
+            <View style={styles.emailForm}>
+              <TextInput
+                style={styles.emailInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                placeholderTextColor={themeColors.textSecondary}
+                value={emailInput}
+                onChangeText={setEmailInput}
+              />
+              {emailAuthMode !== 'reset' ? (
+                <TextInput
+                  style={styles.emailInput}
+                  secureTextEntry
+                  placeholder="Password"
+                  placeholderTextColor={themeColors.textSecondary}
+                  value={passwordInput}
+                  onChangeText={setPasswordInput}
+                />
+              ) : null}
+              {emailAuthMode === 'signUp' ? (
+                <>
+                  <TextInput
+                    style={styles.emailInput}
+                    secureTextEntry
+                    placeholder="Confirm password"
+                    placeholderTextColor={themeColors.textSecondary}
+                    value={confirmPasswordInput}
+                    onChangeText={setConfirmPasswordInput}
+                  />
+                  <TextInput
+                    style={styles.emailInput}
+                    placeholder="Display name"
+                    placeholderTextColor={themeColors.textSecondary}
+                    value={displayNameInput}
+                    onChangeText={setDisplayNameInput}
+                  />
+                </>
+              ) : null}
+            </View>
+            {emailLocalError ? (
+              <Text style={styles.emailErrorText}>{emailLocalError}</Text>
+            ) : null}
+            {authError ? <Text style={styles.emailErrorText}>{authError}</Text> : null}
+            {emailStatusMessage ? (
+              <Text style={styles.emailStatusText}>{emailStatusMessage}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.emailSubmitButton, isEmailBusy && styles.emailSubmitButtonDisabled]}
+              onPress={handleEmailAuthSubmit}
+              activeOpacity={0.85}
+              disabled={isEmailBusy}
+            >
+              {isEmailBusy ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.emailSubmitLabel}>{emailPrimaryButtonLabel}</Text>
+              )}
+            </TouchableOpacity>
+            <View style={styles.emailFooterLinks}>
+              {emailAuthMode === 'signIn' ? (
+                <>
+                  <TouchableOpacity
+                    onPress={() => handleSwitchToMode('reset')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emailFooterLink}>Forgot password?</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleSwitchToMode('signUp')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emailFooterLink}>Need an account? Sign up</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+              {emailAuthMode === 'signUp' ? (
+                <TouchableOpacity
+                  onPress={() => handleSwitchToMode('signIn')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emailFooterLink}>Already have an account? Sign in</Text>
+                </TouchableOpacity>
+              ) : null}
+              {emailAuthMode === 'reset' ? (
+                <TouchableOpacity
+                  onPress={() => handleSwitchToMode('signIn')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emailFooterLink}>Return to sign in</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -479,6 +767,20 @@ export default function SettingsScreen({ navigation }) {
                   {isSigningIn ? 'Connecting...' : 'Continue with Google'}
                 </Text>
               </TouchableOpacity>
+              <View style={styles.emailCtaRow}>
+                <TouchableOpacity
+                  onPress={() => openEmailAuth('signIn')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emailCtaLink}>Use email instead</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => openEmailAuth('signUp')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emailCtaLink}>Create an account</Text>
+                </TouchableOpacity>
+              </View>
               {!canUseGoogleSignIn ? (
                 <Text style={styles.configNotice}>
                   Add your Google OAuth client IDs in constants/authConfig.js.
@@ -1109,6 +1411,20 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 14,
       fontWeight: '600'
     },
+    emailCtaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 16,
+      flexWrap: 'wrap',
+      rowGap: 12,
+      columnGap: 12
+    },
+    emailCtaLink: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primary
+    },
     configNotice: {
       marginTop: 12,
       fontSize: 12,
@@ -1118,6 +1434,93 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 12,
       fontSize: 12,
       color: '#ef4444'
+    },
+    emailModalBackdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(15, 23, 42, 0.45)'
+    },
+    emailModalOverlay: {
+      flex: 1
+    },
+    emailModalCard: {
+      backgroundColor: palette.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 32,
+      borderColor: palette.divider,
+      borderWidth: 1
+    },
+    emailModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    emailModalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    emailCloseButton: {
+      padding: 8,
+      marginRight: -8
+    },
+    emailModalHint: {
+      marginTop: 12,
+      fontSize: 13,
+      lineHeight: 20,
+      color: palette.textSecondary
+    },
+    emailForm: {
+      marginTop: 20,
+      rowGap: 12
+    },
+    emailInput: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.12)',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      fontSize: 15,
+      color: palette.textPrimary,
+      backgroundColor: isDarkMode ? palette.background : '#ffffff'
+    },
+    emailErrorText: {
+      marginTop: 12,
+      fontSize: 12,
+      color: '#ef4444'
+    },
+    emailStatusText: {
+      marginTop: 12,
+      fontSize: 12,
+      color: palette.success ?? palette.primary
+    },
+    emailSubmitButton: {
+      marginTop: 20,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.primary
+    },
+    emailSubmitButtonDisabled: {
+      opacity: 0.7
+    },
+    emailSubmitLabel: {
+      color: '#ffffff',
+      fontSize: 15,
+      fontWeight: '600'
+    },
+    emailFooterLinks: {
+      marginTop: 16,
+      rowGap: 8
+    },
+    emailFooterLink: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primary
     },
     item: {
       flexDirection: 'row',
