@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   View,
   Text,
@@ -23,6 +24,7 @@ import {
   MAILTO_PREFIX_STRING,
   hasRichFormatting
 } from '../utils/textFormatting';
+import { summarizePostDescription } from '../services/summarizationService';
 
 export default function CreatePostModal({
   visible,
@@ -40,7 +42,12 @@ export default function CreatePostModal({
   submitLabel,
   allowLocationChange,
 }) {
-  const { themeColors, isDarkMode } = useSettings();
+  const {
+    themeColors,
+    isDarkMode,
+    premiumSummariesEnabled,
+    premiumSummaryLength
+  } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -61,6 +68,9 @@ export default function CreatePostModal({
   const [highlightDescription, setHighlightDescription] = useState(false);
   const [messageSelection, setMessageSelection] = useState({ start: 0, end: 0 });
   const messageInputRef = useRef(null);
+  const summarizationControllerRef = useRef(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -84,11 +94,23 @@ export default function CreatePostModal({
       setHighlightDescription(initialHighlightDescription ?? false);
       const caret = nextMessage.length;
       setMessageSelection({ start: caret, end: caret });
+      setSummaryError('');
+      setIsSummarizing(false);
+      if (summarizationControllerRef.current) {
+        summarizationControllerRef.current.abort?.();
+        summarizationControllerRef.current = null;
+      }
     } else {
       setLocationModalVisible(false);
       setAdvancedEnabled(false);
       setHighlightDescription(false);
       setMessageSelection({ start: 0, end: 0 });
+      setSummaryError('');
+      setIsSummarizing(false);
+      if (summarizationControllerRef.current) {
+        summarizationControllerRef.current.abort?.();
+        summarizationControllerRef.current = null;
+      }
     }
   }, [
     visible,
@@ -98,6 +120,16 @@ export default function CreatePostModal({
     initialTitle,
     initialHighlightDescription
   ]);
+
+  useEffect(
+    () => () => {
+      if (summarizationControllerRef.current) {
+        summarizationControllerRef.current.abort?.();
+        summarizationControllerRef.current = null;
+      }
+    },
+    []
+  );
 
   const computedTitle = titleText ?? (mode === 'edit' ? 'Edit post' : 'Create a post');
   const computedSubmitLabel = submitLabel ?? (mode === 'edit' ? 'Save changes' : 'Publish');
@@ -119,6 +151,10 @@ export default function CreatePostModal({
   const previewHighlightFill =
     selectedPreset.highlightFill ??
     (selectedPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)');
+  const summaryAccentColor = selectedPreset.buttonBackground ?? themeColors.primaryDark;
+  const summaryButtonBackground =
+    selectedPreset.highlightFill ??
+    (selectedPreset.isDark ? 'rgba(255,255,255,0.16)' : 'rgba(108,77,244,0.1)');
   const advancedTrackOn = themeColors.primaryLight ?? themeColors.primaryDark;
   const advancedThumbOn = '#ffffff';
   const previewAvatarConfig = useMemo(
@@ -128,16 +164,26 @@ export default function CreatePostModal({
 
   const handleClose = () => {
     setTitle('');
-    setMessage('');
+    updateMessageValue('');
     setLocationModalVisible(false);
     setAdvancedEnabled(false);
     setHighlightDescription(false);
     setMessageSelection({ start: 0, end: 0 });
+    setIsSummarizing(false);
+    setSummaryError('');
+    if (summarizationControllerRef.current) {
+      summarizationControllerRef.current.abort?.();
+      summarizationControllerRef.current = null;
+    }
     onClose?.();
   };
 
   const focusDescriptionInput = () => {
     messageInputRef.current?.focus?.();
+  };
+
+  const handleMessageChange = (value) => {
+    updateMessageValue(value);
   };
 
   const updateSelection = (nextSelection) => {
@@ -154,6 +200,15 @@ export default function CreatePostModal({
     }
   };
 
+  const updateMessageValue = (nextValue) => {
+    setSummaryError('');
+    if (typeof nextValue === 'function') {
+      setMessage((prev) => nextValue(prev));
+      return;
+    }
+    setMessage(nextValue);
+  };
+
   const wrapSelection = (wrap) => {
     focusDescriptionInput();
     const { start, end } = messageSelection;
@@ -167,13 +222,13 @@ export default function CreatePostModal({
       const insertion = `${wrap}${wrap}`;
       const nextMessage = `${before}${insertion}${after}`;
       const caret = safeStart + wrap.length;
-      setMessage(nextMessage);
+      updateMessageValue(nextMessage);
       updateSelection({ start: caret, end: caret });
       return;
     }
 
     const nextMessage = `${before}${wrap}${selected}${wrap}${after}`;
-    setMessage(nextMessage);
+    updateMessageValue(nextMessage);
     updateSelection({ start: safeStart + wrap.length, end: safeEnd + wrap.length });
   };
 
@@ -201,7 +256,7 @@ export default function CreatePostModal({
       .join('\n');
 
     const nextMessage = `${text.slice(0, lineStart)}${bulletised}${text.slice(lineEnd)}`;
-    setMessage(nextMessage);
+    updateMessageValue(nextMessage);
     updateSelection({ start: lineStart, end: lineStart + bulletised.length });
   };
 
@@ -225,7 +280,7 @@ export default function CreatePostModal({
 
     const inserted = `[${label}](${MAILTO_PREFIX_STRING}${address})`;
     const nextMessage = `${before}${leadingWhitespace}${inserted}${trailingWhitespace}${after}`;
-    setMessage(nextMessage);
+    updateMessageValue(nextMessage);
 
     const insertedStart = safeStart + leadingWhitespace.length;
     const labelStart = insertedStart + 1;
@@ -249,6 +304,53 @@ export default function CreatePostModal({
     }
   };
 
+  const handleSummarizeDescription = async () => {
+    if (isSummarizing) {
+      return;
+    }
+
+    const trimmed = message.trim();
+    if (!trimmed) {
+      setSummaryError('Add a description before requesting a summary.');
+      return;
+    }
+
+    if (summarizationControllerRef.current) {
+      summarizationControllerRef.current.abort?.();
+      summarizationControllerRef.current = null;
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    summarizationControllerRef.current = controller;
+
+    setSummaryError('');
+    setIsSummarizing(true);
+
+    try {
+      const { summary } = await summarizePostDescription(trimmed, {
+        signal: controller?.signal,
+        lengthPreference: premiumSummaryLength
+      });
+      const nextMessage = summary ?? '';
+      updateMessageValue(nextMessage);
+      const caret = nextMessage.length;
+      focusDescriptionInput();
+      updateSelection({ start: caret, end: caret });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
+      const fallback =
+        error instanceof Error ? error.message : 'Unable to generate a summary right now.';
+      setSummaryError(fallback);
+    } finally {
+      if (summarizationControllerRef.current === controller) {
+        summarizationControllerRef.current = null;
+      }
+      setIsSummarizing(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (submitDisabled) {
       return;
@@ -263,7 +365,7 @@ export default function CreatePostModal({
     });
     if (mode === 'create') {
       setTitle('');
-      setMessage('');
+      updateMessageValue('');
       setMessageSelection({ start: 0, end: 0 });
     }
     setLocationModalVisible(false);
@@ -480,13 +582,43 @@ export default function CreatePostModal({
                 placeholderTextColor={previewMuted}
                 multiline
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={handleMessageChange}
                 autoCapitalize="sentences"
                 ref={messageInputRef}
                 onSelectionChange={(event) => updateSelection(event?.nativeEvent?.selection)}
                 selection={messageSelection}
               />
             </View>
+
+            {premiumSummariesEnabled ? (
+              <View style={styles.summarizeBlock}>
+                <TouchableOpacity
+                  style={[
+                    styles.summarizeButton,
+                    { backgroundColor: summaryButtonBackground },
+                    (isSummarizing || !trimmedMessage) && styles.summarizeButtonDisabled
+                  ]}
+                  onPress={handleSummarizeDescription}
+                  disabled={isSummarizing || !trimmedMessage}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Summarize description with BART"
+                >
+                  {isSummarizing ? (
+                    <ActivityIndicator size="small" color={summaryAccentColor} />
+                  ) : (
+                    <Ionicons name="sparkles-outline" size={18} color={summaryAccentColor} />
+                  )}
+                  <View style={styles.summarizeTextBlock}>
+                    <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Summarize description</Text>
+                    <Text style={styles.summarizeSubtitle}>Premium · BART AI</Text>
+                  </View>
+                </TouchableOpacity>
+                {summaryError ? (
+                  <Text style={styles.summarizeErrorText}>{summaryError}</Text>
+                ) : null}
+              </View>
+            ) : null}
           </ScrollView>
 
           <TouchableOpacity
@@ -648,6 +780,38 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderRadius: 12,
       paddingHorizontal: 10,
       paddingVertical: 8
+    },
+    summarizeBlock: {
+      marginTop: 16
+    },
+    summarizeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      alignSelf: 'flex-start'
+    },
+    summarizeButtonDisabled: {
+      opacity: 0.6
+    },
+    summarizeTextBlock: {
+      marginLeft: 12,
+      maxWidth: 220
+    },
+    summarizeTitle: {
+      fontSize: 14,
+      fontWeight: '700'
+    },
+    summarizeSubtitle: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginTop: 2
+    },
+    summarizeErrorText: {
+      marginTop: 8,
+      fontSize: 12,
+      color: '#D64545'
     },
     swatchRow: {
       flexDirection: 'row',

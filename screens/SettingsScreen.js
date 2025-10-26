@@ -57,7 +57,12 @@ export default function SettingsScreen({ navigation }) {
     premiumTitleFontSize,
     setPremiumTitleFontSize,
     premiumDescriptionFontSize,
-    setPremiumDescriptionFontSize
+    setPremiumDescriptionFontSize,
+    premiumSummariesEnabled,
+    setPremiumSummariesEnabled,
+    premiumSummaryLength,
+    setPremiumSummaryLength,
+    premiumSummaryLengthOptions
   } = useSettings();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
@@ -118,6 +123,12 @@ export default function SettingsScreen({ navigation }) {
     setPremiumAccentBrightness(value);
   };
 
+  const handleSelectSummaryLength = (value) => {
+    setPremiumSummaryLength(value);
+  };
+
+  const summaryLengthOptions = premiumSummaryLengthOptions ?? [];
+
   const handleTogglePremiumTypography = (value) => {
     setPremiumTypographyEnabled(value);
   };
@@ -128,6 +139,10 @@ export default function SettingsScreen({ navigation }) {
 
   const handleToggleDescriptionSizeOverride = (value) => {
     setPremiumDescriptionFontSizeEnabled(value);
+  };
+
+  const handleTogglePremiumSummaries = (value) => {
+    setPremiumSummariesEnabled(value);
   };
 
   const handleNicknameChange = (value) => {
@@ -512,6 +527,84 @@ export default function SettingsScreen({ navigation }) {
           <View style={styles.premiumDivider} />
           <View style={styles.item}>
             <View>
+              <Text style={styles.itemTitle}>AI description summaries</Text>
+              <Text style={styles.itemSubtitle}>
+                Let BART condense long descriptions while composing posts.
+              </Text>
+            </View>
+            <Switch
+              value={premiumSummariesEnabled}
+              onValueChange={handleTogglePremiumSummaries}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={premiumSummariesEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          {premiumSummariesEnabled ? (
+            <>
+              <Text style={[styles.sectionHint, styles.premiumHintSpacing]}>
+                Summaries appear in the composer as a premium-only action.
+              </Text>
+              <View style={styles.summaryLengthBlock}>
+                <Text style={styles.summaryLengthTitle}>Summary length</Text>
+                <Text style={styles.summaryLengthSubtitle}>
+                  Choose how much detail the AI keeps when condensing posts.
+                </Text>
+                <View style={styles.summaryLengthOptions}>
+                  {summaryLengthOptions.map((option, index) => {
+                    const isActive = option.key === premiumSummaryLength;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[
+                          styles.summaryLengthOption,
+                          index > 0 ? styles.summaryLengthOptionSpacing : null,
+                          {
+                            backgroundColor: isActive
+                              ? accentSwitchColor
+                              : themeColors.card,
+                            borderColor: isActive
+                              ? accentSwitchColor
+                              : themeColors.divider
+                          }
+                        ]}
+                        onPress={() => handleSelectSummaryLength(option.key)}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.summaryLengthOptionLabel,
+                            {
+                              color: isActive
+                                ? activeThumbColor
+                                : themeColors.textPrimary
+                            }
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.summaryLengthOptionDescription,
+                            {
+                              color: isActive
+                                ? activeThumbColor
+                                : themeColors.textSecondary
+                            }
+                          ]}
+                        >
+                          {option.description}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          ) : null}
+          <View style={styles.premiumDivider} />
+          <View style={styles.item}>
+            <View>
               <Text style={styles.itemTitle}>Premium themes</Text>
               <Text style={styles.itemSubtitle}>
                 Access exclusive palettes and brighten them to match your vibe.
@@ -821,6 +914,44 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 6,
       fontSize: 12,
       color: palette.textSecondary
+    },
+    premiumHintSpacing: {
+      marginTop: -8,
+      marginBottom: 12
+    },
+    summaryLengthBlock: {
+      marginTop: 4
+    },
+    summaryLengthTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    summaryLengthSubtitle: {
+      marginTop: 4,
+      fontSize: 13,
+      color: palette.textSecondary
+    },
+    summaryLengthOptions: {
+      marginTop: 12
+    },
+    summaryLengthOption: {
+      borderRadius: 14,
+      borderWidth: 1,
+      paddingVertical: 14,
+      paddingHorizontal: 16
+    },
+    summaryLengthOptionSpacing: {
+      marginTop: 10
+    },
+    summaryLengthOptionLabel: {
+      fontSize: 15,
+      fontWeight: '600'
+    },
+    summaryLengthOptionDescription: {
+      marginTop: 6,
+      fontSize: 13,
+      lineHeight: 18
     },
     premiumDivider: {
       height: StyleSheet.hairlineWidth,

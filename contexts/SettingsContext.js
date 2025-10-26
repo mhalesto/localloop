@@ -19,6 +19,24 @@ export const DEFAULT_DESCRIPTION_FONT_SIZE = 18;
 export const PREMIUM_TITLE_FONT_SIZE_RANGE = Object.freeze({ min: 18, max: 28 });
 export const PREMIUM_DESCRIPTION_FONT_SIZE_RANGE = Object.freeze({ min: 16, max: 24 });
 export const PREMIUM_ACCENT_BRIGHTNESS_RANGE = Object.freeze({ min: 0, max: 40 });
+export const PREMIUM_SUMMARY_LENGTH_OPTIONS = Object.freeze([
+  {
+    key: 'concise',
+    label: 'Shorter',
+    description: 'Keep things tight with highlight-level summaries.'
+  },
+  {
+    key: 'balanced',
+    label: 'Balanced',
+    description: 'Blend brevity and context for everyday posts.'
+  },
+  {
+    key: 'detailed',
+    label: 'Longer',
+    description: 'Preserve more nuance for multi-paragraph stories.'
+  }
+]);
+const PREMIUM_SUMMARY_LENGTH_DEFAULT = 'balanced';
 
 const clampWithinRange = (value, range) => {
   if (value === undefined || value === null || Number.isNaN(Number(value))) {
@@ -367,6 +385,10 @@ export function SettingsProvider({ children }) {
   const [premiumDescriptionFontSize, setPremiumDescriptionFontSize] = useState(
     DEFAULT_DESCRIPTION_FONT_SIZE
   );
+  const [premiumSummariesEnabled, setPremiumSummariesEnabled] = useState(false);
+  const [premiumSummaryLength, setPremiumSummaryLength] = useState(
+    PREMIUM_SUMMARY_LENGTH_DEFAULT
+  );
   const [userProfile, setUserProfile] = useState({
     nickname: '',
     country: '',
@@ -429,6 +451,22 @@ export function SettingsProvider({ children }) {
     (enabled) => setPremiumDescriptionFontSizeEnabled(Boolean(enabled)),
     []
   );
+  const updatePremiumSummariesEnabled = useCallback(
+    (enabled) => setPremiumSummariesEnabled(Boolean(enabled)),
+    []
+  );
+  const updatePremiumSummaryLength = useCallback((value) => {
+    setPremiumSummaryLength(() => {
+      const key = typeof value === 'string' ? value.toLowerCase() : '';
+      const match = PREMIUM_SUMMARY_LENGTH_OPTIONS.find(
+        (option) => option.key === key
+      );
+      if (match) {
+        return match.key;
+      }
+      return PREMIUM_SUMMARY_LENGTH_DEFAULT;
+    });
+  }, []);
   const updatePremiumTitleFontSize = useCallback((size) => {
     setPremiumTitleFontSize((prev) => {
       if (size === undefined || size === null || Number.isNaN(Number(size))) {
@@ -501,6 +539,11 @@ export function SettingsProvider({ children }) {
       setPremiumTitleFontSize: updatePremiumTitleFontSize,
       premiumDescriptionFontSize,
       setPremiumDescriptionFontSize: updatePremiumDescriptionFontSize,
+      premiumSummariesEnabled,
+      setPremiumSummariesEnabled: updatePremiumSummariesEnabled,
+      premiumSummaryLength,
+      setPremiumSummaryLength: updatePremiumSummaryLength,
+      premiumSummaryLengthOptions: PREMIUM_SUMMARY_LENGTH_OPTIONS,
       themeColors
     }),
     [
@@ -533,6 +576,10 @@ export function SettingsProvider({ children }) {
       updatePremiumTitleFontSize,
       premiumDescriptionFontSize,
       updatePremiumDescriptionFontSize,
+      premiumSummariesEnabled,
+      updatePremiumSummariesEnabled,
+      premiumSummaryLength,
+      updatePremiumSummaryLength,
       themeColors
     ]
   );
