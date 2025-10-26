@@ -7,35 +7,41 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import Constants from 'expo-constants';
 import {
   GoogleAuthProvider,
-  onAuthStateChanged,
   signInWithCredential,
-  signOut as firebaseSignOut,
+  onAuthStateChanged,
 } from 'firebase/auth';
-import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db } from '../api/firebaseClient';
+import {
+  doc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+  setDoc,
+} from 'firebase/firestore';
+import { app, db, auth as sharedAuth } from '../api/firebaseClient';
 import {
   googleAuthConfig,
   isGoogleAuthConfigured,
+  APP_SCHEME,
   SIGNUP_BONUS_POINTS,
   PREMIUM_DAY_COST,
   PREMIUM_ACCESS_DURATION_MS,
-  APP_SCHEME,
 } from '../constants/authConfig';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const AuthContext = createContext(null);
 
-const normalizeTimestamp = (v) => {
-  if (!v) return null;
-  if (typeof v === 'number') return v;
-  if (typeof v?.toMillis === 'function') return v.toMillis();
+const normalizeTimestamp = (value) => {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value?.toMillis === 'function') return value.toMillis();
   return null;
 };
 
@@ -50,11 +56,44 @@ const normalizeProfile = (raw = {}) => ({
   lastPremiumRedeemedAt: normalizeTimestamp(raw.lastPremiumRedeemedAt),
 });
 
-// Treat anything that isn't a standalone store build as "Expo client/dev"
-const isExpoClient = Constants.appOwnership !== 'standalone';
-
 export function AuthProvider({ children }) {
+  // Reuse the initialized auth (from firebaseClient)
+  const auth = useMemo(() => sharedAuth ?? null, []);
   const googleConfigured = useMemo(() => isGoogleAuthConfigured(), []);
+
+  // Redirect URI: proxy in Expo Go, app scheme in standalone/dev build
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const redirectUri = useMemo(
+    () =>
+      makeRedirectUri({
+        scheme: APP_SCHEME, // e.g. "toilet"
+        useProxy: isExpoGo,
+      }),
+    [isExpoGo]
+  );
+
+  // ✅ Always provide ios/android/web IDs; fall back to Expo/Web ID if missing
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
+    {
+      expoClientId:
+        googleAuthConfig.expoClientId || googleAuthConfig.webClientId || '',
+      iosClientId:
+        googleAuthConfig.iosClientId ||
+        googleAuthConfig.expoClientId ||
+        googleAuthConfig.webClientId ||
+        '',
+      androidClientId:
+        googleAuthConfig.androidClientId ||
+        googleAuthConfig.expoClientId ||
+        googleAuthConfig.webClientId ||
+        '',
+      webClientId:
+        googleAuthConfig.webClientId || googleAuthConfig.expoClientId || '',
+      scopes: ['openid', 'profile', 'email'],
+      redirectUri,
+    },
+    [redirectUri]
+  );
 
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -63,27 +102,7 @@ export function AuthProvider({ children }) {
   const [signInInFlight, setSignInInFlight] = useState(false);
   const [redeemInFlight, setRedeemInFlight] = useState(false);
 
-  const redirectUri = useMemo(
-    () =>
-      makeRedirectUri({
-        scheme: APP_SCHEME,          // e.g. "toilet"
-        useProxy: isExpoClient,      // proxy for Expo Go/dev client
-      }),
-    []
-  );
-
-  // Provide platform client IDs. We *always* define ios/android here
-  // (falling back to the Expo client ID) so the hook never throws.
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    expoClientId: googleAuthConfig.expoClientId || undefined,
-    iosClientId: googleAuthConfig.iosClientId || undefined,
-    androidClientId: googleAuthConfig.androidClientId || undefined,
-    webClientId: googleAuthConfig.webClientId || undefined,
-    selectAccount: true,
-    scopes: ['openid', 'profile', 'email'],
-    redirectUri,
-  });
-
+  // Hydrate / create user profile in Firestore
   const hydrateProfile = useCallback(
     async (user) => {
       if (!db || !user) {
@@ -96,7 +115,7 @@ export function AuthProvider({ children }) {
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
-          const baseData = {
+          const base = {
             displayName: user.displayName ?? '',
             email: user.email ?? '',
             photoURL: user.photoURL ?? '',
@@ -108,17 +127,16 @@ export function AuthProvider({ children }) {
           };
           await setDoc(
             ref,
-            { ...baseData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
+            { ...base, createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
             { merge: false }
           );
-          setProfile(normalizeProfile(baseData));
+          setProfile(normalizeProfile(base));
           return;
         }
 
         const data = snap.data();
         const next = normalizeProfile(data);
         const updates = {};
-
         if ((user.displayName ?? '') !== next.displayName) {
           updates.displayName = user.displayName ?? '';
           next.displayName = updates.displayName;
@@ -149,6 +167,7 @@ export function AuthProvider({ children }) {
     [db]
   );
 
+  // Firebase auth state
   useEffect(() => {
     if (!auth) {
       setInitializing(false);
@@ -163,8 +182,9 @@ export function AuthProvider({ children }) {
     return unsub;
   }, [auth, hydrateProfile]);
 
+  // Handle Google response -> Firebase sign-in
   useEffect(() => {
-    const run = async () => {
+    const go = async () => {
       if (!signInInFlight || !response || !auth) return;
 
       if (response.type === 'success') {
@@ -174,9 +194,9 @@ export function AuthProvider({ children }) {
           const cred = GoogleAuthProvider.credential(idToken);
           await signInWithCredential(auth, cred);
           setAuthError(null);
-        } catch (e) {
-          console.warn('[auth] Google credential sign-in failed', e);
-          setAuthError(e.message ?? 'Google sign-in failed. Please try again.');
+        } catch (err) {
+          console.warn('[auth] Google credential sign-in failed', err);
+          setAuthError(err.message ?? 'Google sign-in failed. Please try again.');
         } finally {
           setSignInInFlight(false);
         }
@@ -188,48 +208,33 @@ export function AuthProvider({ children }) {
         setSignInInFlight(false);
       }
     };
-    run();
+    go();
   }, [response, auth, signInInFlight]);
 
   const startGoogleSignIn = useCallback(async () => {
     if (!googleConfigured) {
-      setAuthError('Google Sign-In is not configured yet. Update constants/authConfig.js.');
+      setAuthError('Google Sign-In is not configured. Add your client IDs to .env and restart with "expo start -c".');
       return;
     }
     if (!request) {
-      setAuthError('Google Sign-In is still initializing. Please try again in a moment.');
+      setAuthError('Google Sign-In is still initializing. Try again in a moment.');
       return;
     }
     try {
       setAuthError(null);
       setSignInInFlight(true);
-      const result = await promptAsync({ useProxy: isExpoClient, showInRecents: true });
+      const result = await promptAsync({ useProxy: isExpoGo, showInRecents: true });
       if (!result || result.type !== 'success') {
         if (!result || result.type === 'cancel') setAuthError(null);
         else setAuthError(result.error?.message ?? 'Google sign-in was cancelled.');
         setSignInInFlight(false);
       }
-    } catch (e) {
-      console.warn('[auth] Failed to start Google sign-in', e);
+    } catch (err) {
+      console.warn('[auth] Failed to start Google sign-in', err);
       setSignInInFlight(false);
       setAuthError('Unable to start Google sign-in. Please try again.');
     }
-  }, [googleConfigured, request, promptAsync]);
-
-  const signOut = useCallback(async () => {
-    if (!auth) return;
-    try {
-      await firebaseSignOut(auth);
-      setAuthError(null);
-    } catch (e) {
-      console.warn('[auth] Sign-out failed', e);
-      setAuthError('Unable to sign out. Please try again.');
-    }
-  }, []);
-
-  const refreshProfile = useCallback(async () => {
-    if (firebaseUser) await hydrateProfile(firebaseUser);
-  }, [firebaseUser, hydrateProfile]);
+  }, [googleConfigured, request, promptAsync, isExpoGo]);
 
   const redeemPremiumDay = useCallback(async () => {
     if (!db || !firebaseUser) {
@@ -269,21 +274,21 @@ export function AuthProvider({ children }) {
       setProfile(result);
       setAuthError(null);
       return { ok: true };
-    } catch (e) {
-      console.warn('[auth] Premium redemption failed', e);
-      setAuthError(e.message ?? 'Unable to unlock premium right now.');
-      return { ok: false, error: e.message };
+    } catch (err) {
+      console.warn('[auth] Premium redemption failed', err);
+      setAuthError(err.message ?? 'Unable to unlock premium right now.');
+      return { ok: false, error: err.message };
     } finally {
       setRedeemInFlight(false);
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, db]);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
-  const hasActivePremium = useMemo(
-    () => !!(profile?.premiumExpiresAt && profile.premiumExpiresAt > Date.now()),
-    [profile?.premiumExpiresAt]
-  );
+  const hasActivePremium = useMemo(() => {
+    if (!profile?.premiumExpiresAt) return false;
+    return profile.premiumExpiresAt > Date.now();
+  }, [profile?.premiumExpiresAt]);
 
   const pointsToNextPremium = useMemo(() => {
     if (!profile) return PREMIUM_DAY_COST;
@@ -306,8 +311,6 @@ export function AuthProvider({ children }) {
       premiumAccessDurationMs: PREMIUM_ACCESS_DURATION_MS,
       canUseGoogleSignIn: googleConfigured && Boolean(request),
       startGoogleSignIn,
-      signOut,
-      refreshProfile,
       redeemPremiumDay,
       clearAuthError,
     }),
@@ -323,8 +326,6 @@ export function AuthProvider({ children }) {
       googleConfigured,
       request,
       startGoogleSignIn,
-      signOut,
-      refreshProfile,
       redeemPremiumDay,
       clearAuthError,
     ]

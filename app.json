@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "toilet",
+    "owner": "hlalisani",
     "slug": "toilet",
     "version": "1.0.0",
     "orientation": "portrait",
