@@ -1,5 +1,5 @@
 // contexts/AuthContext.js
-// Google Sign-In via Expo Auth Session (ID token flow) + Firebase Auth + Firestore profile
+// Google Sign-In via Expo Auth Session (ID token) -> Firebase Auth -> Firestore profile
 
 import React, {
   createContext,
@@ -7,12 +7,13 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
-import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
 import {
@@ -41,7 +42,11 @@ import {
   PREMIUM_ACCESS_DURATION_MS,
 } from '../constants/authConfig';
 
+// MUST be called at the top level so the auth-session can complete on iOS
 WebBrowser.maybeCompleteAuthSession();
+
+const log = (...args) => console.log('[auth]', ...args);
+const warn = (...args) => console.warn('[auth]', ...args);
 
 const AuthContext = createContext(null);
 
@@ -62,38 +67,31 @@ const normalizeProfile = (raw = {}) => ({
 
 // ---------- provider ----------
 export function AuthProvider({ children }) {
-  // Reuse the already-initialized Firebase Auth instance
   const auth = useMemo(() => sharedAuth ?? null, []);
   const googleConfigured = useMemo(() => isGoogleAuthConfigured(), []);
 
-  // In Expo Go we must use the HTTPS proxy redirect. Build it explicitly.
-  const proxyRedirectUri = useMemo(() => {
-    const u = (EXPO_USERNAME || '').trim();
-    const s = (EXPO_SLUG || '').trim();
-    if (u && s) return `https://auth.expo.io/@${u}/${s}`;
-    // Fallback still uses the proxy
-    return makeRedirectUri({ useProxy: true, scheme: APP_SCHEME });
+  // We **force** the Expo proxy redirect for Expo Go
+  const redirectUri = useMemo(() => {
+    const forced = `https://auth.expo.io/@${EXPO_USERNAME}/${EXPO_SLUG}`;
+    log('redirectUri (forced):', forced);
+    return forced;
   }, []);
 
-  // For now, always force proxy (works in Expo Go, dev client, simulators)
-  const redirectUri = proxyRedirectUri;
-  if (__DEV__) console.log('[auth] redirectUri:', redirectUri);
+  // Show the exact client IDs we’ll use
+  useEffect(() => {
+    log('clientIds:', JSON.stringify(googleAuthConfig));
+  }, []);
 
-  // Use ID Token flow so we can sign into Firebase directly
+  // -- Create the Google request (ID TOKEN flow) --
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    // In Expo Go, pass your **Web client ID** as expoClientId
     expoClientId:
-      googleAuthConfig.expoClientId ||
-      googleAuthConfig.webClientId ||
-      undefined,
-    // For native builds later
+      googleAuthConfig.expoClientId || googleAuthConfig.webClientId || undefined,
+    webClientId: googleAuthConfig.webClientId || undefined,
     iosClientId: googleAuthConfig.iosClientId || undefined,
     androidClientId: googleAuthConfig.androidClientId || undefined,
-    // For PWA / web
-    webClientId: googleAuthConfig.webClientId || undefined,
     scopes: ['openid', 'profile', 'email'],
-    selectAccount: true,
-    redirectUri,
+    redirectUri, // force proxy URL
+    // NOTE: do not pass responseType; the `useIdTokenAuthRequest` hook sets it.
   });
 
   const [firebaseUser, setFirebaseUser] = useState(null);
@@ -102,6 +100,35 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [signInInFlight, setSignInInFlight] = useState(false);
   const [redeemInFlight, setRedeemInFlight] = useState(false);
+
+  const urlSeenRef = useRef(0);
+
+  // Extra diagnostics: log any URL that tries to wake the app
+  useEffect(() => {
+    const onUrl = ({ url }) => {
+      urlSeenRef.current++;
+      log('Linking URL event (#' + urlSeenRef.current + '):', url);
+    };
+    const sub = Linking.addEventListener('url', onUrl);
+    Linking.getInitialURL().then((u) => {
+      if (u) log('Initial URL:', u);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Log request creation (helps find rerender loops)
+  useEffect(() => {
+    if (request) {
+      log(
+        'request ready (should be id_token flow):',
+        JSON.stringify({
+          clientId: String(request.clientId || '').slice(0, 10) + '…',
+          redirectUri: request.redirectUri,
+          responseType: request.responseType,
+        })
+      );
+    }
+  }, [request]);
 
   // ---------- profile load / hydrate ----------
   const hydrateProfile = useCallback(async (user) => {
@@ -160,7 +187,7 @@ export function AuthProvider({ children }) {
       }
       setProfile(next);
     } catch (e) {
-      console.warn('[auth] Failed to load profile', e);
+      warn('Failed to load profile', e);
       setAuthError('Unable to load your profile. Please try again.');
     }
   }, []);
@@ -172,6 +199,7 @@ export function AuthProvider({ children }) {
       return;
     }
     const unsub = onAuthStateChanged(auth, (u) => {
+      log('onAuthStateChanged user:', !!u, u?.uid);
       setFirebaseUser(u);
       if (u) hydrateProfile(u);
       else setProfile(null);
@@ -185,6 +213,8 @@ export function AuthProvider({ children }) {
     const go = async () => {
       if (!signInInFlight || !response || !auth) return;
 
+      log('OAuth response:', JSON.stringify(response));
+
       try {
         if (response.type === 'success') {
           const idToken =
@@ -195,46 +225,86 @@ export function AuthProvider({ children }) {
           await signInWithCredential(auth, credential);
           setAuthError(null);
         } else if (response.type === 'cancel') {
-          setAuthError(null);
-        } else {
+          // This is what you’re seeing when the proxy cannot finish the session.
+          setAuthError(
+            'Sign-in was cancelled by the provider or the proxy could not finish. ' +
+            'Double-check: Google redirect URI https://auth.expo.io/@' +
+            `${EXPO_USERNAME}/${EXPO_SLUG}, Expo Go is logged in as ${EXPO_USERNAME}, and avoid reloading during sign-in.`
+          );
+        } else if (response.type === 'error') {
           setAuthError(response.error?.message ?? 'Google sign-in failed.');
+        } else {
+          setAuthError('Google sign-in failed.');
         }
       } catch (e) {
-        console.warn('[auth] Google sign-in failed', e);
+        warn('Google sign-in failed', e);
         setAuthError(e.message ?? 'Google sign-in failed.');
       } finally {
         setSignInInFlight(false);
       }
     };
     go();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response, auth, signInInFlight]);
 
   // ---------- actions ----------
   const startGoogleSignIn = useCallback(async () => {
     if (!googleConfigured) {
-      setAuthError('Google Sign-In is not configured yet. Check your .env values.');
+      setAuthError('Google Sign-In is not configured yet. Check .env values.');
       return;
     }
     if (!request) {
-      setAuthError('Google Sign-In is still initializing. Please try again in a moment.');
+      setAuthError('Google Sign-In is still initializing. Please try again.');
       return;
     }
+
     try {
       setAuthError(null);
       setSignInInFlight(true);
-      // Force the proxy so Google gets an HTTPS redirect (no exp://)
-      const res = await promptAsync({ useProxy: true, showInRecents: true });
+
+      // iOS stability: warm up SFSafariViewController
+      if (Platform.OS === 'ios') {
+        try {
+          await WebBrowser.warmUpAsync();
+        } catch { }
+      }
+
+      log('promptAsync open', {
+        projectNameForProxy: `@${EXPO_USERNAME}/${EXPO_SLUG}`,
+        redirectUri,
+      });
+
+      // Use the proxy (required in Expo Go)
+      const res = await promptAsync({
+        useProxy: true,
+        projectNameForProxy: `@${EXPO_USERNAME}/${EXPO_SLUG}`,
+        preferEphemeralSession: false, // flip to true if you see cookie issues
+        showInRecents: true,
+      });
+
+      log('promptAsync result:', JSON.stringify(res));
+
       if (!res || res.type !== 'success') {
-        if (!res || res.type === 'cancel') setAuthError(null);
-        else setAuthError(res.error?.message ?? 'Google sign-in was cancelled.');
-        setSignInInFlight(false);
+        // Don’t set error here; the response effect will, but we keep a guard:
+        if (res?.type === 'cancel') {
+          // let the response effect set the friendly message
+        } else if (res?.type === 'dismiss') {
+          setAuthError('Sign-in window was dismissed.');
+          setSignInInFlight(false);
+        }
       }
     } catch (e) {
-      console.warn('[auth] Failed to start Google sign-in', e);
+      warn('Failed to start Google sign-in', e);
       setSignInInFlight(false);
       setAuthError('Unable to start Google sign-in. Please try again.');
+    } finally {
+      if (Platform.OS === 'ios') {
+        try {
+          await WebBrowser.coolDownAsync();
+        } catch { }
+      }
     }
-  }, [googleConfigured, request, promptAsync]);
+  }, [googleConfigured, request, promptAsync, redirectUri]);
 
   const signOut = useCallback(async () => {
     if (!auth) return;
@@ -242,7 +312,7 @@ export function AuthProvider({ children }) {
       await firebaseSignOut(auth);
       setAuthError(null);
     } catch (e) {
-      console.warn('[auth] Sign-out failed', e);
+      warn('Sign-out failed', e);
       setAuthError('Unable to sign out. Please try again.');
     }
   }, [auth]);
@@ -287,7 +357,7 @@ export function AuthProvider({ children }) {
       setAuthError(null);
       return { ok: true };
     } catch (e) {
-      console.warn('[auth] Premium redemption failed', e);
+      warn('Premium redemption failed', e);
       setAuthError(e.message ?? 'Unable to unlock premium right now.');
       return { ok: false, error: e.message };
     } finally {
