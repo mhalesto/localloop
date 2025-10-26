@@ -1,15 +1,20 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# --- Node / Expo ---
 node_modules/
-
-# Expo
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# Native
+# --- Native / generated ---
+/ios
+/android
 .kotlin/
 *.orig.*
 *.jks
@@ -18,29 +23,37 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+# --- OS / IDE ---
 .DS_Store
+.idea/
+.vscode/
 *.pem
 
-# local env files
-.env*.local
+# --- Env files ---
+.env
+.env.*
+!.env.example
 
-# typescript
+# --- TypeScript ---
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# --- Tests / coverage ---
+coverage/
 
-# AI models (do not commit)
+# --- Caches (global) ---
+.cache/
+**/.cache/
+
+# --- AI / model artifacts (NEVER commit) ---
+*.onnx
+*.onnx_data
+*.safetensors
+*.bin
+*.ckpt
+*.tflite
+*.pt
+*.weights
+
+# Specific project dirs
 backend/models/
-backend/.cache/
-backend/.cache/transformers/
+backend/uploads/
