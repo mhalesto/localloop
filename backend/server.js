@@ -3,6 +3,9 @@
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const path = require('path');
 const fs = require('fs');
 
@@ -27,6 +30,100 @@ const SUMMARY_SENTENCE_COUNTS = Object.freeze({
   balanced: { min: 3, max: 5 },
   detailed: { min: 4, max: 6 },
 });
+
+/** ---------- Auth config ---------- */
+const {
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  JWT_SECRET,
+  EXPO_PUBLIC_BASE_URL,
+  EXPO_PUBLIC_API_BASE_URL,
+  EXPO_PUBLIC_SCHEME,
+  AUTH_ALLOWED_ORIGINS,
+  AUTH_COOKIE_NAME,
+  SESSION_TOKEN_TTL
+} = process.env;
+
+const RESOLVED_COOKIE_NAME = AUTH_COOKIE_NAME || 'toilet_session';
+const SESSION_TTL = SESSION_TOKEN_TTL || '7d';
+const SESSION_MAX_AGE_MS = Math.max(Number(process.env.SESSION_MAX_AGE_DAYS || 7), 1) * 24 * 60 * 60 * 1000;
+
+const inferredOrigins = [
+  EXPO_PUBLIC_API_BASE_URL,
+  EXPO_PUBLIC_BASE_URL,
+  process.env.APP_URL,
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+  'http://localhost:19006',
+  'http://127.0.0.1:19006'
+]
+  .filter(Boolean)
+  .map((origin) => origin.trim());
+
+const allowedOrigins = new Set(
+  [
+    ...inferredOrigins,
+    ...(AUTH_ALLOWED_ORIGINS ? AUTH_ALLOWED_ORIGINS.split(',') : [])
+  ]
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0)
+);
+
+const resolveCorsOrigin = (origin, callback) => {
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+  if (allowedOrigins.size === 0 || allowedOrigins.has(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(new Error(`Origin ${origin} not allowed`));
+};
+
+const buildCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: SESSION_MAX_AGE_MS,
+  path: '/'
+});
+
+const signSessionToken = (payload = {}) => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured.');
+  }
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: SESSION_TTL });
+};
+
+const verifySessionToken = (token) => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured.');
+  }
+  return jwt.verify(token, JWT_SECRET);
+};
+
+const extractSessionToken = (req) => {
+  const authHeader = req.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+  if (req.cookies && req.cookies[RESOLVED_COOKIE_NAME]) {
+    return req.cookies[RESOLVED_COOKIE_NAME];
+  }
+  return null;
+};
+
+const createOAuthClient = (redirectUri) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    throw new Error('Google OAuth credentials are not configured.');
+  }
+  return new OAuth2Client({
+    clientId: GOOGLE_CLIENT_ID,
+    clientSecret: GOOGLE_CLIENT_SECRET,
+    redirectUri
+  });
+};
 
 /** ---------- Env helpers ---------- */
 const parseBooleanEnv = (value) => {
@@ -553,10 +650,118 @@ const buildSummaryConfig = (inputLength, overrides = {}) => {
 /** ---------- Express ---------- */
 const app = express();
 app.use((_, res, next) => { res.setHeader('Content-Type', 'application/json; charset=utf-8'); next(); });
-app.use(cors());
+app.use(cookieParser());
+app.use(cors({
+  origin: resolveCorsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+app.post('/auth/google/token', async (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'Google OAuth is not configured.' });
+  }
+  if (!JWT_SECRET) {
+    return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
+  }
+
+  const { code, codeVerifier, redirectUri, platform } = req.body ?? {};
+
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'Authorization code is required.' });
+  }
+  if (!redirectUri || typeof redirectUri !== 'string') {
+    return res.status(400).json({ error: 'redirectUri is required.' });
+  }
+
+  try {
+    const oauthClient = createOAuthClient(redirectUri);
+    const { tokens } = await oauthClient.getToken({
+      code,
+      codeVerifier,
+      redirect_uri: redirectUri
+    });
+
+    oauthClient.setCredentials(tokens);
+
+    if (!tokens.id_token) {
+      return res.status(400).json({ error: 'Failed to obtain Google ID token.' });
+    }
+
+    const ticket = await oauthClient.verifyIdToken({ idToken: tokens.id_token, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(400).json({ error: 'Unable to read Google profile.' });
+    }
+
+    const user = {
+      id: payload.sub,
+      email: payload.email,
+      name: payload.name ?? '',
+      picture: payload.picture ?? ''
+    };
+
+    const sessionToken = signSessionToken({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture
+    });
+
+    if (platform === 'web') {
+      res.cookie(RESOLVED_COOKIE_NAME, sessionToken, buildCookieOptions());
+    }
+
+    return res.json({
+      token: platform === 'web' ? undefined : sessionToken,
+      idToken: tokens.id_token,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      user
+    });
+  } catch (error) {
+    console.error('[auth] Google code exchange failed', error);
+    return res.status(400).json({ error: 'Failed to exchange Google authorization code.' });
+  }
+});
+
+app.get('/auth/session', (req, res) => {
+  if (!JWT_SECRET) {
+    return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
+  }
+
+  const token = extractSessionToken(req);
+  if (!token) {
+    return res.status(401).json({ error: 'missing_session' });
+  }
+
+  try {
+    const payload = verifySessionToken(token);
+    return res.json({
+      user: {
+        id: payload.sub,
+        email: payload.email,
+        name: payload.name ?? '',
+        picture: payload.picture ?? ''
+      }
+    });
+  } catch (error) {
+    return res.status(401).json({ error: 'invalid_session' });
+  }
+});
+
+app.post('/auth/signout', (req, res) => {
+  if (req.cookies && req.cookies[RESOLVED_COOKIE_NAME]) {
+    res.clearCookie(RESOLVED_COOKIE_NAME, buildCookieOptions());
+  }
+  res.json({ ok: true });
+});
 
 app.post('/summaries', async (req, res) => {
   const { text, options = {} } = req.body ?? {};

@@ -5,47 +5,37 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState
+  useState,
 } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
+import Constants from 'expo-constants';
 import {
-  getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithCredential,
-  signOut as firebaseSignOut
+  signOut as firebaseSignOut,
 } from 'firebase/auth';
-import {
-  doc,
-  getDoc,
-  runTransaction,
-  serverTimestamp,
-  setDoc
-} from 'firebase/firestore';
-import { app, db } from '../api/firebaseClient';
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
+import { auth, db } from '../api/firebaseClient';
 import {
   googleAuthConfig,
   isGoogleAuthConfigured,
   SIGNUP_BONUS_POINTS,
   PREMIUM_DAY_COST,
-  PREMIUM_ACCESS_DURATION_MS
+  PREMIUM_ACCESS_DURATION_MS,
+  APP_SCHEME,
 } from '../constants/authConfig';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const AuthContext = createContext(null);
 
-const normalizeTimestamp = (value) => {
-  if (!value) {
-    return null;
-  }
-  if (typeof value === 'number') {
-    return value;
-  }
-  if (typeof value.toMillis === 'function') {
-    return value.toMillis();
-  }
+const normalizeTimestamp = (v) => {
+  if (!v) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v?.toMillis === 'function') return v.toMillis();
   return null;
 };
 
@@ -57,24 +47,15 @@ const normalizeProfile = (raw = {}) => ({
   premiumExpiresAt: normalizeTimestamp(raw.premiumExpiresAt),
   signupBonusAwardedAt: normalizeTimestamp(raw.signupBonusAwardedAt),
   lastLoginAt: normalizeTimestamp(raw.lastLoginAt),
-  lastPremiumRedeemedAt: normalizeTimestamp(raw.lastPremiumRedeemedAt)
+  lastPremiumRedeemedAt: normalizeTimestamp(raw.lastPremiumRedeemedAt),
 });
 
-const getAuthInstance = () => {
-  if (!app) {
-    return null;
-  }
-  try {
-    return getAuth(app);
-  } catch (error) {
-    console.warn('[auth] Unable to initialize Firebase auth', error);
-    return null;
-  }
-};
+// Treat anything that isn't a standalone store build as "Expo client/dev"
+const isExpoClient = Constants.appOwnership !== 'standalone';
 
 export function AuthProvider({ children }) {
-  const auth = useMemo(() => getAuthInstance(), []);
   const googleConfigured = useMemo(() => isGoogleAuthConfigured(), []);
+
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [initializing, setInitializing] = useState(true);
@@ -82,12 +63,25 @@ export function AuthProvider({ children }) {
   const [signInInFlight, setSignInInFlight] = useState(false);
   const [redeemInFlight, setRedeemInFlight] = useState(false);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const redirectUri = useMemo(
+    () =>
+      makeRedirectUri({
+        scheme: APP_SCHEME,          // e.g. "toilet"
+        useProxy: isExpoClient,      // proxy for Expo Go/dev client
+      }),
+    []
+  );
+
+  // Provide platform client IDs. We *always* define ios/android here
+  // (falling back to the Expo client ID) so the hook never throws.
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     expoClientId: googleAuthConfig.expoClientId || undefined,
     iosClientId: googleAuthConfig.iosClientId || undefined,
     androidClientId: googleAuthConfig.androidClientId || undefined,
     webClientId: googleAuthConfig.webClientId || undefined,
-    selectAccount: true
+    selectAccount: true,
+    scopes: ['openid', 'profile', 'email'],
+    redirectUri,
   });
 
   const hydrateProfile = useCallback(
@@ -99,8 +93,9 @@ export function AuthProvider({ children }) {
       try {
         const now = Date.now();
         const ref = doc(db, 'users', user.uid);
-        const snapshot = await getDoc(ref);
-        if (!snapshot.exists()) {
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
           const baseData = {
             displayName: user.displayName ?? '',
             email: user.email ?? '',
@@ -109,54 +104,45 @@ export function AuthProvider({ children }) {
             premiumExpiresAt: null,
             signupBonusAwardedAt: now,
             lastLoginAt: now,
-            providers: (user.providerData ?? []).map((provider) => provider.providerId)
+            providers: (user.providerData ?? []).map((p) => p.providerId),
           };
           await setDoc(
             ref,
-            {
-              ...baseData,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            },
+            { ...baseData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
             { merge: false }
           );
           setProfile(normalizeProfile(baseData));
           return;
         }
-        const data = snapshot.data();
-        const nextProfile = normalizeProfile(data);
+
+        const data = snap.data();
+        const next = normalizeProfile(data);
         const updates = {};
-        if ((user.displayName ?? '') !== nextProfile.displayName) {
+
+        if ((user.displayName ?? '') !== next.displayName) {
           updates.displayName = user.displayName ?? '';
-          nextProfile.displayName = updates.displayName;
+          next.displayName = updates.displayName;
         }
-        if ((user.email ?? '') !== nextProfile.email) {
+        if ((user.email ?? '') !== next.email) {
           updates.email = user.email ?? '';
-          nextProfile.email = updates.email;
+          next.email = updates.email;
         }
-        if ((user.photoURL ?? '') !== nextProfile.photoURL) {
+        if ((user.photoURL ?? '') !== next.photoURL) {
           updates.photoURL = user.photoURL ?? '';
-          nextProfile.photoURL = updates.photoURL;
+          next.photoURL = updates.photoURL;
         }
         updates.lastLoginAt = now;
-        nextProfile.lastLoginAt = now;
-        const providers = (user.providerData ?? []).map((provider) => provider.providerId);
-        if (providers.length) {
-          updates.providers = providers;
+        next.lastLoginAt = now;
+
+        const providers = (user.providerData ?? []).map((p) => p.providerId);
+        if (providers.length) updates.providers = providers;
+
+        if (Object.keys(updates).length) {
+          await setDoc(ref, { ...updates, updatedAt: serverTimestamp() }, { merge: true });
         }
-        if (Object.keys(updates).length > 0) {
-          await setDoc(
-            ref,
-            {
-              ...updates,
-              updatedAt: serverTimestamp()
-            },
-            { merge: true }
-          );
-        }
-        setProfile(nextProfile);
-      } catch (error) {
-        console.warn('[auth] Failed to load profile', error);
+        setProfile(next);
+      } catch (e) {
+        console.warn('[auth] Failed to load profile', e);
         setAuthError('Unable to load your profile. Please try again.');
       }
     },
@@ -168,35 +154,29 @@ export function AuthProvider({ children }) {
       setInitializing(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setFirebaseUser(nextUser);
-      if (nextUser) {
-        hydrateProfile(nextUser);
-      } else {
-        setProfile(null);
-      }
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setFirebaseUser(u);
+      if (u) hydrateProfile(u);
+      else setProfile(null);
       setInitializing(false);
     });
-    return unsubscribe;
+    return unsub;
   }, [auth, hydrateProfile]);
 
   useEffect(() => {
-    const handleResponse = async () => {
-      if (!signInInFlight || !response || !auth) {
-        return;
-      }
+    const run = async () => {
+      if (!signInInFlight || !response || !auth) return;
+
       if (response.type === 'success') {
         try {
-          const idToken = response.authentication?.idToken;
-          if (!idToken) {
-            throw new Error('Missing Google ID token.');
-          }
-          const credential = GoogleAuthProvider.credential(idToken);
-          await signInWithCredential(auth, credential);
+          const idToken = response.params?.id_token || response.authentication?.idToken;
+          if (!idToken) throw new Error('Missing Google ID token.');
+          const cred = GoogleAuthProvider.credential(idToken);
+          await signInWithCredential(auth, cred);
           setAuthError(null);
-        } catch (error) {
-          console.warn('[auth] Google credential sign-in failed', error);
-          setAuthError(error.message ?? 'Google sign-in failed. Please try again.');
+        } catch (e) {
+          console.warn('[auth] Google credential sign-in failed', e);
+          setAuthError(e.message ?? 'Google sign-in failed. Please try again.');
         } finally {
           setSignInInFlight(false);
         }
@@ -208,7 +188,7 @@ export function AuthProvider({ children }) {
         setSignInInFlight(false);
       }
     };
-    handleResponse();
+    run();
   }, [response, auth, signInInFlight]);
 
   const startGoogleSignIn = useCallback(async () => {
@@ -223,39 +203,32 @@ export function AuthProvider({ children }) {
     try {
       setAuthError(null);
       setSignInInFlight(true);
-      const result = await promptAsync();
+      const result = await promptAsync({ useProxy: isExpoClient, showInRecents: true });
       if (!result || result.type !== 'success') {
-        if (!result || result.type === 'cancel') {
-          setAuthError(null);
-        } else {
-          setAuthError(result.error?.message ?? 'Google sign-in was cancelled.');
-        }
+        if (!result || result.type === 'cancel') setAuthError(null);
+        else setAuthError(result.error?.message ?? 'Google sign-in was cancelled.');
         setSignInInFlight(false);
       }
-    } catch (error) {
-      console.warn('[auth] Failed to start Google sign-in', error);
+    } catch (e) {
+      console.warn('[auth] Failed to start Google sign-in', e);
       setSignInInFlight(false);
       setAuthError('Unable to start Google sign-in. Please try again.');
     }
   }, [googleConfigured, request, promptAsync]);
 
   const signOut = useCallback(async () => {
-    if (!auth) {
-      return;
-    }
+    if (!auth) return;
     try {
       await firebaseSignOut(auth);
       setAuthError(null);
-    } catch (error) {
-      console.warn('[auth] Sign-out failed', error);
+    } catch (e) {
+      console.warn('[auth] Sign-out failed', e);
       setAuthError('Unable to sign out. Please try again.');
     }
-  }, [auth]);
+  }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (firebaseUser) {
-      await hydrateProfile(firebaseUser);
-    }
+    if (firebaseUser) await hydrateProfile(firebaseUser);
   }, [firebaseUser, hydrateProfile]);
 
   const redeemPremiumDay = useCallback(async () => {
@@ -265,62 +238,56 @@ export function AuthProvider({ children }) {
     }
     setRedeemInFlight(true);
     try {
-      const result = await runTransaction(db, async (transaction) => {
+      const result = await runTransaction(db, async (tx) => {
         const ref = doc(db, 'users', firebaseUser.uid);
-        const snapshot = await transaction.get(ref);
-        if (!snapshot.exists()) {
-          throw new Error('Profile not found.');
-        }
-        const data = normalizeProfile(snapshot.data());
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Profile not found.');
+
+        const data = normalizeProfile(snap.data());
         const now = Date.now();
         const currentPoints = data.points ?? 0;
-        if (currentPoints < PREMIUM_DAY_COST) {
-          throw new Error('Not enough points to unlock premium.');
-        }
+        if (currentPoints < PREMIUM_DAY_COST) throw new Error('Not enough points to unlock premium.');
+
         const activeUntil =
           data.premiumExpiresAt && data.premiumExpiresAt > now ? data.premiumExpiresAt : now;
         const premiumExpiresAt = activeUntil + PREMIUM_ACCESS_DURATION_MS;
-        transaction.update(ref, {
+
+        tx.update(ref, {
           points: currentPoints - PREMIUM_DAY_COST,
           premiumExpiresAt,
           lastPremiumRedeemedAt: now,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
+
         return {
           ...data,
           points: currentPoints - PREMIUM_DAY_COST,
           premiumExpiresAt,
-          lastPremiumRedeemedAt: now
+          lastPremiumRedeemedAt: now,
         };
       });
       setProfile(result);
       setAuthError(null);
       return { ok: true };
-    } catch (error) {
-      console.warn('[auth] Premium redemption failed', error);
-      setAuthError(error.message ?? 'Unable to unlock premium right now.');
-      return { ok: false, error: error.message };
+    } catch (e) {
+      console.warn('[auth] Premium redemption failed', e);
+      setAuthError(e.message ?? 'Unable to unlock premium right now.');
+      return { ok: false, error: e.message };
     } finally {
       setRedeemInFlight(false);
     }
-  }, [firebaseUser, db]);
+  }, [firebaseUser]);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
-  const hasActivePremium = useMemo(() => {
-    if (!profile?.premiumExpiresAt) {
-      return false;
-    }
-    return profile.premiumExpiresAt > Date.now();
-  }, [profile?.premiumExpiresAt]);
+  const hasActivePremium = useMemo(
+    () => !!(profile?.premiumExpiresAt && profile.premiumExpiresAt > Date.now()),
+    [profile?.premiumExpiresAt]
+  );
 
   const pointsToNextPremium = useMemo(() => {
-    if (!profile) {
-      return PREMIUM_DAY_COST;
-    }
-    if (hasActivePremium) {
-      return 0;
-    }
+    if (!profile) return PREMIUM_DAY_COST;
+    if (hasActivePremium) return 0;
     const balance = Number.isFinite(profile.points) ? profile.points : 0;
     return Math.max(PREMIUM_DAY_COST - balance, 0);
   }, [profile, hasActivePremium]);
@@ -342,7 +309,7 @@ export function AuthProvider({ children }) {
       signOut,
       refreshProfile,
       redeemPremiumDay,
-      clearAuthError
+      clearAuthError,
     }),
     [
       firebaseUser,
@@ -359,7 +326,7 @@ export function AuthProvider({ children }) {
       signOut,
       refreshProfile,
       redeemPremiumDay,
-      clearAuthError
+      clearAuthError,
     ]
   );
 
@@ -367,9 +334,7 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }
