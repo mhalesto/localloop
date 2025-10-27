@@ -43,6 +43,7 @@ import {
   SIGNUP_BONUS_POINTS,
   PREMIUM_DAY_COST,
   PREMIUM_ACCESS_DURATION_MS,
+  ENGAGEMENT_POINT_RULES,
 } from '../constants/authConfig';
 
 // MUST be called at the top level so the auth-session can complete on iOS
@@ -415,6 +416,68 @@ export function AuthProvider({ children }) {
     [auth]
   );
 
+  const adjustPoints = useCallback(
+    async (delta, { reason = 'adjustment' } = {}) => {
+      if (!db || !firebaseUser) {
+        return { ok: false, error: 'not_authenticated' };
+      }
+      if (!Number.isFinite(delta) || delta === 0) {
+        return { ok: false, error: 'invalid_delta' };
+      }
+
+      try {
+        const result = await runTransaction(db, async (tx) => {
+          const ref = doc(db, 'users', firebaseUser.uid);
+          const snap = await tx.get(ref);
+          if (!snap.exists()) {
+            throw new Error('Profile not found.');
+          }
+
+          const data = snap.data() ?? {};
+          const currentPoints = Number.isFinite(data.points) ? data.points : 0;
+          const nextPoints = Math.max(0, Math.round(currentPoints + delta));
+
+          const updatePayload = {
+            points: nextPoints,
+            updatedAt: serverTimestamp(),
+          };
+          if (reason === 'engagement') {
+            updatePayload.lastEngagementAt = serverTimestamp();
+          }
+
+          tx.set(ref, updatePayload, { merge: true });
+          return nextPoints;
+        });
+
+        setProfile((prev) => (prev ? { ...prev, points: result } : prev));
+        return { ok: true, points: result };
+      } catch (e) {
+        warn('Adjust points failed', e);
+        return { ok: false, error: e?.message ?? 'adjust_points_failed' };
+      }
+    },
+    [db, firebaseUser]
+  );
+
+  const awardEngagementPoints = useCallback(
+    async (type, { amount } = {}) => {
+      const base = Number.isFinite(amount)
+        ? Number(amount)
+        : Number(ENGAGEMENT_POINT_RULES[type] ?? 0);
+      if (!base) {
+        return { ok: false, error: 'unsupported_engagement_type' };
+      }
+
+      const result = await adjustPoints(base, { reason: 'engagement' });
+      if (!result.ok && result.error === 'not_authenticated') {
+        // Silently ignore for guests.
+        return { ok: false, error: 'not_authenticated' };
+      }
+      return result;
+    },
+    [adjustPoints]
+  );
+
   const signOut = useCallback(async () => {
     if (!auth) return;
     try {
@@ -507,6 +570,7 @@ export function AuthProvider({ children }) {
       signUpWithEmail,
       sendPasswordReset: sendResetEmail,
       isResettingPassword: resetInFlight,
+      awardEngagementPoints,
       signOut,
       redeemPremiumDay,
       clearAuthError,
@@ -527,6 +591,7 @@ export function AuthProvider({ children }) {
       signInWithEmail,
       signUpWithEmail,
       sendResetEmail,
+      awardEngagementPoints,
       signOut,
       redeemPremiumDay,
       clearAuthError,

@@ -15,6 +15,7 @@ import RoomScreen from './screens/RoomScreen';
 import PostThreadScreen from './screens/PostThreadScreen';
 import MyCommentsScreen from './screens/MyCommentsScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -35,6 +36,7 @@ function RootNavigator() {
       <Stack.Screen name="PostThread" component={PostThreadScreen} />
       <Stack.Screen name="MyComments" component={MyCommentsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
     </Stack.Navigator>
   );
 }

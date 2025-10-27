@@ -41,6 +41,12 @@ export const SCHEME_REDIRECT = `${APP_SCHEME}://redirect`;
  */
 export const resolveRedirectUri = () => EXPO_PROXY_REDIRECT;
 
+// ── Engagement points ────────────────────────────────────────────────────────
+export const ENGAGEMENT_POINT_RULES = {
+  comment: 15,
+  upvote: 4,
+};
+
 // App constants (unchanged)
 export const SIGNUP_BONUS_POINTS = 250;
 export const PREMIUM_DAY_COST = 250;

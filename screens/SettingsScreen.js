@@ -709,6 +709,17 @@ export default function SettingsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity
+                style={styles.profileLinkRow}
+                onPress={() => navigation.navigate('Profile')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.profileLinkCopy}>
+                  <Text style={styles.profileLinkLabel}>View full profile</Text>
+                  <Text style={styles.profileLinkHint}>See rewards and premium status</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+              </TouchableOpacity>
               <View style={styles.rewardsCard}>
                 <View style={styles.rewardsHeader}>
                   <Text style={styles.rewardsLabel}>Point balance</Text>
@@ -1434,6 +1445,35 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 12,
       fontSize: 12,
       color: '#ef4444'
+    },
+    profileLinkRow: {
+      marginTop: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.background,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    },
+    profileLinkCopy: {
+      flex: 1,
+      marginRight: 12
+    },
+    profileLinkLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: palette.textPrimary
+    },
+    profileLinkHint: {
+      marginTop: 4,
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    profileLinkIcon: {
+      color: palette.primaryDark
     },
     emailModalBackdrop: {
       flex: 1,

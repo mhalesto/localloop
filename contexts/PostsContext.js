@@ -19,6 +19,7 @@ import {
   subscribeToTypingPresence,
   updateTypingPresence
 } from '../api/postService';
+import { useAuth } from './AuthContext';
 
 const PostsContext = createContext(null);
 
@@ -288,6 +289,7 @@ export function PostsProvider({ children }) {
   const prevPostsRef = useRef({});
   const hasHydratedPostsRef = useRef(false);
   const threadListenersRef = useRef(new Map());
+  const { awardEngagementPoints } = useAuth();
 
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
@@ -979,8 +981,10 @@ export function PostsProvider({ children }) {
         type: 'addComment',
         payload: { city, postId, comment: prepareCommentForRemote(newComment) }
       });
+
+      awardEngagementPoints?.('comment');
     },
-    [enqueueOperation, ensureClientId, setPostsWithPersist]
+    [awardEngagementPoints, enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
   const toggleCommentReaction = useCallback(
@@ -1474,6 +1478,7 @@ export function PostsProvider({ children }) {
     (city, postId, direction) => {
       const voterId = ensureClientId();
       let remotePayload = null;
+      let earnedEngagementPoints = false;
 
       setPostsWithPersist((prev) => {
         const cityPosts = prev[city] ?? [];
@@ -1496,6 +1501,10 @@ export function PostsProvider({ children }) {
             delete votes[voterId];
           } else {
             votes[voterId] = nextVote;
+          }
+
+          if (direction === 'up' && currentVote !== 'up' && nextVote === 'up') {
+            earnedEngagementPoints = true;
           }
 
           const voteValues = Object.values(votes);
@@ -1526,8 +1535,12 @@ export function PostsProvider({ children }) {
       if (remotePayload) {
         enqueueOperation({ type: 'updatePost', payload: { post: remotePayload } });
       }
+
+      if (earnedEngagementPoints) {
+        awardEngagementPoints?.('upvote');
+      }
     },
-    [enqueueOperation, ensureClientId, setPostsWithPersist]
+    [awardEngagementPoints, enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
   const updatePost = useCallback(
