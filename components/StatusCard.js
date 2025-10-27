@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,9 +16,7 @@ const formatRelativeTime = (timestamp) => {
   const now = Date.now();
   const diffSeconds = Math.max(1, Math.floor((now - timestamp) / 1000));
 
-  if (diffSeconds < 60) {
-    return `${diffSeconds}s ago`;
-  }
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
 
   for (let i = 0; i < RELATIVE_TIME_THRESHOLDS.length; i += 1) {
     const { unit, seconds } = RELATIVE_TIME_THRESHOLDS[i];
@@ -36,12 +34,11 @@ const formatRelativeTime = (timestamp) => {
 export default function StatusCard({ status, onPress, onReact, onReport }) {
   const { themeColors } = useSettings();
   const { user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
-  if (!status) {
-    return null;
-  }
+  if (!status) return null;
 
   const {
     message,
@@ -54,51 +51,88 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
     province,
   } = status;
 
-  const totalReactions = Object.values(reactions).reduce((sum, entry) => sum + (entry?.count ?? 0), 0);
+  const totalReactions = Object.values(reactions).reduce(
+    (sum, entry) => sum + (entry?.count ?? 0),
+    0
+  );
   const readyLocation = [city, province].filter(Boolean).join(', ');
   const viewerReactionKey = useMemo(() => {
     if (user?.uid) return user.uid;
     if (user?.email) return `client-${user.email}`;
     return null;
   }, [user?.email, user?.uid]);
+
   const viewerReacted = Boolean(
     viewerReactionKey && reactions?.heart?.reactors && reactions.heart.reactors[viewerReactionKey]
   );
+
   const authorName = author?.nickname || author?.displayName || 'Anonymous';
   const relativeTime = formatRelativeTime(createdAt);
 
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => onPress?.(status)}
+      onPress={() => {
+        setMenuOpen(false);
+        onPress?.(status);
+      }}
       activeOpacity={0.9}
     >
       <View style={styles.headerRow}>
         <Ionicons name="person-circle" size={40} color={themeColors.primaryDark} />
-        <View style={styles.authorTextBlock}>
+
+        <View style={styles.authorTextBlock /* minWidth:0 + shrink fixes text clipping */}>
           <Text style={styles.authorName} numberOfLines={1}>
             {authorName}
           </Text>
-          <View style={styles.metaRow}>
+
+          <View style={styles.metaRow /* wrap + shrink so chips never clip behind menu */}>
             <View style={styles.metaChip}>
               <Ionicons name="location-outline" size={14} color={themeColors.textSecondary} />
               <Text style={styles.metaChipText} numberOfLines={1}>
                 {readyLocation || 'Somewhere nearby'}
               </Text>
             </View>
-            <View style={[styles.metaChip, styles.metaChipGhost, styles.metaChipLast]}>
+
+            <View style={[styles.metaChip, styles.metaChipGhost]}>
               <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
-              <Text style={styles.metaChipText}>{relativeTime}</Text>
+              <Text style={styles.metaChipText} numberOfLines={1}>
+                {relativeTime}
+              </Text>
             </View>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.reportButton}
-          onPress={() => onReport?.(status)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="flag-outline" size={18} color={themeColors.textSecondary} />
-        </TouchableOpacity>
+
+        {/* Three-dots overflow menu (replaces always-on flag) */}
+        <View style={{ position: 'relative' }}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setMenuOpen((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={themeColors.textSecondary} />
+          </TouchableOpacity>
+
+          {menuOpen ? (
+            <View style={styles.menuPopover}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  onReport?.(status);
+                }}
+              >
+                <Ionicons
+                  name="flag-outline"
+                  size={16}
+                  color={themeColors.textPrimary}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.menuItemText}>Report status</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <Text style={styles.message}>{message}</Text>
@@ -108,6 +142,7 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
       ) : null}
 
       <View style={styles.footerRow}>
+        {/* Heart / reactions */}
         <TouchableOpacity
           style={[styles.footerPill, viewerReacted && styles.footerPillActive]}
           onPress={() => onReact?.(status)}
@@ -123,10 +158,15 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
           </Text>
         </TouchableOpacity>
 
-        <View style={[styles.footerPill, styles.footerPillGhost]}>
+        {/* Comments count right next to heart */}
+        <TouchableOpacity
+          style={[styles.footerPill, styles.footerPillGhost]}
+          onPress={() => onPress?.(status)}
+          activeOpacity={0.8}
+        >
           <Ionicons name="chatbubble-ellipses-outline" size={18} color={themeColors.textSecondary} />
           <Text style={styles.footerLabel}>{repliesCount}</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -146,16 +186,18 @@ const createStyles = (palette) =>
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 6 },
       elevation: 2,
+      position: 'relative',
     },
     headerRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 12,
     },
     authorTextBlock: {
       marginLeft: 12,
       flex: 1,
+      minWidth: 0,      // 🔧 lets text shrink instead of overflow
+      flexShrink: 1,
     },
     authorName: {
       fontSize: 16,
@@ -166,6 +208,7 @@ const createStyles = (palette) =>
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 8,
+      flexWrap: 'wrap', // 🔧 avoids clipping under menu on small widths
     },
     metaChip: {
       flexDirection: 'row',
@@ -174,23 +217,50 @@ const createStyles = (palette) =>
       paddingHorizontal: 10,
       borderRadius: 999,
       backgroundColor: palette.background,
-      maxWidth: '100%',
       marginRight: 8,
+      marginTop: 4,
+      maxWidth: '100%',
+      flexShrink: 1, // 🔧
     },
     metaChipGhost: {
       backgroundColor: palette.card,
       borderWidth: 1,
       borderColor: palette.divider,
     },
-    metaChipLast: {
-      marginRight: 0,
-    },
     metaChipText: {
+      marginLeft: 6, // space after icon
       fontSize: 12,
       color: palette.textSecondary,
+      flexShrink: 1, // 🔧
     },
-    reportButton: {
-      padding: 6,
+    menuButton: { padding: 6, marginLeft: 6 },
+    menuPopover: {
+      position: 'absolute',
+      top: 32,
+      right: 0,
+      backgroundColor: palette.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      paddingVertical: 6,
+      minWidth: 160,
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 3,
+      zIndex: 10,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    menuItemText: {
+      color: palette.textPrimary,
+      fontSize: 14,
+      fontWeight: '600',
     },
     message: {
       fontSize: 16,
@@ -209,7 +279,6 @@ const createStyles = (palette) =>
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 18,
-      justifyContent: 'space-between',
     },
     footerPill: {
       flexDirection: 'row',
@@ -218,7 +287,7 @@ const createStyles = (palette) =>
       paddingVertical: 8,
       borderRadius: 999,
       backgroundColor: palette.background,
-      marginRight: 10,
+      marginRight: 10, // keep pills next to each other
     },
     footerPillActive: {
       backgroundColor: palette.primary,
@@ -226,9 +295,9 @@ const createStyles = (palette) =>
     footerPillGhost: {
       backgroundColor: palette.background,
       opacity: 0.9,
-      marginRight: 0,
     },
     footerLabel: {
+      marginLeft: 8,
       fontSize: 13,
       fontWeight: '600',
       color: palette.textSecondary,
