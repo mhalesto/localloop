@@ -24,6 +24,7 @@ export default function StatusComposerScreen({ navigation }) {
 
   const [message, setMessage] = useState('');
   const [imageUri, setImageUri] = useState(null);
+  const [imageMimeType, setImageMimeType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -42,8 +43,16 @@ export default function StatusComposerScreen({ navigation }) {
       allowsEditing: true,
     });
 
+    // const result = await ImagePicker.launchImageLibraryAsync({
+    //   mediaTypes: ImagePicker.MediaType.IMAGE,
+    //   allowsEditing: true,
+    //   quality: 0.8,
+    // });
+
     if (!result.canceled && result.assets?.length) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+      setImageMimeType(asset.mimeType ?? null);
       setError('');
     }
   }, []);
@@ -57,9 +66,11 @@ export default function StatusComposerScreen({ navigation }) {
 
     setSubmitting(true);
     try {
-      await createStatus({ message: trimmed, imageUri });
+      const image = imageUri ? { uri: imageUri, mimeType: imageMimeType } : null;
+      await createStatus({ message: trimmed, image });
       setMessage('');
       setImageUri(null);
+      setImageMimeType(null);
       setError('');
       navigation.goBack();
     } catch (submitError) {
@@ -108,7 +119,10 @@ export default function StatusComposerScreen({ navigation }) {
               <View style={styles.previewBlock}>
                 <Image source={{ uri: imageUri }} style={styles.previewImage} />
                 <TouchableOpacity
-                  onPress={() => setImageUri(null)}
+                  onPress={() => {
+                    setImageUri(null);
+                    setImageMimeType(null);
+                  }}
                   style={styles.removeImageButton}
                   activeOpacity={0.8}
                 >

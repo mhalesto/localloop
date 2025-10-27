@@ -94,24 +94,38 @@ const normalizeStatus = (docSnap) => {
 
 const buildImagePath = (uid, statusId) => `statuses/${uid || 'guest'}/${statusId}.jpg`;
 
-const uploadStatusImageAsync = async (uri, uid, statusId) => {
-  if (!uri) {
+const uriToBlob = (uri) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onerror = () => reject(new TypeError('Network request failed'));
+    xhr.onload = () => {
+      resolve(xhr.response);
+    };
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
+
+const uploadStatusImageAsync = async (image, uid, statusId) => {
+  if (!image?.uri) {
     return { imageUrl: null, imageStoragePath: null };
   }
 
   ensureStorage();
   const path = buildImagePath(uid, statusId);
   const storageRef = ref(storage, path);
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  await uploadBytes(storageRef, blob);
+  const blob = await uriToBlob(image.uri);
+  const metadata = image?.mimeType ? { contentType: image.mimeType } : undefined;
+
+  await uploadBytes(storageRef, blob, metadata);
+  blob.close?.();
   const downloadUrl = await getDownloadURL(storageRef);
   return { imageUrl: downloadUrl, imageStoragePath: path };
 };
 
 export async function createStatus({
   message,
-  imageUri,
+  image,
   author,
   location,
 }) {
@@ -124,9 +138,9 @@ export async function createStatus({
 
   const statusId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let imagePayload = { imageUrl: null, imageStoragePath: null };
-  if (imageUri) {
+  if (image) {
     try {
-      imagePayload = await uploadStatusImageAsync(imageUri, author?.uid ?? 'guest', statusId);
+      imagePayload = await uploadStatusImageAsync(image, author?.uid ?? 'guest', statusId);
     } catch (error) {
       console.warn('[statusService] upload image failed', error);
       throw new Error('Unable to upload image right now.');

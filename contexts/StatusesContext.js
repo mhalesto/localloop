@@ -114,7 +114,7 @@ export function StatusesProvider({ children }) {
   );
 
   const createStatusEntry = useCallback(
-    async ({ message, imageUri }) => {
+    async ({ message, image }) => {
       const author = {
         uid: user?.uid ?? null,
         displayName: user?.displayName ?? authProfile?.displayName ?? '',
@@ -125,7 +125,7 @@ export function StatusesProvider({ children }) {
 
       const payload = await createStatus({
         message,
-        imageUri,
+        image,
         author,
         location,
       });
