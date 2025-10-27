@@ -12,12 +12,15 @@ import NetInfo from '@react-native-community/netinfo';
 import {
   deletePostRemote,
   fetchAllPostsRemote,
+  fetchReportedPosts,
   saveCommentRemote,
   savePostRemote,
   subscribeToAllPosts,
   subscribeToPostComments,
   subscribeToTypingPresence,
-  updateTypingPresence
+  updateTypingPresence,
+  reportPostRemote,
+  POST_REPORT_THRESHOLD
 } from '../api/postService';
 import { useAuth } from './AuthContext';
 
@@ -286,6 +289,7 @@ export function PostsProvider({ children }) {
   const [threadReads, setThreadReads] = useState({});
   const [postSubscriptions, setPostSubscriptions] = useState({});
   const [notifications, setNotifications] = useState([]);
+  const [reportedPosts, setReportedPosts] = useState([]);
   const prevPostsRef = useRef({});
   const hasHydratedPostsRef = useRef(false);
   const threadListenersRef = useRef(new Map());
@@ -298,7 +302,7 @@ export function PostsProvider({ children }) {
     const localClientId = clientIdRef.current;
     const result = {};
     Object.entries(data).forEach(([cityName, posts]) => {
-      result[cityName] = (posts ?? []).map((post) => {
+      const normalized = (posts ?? []).map((post) => {
         const postClientId = post.clientId ?? null;
         const rawVotes =
           post.votes && typeof post.votes === 'object' && !Array.isArray(post.votes) ? post.votes : {};
@@ -336,6 +340,10 @@ export function PostsProvider({ children }) {
             ? post.message
             : '';
 
+        const reportCount = Number.isFinite(post.reportCount) ? post.reportCount : 0;
+        const reports = typeof post.reports === 'object' ? post.reports : {};
+        const isHidden = Boolean(post.isHidden);
+
         return {
           ...post,
           votes: rawVotes,
@@ -346,8 +354,19 @@ export function PostsProvider({ children }) {
           title: normalizedTitle,
           createdByMe: postClientId ? postClientId === localClientId : Boolean(post.createdByMe),
           comments: normalizedComments,
-          highlightDescription: Boolean(post.highlightDescription)
+          highlightDescription: Boolean(post.highlightDescription),
+          reports,
+          reportCount,
+          isHidden,
         };
+      });
+
+      result[cityName] = normalized.filter((item) => {
+        if (!item) return false;
+        if (item.createdByMe) return true;
+        if (item.isHidden) return false;
+        if (item.reportCount >= POST_REPORT_THRESHOLD) return false;
+        return true;
       });
     });
     return result;
@@ -1543,6 +1562,68 @@ export function PostsProvider({ children }) {
     [awardEngagementPoints, enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
+  const reportPost = useCallback(
+    async (postId, reason = 'inappropriate') => {
+      if (!postId) {
+        return { ok: false, error: 'invalid_arguments' };
+      }
+
+      const reporterId = ensureClientId();
+      const result = await reportPostRemote(postId, reporterId, reason);
+
+      if (result.ok && !result.alreadyReported) {
+        setPostsWithPersist((prev) => {
+          const next = { ...prev };
+          let mutated = false;
+
+          Object.keys(next).forEach((cityKey) => {
+            const posts = next[cityKey];
+            if (!Array.isArray(posts)) {
+              return;
+            }
+
+            next[cityKey] = posts.map((post) => {
+              if (post.id !== postId) {
+                return post;
+              }
+
+              const reports = { ...(post.reports ?? {}) };
+              reports[reporterId] = {
+                reason,
+                reportedAt: Date.now()
+              };
+              const reportCount = Object.keys(reports).length;
+              const isHidden = result.isHidden ?? post.isHidden;
+              mutated = true;
+              return {
+                ...post,
+                reports,
+                reportCount,
+                isHidden
+              };
+            });
+          });
+
+          return mutated ? next : prev;
+        });
+      }
+
+      return result;
+    },
+    [ensureClientId, setPostsWithPersist]
+  );
+
+  const refreshReportedPosts = useCallback(async () => {
+    try {
+      const items = await fetchReportedPosts({ limit: 100 });
+      setReportedPosts(items);
+      return items;
+    } catch (error) {
+      console.warn('[PostsProvider] refreshReportedPosts failed', error);
+      return [];
+    }
+  }, []);
+
   const updatePost = useCallback(
     (city, postId, updates) => {
       if (!city || !postId || !updates || typeof updates !== 'object') {
@@ -1696,7 +1777,10 @@ export function PostsProvider({ children }) {
       refreshPosts: refreshFromRemote,
       watchThread,
       setTypingStatus,
-      observeTyping
+      observeTyping,
+      reportPost,
+      reportedPosts,
+      refreshReportedPosts
     }),
     [
       addComment,
@@ -1722,7 +1806,10 @@ export function PostsProvider({ children }) {
       refreshFromRemote,
       watchThread,
       setTypingStatus,
-      observeTyping
+      observeTyping,
+      reportPost,
+      reportedPosts,
+      refreshReportedPosts
     ]
   );
 

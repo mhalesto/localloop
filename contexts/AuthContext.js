@@ -44,6 +44,7 @@ import {
   PREMIUM_DAY_COST,
   PREMIUM_ACCESS_DURATION_MS,
   ENGAGEMENT_POINT_RULES,
+  ADMIN_EMAILS,
 } from '../constants/authConfig';
 
 // MUST be called at the top level so the auth-session can complete on iOS
@@ -136,6 +137,15 @@ export function AuthProvider({ children }) {
   const [signInInFlight, setSignInInFlight] = useState(false);
   const [redeemInFlight, setRedeemInFlight] = useState(false);
   const [resetInFlight, setResetInFlight] = useState(false);
+
+  const adminEmailSet = useMemo(
+    () => new Set((ADMIN_EMAILS ?? []).map((email) => email.toLowerCase())),
+    []
+  );
+  const isAdmin = useMemo(() => {
+    const email = (firebaseUser?.email ?? profile?.email ?? '').toLowerCase();
+    return email ? adminEmailSet.has(email) : false;
+  }, [adminEmailSet, firebaseUser?.email, profile?.email]);
 
   const urlSeenRef = useRef(0);
 
@@ -571,6 +581,7 @@ export function AuthProvider({ children }) {
       sendPasswordReset: sendResetEmail,
       isResettingPassword: resetInFlight,
       awardEngagementPoints,
+      isAdmin,
       signOut,
       redeemPremiumDay,
       clearAuthError,
@@ -592,6 +603,7 @@ export function AuthProvider({ children }) {
       signUpWithEmail,
       sendResetEmail,
       awardEngagementPoints,
+      isAdmin,
       signOut,
       redeemPremiumDay,
       clearAuthError,

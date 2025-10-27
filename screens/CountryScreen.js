@@ -8,9 +8,12 @@ import {
   ActivityIndicator
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import StatusCard from '../components/StatusCard';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
+import { useStatuses } from '../contexts/StatusesContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
 
 const INITIAL_VISIBLE = 40;
@@ -37,6 +40,14 @@ export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts } = usePosts();
+  const {
+    statuses,
+    isLoading: statusesLoading,
+    toggleStatusReaction,
+    reportStatus: reportStatusStatus,
+    statusesError,
+  } = useStatuses();
+  const [viewMode, setViewMode] = useState('picks');
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -168,6 +179,42 @@ export default function CountryScreen({ navigation }) {
     }
   }, [loadCountries, loadPersonalCities, refreshPosts]);
 
+  const statusList = useMemo(
+    () =>
+      [...statuses]
+        .filter(Boolean)
+        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)),
+    [statuses]
+  );
+
+  const isStatusesView = viewMode === 'statuses';
+  const statusesEmpty = statusList.length === 0;
+
+  const handleAddStatusPress = useCallback(() => {
+    navigation.navigate('StatusComposer');
+  }, [navigation]);
+
+  const handleOpenStatus = useCallback(
+    (status) => {
+      navigation.navigate('StatusDetail', { statusId: status.id });
+    },
+    [navigation]
+  );
+
+  const handleReactToStatus = useCallback(
+    async (status) => {
+      await toggleStatusReaction(status.id, 'heart');
+    },
+    [toggleStatusReaction]
+  );
+
+  const handleReportStatus = useCallback(
+    async (status) => {
+      await reportStatusStatus(status.id, 'inappropriate');
+    },
+    [reportStatusStatus]
+  );
+
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -289,7 +336,69 @@ export default function CountryScreen({ navigation }) {
       navigation={navigation}
       activeTab="home"
     >
-      {loading ? (
+      <View style={styles.toggleRow}>
+        <TouchableOpacity
+          style={[styles.toggleButton, !isStatusesView && styles.toggleButtonActive]}
+          onPress={() => setViewMode('picks')}
+          activeOpacity={0.9}
+        >
+          <Text style={[styles.toggleLabel, !isStatusesView && styles.toggleLabelActive]}>Top picks</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleButton, isStatusesView && styles.toggleButtonActive]}
+          onPress={() => setViewMode('statuses')}
+          activeOpacity={0.9}
+        >
+          <Text style={[styles.toggleLabel, isStatusesView && styles.toggleLabelActive]}>Top statuses</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isStatusesView ? (
+        statusesLoading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={themeColors.primaryDark} />
+          </View>
+        ) : (
+          <FlatList
+            data={statusList}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={
+              <View style={styles.statusHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Top statuses</Text>
+                  <Text style={styles.sectionHint}>Fresh updates from your area</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.statusCta}
+                  onPress={handleAddStatusPress}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="create-outline" size={18} color={themeColors.primaryDark} />
+                  <Text style={styles.statusCtaLabel}>New status</Text>
+                </TouchableOpacity>
+              </View>
+            }
+            ListEmptyComponent={
+              <Text style={styles.emptyState}>
+                {statusesError ? statusesError : 'No statuses yet. Be the first to post!'}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <StatusCard
+                status={item}
+                onPress={handleOpenStatus}
+                onReact={handleReactToStatus}
+                onReport={handleReportStatus}
+              />
+            )}
+            contentContainerStyle={[
+              styles.statusListContent,
+              statusesEmpty && styles.listContentEmpty
+            ]}
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      ) : loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={themeColors.primaryDark} />
         </View>
@@ -393,9 +502,7 @@ export default function CountryScreen({ navigation }) {
               <Text style={styles.emptyState}>No countries match your search yet.</Text>
             )
           }
-          ListFooterComponent={
-            <View style={{ height: showAddShortcut ? 160 : 60 }} />
-          }
+          ListFooterComponent={<View style={{ height: showAddShortcut ? 160 : 60 }} />}
           contentContainerStyle={[
             styles.listContent,
             listIsEmpty && styles.listContentEmpty
@@ -418,6 +525,63 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600',
       color: palette.textPrimary,
       marginBottom: 16
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      marginBottom: 16,
+      gap: 12
+    },
+    toggleButton: {
+      flex: 1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.background,
+      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    toggleButtonActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary
+    },
+    toggleLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: palette.textSecondary
+    },
+    toggleLabelActive: {
+      color: '#fff'
+    },
+    statusHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16
+    },
+    statusCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.background,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: palette.divider
+    },
+    statusCtaLabel: {
+      marginLeft: 8,
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primaryDark
+    },
+    statusListContent: {
+      paddingBottom: 120
+    },
+    personalError: {
+      marginTop: 6,
+      fontSize: 12,
+      color: '#ef4444'
     },
     sectionHint: {
       fontSize: 12,

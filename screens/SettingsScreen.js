@@ -50,7 +50,8 @@ export default function SettingsScreen({ navigation }) {
     signUpWithEmail,
     sendPasswordReset,
     redeemPremiumDay,
-    clearAuthError
+    clearAuthError,
+    isAdmin
   } = useAuth();
   const {
     showAddShortcut,
@@ -720,6 +721,19 @@ export default function SettingsScreen({ navigation }) {
                 </View>
                 <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
               </TouchableOpacity>
+              {isAdmin ? (
+                <TouchableOpacity
+                  style={styles.profileLinkRow}
+                  onPress={() => navigation.navigate('Moderation')}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.profileLinkCopy}>
+                    <Text style={styles.profileLinkLabel}>Moderation dashboard</Text>
+                    <Text style={styles.profileLinkHint}>Review reported posts and statuses</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+                </TouchableOpacity>
+              ) : null}
               <View style={styles.rewardsCard}>
                 <View style={styles.rewardsHeader}>
                   <Text style={styles.rewardsLabel}>Point balance</Text>

@@ -2,6 +2,7 @@
 import { Platform } from 'react-native';
 import { getApps, getApp, initializeApp } from 'firebase/app';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseConfig } from './firebaseConfig';
@@ -26,6 +27,8 @@ export const db =
       useFetchStreams: false,
       ignoreUndefinedProperties: true
     });
+
+export const storage = getStorage(app);
 
 let _auth;
 if (Platform.OS === 'web') {

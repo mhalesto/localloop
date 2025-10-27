@@ -3,14 +3,19 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  limit as limitQuery,
   onSnapshot,
   orderBy,
   query,
-  setDoc
+  runTransaction,
+  setDoc,
+  where
 } from 'firebase/firestore';
 import { db } from './firebaseClient';
+import { POST_REPORT_THRESHOLD } from '../constants/authConfig';
 
 const POSTS_COLLECTION = 'posts';
+export { POST_REPORT_THRESHOLD };
 
 const ensureDb = () => {
   if (!db) {
@@ -80,6 +85,84 @@ export async function savePostRemote(post) {
 
   const { comments, ...rest } = post;
   await setDoc(doc(db, POSTS_COLLECTION, post.id), rest, { merge: true });
+}
+
+export async function reportPostRemote(postId, userId, reason = 'inappropriate') {
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] reportPostRemote skipped:', error.message);
+    return { ok: false, error: 'db_unavailable' };
+  }
+
+  if (!postId || !userId) {
+    return { ok: false, error: 'invalid_arguments' };
+  }
+
+  try {
+    const result = await runTransaction(db, async (tx) => {
+      const ref = doc(db, POSTS_COLLECTION, postId);
+      const snap = await tx.get(ref);
+      if (!snap.exists()) {
+        throw new Error('Post not found.');
+      }
+
+      const data = snap.data() ?? {};
+      const reports = typeof data.reports === 'object' ? { ...data.reports } : {};
+      if (reports[userId]) {
+        return {
+          reportCount: data.reportCount ?? Object.keys(reports).length,
+          isHidden: Boolean(data.isHidden),
+          alreadyReported: true,
+        };
+      }
+
+      reports[userId] = {
+        reason,
+        reportedAt: Date.now()
+      };
+
+      const reportCount = Object.keys(reports).length;
+      const isHidden = reportCount >= POST_REPORT_THRESHOLD;
+
+      tx.update(ref, {
+        reports,
+        reportCount,
+        isHidden,
+        lastInteractionAt: Date.now()
+      });
+
+      return { reportCount, isHidden, alreadyReported: false };
+    });
+
+    return { ok: true, ...result };
+  } catch (error) {
+    console.warn('[postService] reportPostRemote failed', error);
+    return { ok: false, error: error?.message ?? 'report_failed' };
+  }
+}
+
+export async function fetchReportedPosts({ limit = 50 } = {}) {
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] fetchReportedPosts skipped:', error.message);
+    return [];
+  }
+
+  const q = query(
+    collection(db, POSTS_COLLECTION),
+    where('reportCount', '>=', 1),
+    orderBy('reportCount', 'desc'),
+    limitQuery(limit)
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
+    createdAt: normaliseTimestamp(docSnap.data()?.createdAt),
+  }));
 }
 
 export async function saveCommentRemote(postId, comment) {
@@ -241,4 +324,3 @@ export function subscribeToTypingPresence(postId, onPresence) {
 
   return unsubscribe;
 }
-
