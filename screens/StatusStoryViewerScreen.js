@@ -6,7 +6,9 @@ import React, {
   useState,
 } from 'react';
 import {
-  ImageBackground,
+  Image,
+  Pressable,
+  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
   Share,
@@ -26,6 +28,9 @@ import { useAuth } from '../contexts/AuthContext';
 
 const STORY_DURATION_MS = 6000;
 
+// rough header height: progress (8) + header (48) + margins
+const HEADER_TOUCH_EXCLUDE = 64;
+
 const formatRelativeTime = (timestamp) => {
   if (!timestamp) return '';
   try {
@@ -37,7 +42,7 @@ const formatRelativeTime = (timestamp) => {
 };
 
 export default function StatusStoryViewerScreen({ route, navigation }) {
-  const { themeColors } = useSettings(); // (not used, but kept for parity)
+  const { themeColors } = useSettings(); // reserved for theming
   const { user } = useAuth();
   const {
     statuses,
@@ -45,7 +50,9 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
     addReply,
     preloadStatuses,
   } = useStatuses();
+
   const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
 
   const statusIds = route.params?.statusIds ?? [];
   const initialStatusId = route.params?.initialStatusId ?? null;
@@ -75,26 +82,37 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const [sendingReply, setSendingReply] = useState(false);
   const [error, setError] = useState('');
 
-  const progressRef = useRef(progress);
-  useEffect(() => {
-    progressRef.current = progress;
-  }, [progress]);
+  // uploaded image natural size
+  const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 });
 
-  useEffect(() => {
-    setCurrentIndex(derivedInitialIndex);
-  }, [derivedInitialIndex]);
+  // ticker ref
+  const progressRef = useRef(progress);
+  useEffect(() => { progressRef.current = progress; }, [progress]);
+
+  useEffect(() => { setCurrentIndex(derivedInitialIndex); }, [derivedInitialIndex]);
 
   const currentStatus = storyItems[currentIndex] ?? null;
 
   useEffect(() => {
-    if (storyItems.length === 0) {
-      navigation.goBack?.();
-    }
+    if (storyItems.length === 0) navigation.goBack?.();
   }, [storyItems.length, navigation]);
 
   useEffect(() => {
-    preloadStatuses?.(storyItems.map((item) => item.id));
+    preloadStatuses?.(storyItems.map((i) => i.id));
   }, [preloadStatuses, storyItems]);
+
+  // natural image size lookup
+  useEffect(() => {
+    if (currentStatus?.imageUrl) {
+      Image.getSize(
+        currentStatus.imageUrl,
+        (w, h) => setImgNatural({ w, h }),
+        () => setImgNatural({ w: 0, h: 0 })
+      );
+    } else {
+      setImgNatural({ w: 0, h: 0 });
+    }
+  }, [currentStatus?.imageUrl]);
 
   const viewerReactionKey = useMemo(() => {
     if (user?.uid) return user.uid;
@@ -108,54 +126,48 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   }, [currentStatus?.reactions?.heart?.reactors, viewerReactionKey]);
 
   const handleExit = useCallback(() => {
-    navigation.goBack?.();
+    // schedule to avoid “set state during render” issues
+    requestAnimationFrame(() => navigation.goBack?.());
   }, [navigation]);
 
+  // boundary-safe next/prev (no setState callback that calls navigation)
   const handleNext = useCallback(() => {
     setProgress(0);
-    setCurrentIndex((prev) => {
-      if (prev + 1 >= storyItems.length) {
-        handleExit();
-        return prev;
-      }
-      return prev + 1;
-    });
-  }, [storyItems.length, handleExit]);
+    if (currentIndex + 1 >= storyItems.length) {
+      setIsPaused(true);
+      handleExit();
+      return;
+    }
+    setCurrentIndex(currentIndex + 1);
+  }, [currentIndex, storyItems.length, handleExit]);
 
   const handlePrevious = useCallback(() => {
     setProgress(0);
-    setCurrentIndex((prev) => {
-      if (prev <= 0) {
-        handleExit();
-        return prev;
-      }
-      return prev - 1;
-    });
-  }, [handleExit]);
-
-  useEffect(() => {
-    if (!currentStatus || isPaused) {
-      return undefined;
+    if (currentIndex <= 0) {
+      setIsPaused(true);
+      handleExit();
+      return;
     }
+    setCurrentIndex(currentIndex - 1);
+  }, [currentIndex, handleExit]);
+
+  // progress ticker
+  useEffect(() => {
+    if (!currentStatus || isPaused) return;
     let frame;
     const start = Date.now() - progressRef.current * STORY_DURATION_MS;
     const update = () => {
       const elapsed = Date.now() - start;
       const ratio = Math.min(1, elapsed / STORY_DURATION_MS);
       setProgress(ratio);
-      if (ratio >= 1) {
-        handleNext();
-      } else {
-        frame = requestAnimationFrame(update);
-      }
+      if (ratio >= 1) handleNext();
+      else frame = requestAnimationFrame(update);
     };
     frame = requestAnimationFrame(update);
-
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-    };
+    return () => { if (frame) cancelAnimationFrame(frame); };
   }, [currentStatus, isPaused, handleNext]);
 
+  // reset between slides
   useEffect(() => {
     setProgress(0);
     setReply('');
@@ -175,8 +187,8 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
         message: `${payload}Shared via Toilet`,
         url: currentStatus.imageUrl ?? undefined,
       });
-    } catch (shareError) {
-      console.warn('[StatusStoryViewer] share failed', shareError);
+    } catch (err) {
+      console.warn('[StatusStoryViewer] share failed', err);
     }
   }, [currentStatus]);
 
@@ -192,8 +204,8 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
       await addReply(currentStatus.id, trimmed);
       setReply('');
       setError('');
-    } catch (replyError) {
-      setError(replyError?.message ?? 'Unable to send reply right now.');
+    } catch (e) {
+      setError(e?.message ?? 'Unable to send reply right now.');
     } finally {
       setSendingReply(false);
     }
@@ -202,6 +214,38 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const handleInputFocus = useCallback(() => setIsPaused(true), []);
   const handleInputBlur = useCallback(() => setIsPaused(false), []);
 
+  // --- tap & hold controls ---
+  const didLongPressRef = useRef(false);
+  const onZonePressIn = useCallback(() => {
+    didLongPressRef.current = false;
+    setIsPaused(true);
+  }, []);
+  const onZoneLongPress = useCallback(() => {
+    didLongPressRef.current = true; // prevent navigation on release
+  }, []);
+  const onZonePressOut = useCallback(() => {
+    setIsPaused(false);
+  }, []);
+  const onLeftTap = useCallback(() => {
+    if (didLongPressRef.current) { didLongPressRef.current = false; return; }
+    handlePrevious();
+  }, [handlePrevious]);
+  const onRightTap = useCallback(() => {
+    if (didLongPressRef.current) { didLongPressRef.current = false; return; }
+    handleNext();
+  }, [handleNext]);
+
+  // compute displayed image size; never upscale beyond original
+  const availableW = winW;
+  const availableH = winH;
+  let displayW = availableW;
+  let displayH = availableH;
+  if (imgNatural.w && imgNatural.h) {
+    const scale = Math.min(1, availableW / imgNatural.w, availableH / imgNatural.h);
+    displayW = Math.round(imgNatural.w * scale);
+    displayH = Math.round(imgNatural.h * scale);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: '#0F0B26' }]}>
       <StatusBar style="light" hidden />
@@ -209,35 +253,59 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Tap zones for previous/next */}
-        <View style={[styles.touchOverlay, { bottom: 140 + insets.bottom }]} pointerEvents="box-none">
-          <TouchableOpacity style={styles.touchZone} activeOpacity={1} onPress={handlePrevious} />
-          <TouchableOpacity style={styles.touchZone} activeOpacity={1} onPress={handleNext} />
+        {/* Touch overlay ABOVE media, BELOW header/bottom */}
+        <View
+          style={[
+            styles.touchOverlay,
+            {
+              top: insets.top + HEADER_TOUCH_EXCLUDE,
+              bottom: 140 + insets.bottom,
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          <Pressable
+            style={styles.touchZone}
+            onPress={onLeftTap}
+            onPressIn={onZonePressIn}
+            onPressOut={onZonePressOut}
+            onLongPress={onZoneLongPress}
+            delayLongPress={200}
+          />
+          <Pressable
+            style={styles.touchZone}
+            onPress={onRightTap}
+            onPressIn={onZonePressIn}
+            onPressOut={onZonePressOut}
+            onLongPress={onZoneLongPress}
+            delayLongPress={200}
+          />
         </View>
 
-        {/* Background media */}
+        {/* Media layer: center image at natural size, never upscale */}
         {currentStatus?.imageUrl ? (
-          <ImageBackground
-            source={{ uri: currentStatus.imageUrl }}
-            style={styles.media}
-            resizeMode="cover"
-          >
+          <View style={styles.media}>
+            <Image
+              source={{ uri: currentStatus.imageUrl }}
+              style={[styles.mediaImage, { width: displayW, height: displayH }]}
+              resizeMode="contain"
+            />
             <View style={styles.mediaOverlay} />
-          </ImageBackground>
+          </View>
         ) : (
           <View style={[styles.media, styles.mediaFallback]}>
             <Text style={styles.fallbackText}>{currentStatus?.message}</Text>
           </View>
         )}
 
-        {/* UI chrome overlay */}
+        {/* UI chrome */}
         <View
           style={[
             styles.chromeOverlay,
             { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 },
           ]}
         >
-          {/* TOP: progress + header */}
+          {/* progress bars */}
           <View style={styles.progressRow}>
             {storyItems.map((_, index) => {
               let fill = 0;
@@ -257,6 +325,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             })}
           </View>
 
+          {/* header */}
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={handleExit} style={styles.headerButton} activeOpacity={0.8}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -276,17 +345,17 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Spacer pushes caption + bottom bar to the bottom */}
+          {/* spacer */}
           <View style={styles.bodyContent} />
 
-          {/* CAPTION ABOVE REPLY */}
+          {/* caption above reply */}
           {!!currentStatus?.message && (
             <Text style={styles.captionBelow} numberOfLines={3}>
               {currentStatus.message}
             </Text>
           )}
 
-          {/* BOTTOM BAR */}
+          {/* bottom bar */}
           <View style={styles.bottomBar}>
             <View style={styles.replyContainer}>
               <TextInput
@@ -339,7 +408,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
 
-  media: { flex: 1 },
+  // Media container centers image
+  media: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaImage: {
+    // width/height supplied dynamically
+  },
   mediaOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,15,35,0.25)',
@@ -368,7 +445,7 @@ const styles = StyleSheet.create({
   progressRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 8, // tighter to keep header near top
+    marginBottom: 8,
   },
   progressTrack: {
     flex: 1,
@@ -407,7 +484,7 @@ const styles = StyleSheet.create({
   // Spacer to push bottom content down
   bodyContent: { flex: 1, justifyContent: 'center' },
 
-  // Caption on its own line above reply
+  // Caption line above reply
   captionBelow: {
     color: '#fff',
     fontSize: 20,
@@ -476,12 +553,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Tap zones for previous/next
+  // Tap zones for prev/next with hold-to-pause
   touchOverlay: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
-    zIndex: 2,
-    bottom: 140,
+    zIndex: 4, // above media, below header/bottom (header buttons still work because we exclude its area via `top`)
   },
   touchZone: { flex: 1 },
 });
