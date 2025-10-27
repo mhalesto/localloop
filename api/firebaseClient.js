@@ -7,29 +7,50 @@ import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/aut
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseConfig } from './firebaseConfig';
 
+// OPTIONAL App Check on web (safe no-op on native without provider)
+let maybeInitAppCheck = () => { };
+try {
+  const { initializeAppCheck, ReCaptchaV3Provider } = require('firebase/app-check');
+  maybeInitAppCheck = (app) => {
+    if (Platform.OS === 'web') {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider('<YOUR_RECAPTCHA_V3_SITE_KEY>'),
+        isTokenAutoRefreshEnabled: true,
+      });
+    }
+  };
+} catch { }
+
 if (!firebaseConfig || !firebaseConfig.projectId) {
   console.warn('[firebase] Missing configuration. Fill in api/firebaseConfig.js');
 }
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-console.log(
-  '[firebase] using project:',
-  app?.options?.projectId,
-  'db URL:',
-  app?.options?.databaseURL ?? '(none)'
-);
+maybeInitAppCheck(app);
 
+const bucketFromConfig = app?.options?.storageBucket || '(none)';
+const gsBucketUrl = bucketFromConfig?.startsWith('gs://')
+  ? bucketFromConfig
+  : `gs://${bucketFromConfig}`;
+
+console.log('[firebase] using project:', app?.options?.projectId);
+console.log('[firebase] storage bucket (config):', bucketFromConfig);
+console.log('[firebase] storage bucket URL used:', gsBucketUrl);
+
+// Firestore
 export const db =
   Platform.OS === 'web'
     ? getFirestore(app)
     : initializeFirestore(app, {
       experimentalForceLongPolling: true,
       useFetchStreams: false,
-      ignoreUndefinedProperties: true
+      ignoreUndefinedProperties: true,
     });
 
-export const storage = getStorage(app);
+// Storage — pass bucket explicitly to avoid mismatches
+export const storage = getStorage(app, gsBucketUrl);
 
+// Auth
 let _auth;
 if (Platform.OS === 'web') {
   _auth = getAuth(app);
@@ -41,5 +62,4 @@ if (Platform.OS === 'web') {
     try { _auth = getAuth(app); } catch { _auth = null; }
   }
 }
-
 export const auth = _auth;

@@ -1,24 +1,54 @@
-// api/firebaseConfig.js
-// Paste the values from your Firebase Web app SDK snippet
+// // api/firebaseConfig.js
+// // Paste the values from your Firebase Web app SDK snippet
+
+// // export const firebaseConfig = {
+// //   apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+// //   authDomain: "share-your-story-1.firebaseapp.com",
+// //   projectId: "share-your-story-1",
+// //   storageBucket: "share-your-story-1.appspot.com", // <-- fixed
+// //   messagingSenderId: "673056432219",
+// //   appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
+// //   // measurementId is optional for Analytics on web; you can keep or remove it
+// //   measurementId: "G-75VDYJHL88"
+// // };
+
 
 // export const firebaseConfig = {
 //   apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
 //   authDomain: "share-your-story-1.firebaseapp.com",
 //   projectId: "share-your-story-1",
-//   storageBucket: "share-your-story-1.appspot.com", // <-- fixed
+//   storageBucket: "share-your-story-1.appspot.com",
 //   messagingSenderId: "673056432219",
 //   appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
-//   // measurementId is optional for Analytics on web; you can keep or remove it
-//   measurementId: "G-75VDYJHL88"
+//   measurementId: "G-75VDYJHL88" // optional on native
 // };
 
+
+// api/firebaseConfig.js
+// Your Firebase Web app config (safe to ship in client apps)
+
+// export const firebaseConfig = {
+//   apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+//   authDomain: "share-your-story-1.firebaseapp.com",
+//   projectId: "share-your-story-1",
+//   storageBucket: "share-your-story-1.appspot.com",
+//   messagingSenderId: "673056432219",
+//   appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
+//   measurementId: "G-75VDYJHL88" // optional on native
+// };
+
+
+
+// api/firebaseConfig.js
+// Use the EXACT bucket name shown in Firebase Console (top of Storage screen).
+// Your screenshots show: share-your-story-1.firebasestorage.app
 
 export const firebaseConfig = {
   apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
   authDomain: "share-your-story-1.firebaseapp.com",
   projectId: "share-your-story-1",
-  storageBucket: "share-your-story-1.appspot.com",
+  storageBucket: "share-your-story-1.firebasestorage.app", // <-- use console bucket
   messagingSenderId: "673056432219",
   appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
-  measurementId: "G-75VDYJHL88" // optional on native
+  measurementId: "G-75VDYJHL88"
 };

@@ -1,3 +1,4 @@
+// contexts/StatusesContext.js
 import React, {
   createContext,
   useCallback,
@@ -91,17 +92,10 @@ export function StatusesProvider({ children }) {
   }, [location.city, location.province, location.country]);
 
   const ensureRepliesSubscription = useCallback((statusId) => {
-    if (!statusId || repliesSubscriptionsRef.current.has(statusId)) {
-      return;
-    }
-
+    if (!statusId || repliesSubscriptionsRef.current.has(statusId)) return;
     const unsubscribe = subscribeToStatusReplies(statusId, (items) => {
-      setStatusReplies((prev) => ({
-        ...prev,
-        [statusId]: items,
-      }));
+      setStatusReplies((prev) => ({ ...prev, [statusId]: items }));
     });
-
     repliesSubscriptionsRef.current.set(statusId, unsubscribe);
   }, []);
 
@@ -115,33 +109,37 @@ export function StatusesProvider({ children }) {
 
   const createStatusEntry = useCallback(
     async ({ message, image }) => {
+      if (!user?.uid) throw new Error('Please sign in to share a status.');
+
       const author = {
-        uid: user?.uid ?? null,
+        uid: user.uid,
         displayName: user?.displayName ?? authProfile?.displayName ?? '',
         photoURL: user?.photoURL ?? authProfile?.photoURL ?? '',
         nickname: userProfile?.nickname ?? authProfile?.displayName ?? '',
         email: user?.email ?? authProfile?.email ?? '',
       };
 
-      const payload = await createStatus({
-        message,
-        image,
-        author,
-        location,
-      });
-
+      const payload = await createStatus({ message, image, author, location });
       await awardEngagementPoints?.('comment');
       return payload;
     },
-    [authProfile?.displayName, authProfile?.email, authProfile?.photoURL, awardEngagementPoints, location, user?.displayName, user?.email, user?.photoURL, user?.uid, userProfile?.nickname]
+    [
+      user?.uid,
+      user?.displayName,
+      user?.photoURL,
+      user?.email,
+      authProfile?.displayName,
+      authProfile?.email,
+      authProfile?.photoURL,
+      userProfile?.nickname,
+      awardEngagementPoints,
+      location,
+    ]
   );
 
   const toggleStatusReaction = useCallback(
     async (statusId, emoji) => {
-      if (!statusId || !emoji) {
-        return { ok: false, error: 'invalid_arguments' };
-      }
-
+      if (!statusId || !emoji) return { ok: false, error: 'invalid_arguments' };
       const userId = user?.uid ?? `client-${user?.email ?? 'guest'}`;
       const result = await toggleStatusReactionRemote(statusId, emoji, userId);
 
@@ -155,9 +153,7 @@ export function StatusesProvider({ children }) {
               : status
           )
         );
-        if (addedReaction) {
-          await awardEngagementPoints?.('upvote');
-        }
+        if (addedReaction) await awardEngagementPoints?.('upvote');
       }
       return result;
     },
@@ -172,7 +168,6 @@ export function StatusesProvider({ children }) {
         nickname: userProfile?.nickname ?? '',
         photoURL: user?.photoURL ?? authProfile?.photoURL ?? '',
       };
-
       await addStatusReply(statusId, { message, author });
       await awardEngagementPoints?.('comment');
       ensureRepliesSubscription(statusId);
@@ -184,34 +179,23 @@ export function StatusesProvider({ children }) {
     async (statusId, reason = 'inappropriate') => {
       const reporterId = user?.uid ?? user?.email ?? 'guest';
       const result = await reportStatusRemote(statusId, reporterId, reason);
-
       if (result.ok && !result.alreadyReported) {
         setStatuses((prev) =>
           prev.filter((status) => {
-            if (status.id !== statusId) {
-              return true;
-            }
+            if (status.id !== statusId) return true;
             const reportCount = result.reportCount ?? status.reportCount + 1;
             const isHidden = result.isHidden ?? status.isHidden;
-            if (isHidden || reportCount >= STATUS_REPORT_THRESHOLD) {
-              return false;
-            }
-            return true;
+            return !(isHidden || reportCount >= STATUS_REPORT_THRESHOLD);
           })
         );
       }
-
       return result;
     },
     [user?.email, user?.uid]
   );
 
   const refreshReportedStatuses = useCallback(async () => {
-    if (!isAdmin) {
-      setReportedStatuses([]);
-      return [];
-    }
-
+    if (!isAdmin) { setReportedStatuses([]); return []; }
     try {
       const items = await fetchReportedStatuses({ limit: 100 });
       setReportedStatuses(items);
@@ -263,8 +247,6 @@ export function StatusesProvider({ children }) {
 
 export function useStatuses() {
   const context = useContext(StatusesContext);
-  if (!context) {
-    throw new Error('useStatuses must be used within a StatusesProvider');
-  }
+  if (!context) throw new Error('useStatuses must be used within a StatusesProvider');
   return context;
 }
