@@ -189,10 +189,11 @@ export default function CountryScreen({ navigation }) {
     [statusList]
   );
   const carouselData = useMemo(() => {
-    const items = statusCarouselItems.map((item) => ({
+    const items = statusCarouselItems.map((item, index) => ({
       key: item.id,
       type: 'status',
       status: item,
+      index,
     }));
     items.push({ key: 'cta', type: 'cta' });
     return items;
@@ -203,11 +204,16 @@ export default function CountryScreen({ navigation }) {
   }, [navigation]);
 
   const handleOpenStatus = useCallback(
-    (status) => {
+    (status, index = 0) => {
       if (!status) return;
-      navigation.navigate('StatusDetail', { statusId: status.id });
+      const ids = statusCarouselItems.map((item) => item.id);
+      navigation.navigate('StatusStoryViewer', {
+        statusIds: ids,
+        initialStatusId: status.id,
+        initialIndex: index,
+      });
     },
-    [navigation]
+    [navigation, statusCarouselItems]
   );
 
   const handleSeeAllStatuses = useCallback(() => {
@@ -236,7 +242,7 @@ export default function CountryScreen({ navigation }) {
       return (
         <StatusStoryCard
           status={item.status}
-          onPress={handleOpenStatus}
+          onPress={() => handleOpenStatus(item.status, item.index)}
         />
       );
     },

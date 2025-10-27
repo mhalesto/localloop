@@ -99,6 +99,12 @@ export function StatusesProvider({ children }) {
     repliesSubscriptionsRef.current.set(statusId, unsubscribe);
   }, []);
 
+  const preloadStatuses = useCallback((statusIds = []) => {
+    statusIds.filter(Boolean).forEach((id) => {
+      ensureRepliesSubscription(id);
+    });
+  }, [ensureRepliesSubscription]);
+
   useEffect(
     () => () => {
       repliesSubscriptionsRef.current.forEach((unsub) => unsub?.());
@@ -223,6 +229,7 @@ export function StatusesProvider({ children }) {
       addReply,
       reportStatus,
       ensureRepliesSubscription,
+      preloadStatuses,
       getRepliesForStatus,
       reportedStatuses,
       refreshReportedStatuses,
@@ -233,6 +240,7 @@ export function StatusesProvider({ children }) {
       addReply,
       createStatusEntry,
       ensureRepliesSubscription,
+      preloadStatuses,
       getRepliesForStatus,
       isAdmin,
       isLoading,

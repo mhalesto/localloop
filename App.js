@@ -20,6 +20,7 @@ import StatusDetailScreen from './screens/StatusDetailScreen';
 import StatusComposerScreen from './screens/StatusComposerScreen';
 import ModerationScreen from './screens/ModerationScreen';
 import TopStatusesScreen from './screens/TopStatusesScreen';
+import StatusStoryViewerScreen from './screens/StatusStoryViewerScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -46,6 +47,7 @@ function RootNavigator() {
       <Stack.Screen name="StatusComposer" component={StatusComposerScreen} />
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="TopStatuses" component={TopStatusesScreen} />
+      <Stack.Screen name="StatusStoryViewer" component={StatusStoryViewerScreen} />
     </Stack.Navigator>
   );
 }
