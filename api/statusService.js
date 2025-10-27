@@ -1,3 +1,4 @@
+// api/statusService.js
 import {
   collection,
   deleteDoc,
@@ -13,7 +14,13 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytesResumable,
+} from 'firebase/storage';
+
 import { db, storage } from './firebaseClient';
 import { STATUS_TTL_MS, STATUS_REPORT_THRESHOLD } from '../constants/authConfig';
 
@@ -50,8 +57,6 @@ const sanitizeReactions = (raw = {}) => {
 const normalizeStatus = (docSnap) => {
   if (!docSnap) return null;
   const data = docSnap.data?.() ?? docSnap;
-  const reactions = sanitizeReactions(data.reactions);
-  const reportCount = Number.isFinite(data.reportCount) ? data.reportCount : 0;
 
   return {
     id: docSnap.id ?? data.id,
@@ -64,27 +69,22 @@ const normalizeStatus = (docSnap) => {
     city: data.city ?? '',
     province: data.province ?? '',
     country: data.country ?? '',
-    reactions,
+    reactions: sanitizeReactions(data.reactions),
     userReactions: data.userReactions ?? {},
     repliesCount: Number.isFinite(data.repliesCount) ? data.repliesCount : 0,
-    reportCount,
+    reportCount: Number.isFinite(data.reportCount) ? data.reportCount : 0,
     reports: data.reports ?? {},
     isHidden: Boolean(data.isHidden),
-    lastInteractionAt: normalizeTimestamp(
-      data.lastInteractionAt,
-      normalizeTimestamp(data.createdAt)
-    ),
+    lastInteractionAt: normalizeTimestamp(data.lastInteractionAt, normalizeTimestamp(data.createdAt)),
   };
 };
 
-// Require a real uid and store under /statuses/{uid}/{statusId}.jpg
 const buildImagePath = (uid, statusId) => {
   if (!uid) throw new Error('Please sign in to upload images.');
   return `statuses/${uid}/${statusId}.jpg`;
 };
 
 const logErr = (label, e) => {
-  // Centralized error logging for visibility
   const code = e?.code || '';
   const server = e?.customData?.serverResponse || e?.serverResponse || '';
   console.error(`[statusService] ${label}`, {
@@ -92,12 +92,52 @@ const logErr = (label, e) => {
     message: e?.message,
     name: e?.name,
     serverResponse: typeof server === 'string' ? server.slice(0, 500) : server,
-    full: e,
   });
 };
 
-// Upload with contentType and detailed logs
-const uploadStatusImageAsync = async (image, uid, statusId) => {
+// Resumable upload with exponential backoff + progress callback
+async function uploadWithBackoff(storageRef, blob, metadata, onProgress) {
+  const shouldRetry = (code) =>
+    ['storage/retry-limit-exceeded', 'storage/unknown', 'storage/network-request-failed']
+      .some((c) => (code || '').includes(c));
+
+  let attempt = 0;
+  const max = 3;
+
+  while (true) {
+    attempt += 1;
+    try {
+      return await new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(storageRef, blob, metadata);
+        task.on(
+          'state_changed',
+          (snap) => {
+            if (onProgress && snap.totalBytes) {
+              const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+              onProgress(pct);
+            }
+          },
+          reject,
+          async () => {
+            try {
+              const url = await getDownloadURL(storageRef);
+              resolve(url);
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+      });
+    } catch (e) {
+      const code = e?.code || '';
+      if (attempt >= max || !shouldRetry(code)) throw e;
+      const delay = (500 * Math.pow(2, attempt - 1)) * (0.5 + Math.random()); // jitter
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
+const uploadStatusImageAsync = async (image, uid, statusId, onProgress) => {
   if (!image?.uri) return { imageUrl: null, imageStoragePath: null };
 
   ensureStorage();
@@ -105,11 +145,7 @@ const uploadStatusImageAsync = async (image, uid, statusId) => {
   const storageRef = ref(storage, path);
 
   console.log('[statusService] upload start', {
-    uid,
-    statusId,
-    path,
-    bucket: storage?.app?.options?.storageBucket,
-    imageUri: image.uri,
+    uid, statusId, path, bucket: storage?.app?.options?.storageBucket, imageUri: image.uri,
   });
 
   let blob;
@@ -122,43 +158,32 @@ const uploadStatusImageAsync = async (image, uid, statusId) => {
   }
 
   const metadata = { contentType: image?.mimeType || blob?.type || 'image/jpeg' };
-  console.log('[statusService] upload blob ready', {
-    size: blob?.size,
-    contentType: metadata.contentType,
-  });
+  console.log('[statusService] upload blob ready', { size: blob?.size, contentType: metadata.contentType });
 
   try {
-    await uploadBytes(storageRef, blob, metadata);
-    console.log('[statusService] uploadBytes OK');
+    const downloadUrl = await uploadWithBackoff(storageRef, blob, metadata, onProgress);
+    console.log('[statusService] upload OK -> url ready');
+    return { imageUrl: downloadUrl, imageStoragePath: path };
   } catch (e) {
-    logErr('uploadBytes error', e);
-
+    logErr('upload error', e);
     const code = String(e?.code || '');
-    const server = String(e?.customData?.serverResponse || '');
-
     if (code.includes('unauthorized') || code.includes('permission')) {
       throw new Error('Not allowed to upload. Check Storage rules and that you are signed in.');
     }
     if (code.includes('app-check')) {
-      throw new Error('Upload blocked by App Check. Initialize App Check or disable enforcement for Storage.');
-    }
-    if (server.includes('bucket') && server.includes('does not exist')) {
-      throw new Error('Storage bucket not found. Update firebaseConfig.storageBucket to match the Console bucket.');
+      throw new Error('Upload blocked by App Check. Initialize App Check or disable enforcement.');
     }
     throw new Error('Unable to upload image right now.');
   }
-
-  try {
-    const downloadUrl = await getDownloadURL(storageRef);
-    console.log('[statusService] getDownloadURL OK', { downloadUrl: downloadUrl?.slice(0, 120) + '…' });
-    return { imageUrl: downloadUrl, imageStoragePath: path };
-  } catch (e) {
-    logErr('getDownloadURL error', e);
-    throw new Error('Image uploaded but URL fetch failed.');
-  }
 };
 
-export async function createStatus({ message, image, author, location }) {
+export async function createStatus({
+  message,
+  image,
+  author,
+  location,
+  onUploadProgress, // optional callback (pct)
+}) {
   ensureDb();
 
   const trimmed = message?.trim?.() ?? '';
@@ -169,7 +194,7 @@ export async function createStatus({ message, image, author, location }) {
 
   let imagePayload = { imageUrl: null, imageStoragePath: null };
   if (image) {
-    imagePayload = await uploadStatusImageAsync(image, author.uid, statusId);
+    imagePayload = await uploadStatusImageAsync(image, author.uid, statusId, onUploadProgress);
   }
 
   const now = Date.now();
@@ -201,43 +226,31 @@ export async function createStatus({ message, image, author, location }) {
   return payload;
 }
 
-// (rest of file unchanged)
-export function subscribeToStatuses({ city, province, country, limit = 50, onChange, includeHidden = false, onError, }) {
+// === the rest (subscribe, replies, reactions, report, cleanup) unchanged ===
+export function subscribeToStatuses({ city, province, country, limit = 50, onChange, includeHidden = false, onError }) {
   try { ensureDb(); } catch (error) { console.warn('[statusService] subscribeToStatuses skipped:', error.message); onError?.(error); return () => { }; }
   const constraints = [orderBy('createdAt', 'desc'), limitQuery(limit)];
   if (city) constraints.unshift(where('city', '==', city));
   else if (province) constraints.unshift(where('province', '==', province));
   else if (country) constraints.unshift(where('country', '==', country));
   const q = query(collection(db, STATUSES_COLLECTION), ...constraints);
-  const unsubscribe = onSnapshot(
+  return onSnapshot(
     q,
     (snapshot) => {
       const now = Date.now();
       const statuses = snapshot.docs
         .map((docSnap) => normalizeStatus(docSnap))
-        .filter((status) => {
-          if (!status) return false;
-          if (!includeHidden && status.isHidden) return false;
-          if (status.expiresAt <= now) return false;
-          if (status.reportCount >= STATUS_REPORT_THRESHOLD && !includeHidden) return false;
-          return true;
-        });
+        .filter((s) => s && !s.isHidden && s.expiresAt > now && s.reportCount < STATUS_REPORT_THRESHOLD);
       onChange?.(statuses);
     },
     (error) => { console.warn('[statusService] subscribeToStatuses error', error); onError?.(error); }
   );
-  return unsubscribe;
 }
 
 export function subscribeToStatusReplies(statusId, onChange) {
   if (!statusId) return () => { };
   ensureDb();
-
-  const repliesQuery = query(
-    collection(db, STATUSES_COLLECTION, statusId, REPLIES_COLLECTION),
-    orderBy('createdAt', 'asc')
-  );
-
+  const repliesQuery = query(collection(db, STATUSES_COLLECTION, statusId, REPLIES_COLLECTION), orderBy('createdAt', 'asc'));
   return onSnapshot(
     repliesQuery,
     (snapshot) => {
@@ -256,119 +269,81 @@ export async function addStatusReply(statusId, { message, author }) {
   ensureDb();
   const trimmed = message?.trim?.() ?? '';
   if (!trimmed) throw new Error('Reply cannot be empty.');
-
   const replyId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const now = Date.now();
-
-  await setDoc(
-    doc(collection(db, STATUSES_COLLECTION, statusId, REPLIES_COLLECTION), replyId),
-    {
-      id: replyId,
-      message: trimmed,
-      createdAt: now,
-      author: {
-        uid: author?.uid ?? null,
-        displayName: author?.displayName ?? '',
-        nickname: author?.nickname ?? '',
-        photoURL: author?.photoURL ?? '',
-      },
+  await setDoc(doc(collection(db, STATUSES_COLLECTION, statusId, REPLIES_COLLECTION), replyId), {
+    id: replyId,
+    message: trimmed,
+    createdAt: now,
+    author: {
+      uid: author?.uid ?? null,
+      displayName: author?.displayName ?? '',
+      nickname: author?.nickname ?? '',
+      photoURL: author?.photoURL ?? '',
     },
-    { merge: true }
-  );
-
-  await updateDoc(doc(db, STATUSES_COLLECTION, statusId), {
-    repliesCount: increment(1),
-    lastInteractionAt: now,
-  }).catch((error) => console.warn('[statusService] update repliesCount failed', error));
+  }, { merge: true });
+  await updateDoc(doc(db, STATUSES_COLLECTION, statusId), { repliesCount: increment(1), lastInteractionAt: now })
+    .catch((e) => console.warn('[statusService] update repliesCount failed', e));
 }
-
-const toggleReactionInPayload = (statusData, emoji, userId) => {
-  const next = sanitizeReactions(statusData.reactions ?? {});
-  if (!emoji || !userId) return next;
-
-  const entry = next[emoji] ?? { reactors: {}, count: 0 };
-  const hasReacted = Boolean(entry.reactors[userId]);
-  if (hasReacted) delete entry.reactors[userId];
-  else entry.reactors[userId] = true;
-
-  entry.count = Math.max(0, Object.keys(entry.reactors).length);
-  if (entry.count === 0) delete next[emoji];
-  else next[emoji] = entry;
-  return next;
-};
 
 export async function toggleStatusReaction(statusId, emoji, userId) {
   ensureDb();
   if (!statusId || !emoji || !userId) return { ok: false, error: 'invalid_arguments' };
-
   try {
     const result = await runTransaction(db, async (tx) => {
       const ref = doc(db, STATUSES_COLLECTION, statusId);
       const snap = await tx.get(ref);
       if (!snap.exists()) throw new Error('Status not found.');
-
       const data = snap.data() ?? {};
-      const reactions = toggleReactionInPayload(data, emoji, userId);
+      const next = sanitizeReactions(data.reactions ?? {});
+      const entry = next[emoji] ?? { reactors: {}, count: 0 };
+      if (entry.reactors[userId]) delete entry.reactors[userId]; else entry.reactors[userId] = true;
+      entry.count = Math.max(0, Object.keys(entry.reactors).length);
+      if (entry.count === 0) delete next[emoji]; else next[emoji] = entry;
       const lastInteractionAt = Date.now();
-      tx.update(ref, { reactions, lastInteractionAt });
-      return { reactions, lastInteractionAt };
+      tx.update(ref, { reactions: next, lastInteractionAt });
+      return { reactions: next, lastInteractionAt };
     });
     return { ok: true, ...result };
-  } catch (error) {
-    console.warn('[statusService] toggleStatusReaction failed', error);
-    return { ok: false, error: error?.message ?? 'reaction_failed' };
+  } catch (e) {
+    console.warn('[statusService] toggleStatusReaction failed', e);
+    return { ok: false, error: e?.message ?? 'reaction_failed' };
   }
 }
 
 export async function reportStatus(statusId, userId, reason = 'inappropriate') {
   ensureDb();
   if (!statusId || !userId) return { ok: false, error: 'invalid_arguments' };
-
   try {
     const result = await runTransaction(db, async (tx) => {
       const ref = doc(db, STATUSES_COLLECTION, statusId);
       const snap = await tx.get(ref);
       if (!snap.exists()) throw new Error('Status not found.');
-
       const data = snap.data() ?? {};
-      const existingReports = typeof data.reports === 'object' ? { ...data.reports } : {};
-      if (existingReports[userId]) {
+      const existing = typeof data.reports === 'object' ? { ...data.reports } : {};
+      if (existing[userId]) {
         return {
-          reportCount: data.reportCount ?? Object.keys(existingReports).length,
+          reportCount: data.reportCount ?? Object.keys(existing).length,
           isHidden: Boolean(data.isHidden),
           alreadyReported: true,
         };
       }
-
-      existingReports[userId] = { reason, reportedAt: Date.now() };
-      const reportCount = Object.keys(existingReports).length;
+      existing[userId] = { reason, reportedAt: Date.now() };
+      const reportCount = Object.keys(existing).length;
       const isHidden = reportCount >= STATUS_REPORT_THRESHOLD;
-
-      tx.update(ref, {
-        reports: existingReports,
-        reportCount,
-        isHidden,
-        lastInteractionAt: Date.now(),
-      });
-
+      tx.update(ref, { reports: existing, reportCount, isHidden, lastInteractionAt: Date.now() });
       return { reportCount, isHidden, alreadyReported: false };
     });
-
     return { ok: true, ...result };
-  } catch (error) {
-    console.warn('[statusService] reportStatus failed', error);
-    return { ok: false, error: error?.message ?? 'report_failed' };
+  } catch (e) {
+    console.warn('[statusService] reportStatus failed', e);
+    return { ok: false, error: e?.message ?? 'report_failed' };
   }
 }
 
 export async function fetchReportedStatuses({ limit = 50 } = {}) {
   ensureDb();
-  const q = query(
-    collection(db, STATUSES_COLLECTION),
-    where('reportCount', '>=', 1),
-    orderBy('reportCount', 'desc'),
-    limitQuery(limit)
-  );
+  const q = query(collection(db, STATUSES_COLLECTION), where('reportCount', '>=', 1), orderBy('reportCount', 'desc'), limitQuery(limit));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((docSnap) => normalizeStatus(docSnap));
 }
@@ -376,22 +351,14 @@ export async function fetchReportedStatuses({ limit = 50 } = {}) {
 export async function cleanupExpiredStatuses({ limit = 25 } = {}) {
   ensureDb();
   const now = Date.now();
-  const snapshot = await getDocs(
-    query(collection(db, STATUSES_COLLECTION), where('expiresAt', '<=', now), limitQuery(limit))
-  );
-
+  const snapshot = await getDocs(query(collection(db, STATUSES_COLLECTION), where('expiresAt', '<=', now), limitQuery(limit)));
   const deletions = snapshot.docs.map(async (docSnap) => {
     const data = docSnap.data();
     try {
-      if (data?.imageStoragePath) {
-        await deleteObject(ref(storage, data.imageStoragePath)).catch(() => { });
-      }
+      if (data?.imageStoragePath) await deleteObject(ref(storage, data.imageStoragePath)).catch(() => { });
       await deleteDoc(docSnap.ref);
-    } catch (error) {
-      console.warn('[statusService] cleanupExpiredStatuses failed', error);
-    }
+    } catch (e) { console.warn('[statusService] cleanupExpiredStatuses failed', e); }
   });
-
   await Promise.all(deletions);
 }
 

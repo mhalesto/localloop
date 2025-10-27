@@ -108,9 +108,8 @@ export function StatusesProvider({ children }) {
   );
 
   const createStatusEntry = useCallback(
-    async ({ message, image }) => {
+    async ({ message, image, onUploadProgress }) => {
       if (!user?.uid) throw new Error('Please sign in to share a status.');
-
       const author = {
         uid: user.uid,
         displayName: user?.displayName ?? authProfile?.displayName ?? '',
@@ -118,8 +117,13 @@ export function StatusesProvider({ children }) {
         nickname: userProfile?.nickname ?? authProfile?.displayName ?? '',
         email: user?.email ?? authProfile?.email ?? '',
       };
-
-      const payload = await createStatus({ message, image, author, location });
+      const payload = await createStatus({
+        message,
+        image,
+        author,
+        location,
+        onUploadProgress,
+      });
       await awardEngagementPoints?.('comment');
       return payload;
     },
@@ -142,7 +146,6 @@ export function StatusesProvider({ children }) {
       if (!statusId || !emoji) return { ok: false, error: 'invalid_arguments' };
       const userId = user?.uid ?? `client-${user?.email ?? 'guest'}`;
       const result = await toggleStatusReactionRemote(statusId, emoji, userId);
-
       if (result.ok) {
         const reactors = result.reactions?.[emoji]?.reactors ?? {};
         const addedReaction = Boolean(reactors[userId]);

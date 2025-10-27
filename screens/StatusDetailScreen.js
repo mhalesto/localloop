@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return '';
@@ -38,6 +39,7 @@ export default function StatusDetailScreen({ route, navigation }) {
     reportStatus,
   } = useStatuses();
   const { themeColors } = useSettings();
+  const { user } = useAuth();
 
   const [reply, setReply] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
@@ -111,10 +113,27 @@ export default function StatusDetailScreen({ route, navigation }) {
     );
   }
 
-  const totalReactions = Object.values(status.reactions ?? {}).reduce(
-    (sum, entry) => sum + (entry?.count ?? 0),
-    0
+  const totalReactions = useMemo(
+    () =>
+      Object.values(status.reactions ?? {}).reduce(
+        (sum, entry) => sum + (entry?.count ?? 0),
+        0
+      ),
+    [status.reactions]
   );
+  const locationSummary = useMemo(
+    () => [status.city, status.province].filter(Boolean).join(', ') || 'Nearby',
+    [status.city, status.province]
+  );
+  const viewerReactionKey = useMemo(() => {
+    if (user?.uid) return user.uid;
+    if (user?.email) return `client-${user.email}`;
+    return null;
+  }, [user?.email, user?.uid]);
+  const viewerReacted = Boolean(
+    viewerReactionKey && status.reactions?.heart?.reactors?.[viewerReactionKey]
+  );
+  const repliesEmpty = replies.length === 0;
 
   return (
     <ScreenLayout
@@ -136,26 +155,32 @@ export default function StatusDetailScreen({ route, navigation }) {
           ListHeaderComponent={
             <View style={styles.card}>
               <View style={styles.headerRow}>
-                <View style={styles.authorBlock}>
-                  <Ionicons name="person-circle" size={36} color={themeColors.primaryDark} />
-                  <View style={styles.authorTextBlock}>
-                    <Text style={styles.authorName}>{status.author?.nickname || status.author?.displayName || 'Anonymous'}</Text>
-                    <Text style={styles.meta}>{formatTimestamp(status.createdAt)}</Text>
-                    <Text style={styles.meta} numberOfLines={1}>
-                      {[status.city, status.province].filter(Boolean).join(', ') || 'Nearby'}
-                    </Text>
+                <Ionicons name="person-circle" size={48} color={themeColors.primaryDark} />
+                <View style={styles.authorTextBlock}>
+                  <Text style={styles.authorName}>
+                    {status.author?.nickname || status.author?.displayName || 'Anonymous'}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaChip}>
+                      <Ionicons name="location-outline" size={14} color={themeColors.textSecondary} />
+                      <Text style={styles.metaChipText}>{locationSummary}</Text>
+                    </View>
+                    <View style={[styles.metaChip, styles.metaChipGhost]}>
+                      <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
+                      <Text style={styles.metaChipText}>{formatTimestamp(status.createdAt)}</Text>
+                    </View>
                   </View>
                 </View>
                 <TouchableOpacity
-                  style={styles.inlineButton}
+                  style={styles.reportButton}
                   onPress={handleReport}
                   activeOpacity={0.85}
                   disabled={reporting}
                 >
                   {reporting ? (
-                    <ActivityIndicator size="small" color={themeColors.textSecondary} />
+                    <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Ionicons name="flag-outline" size={18} color={themeColors.textSecondary} />
+                    <Ionicons name="flag-outline" size={18} color="#fff" />
                   )}
                 </TouchableOpacity>
               </View>
@@ -166,16 +191,33 @@ export default function StatusDetailScreen({ route, navigation }) {
               ) : null}
 
               <View style={styles.footerRow}>
-                <TouchableOpacity style={styles.footerButton} onPress={handleReact} activeOpacity={0.8}>
-                  <Ionicons name="heart-outline" size={18} color={themeColors.primaryDark} />
-                  <Text style={styles.footerLabel}>{totalReactions}</Text>
+                <TouchableOpacity
+                  style={[styles.footerPill, viewerReacted && styles.footerPillActive]}
+                  onPress={handleReact}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={viewerReacted ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={viewerReacted ? '#fff' : themeColors.primaryDark}
+                  />
+                  <Text style={[styles.footerLabel, viewerReacted && styles.footerLabelActive]}>
+                    {totalReactions}
+                  </Text>
                 </TouchableOpacity>
 
-                <View style={styles.footerButton}>
+                <View style={[styles.footerPill, styles.footerPillGhost]}>
                   <Ionicons name="chatbubble-ellipses-outline" size={18} color={themeColors.textSecondary} />
                   <Text style={styles.footerLabel}>{replies.length}</Text>
                 </View>
               </View>
+
+              {repliesEmpty ? (
+                <View style={styles.emptyReplies}>
+                  <Ionicons name="chatbubbles-outline" size={22} color={themeColors.textSecondary} />
+                  <Text style={styles.emptyRepliesText}>No replies yet. Start the conversation below.</Text>
+                </View>
+              ) : null}
             </View>
           }
           renderItem={({ item }) => (
@@ -196,27 +238,35 @@ export default function StatusDetailScreen({ route, navigation }) {
         />
 
         <View style={styles.composer}>
-          <TextInput
-            style={styles.composerInput}
-            placeholder="Reply to this status"
-            placeholderTextColor={themeColors.textSecondary}
-            multiline
-            value={reply}
-            onChangeText={setReply}
-          />
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <TouchableOpacity
-            style={[styles.submitButton, submittingReply && styles.submitDisabled]}
-            onPress={handleReply}
-            disabled={submittingReply}
-            activeOpacity={0.9}
-          >
-            {submittingReply ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitLabel}>Reply</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.composerCard}>
+            <Text style={styles.composerLabel}>Add a reply</Text>
+            <TextInput
+              style={styles.composerInput}
+              placeholder="Share a quick thought or tip..."
+              placeholderTextColor={themeColors.textSecondary}
+              multiline
+              value={reply}
+              onChangeText={setReply}
+            />
+            {error ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={16} color="#fff" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.submitButton, submittingReply && styles.submitDisabled]}
+              onPress={handleReply}
+              disabled={submittingReply}
+              activeOpacity={0.9}
+            >
+              {submittingReply ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.submitLabel}>Send reply</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </ScreenLayout>
@@ -234,96 +284,163 @@ const createStyles = (palette) =>
     },
     card: {
       backgroundColor: palette.card,
-      borderRadius: 20,
-      padding: 20,
+      borderRadius: 24,
+      padding: 22,
       borderWidth: 1,
       borderColor: palette.divider,
-      marginBottom: 16,
+      marginBottom: 18,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
     },
     headerRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
-    },
-    authorBlock: {
-      flexDirection: 'row',
-      flex: 1,
-      alignItems: 'center',
+      marginBottom: 18,
     },
     authorTextBlock: {
-      marginLeft: 12,
       flex: 1,
+      marginLeft: 14,
     },
     authorName: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '700',
       color: palette.textPrimary,
     },
-    meta: {
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    metaChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: palette.background,
+      marginRight: 10,
+    },
+    metaChipGhost: {
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      marginRight: 0,
+    },
+    metaChipText: {
+      marginLeft: 6,
       fontSize: 12,
       color: palette.textSecondary,
-      marginTop: 2,
     },
-    inlineButton: {
-      padding: 6,
+    reportButton: {
+      marginLeft: 12,
+      backgroundColor: palette.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
     },
     message: {
-      fontSize: 16,
-      lineHeight: 24,
+      fontSize: 17,
+      lineHeight: 26,
       color: palette.textPrimary,
     },
     image: {
-      borderRadius: 16,
-      marginTop: 16,
+      borderRadius: 18,
+      marginTop: 20,
       width: '100%',
-      height: 220,
+      height: 240,
     },
     footerRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: 20,
+      marginTop: 22,
+      justifyContent: 'space-between',
     },
-    footerButton: {
+    footerPill: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: palette.background,
+      marginRight: 12,
+    },
+    footerPillActive: {
+      backgroundColor: palette.primary,
+    },
+    footerPillGhost: {
+      backgroundColor: palette.background,
+      marginRight: 0,
     },
     footerLabel: {
-      marginLeft: 6,
-      fontSize: 13,
+      marginLeft: 8,
+      fontSize: 14,
       fontWeight: '600',
-      color: palette.textPrimary,
+      color: palette.textSecondary,
+    },
+    footerLabelActive: {
+      color: '#fff',
+    },
+    emptyReplies: {
+      marginTop: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.background,
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    emptyRepliesText: {
+      marginLeft: 10,
+      fontSize: 13,
+      color: palette.textSecondary,
+      flex: 1,
     },
     replyCard: {
       backgroundColor: palette.card,
-      borderRadius: 16,
-      padding: 16,
+      borderRadius: 18,
+      padding: 18,
       borderWidth: 1,
       borderColor: palette.divider,
       marginBottom: 12,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
     },
     replyHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 8,
+      marginBottom: 10,
     },
     replyTextBlock: {
-      marginLeft: 10,
+      marginLeft: 12,
+      flex: 1,
     },
     replyAuthor: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
       color: palette.textPrimary,
     },
     replyMeta: {
       fontSize: 12,
       color: palette.textSecondary,
+      marginTop: 2,
     },
     replyMessage: {
       fontSize: 14,
       color: palette.textPrimary,
-      lineHeight: 20,
+      lineHeight: 21,
     },
     composer: {
       padding: 20,
@@ -331,41 +448,71 @@ const createStyles = (palette) =>
       borderTopWidth: 1,
       borderColor: palette.divider,
     },
-    composerInput: {
-      minHeight: 80,
-      borderRadius: 16,
+    composerCard: {
       backgroundColor: palette.background,
+      borderRadius: 20,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    composerLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: palette.textPrimary,
+      marginBottom: 12,
+    },
+    composerInput: {
+      minHeight: 90,
+      borderRadius: 16,
+      backgroundColor: palette.card,
       padding: 14,
       fontSize: 14,
       lineHeight: 20,
       color: palette.textPrimary,
       textAlignVertical: 'top',
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    errorBanner: {
+      marginTop: 12,
+      backgroundColor: '#EF4444',
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     errorText: {
-      marginTop: 8,
-      color: '#ef4444',
+      color: '#fff',
       fontSize: 12,
+      fontWeight: '600',
+      marginLeft: 6,
     },
     submitButton: {
-      marginTop: 12,
-      borderRadius: 14,
+      marginTop: 16,
+      borderRadius: 16,
       backgroundColor: palette.primary,
-      paddingVertical: 12,
+      paddingVertical: 14,
       alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
     },
     submitDisabled: {
       opacity: 0.7,
     },
     submitLabel: {
       color: '#fff',
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
     },
     emptyState: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 12,
       padding: 32,
     },
     emptyTitle: {
@@ -378,5 +525,6 @@ const createStyles = (palette) =>
       textAlign: 'center',
       color: palette.textSecondary,
       lineHeight: 20,
+      marginTop: 6,
     },
   });

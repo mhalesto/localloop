@@ -29,6 +29,7 @@ export default function StatusComposerScreen({ navigation }) {
   const [imageUri, setImageUri] = useState(null);
   const [imageMimeType, setImageMimeType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState('');
 
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
@@ -89,19 +90,27 @@ export default function StatusComposerScreen({ navigation }) {
   const handleSubmit = useCallback(async () => {
     const trimmed = message.trim();
     if (!trimmed) { setError('Write something to share.'); return; }
-
     setSubmitting(true);
+    setUploadPct(0);
     try {
       const image = imageUri ? { uri: imageUri, mimeType: imageMimeType } : null;
       console.log('[composer] submit with image?', Boolean(image));
-      await createStatus({ message: trimmed, image });
-      setMessage(''); setImageUri(null); setImageMimeType(null); setError('');
+      await createStatus({
+        message: trimmed,
+        image,
+        onUploadProgress: (pct) => setUploadPct(pct),
+      });
+      setMessage('');
+      setImageUri(null);
+      setImageMimeType(null);
+      setError('');
       navigation.goBack();
     } catch (submitError) {
       console.error('[composer] submit error:', submitError);
       setError(submitError?.message ?? 'Unable to share status right now.');
     } finally {
       setSubmitting(false);
+      setUploadPct(0);
     }
   }, [createStatus, imageUri, imageMimeType, message, navigation]);
 
@@ -136,7 +145,11 @@ export default function StatusComposerScreen({ navigation }) {
             {imageUri ? (
               <View style={styles.previewBlock}>
                 <Image source={{ uri: imageUri }} style={styles.previewImage} />
-                <TouchableOpacity onPress={() => { setImageUri(null); setImageMimeType(null); }} style={styles.removeImageButton} activeOpacity={0.8}>
+                <TouchableOpacity
+                  onPress={() => { setImageUri(null); setImageMimeType(null); }}
+                  style={styles.removeImageButton}
+                  activeOpacity={0.8}
+                >
                   <Ionicons name="close" size={18} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -161,7 +174,13 @@ export default function StatusComposerScreen({ navigation }) {
             disabled={submitting}
             activeOpacity={0.9}
           >
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitLabel}>Share status</Text>}
+            {submitting ? (
+              <Text style={styles.submitLabel}>
+                {uploadPct > 0 ? `Uploading ${uploadPct}%…` : 'Sharing…'}
+              </Text>
+            ) : (
+              <Text style={styles.submitLabel}>Share status</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

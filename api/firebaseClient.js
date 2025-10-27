@@ -7,7 +7,7 @@ import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/aut
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseConfig } from './firebaseConfig';
 
-// OPTIONAL App Check on web (safe no-op on native without provider)
+// (Optional) App Check on web only
 let maybeInitAppCheck = () => { };
 try {
   const { initializeAppCheck, ReCaptchaV3Provider } = require('firebase/app-check');
@@ -21,23 +21,13 @@ try {
   };
 } catch { }
 
-if (!firebaseConfig || !firebaseConfig.projectId) {
-  console.warn('[firebase] Missing configuration. Fill in api/firebaseConfig.js');
-}
-
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 maybeInitAppCheck(app);
 
-const bucketFromConfig = app?.options?.storageBucket || '(none)';
-const gsBucketUrl = bucketFromConfig?.startsWith('gs://')
-  ? bucketFromConfig
-  : `gs://${bucketFromConfig}`;
+console.log('[firebase] project:', app?.options?.projectId);
+console.log('[firebase] storageBucket (config):', app?.options?.storageBucket);
 
-console.log('[firebase] using project:', app?.options?.projectId);
-console.log('[firebase] storage bucket (config):', bucketFromConfig);
-console.log('[firebase] storage bucket URL used:', gsBucketUrl);
-
-// Firestore
+// ----- Firestore -----
 export const db =
   Platform.OS === 'web'
     ? getFirestore(app)
@@ -47,10 +37,24 @@ export const db =
       ignoreUndefinedProperties: true,
     });
 
-// Storage — pass bucket explicitly to avoid mismatches
-export const storage = getStorage(app, gsBucketUrl);
+// ----- Storage -----
+export const storage = getStorage(app);
 
-// Auth
+// Guarded retry-tuning (SDKs without these exports won’t crash)
+try {
+  // dynamic require to avoid bundling-time errors across SDK versions
+  const storageMod = require('firebase/storage');
+  const setMaxUploadRetryTime = storageMod?.setMaxUploadRetryTime;
+  const setMaxOperationRetryTime = storageMod?.setMaxOperationRetryTime;
+  if (typeof setMaxUploadRetryTime === 'function') {
+    setMaxUploadRetryTime(storage, 15_000);
+  }
+  if (typeof setMaxOperationRetryTime === 'function') {
+    setMaxOperationRetryTime(storage, 10_000);
+  }
+} catch { /* noop */ }
+
+// ----- Auth -----
 let _auth;
 if (Platform.OS === 'web') {
   _auth = getAuth(app);

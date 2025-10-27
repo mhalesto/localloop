@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const RELATIVE_TIME_THRESHOLDS = [
   { unit: 'minute', seconds: 60 },
@@ -34,6 +35,7 @@ const formatRelativeTime = (timestamp) => {
 
 export default function StatusCard({ status, onPress, onReact, onReport }) {
   const { themeColors } = useSettings();
+  const { user } = useAuth();
 
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
@@ -54,6 +56,16 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
 
   const totalReactions = Object.values(reactions).reduce((sum, entry) => sum + (entry?.count ?? 0), 0);
   const readyLocation = [city, province].filter(Boolean).join(', ');
+  const viewerReactionKey = useMemo(() => {
+    if (user?.uid) return user.uid;
+    if (user?.email) return `client-${user.email}`;
+    return null;
+  }, [user?.email, user?.uid]);
+  const viewerReacted = Boolean(
+    viewerReactionKey && reactions?.heart?.reactors && reactions.heart.reactors[viewerReactionKey]
+  );
+  const authorName = author?.nickname || author?.displayName || 'Anonymous';
+  const relativeTime = formatRelativeTime(createdAt);
 
   return (
     <TouchableOpacity
@@ -62,15 +74,22 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
       activeOpacity={0.9}
     >
       <View style={styles.headerRow}>
-        <View style={styles.authorBlock}>
-          <Ionicons name="person-circle" size={32} color={themeColors.primaryDark} />
-          <View style={styles.authorTextBlock}>
-            <Text style={styles.authorName} numberOfLines={1}>
-              {author?.nickname || author?.displayName || 'Anonymous' }
-            </Text>
-            <Text style={styles.meta} numberOfLines={1}>
-              {readyLocation || 'Somewhere nearby'} · {formatRelativeTime(createdAt)}
-            </Text>
+        <Ionicons name="person-circle" size={40} color={themeColors.primaryDark} />
+        <View style={styles.authorTextBlock}>
+          <Text style={styles.authorName} numberOfLines={1}>
+            {authorName}
+          </Text>
+          <View style={styles.metaRow}>
+            <View style={styles.metaChip}>
+              <Ionicons name="location-outline" size={14} color={themeColors.textSecondary} />
+              <Text style={styles.metaChipText} numberOfLines={1}>
+                {readyLocation || 'Somewhere nearby'}
+              </Text>
+            </View>
+            <View style={[styles.metaChip, styles.metaChipGhost, styles.metaChipLast]}>
+              <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
+              <Text style={styles.metaChipText}>{relativeTime}</Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity
@@ -90,15 +109,21 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
 
       <View style={styles.footerRow}>
         <TouchableOpacity
-          style={styles.footerButton}
+          style={[styles.footerPill, viewerReacted && styles.footerPillActive]}
           onPress={() => onReact?.(status)}
           activeOpacity={0.8}
         >
-          <Ionicons name="heart-outline" size={18} color={themeColors.primaryDark} />
-          <Text style={styles.footerLabel}>{totalReactions}</Text>
+          <Ionicons
+            name={viewerReacted ? 'heart' : 'heart-outline'}
+            size={18}
+            color={viewerReacted ? '#fff' : themeColors.primaryDark}
+          />
+          <Text style={[styles.footerLabel, viewerReacted && styles.footerLabelActive]}>
+            {totalReactions}
+          </Text>
         </TouchableOpacity>
 
-        <View style={styles.footerButton}>
+        <View style={[styles.footerPill, styles.footerPillGhost]}>
           <Ionicons name="chatbubble-ellipses-outline" size={18} color={themeColors.textSecondary} />
           <Text style={styles.footerLabel}>{repliesCount}</Text>
         </View>
@@ -111,11 +136,16 @@ const createStyles = (palette) =>
   StyleSheet.create({
     card: {
       backgroundColor: palette.card,
-      borderRadius: 18,
-      padding: 16,
+      borderRadius: 22,
+      padding: 18,
       borderWidth: 1,
       borderColor: palette.divider,
-      marginBottom: 16,
+      marginBottom: 18,
+      shadowColor: '#000000',
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
     },
     headerRow: {
       flexDirection: 'row',
@@ -123,54 +153,87 @@ const createStyles = (palette) =>
       alignItems: 'center',
       marginBottom: 12,
     },
-    authorBlock: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
     authorTextBlock: {
       marginLeft: 12,
       flex: 1,
     },
     authorName: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '700',
       color: palette.textPrimary,
     },
-    meta: {
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    metaChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      backgroundColor: palette.background,
+      maxWidth: '100%',
+      marginRight: 8,
+    },
+    metaChipGhost: {
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    metaChipLast: {
+      marginRight: 0,
+    },
+    metaChipText: {
       fontSize: 12,
       color: palette.textSecondary,
-      marginTop: 2,
     },
     reportButton: {
       padding: 6,
     },
     message: {
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: 16,
+      lineHeight: 24,
       color: palette.textPrimary,
+      marginTop: 10,
     },
     image: {
       height: 200,
-      borderRadius: 14,
-      marginTop: 12,
+      borderRadius: 18,
+      marginTop: 14,
       width: '100%',
       backgroundColor: palette.background,
     },
     footerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 16,
+      marginTop: 18,
       justifyContent: 'space-between',
     },
-    footerButton: {
+    footerPill: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: palette.background,
+      marginRight: 10,
+    },
+    footerPillActive: {
+      backgroundColor: palette.primary,
+    },
+    footerPillGhost: {
+      backgroundColor: palette.background,
+      opacity: 0.9,
+      marginRight: 0,
     },
     footerLabel: {
-      marginLeft: 6,
       fontSize: 13,
       fontWeight: '600',
-      color: palette.textPrimary,
+      color: palette.textSecondary,
+    },
+    footerLabelActive: {
+      color: '#fff',
     },
   });
