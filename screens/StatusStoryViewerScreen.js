@@ -37,7 +37,7 @@ const formatRelativeTime = (timestamp) => {
 };
 
 export default function StatusStoryViewerScreen({ route, navigation }) {
-  const { themeColors } = useSettings();
+  const { themeColors } = useSettings(); // (not used, but kept for parity)
   const { user } = useAuth();
   const {
     statuses,
@@ -170,9 +170,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const handleShare = useCallback(async () => {
     if (!currentStatus) return;
     try {
-      const payload = currentStatus.message
-        ? `${currentStatus.message}\n`
-        : '';
+      const payload = currentStatus.message ? `${currentStatus.message}\n` : '';
       await Share.share({
         message: `${payload}Shared via Toilet`,
         url: currentStatus.imageUrl ?? undefined,
@@ -211,10 +209,13 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Tap zones for previous/next */}
         <View style={[styles.touchOverlay, { bottom: 140 + insets.bottom }]} pointerEvents="box-none">
           <TouchableOpacity style={styles.touchZone} activeOpacity={1} onPress={handlePrevious} />
           <TouchableOpacity style={styles.touchZone} activeOpacity={1} onPress={handleNext} />
         </View>
+
+        {/* Background media */}
         {currentStatus?.imageUrl ? (
           <ImageBackground
             source={{ uri: currentStatus.imageUrl }}
@@ -229,7 +230,14 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
           </View>
         )}
 
-        <View style={[styles.chromeOverlay, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
+        {/* UI chrome overlay */}
+        <View
+          style={[
+            styles.chromeOverlay,
+            { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
+          {/* TOP: progress + header */}
           <View style={styles.progressRow}>
             {storyItems.map((_, index) => {
               let fill = 0;
@@ -238,7 +246,12 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
               return (
                 <View key={storyItems[index]?.id ?? `progress-${index}`} style={styles.progressTrack}>
                   <View style={styles.progressBackground} />
-                  <View style={[styles.progressFill, { width: `${Math.min(Math.max(fill, 0), 1) * 100}%` }]} />
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.min(Math.max(fill, 0), 1) * 100}%` },
+                    ]}
+                  />
                 </View>
               );
             })}
@@ -250,23 +263,30 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             </TouchableOpacity>
             <View style={styles.headerMeta}>
               <Text style={styles.headerName} numberOfLines={1}>
-                {currentStatus?.author?.nickname || currentStatus?.author?.displayName || 'Anonymous'}
+                {currentStatus?.author?.nickname ||
+                  currentStatus?.author?.displayName ||
+                  'Anonymous'}
               </Text>
-              <Text style={styles.headerTime}>{formatRelativeTime(currentStatus?.createdAt)}</Text>
+              <Text style={styles.headerTime}>
+                {formatRelativeTime(currentStatus?.createdAt)}
+              </Text>
             </View>
             <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
               <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.bodyContent}>
-            {!currentStatus?.imageUrl && currentStatus?.message ? null : currentStatus?.message ? (
-              <View style={styles.messageBubble}>
-                <Text style={styles.messageText}>{currentStatus.message}</Text>
-              </View>
-            ) : null}
-          </View>
+          {/* Spacer pushes caption + bottom bar to the bottom */}
+          <View style={styles.bodyContent} />
 
+          {/* CAPTION ABOVE REPLY */}
+          {!!currentStatus?.message && (
+            <Text style={styles.captionBelow} numberOfLines={3}>
+              {currentStatus.message}
+            </Text>
+          )}
+
+          {/* BOTTOM BAR */}
           <View style={styles.bottomBar}>
             <View style={styles.replyContainer}>
               <TextInput
@@ -289,6 +309,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
                 <Ionicons name="send" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
+
             <View style={styles.actionButtons}>
               <TouchableOpacity style={styles.iconButton} onPress={handleShare} activeOpacity={0.85}>
                 <Ionicons name="arrow-redo" size={22} color="#fff" />
@@ -306,6 +327,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           </View>
+
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </View>
       </KeyboardAvoidingView>
@@ -314,19 +336,15 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
-  media: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  flex: { flex: 1 },
+
+  media: { flex: 1 },
   mediaOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,15,35,0.25)',
   },
+
   mediaFallback: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -339,16 +357,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 34,
   },
+
   chromeOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     paddingHorizontal: 20,
     zIndex: 3,
   },
+
   progressRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: 8, // tighter to keep header near top
   },
   progressTrack: {
     flex: 1,
@@ -372,46 +392,30 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#fff',
   },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 12,
   },
-  headerButton: {
-    padding: 6,
-  },
-  headerMeta: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  headerName: {
+  headerButton: { padding: 6 },
+  headerMeta: { flex: 1, marginHorizontal: 12 },
+  headerName: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerTime: { marginTop: 2, color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+
+  // Spacer to push bottom content down
+  bodyContent: { flex: 1, justifyContent: 'center' },
+
+  // Caption on its own line above reply
+  captionBelow: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '700',
+    lineHeight: 26,
+    marginBottom: 10,
   },
-  headerTime: {
-    marginTop: 2,
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  bodyContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  messageBubble: {
-    marginTop: 12,
-    backgroundColor: 'rgba(15,15,35,0.45)',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 18,
-    alignSelf: 'flex-start',
-  },
-  messageText: {
-    color: '#fff',
-    fontSize: 16,
-    lineHeight: 24,
-  },
+
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,6 +448,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -463,19 +468,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(248,113,113,0.2)',
     borderColor: 'rgba(248,113,113,0.45)',
   },
+
   errorText: {
     color: '#F87171',
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
   },
+
+  // Tap zones for previous/next
   touchOverlay: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     zIndex: 2,
     bottom: 140,
   },
-  touchZone: {
-    flex: 1,
-  },
+  touchZone: { flex: 1 },
 });
