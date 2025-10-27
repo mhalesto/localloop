@@ -132,6 +132,8 @@ export default function ScreenLayout({
       navigation.navigate('Country');
     } else if (key === 'myComments') {
       navigation.navigate('MyComments');
+    } else if (key === 'topStatuses') {
+      navigation.navigate('TopStatuses');
     } else if (key === 'settings') {
       navigation.navigate('Settings');
     }

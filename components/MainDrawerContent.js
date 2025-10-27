@@ -25,6 +25,19 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       }
     },
     {
+      label: 'Top statuses',
+      icon: 'megaphone-outline',
+      key: 'topStatuses',
+      onPress: () => {
+        if (onSelectShortcut) {
+          onSelectShortcut('topStatuses');
+        } else if (navigation) {
+          navigation.closeDrawer?.();
+          navigation.navigate('TopStatuses');
+        }
+      }
+    },
+    {
       label: 'My replies',
       icon: 'chatbubble-ellipses-outline',
       key: 'myComments',

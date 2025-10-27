@@ -10,7 +10,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
-import StatusCard from '../components/StatusCard';
+import StatusStoryCard from '../components/StatusStoryCard';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
@@ -43,11 +43,8 @@ export default function CountryScreen({ navigation }) {
   const {
     statuses,
     isLoading: statusesLoading,
-    toggleStatusReaction,
-    reportStatus: reportStatusStatus,
     statusesError,
   } = useStatuses();
-  const [viewMode, setViewMode] = useState('picks');
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -187,8 +184,19 @@ export default function CountryScreen({ navigation }) {
     [statuses]
   );
 
-  const isStatusesView = viewMode === 'statuses';
-  const statusesEmpty = statusList.length === 0;
+  const statusCarouselItems = useMemo(
+    () => statusList.slice(0, 8),
+    [statusList]
+  );
+  const carouselData = useMemo(() => {
+    const items = statusCarouselItems.map((item) => ({
+      key: item.id,
+      type: 'status',
+      status: item,
+    }));
+    items.push({ key: 'cta', type: 'cta' });
+    return items;
+  }, [statusCarouselItems]);
 
   const handleAddStatusPress = useCallback(() => {
     navigation.navigate('StatusComposer');
@@ -196,23 +204,43 @@ export default function CountryScreen({ navigation }) {
 
   const handleOpenStatus = useCallback(
     (status) => {
+      if (!status) return;
       navigation.navigate('StatusDetail', { statusId: status.id });
     },
     [navigation]
   );
 
-  const handleReactToStatus = useCallback(
-    async (status) => {
-      await toggleStatusReaction(status.id, 'heart');
-    },
-    [toggleStatusReaction]
-  );
+  const handleSeeAllStatuses = useCallback(() => {
+    navigation.navigate('TopStatuses');
+  }, [navigation]);
 
-  const handleReportStatus = useCallback(
-    async (status) => {
-      await reportStatusStatus(status.id, 'inappropriate');
+  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+
+  const renderCarouselItem = useCallback(
+    ({ item }) => {
+      if (item.type === 'cta') {
+        return (
+          <TouchableOpacity
+            style={styles.carouselCtaCard}
+            activeOpacity={0.9}
+            onPress={handleAddStatusPress}
+          >
+            <View style={styles.carouselCtaIcon}>
+              <Ionicons name="add" size={18} color="#fff" />
+            </View>
+            <Text style={styles.carouselCtaTitle}>New status</Text>
+            <Text style={styles.carouselCtaSubtitle}>Share a quick update with neighbours</Text>
+          </TouchableOpacity>
+        );
+      }
+      return (
+        <StatusStoryCard
+          status={item.status}
+          onPress={handleOpenStatus}
+        />
+      );
     },
-    [reportStatusStatus]
+    [handleAddStatusPress, handleOpenStatus, styles]
   );
 
   useEffect(() => {
@@ -323,8 +351,6 @@ export default function CountryScreen({ navigation }) {
   const listData = showingPersonalized ? personalFiltered : paginated;
   const listIsEmpty = listData.length === 0;
 
-  const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
-
   return (
     <ScreenLayout
       title="Explore"
@@ -336,69 +362,7 @@ export default function CountryScreen({ navigation }) {
       navigation={navigation}
       activeTab="home"
     >
-      <View style={styles.toggleRow}>
-        <TouchableOpacity
-          style={[styles.toggleButton, !isStatusesView && styles.toggleButtonActive]}
-          onPress={() => setViewMode('picks')}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.toggleLabel, !isStatusesView && styles.toggleLabelActive]}>Top picks</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleButton, isStatusesView && styles.toggleButtonActive]}
-          onPress={() => setViewMode('statuses')}
-          activeOpacity={0.9}
-        >
-          <Text style={[styles.toggleLabel, isStatusesView && styles.toggleLabelActive]}>Top statuses</Text>
-        </TouchableOpacity>
-      </View>
-
-      {isStatusesView ? (
-        statusesLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={themeColors.primaryDark} />
-          </View>
-        ) : (
-          <FlatList
-            data={statusList}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={
-              <View style={styles.statusHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Top statuses</Text>
-                  <Text style={styles.sectionHint}>Fresh updates from your area</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.statusCta}
-                  onPress={handleAddStatusPress}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="create-outline" size={18} color={themeColors.primaryDark} />
-                  <Text style={styles.statusCtaLabel}>New status</Text>
-                </TouchableOpacity>
-              </View>
-            }
-            ListEmptyComponent={
-              <Text style={styles.emptyState}>
-                {statusesError ? statusesError : 'No statuses yet. Be the first to post!'}
-              </Text>
-            }
-            renderItem={({ item }) => (
-              <StatusCard
-                status={item}
-                onPress={handleOpenStatus}
-                onReact={handleReactToStatus}
-                onReport={handleReportStatus}
-              />
-            )}
-            contentContainerStyle={[
-              styles.statusListContent,
-              statusesEmpty && styles.listContentEmpty
-            ]}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      ) : loading ? (
+      {loading ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={themeColors.primaryDark} />
         </View>
@@ -439,6 +403,44 @@ export default function CountryScreen({ navigation }) {
           }
           ListHeaderComponent={
             <View>
+              <View style={styles.carouselSection}>
+                <View style={styles.carouselHeader}>
+                  <View>
+                    <Text style={styles.carouselTitle}>Status spotlight</Text>
+                    <Text style={styles.carouselSubtitle}>
+                      {statusCarouselItems.length
+                        ? 'Quick updates from neighbours near you'
+                        : 'Share something happening around you'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.carouselLinkButton}
+                    onPress={handleSeeAllStatuses}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.carouselLinkText}>See all</Text>
+                    <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
+                  </TouchableOpacity>
+                </View>
+                {statusesLoading ? (
+                  <View style={styles.carouselLoader}>
+                    <ActivityIndicator size="small" color={themeColors.primaryDark} />
+                  </View>
+                ) : (
+                  <FlatList
+                    data={carouselData}
+                    horizontal
+                    keyExtractor={(item) => item.key}
+                    renderItem={renderCarouselItem}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.carouselListContent}
+                  />
+                )}
+                {statusesError && !statusesLoading ? (
+                  <Text style={styles.carouselError}>{statusesError}</Text>
+                ) : null}
+              </View>
+
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Top picks</Text>
@@ -526,57 +528,96 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       color: palette.textPrimary,
       marginBottom: 16
     },
-    toggleRow: {
-      flexDirection: 'row',
-      marginBottom: 16,
-      gap: 12
+    carouselSection: {
+      marginBottom: 24
     },
-    toggleButton: {
-      flex: 1,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: palette.divider,
-      backgroundColor: palette.background,
-      paddingVertical: 12,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    toggleButtonActive: {
-      backgroundColor: palette.primary,
-      borderColor: palette.primary
-    },
-    toggleLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: palette.textSecondary
-    },
-    toggleLabelActive: {
-      color: '#fff'
-    },
-    statusHeader: {
+    carouselHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 16
     },
-    statusCta: {
+    carouselTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    carouselSubtitle: {
+      marginTop: 4,
+      fontSize: 12,
+      color: palette.textSecondary
+    },
+    carouselLinkButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: palette.background,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       borderRadius: 14,
+      backgroundColor: palette.background,
       borderWidth: 1,
       borderColor: palette.divider
     },
-    statusCtaLabel: {
-      marginLeft: 8,
+    carouselLinkText: {
       fontSize: 13,
       fontWeight: '600',
-      color: palette.primaryDark
+      color: palette.primaryDark,
+      marginRight: 4
     },
-    statusListContent: {
-      paddingBottom: 120
+    carouselLoader: {
+      height: 200,
+      borderRadius: 28,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    carouselListContent: {
+      paddingBottom: 4,
+      paddingRight: 12,
+      paddingLeft: 4
+    },
+    carouselError: {
+      marginTop: 10,
+      fontSize: 12,
+      color: '#ef4444'
+    },
+    carouselCtaCard: {
+      width: 140,
+      height: 200,
+      borderRadius: 28,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      padding: 18,
+      marginRight: 16,
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
+    },
+    carouselCtaIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: palette.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12
+    },
+    carouselCtaTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    carouselCtaSubtitle: {
+      marginTop: 8,
+      fontSize: 12,
+      color: palette.textSecondary,
+      lineHeight: 18
     },
     personalError: {
       marginTop: 6,
