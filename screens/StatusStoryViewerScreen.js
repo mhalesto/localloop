@@ -28,7 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const STORY_DURATION_MS = 6000;
 
-// rough header height: progress (8) + header (48) + margins
+// progress (8) + header (≈56) buffer so tap overlay starts below header
 const HEADER_TOUCH_EXCLUDE = 64;
 
 const formatRelativeTime = (timestamp) => {
@@ -42,7 +42,7 @@ const formatRelativeTime = (timestamp) => {
 };
 
 export default function StatusStoryViewerScreen({ route, navigation }) {
-  const { themeColors } = useSettings(); // reserved for theming
+  const { themeColors } = useSettings();
   const { user } = useAuth();
   const {
     statuses,
@@ -60,17 +60,17 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
 
   const storyItems = useMemo(() => {
     const mapped = statusIds
-      .map((id) => statuses.find((status) => status.id === id))
+      .map((id) => statuses.find((s) => s.id === id))
       .filter(Boolean);
     if (mapped.length === 0 && initialStatusId) {
-      const fallback = statuses.find((item) => item.id === initialStatusId);
+      const fallback = statuses.find((i) => i.id === initialStatusId);
       return fallback ? [fallback] : [];
     }
     return mapped;
   }, [statusIds, statuses, initialStatusId]);
 
   const derivedInitialIndex = useMemo(() => {
-    const matchedIndex = storyItems.findIndex((status) => status.id === initialStatusId);
+    const matchedIndex = storyItems.findIndex((s) => s.id === initialStatusId);
     if (matchedIndex >= 0) return matchedIndex;
     return Math.min(Math.max(initialIndexParam, 0), Math.max(storyItems.length - 1, 0));
   }, [storyItems, initialStatusId, initialIndexParam]);
@@ -78,6 +78,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const [currentIndex, setCurrentIndex] = useState(derivedInitialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isHolding, setIsHolding] = useState(false); // NEW: hide header while holding
   const [reply, setReply] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [error, setError] = useState('');
@@ -85,7 +86,6 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   // uploaded image natural size
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 });
 
-  // ticker ref
   const progressRef = useRef(progress);
   useEffect(() => { progressRef.current = progress; }, [progress]);
 
@@ -101,7 +101,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
     preloadStatuses?.(storyItems.map((i) => i.id));
   }, [preloadStatuses, storyItems]);
 
-  // natural image size lookup
+  // natural image size
   useEffect(() => {
     if (currentStatus?.imageUrl) {
       Image.getSize(
@@ -126,11 +126,9 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   }, [currentStatus?.reactions?.heart?.reactors, viewerReactionKey]);
 
   const handleExit = useCallback(() => {
-    // schedule to avoid “set state during render” issues
     requestAnimationFrame(() => navigation.goBack?.());
   }, [navigation]);
 
-  // boundary-safe next/prev (no setState callback that calls navigation)
   const handleNext = useCallback(() => {
     setProgress(0);
     if (currentIndex + 1 >= storyItems.length) {
@@ -167,7 +165,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
     return () => { if (frame) cancelAnimationFrame(frame); };
   }, [currentStatus, isPaused, handleNext]);
 
-  // reset between slides
+  // reset per slide
   useEffect(() => {
     setProgress(0);
     setReply('');
@@ -214,7 +212,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const handleInputFocus = useCallback(() => setIsPaused(true), []);
   const handleInputBlur = useCallback(() => setIsPaused(false), []);
 
-  // --- tap & hold controls ---
+  // --- tap/hold controls ---
   const didLongPressRef = useRef(false);
   const onZonePressIn = useCallback(() => {
     didLongPressRef.current = false;
@@ -222,9 +220,11 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   }, []);
   const onZoneLongPress = useCallback(() => {
     didLongPressRef.current = true; // prevent navigation on release
+    setIsHolding(true);             // hide header while holding
   }, []);
   const onZonePressOut = useCallback(() => {
     setIsPaused(false);
+    setIsHolding(false);
   }, []);
   const onLeftTap = useCallback(() => {
     if (didLongPressRef.current) { didLongPressRef.current = false; return; }
@@ -248,7 +248,9 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: '#0F0B26' }]}>
-      <StatusBar style="light" hidden />
+      {/* Status bar BACK ON */}
+      <StatusBar style="light" hidden={false} />
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -282,7 +284,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Media layer: center image at natural size, never upscale */}
+        {/* Media: center at natural size, never upscale */}
         {currentStatus?.imageUrl ? (
           <View style={styles.media}>
             <Image
@@ -325,8 +327,11 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             })}
           </View>
 
-          {/* header */}
-          <View style={styles.headerRow}>
+          {/* header — hidden while holding */}
+          <View
+            style={[styles.headerRow, isHolding && { opacity: 0 }]}
+            pointerEvents={isHolding ? 'none' : 'auto'}
+          >
             <TouchableOpacity onPress={handleExit} style={styles.headerButton} activeOpacity={0.8}>
               <Ionicons name="chevron-back" size={22} color="#fff" />
             </TouchableOpacity>
@@ -481,10 +486,9 @@ const styles = StyleSheet.create({
   headerName: { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerTime: { marginTop: 2, color: 'rgba(255,255,255,0.7)', fontSize: 12 },
 
-  // Spacer to push bottom content down
+  // Spacer pushes bottom content down
   bodyContent: { flex: 1, justifyContent: 'center' },
 
-  // Caption line above reply
   captionBelow: {
     color: '#fff',
     fontSize: 20,
@@ -557,7 +561,7 @@ const styles = StyleSheet.create({
   touchOverlay: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
-    zIndex: 4, // above media, below header/bottom (header buttons still work because we exclude its area via `top`)
+    zIndex: 4,
   },
   touchZone: { flex: 1 },
 });
