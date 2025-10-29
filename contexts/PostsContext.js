@@ -41,6 +41,7 @@ const makeThreadKey = (city, postId) => `${city}::${postId}`;
 function normalizeProfile(profile) {
   if (!profile) {
     return {
+      uid: null,
       nickname: '',
       country: '',
       province: '',
@@ -48,7 +49,14 @@ function normalizeProfile(profile) {
       avatarKey: 'default'
     };
   }
+  const uid =
+    typeof profile.uid === 'string' && profile.uid.trim().length > 0
+      ? profile.uid.trim()
+      : typeof profile.id === 'string' && profile.id.trim().length > 0
+      ? profile.id.trim()
+      : null;
   return {
+    uid,
     nickname: profile.nickname?.trim() ?? '',
     country: profile.country ?? '',
     province: profile.province ?? '',
@@ -293,7 +301,7 @@ export function PostsProvider({ children }) {
   const prevPostsRef = useRef({});
   const hasHydratedPostsRef = useRef(false);
   const threadListenersRef = useRef(new Map());
-  const { awardEngagementPoints } = useAuth();
+  const { awardEngagementPoints, user: firebaseUser } = useAuth();
 
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
@@ -746,7 +754,12 @@ export function PostsProvider({ children }) {
         if (cancelled) return;
         try {
           if (operation.type === 'addPost') {
-            await savePostRemote(operation.payload.post);
+            const { post } = operation.payload ?? {};
+            if (!post?.author?.uid) {
+              console.warn('[PostsProvider] skipping queued post without author uid');
+              continue;
+            }
+            await savePostRemote(post);
           } else if (operation.type === 'addComment') {
             await saveCommentRemote(operation.payload.postId, operation.payload.comment);
           } else if (operation.type === 'updatePost') {
@@ -936,12 +949,20 @@ export function PostsProvider({ children }) {
     ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
-        return;
+        return false;
+      }
+
+      if (!firebaseUser?.uid) {
+        console.warn('[PostsProvider] addPost blocked: missing authenticated user');
+        return false;
       }
 
       const trimmedDescription = description?.trim?.() ?? '';
       const ownerId = ensureClientId();
-      const author = normalizeProfile(authorProfile);
+      const author = normalizeProfile({
+        ...(authorProfile || {}),
+        uid: firebaseUser.uid
+      });
       const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const newPost = {
         id: newPostId,
@@ -971,8 +992,9 @@ export function PostsProvider({ children }) {
       });
 
       enqueueOperation({ type: 'addPost', payload: { post: newPost } });
+      return true;
     },
-    [enqueueOperation, ensureClientId, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, firebaseUser?.uid, setPostsWithPersist]
   );
 
   const addComment = useCallback(
@@ -1437,7 +1459,12 @@ export function PostsProvider({ children }) {
   const sharePost = useCallback(
     (fromCity, postId, toCity, authorProfile = null) => {
       if (fromCity === toCity) {
-        return;
+        return false;
+      }
+
+      if (!firebaseUser?.uid) {
+        console.warn('[PostsProvider] sharePost blocked: missing authenticated user');
+        return false;
       }
 
       const basePost = (() => {
@@ -1446,11 +1473,14 @@ export function PostsProvider({ children }) {
       })();
 
       if (!basePost) {
-        return;
+        return false;
       }
 
       const ownerId = ensureClientId();
-      const author = normalizeProfile(authorProfile ?? basePost.author);
+      const author = normalizeProfile({
+        ...(authorProfile ?? basePost.author),
+        uid: firebaseUser.uid
+      });
       const nextShareCount = (basePost.shareCount ?? 0) + 1;
 
       const sharedPost = {
@@ -1459,7 +1489,11 @@ export function PostsProvider({ children }) {
         city: toCity,
         createdAt: Date.now(),
         comments: [],
-        sharedFrom: { city: fromCity },
+        sharedFrom: {
+          city: fromCity,
+          postId: basePost.id,
+          author: basePost.author ?? null
+        },
         sourceCity: basePost.sourceCity ?? basePost.city ?? fromCity,
         sourcePostId: basePost.sourcePostId ?? basePost.id,
         createdByMe: true,
@@ -1489,8 +1523,9 @@ export function PostsProvider({ children }) {
         type: 'updatePost',
         payload: { post: { id: postId, shareCount: nextShareCount } }
       });
+      return true;
     },
-    [enqueueOperation, ensureClientId, postsByCity, setPostsWithPersist]
+    [enqueueOperation, ensureClientId, firebaseUser?.uid, postsByCity, setPostsWithPersist]
   );
 
   const toggleVote = useCallback(

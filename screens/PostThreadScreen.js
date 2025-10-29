@@ -27,6 +27,7 @@ import { LongPressGestureHandler } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 
 import { usePosts } from '../contexts/PostsContext';
+import { useAuth } from '../contexts/AuthContext';
 import ScreenLayout from '../components/ScreenLayout';
 import CreatePostModal from '../components/CreatePostModal';
 import {
@@ -428,6 +429,7 @@ export default function PostThreadScreen({ route, navigation }) {
     premiumTitleFontSize,
     premiumDescriptionFontSize
   } = useSettings();
+  const { user: firebaseUser } = useAuth();
   const effectiveTitleFontSize =
     premiumTypographyEnabled && premiumTitleFontSizeEnabled
       ? premiumTitleFontSize
@@ -1471,11 +1473,20 @@ export default function PostThreadScreen({ route, navigation }) {
         closeShareModal();
         return;
       }
-      sharePost(city, postId, targetCity, userProfile);
-      setFeedbackMessage(`Shared to ${targetCity}`);
+      if (!firebaseUser?.uid) {
+        Alert.alert('Sign in required', 'Sign in to share posts to another room.');
+        closeShareModal();
+        return;
+      }
+      const shared = sharePost(city, postId, targetCity, userProfile);
+      if (shared) {
+        setFeedbackMessage(`Shared to ${targetCity}`);
+      } else {
+        Alert.alert('Unable to share', 'We could not share that post right now. Please try again soon.');
+      }
       closeShareModal();
     },
-    [city, closeShareModal, postId, sharePost, userProfile]
+    [city, closeShareModal, firebaseUser?.uid, postId, sharePost, userProfile]
   );
 
   const handleShareOutside = useCallback(async () => {

@@ -20,7 +20,8 @@ export const DEFAULT_TITLE_FONT_SIZE = 22;
 export const DEFAULT_DESCRIPTION_FONT_SIZE = 18;
 export const PREMIUM_TITLE_FONT_SIZE_RANGE = Object.freeze({ min: 18, max: 28 });
 export const PREMIUM_DESCRIPTION_FONT_SIZE_RANGE = Object.freeze({ min: 16, max: 24 });
-export const PREMIUM_ACCENT_BRIGHTNESS_RANGE = Object.freeze({ min: 0, max: 40 });
+export const PREMIUM_ACCENT_BRIGHTNESS_RANGE = Object.freeze({ min: 0, max: 50 });
+export const PREMIUM_ACCENT_SHADE_RANGE = Object.freeze({ min: 0, max: 100 });
 export const PREMIUM_SUMMARY_LENGTH_OPTIONS = Object.freeze([
   {
     key: 'concise',
@@ -64,6 +65,8 @@ const normalizeHex = (hex) => {
   return null;
 };
 
+const clampChannel = (value) => Math.max(0, Math.min(255, Math.round(value)));
+
 const lightenHex = (color, percent) => {
   const normalized = normalizeHex(color);
   if (!normalized) {
@@ -73,7 +76,7 @@ const lightenHex = (color, percent) => {
   const r = parseInt(normalized.slice(0, 2), 16);
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
-  const mix = (channel) => Math.round(channel + (255 - channel) * factor);
+  const mix = (channel) => clampChannel(channel + (255 - channel) * factor);
   const next = [mix(r), mix(g), mix(b)]
     .map((channel) => channel.toString(16).padStart(2, '0').toUpperCase())
     .join('');
@@ -94,8 +97,83 @@ const lightenRgba = (color, percent) => {
   const b = Number(bRaw);
   const a = aRaw.trim();
   const factor = percent / 100;
-  const mix = (channel) => Math.round(channel + (255 - channel) * factor);
+  const mix = (channel) => clampChannel(channel + (255 - channel) * factor);
   return `rgba(${mix(r)},${mix(g)},${mix(b)},${a})`;
+};
+
+const parseHexColor = (color) => {
+  const normalized = normalizeHex(color);
+  if (!normalized) {
+    return null;
+  }
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16)
+  };
+};
+
+const parseRgbaColor = (color) => {
+  if (typeof color !== 'string' || !color.startsWith('rgba')) {
+    return null;
+  }
+  const match = color.match(/rgba\((\d+),(\d+),(\d+),(.*)\)/);
+  if (!match) {
+    return null;
+  }
+  const [, rRaw, gRaw, bRaw, aRaw] = match;
+  return {
+    r: Number(rRaw),
+    g: Number(gRaw),
+    b: Number(bRaw),
+    a: Number(aRaw)
+  };
+};
+
+const rgbToHex = ({ r, g, b }) =>
+  `#${[r, g, b]
+    .map((channel) => clampChannel(channel).toString(16).padStart(2, '0').toUpperCase())
+    .join('')}`;
+
+const toRgbaString = ({ r, g, b, a }) =>
+  `rgba(${clampChannel(r)},${clampChannel(g)},${clampChannel(b)},${typeof a === 'number' ? a : 1})`;
+
+const mixRgbTowards = (source, target, percent) => {
+  const factor = percent / 100;
+  return {
+    r: clampChannel(source.r + (target.r - source.r) * factor),
+    g: clampChannel(source.g + (target.g - source.g) * factor),
+    b: clampChannel(source.b + (target.b - source.b) * factor),
+    a: typeof source.a === 'number' ? source.a : undefined
+  };
+};
+
+const mixHexTowards = (color, targetColor, percent) => {
+  const source = parseHexColor(color);
+  const target = parseHexColor(targetColor);
+  if (!source || !target) {
+    return color;
+  }
+  return rgbToHex(mixRgbTowards(source, target, percent));
+};
+
+const mixRgbaTowards = (color, targetColor, percent) => {
+  const source = parseRgbaColor(color);
+  if (!source) {
+    return color;
+  }
+  const targetHex = parseHexColor(targetColor);
+  const targetRgba = targetHex || parseRgbaColor(targetColor);
+  if (!targetRgba) {
+    return color;
+  }
+  const target = {
+    r: targetRgba.r,
+    g: targetRgba.g,
+    b: targetRgba.b
+  };
+  const mixed = mixRgbTowards(source, target, percent);
+  return toRgbaString({ ...mixed, a: source.a });
 };
 
 const applyBrightnessToPreset = (preset, brightness) => {
@@ -124,6 +202,46 @@ const applyBrightnessToPreset = (preset, brightness) => {
     }
   });
   return next;
+};
+
+const applyShadeToPreset = (preset, shade) => {
+  if (!shade) {
+    return preset;
+  }
+  const targetColor = preset.buttonBackground ?? preset.background;
+  if (typeof targetColor !== 'string') {
+    return preset;
+  }
+  const fieldsToTint = ['background', 'badgeBackground', 'statCardBackground', 'iconBackground', 'iconBorder'];
+  const next = { ...preset };
+  fieldsToTint.forEach((field) => {
+    const value = next[field];
+    if (typeof value !== 'string') {
+      return;
+    }
+    if (value.startsWith('#')) {
+      next[field] = mixHexTowards(value, targetColor, shade);
+    } else if (value.startsWith('rgba')) {
+      next[field] = mixRgbaTowards(value, targetColor, shade);
+    }
+  });
+  return next;
+};
+
+const ensureHighContrastAccent = (preset, forceLight = false) => {
+  if (!forceLight) {
+    return preset;
+  }
+  return {
+    ...preset,
+    isDark: true,
+    onPrimary: '#FFFFFF',
+    subtitleColor: 'rgba(255,255,255,0.82)',
+    iconTint: '#FFFFFF',
+    iconBackground: 'rgba(255,255,255,0.18)',
+    iconBorder: 'rgba(255,255,255,0.35)',
+    placeholderColor: 'rgba(255,255,255,0.65)'
+  };
 };
 
 export const baseAccentPresets = [
@@ -222,6 +340,55 @@ export const baseAccentPresets = [
 ];
 
 export const premiumAccentPresets = [
+  {
+    key: 'pinkdream',
+    label: 'Pink Dreamscape',
+    tier: 'premium',
+    background: '#F7D7F7',
+    isDark: false,
+    onPrimary: lightColors.textPrimary,
+    subtitleColor: '#B85AA6',
+    metaColor: '#9F7098',
+    iconTint: '#FF7BC4',
+    iconBorder: 'rgba(255,123,196,0.28)',
+    iconBackground: '#ffffff',
+    statCardBackground: 'rgba(255,123,196,0.16)',
+    statValue: '#D25AA5',
+    statLabel: lightColors.textSecondary,
+    buttonBackground: '#FF7BC4',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#F7D7F7',
+    badgeTextColor: '#D25AA5',
+    linkColor: '#FF7BC4',
+    fabBackground: '#FF7BC4',
+    fabForeground: '#ffffff',
+    backgroundImage: require('../assets/themes/pink-dream.png')
+  },
+  {
+    key: 'shapeplay',
+    label: 'Shape Play',
+    tier: 'premium',
+    background: '#E5F1FF',
+    isDark: false,
+    onPrimary: lightColors.textPrimary,
+    subtitleColor: '#1F3B61',
+    metaColor: '#4B5C7A',
+    iconTint: '#436BFF',
+    iconBorder: 'rgba(67,107,255,0.24)',
+    iconBackground: '#ffffff',
+    statCardBackground: 'rgba(67,107,255,0.12)',
+    statValue: '#2E4AA5',
+    statLabel: lightColors.textSecondary,
+    buttonBackground: '#436BFF',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#E5F1FF',
+    badgeTextColor: '#2E4AA5',
+    linkColor: '#436BFF',
+    fabBackground: '#436BFF',
+    fabForeground: '#ffffff',
+    backgroundImage: require('../assets/themes/shape-play.gif')
+  },
+
   {
     key: 'sunrise',
     label: 'Sunrise Glow',
@@ -367,16 +534,19 @@ export const accentPresets = [...baseAccentPresets, ...premiumAccentPresets];
 const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
+  const isDevBuild = __DEV__ === true;
+  const defaultPremiumAccentKey = premiumAccentPresets[0]?.key ?? baseAccentPresets[0].key;
   const [showAddShortcut, setShowAddShortcut] = useState(true);
-  const [accentKey, setAccentKey] = useState(baseAccentPresets[0].key);
-  const [baseAccentKey, setBaseAccentKey] = useState(baseAccentPresets[0].key);
-  const [premiumAccentEnabled, setPremiumAccentEnabled] = useState(false);
-  const [premiumAccentKey, setPremiumAccentKey] = useState(
-    premiumAccentPresets[0]?.key ?? baseAccentPresets[0].key
+  const [accentKey, setAccentKey] = useState(
+    isDevBuild ? defaultPremiumAccentKey : baseAccentPresets[0].key
   );
+  const [baseAccentKey, setBaseAccentKey] = useState(baseAccentPresets[0].key);
+  const [premiumAccentEnabled, setPremiumAccentEnabled] = useState(isDevBuild);
+  const [premiumAccentKey, setPremiumAccentKey] = useState(defaultPremiumAccentKey);
   const [premiumAccentBrightness, setPremiumAccentBrightness] = useState(
     PREMIUM_ACCENT_BRIGHTNESS_RANGE.min
   );
+  const [premiumAccentShade, setPremiumAccentShade] = useState(0);
   const [locationPermissionStatus, setLocationPermissionStatus] = useState('undetermined');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [dreamyScrollIndicatorEnabled, setDreamyScrollIndicatorEnabled] = useState(false);
@@ -401,7 +571,7 @@ export function SettingsProvider({ children }) {
   const { hasActivePremium } = useAuth();
 
   useEffect(() => {
-    if (hasActivePremium) {
+    if (hasActivePremium || isDevBuild) {
       return;
     }
     setPremiumAccentEnabled(false);
@@ -410,7 +580,8 @@ export function SettingsProvider({ children }) {
     setPremiumTitleFontSizeEnabled(false);
     setPremiumDescriptionFontSizeEnabled(false);
     setPremiumSummariesEnabled(false);
-  }, [hasActivePremium, baseAccentKey]);
+    setPremiumAccentShade(0);
+  }, [hasActivePremium, baseAccentKey, isDevBuild]);
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
@@ -427,26 +598,26 @@ export function SettingsProvider({ children }) {
   const updatePremiumAccentEnabled = useCallback(
     (enabled) => {
       const nextEnabled = Boolean(enabled);
-      if (!hasActivePremium && nextEnabled) {
+      if (!hasActivePremium && !isDevBuild && nextEnabled) {
         return;
       }
       setPremiumAccentEnabled(nextEnabled);
       setAccentKey(nextEnabled ? premiumAccentKey : baseAccentKey);
     },
-    [hasActivePremium, baseAccentKey, premiumAccentKey]
+    [hasActivePremium, baseAccentKey, premiumAccentKey, isDevBuild]
   );
   const updatePremiumAccentKey = useCallback(
     (key) => {
       setPremiumAccentKey(key);
-      if (premiumAccentEnabled && hasActivePremium) {
+      if (premiumAccentEnabled && (hasActivePremium || isDevBuild)) {
         setAccentKey(key);
       }
     },
-    [premiumAccentEnabled, hasActivePremium]
+    [premiumAccentEnabled, hasActivePremium, isDevBuild]
   );
   const updatePremiumAccentBrightness = useCallback(
     (value) => {
-      if (!hasActivePremium) {
+      if (!hasActivePremium && !isDevBuild) {
         return;
       }
       setPremiumAccentBrightness((prev) => {
@@ -456,7 +627,21 @@ export function SettingsProvider({ children }) {
         return clampWithinRange(value, PREMIUM_ACCENT_BRIGHTNESS_RANGE);
       });
     },
-    [hasActivePremium]
+    [hasActivePremium, isDevBuild]
+  );
+  const updatePremiumAccentShade = useCallback(
+    (value) => {
+      if (!hasActivePremium && !isDevBuild) {
+        return;
+      }
+      setPremiumAccentShade((prev) => {
+        if (value === undefined || value === null) {
+          return prev;
+        }
+        return clampWithinRange(value, PREMIUM_ACCENT_SHADE_RANGE);
+      });
+    },
+    [hasActivePremium, isDevBuild]
   );
   const updateIsDarkMode = useCallback((enabled) => setIsDarkMode(Boolean(enabled)), []);
   const updateDreamyScrollIndicatorEnabled = useCallback(
@@ -563,11 +748,15 @@ export function SettingsProvider({ children }) {
   const accentPreset = useMemo(() => {
     const basePreset = accentPresets.find((preset) => preset.key === accentKey) ?? accentPresets[0];
     const isPremiumPreset = premiumAccentPresets.some((preset) => preset.key === basePreset.key);
+    let result = basePreset;
     if (premiumAccentEnabled && isPremiumPreset) {
-      return applyBrightnessToPreset(basePreset, premiumAccentBrightness);
+      const brightened = applyBrightnessToPreset(basePreset, premiumAccentBrightness);
+      const shaded = applyShadeToPreset(brightened, premiumAccentShade);
+      const forceLight = premiumAccentShade >= 50;
+      result = ensureHighContrastAccent(shaded, forceLight);
     }
-    return basePreset;
-  }, [accentKey, premiumAccentBrightness, premiumAccentEnabled]);
+    return result;
+  }, [accentKey, premiumAccentBrightness, premiumAccentEnabled, premiumAccentShade]);
   const themeColors = isDarkMode ? darkColors : lightColors;
 
   const value = useMemo(
@@ -585,6 +774,8 @@ export function SettingsProvider({ children }) {
       setPremiumAccentKey: updatePremiumAccentKey,
       premiumAccentBrightness,
       setPremiumAccentBrightness: updatePremiumAccentBrightness,
+      premiumAccentShade,
+      setPremiumAccentShade: updatePremiumAccentShade,
       userProfile,
       updateUserProfile,
       locationPermissionStatus,
@@ -623,6 +814,8 @@ export function SettingsProvider({ children }) {
       updatePremiumAccentKey,
       premiumAccentBrightness,
       updatePremiumAccentBrightness,
+      premiumAccentShade,
+      updatePremiumAccentShade,
       userProfile,
       updateUserProfile,
       locationPermissionStatus,

@@ -17,13 +17,15 @@ import {
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import PremiumSlider from '../components/PremiumSlider';
 import {
   useSettings,
   DEFAULT_TITLE_FONT_SIZE,
   DEFAULT_DESCRIPTION_FONT_SIZE,
   PREMIUM_TITLE_FONT_SIZE_RANGE,
   PREMIUM_DESCRIPTION_FONT_SIZE_RANGE,
-  PREMIUM_ACCENT_BRIGHTNESS_RANGE
+  PREMIUM_ACCENT_BRIGHTNESS_RANGE,
+  PREMIUM_ACCENT_SHADE_RANGE
 } from '../contexts/SettingsContext';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
@@ -67,6 +69,8 @@ export default function SettingsScreen({ navigation }) {
     setPremiumAccentKey,
     premiumAccentBrightness,
     setPremiumAccentBrightness,
+    premiumAccentShade,
+    setPremiumAccentShade,
     userProfile,
     updateUserProfile,
     locationPermissionStatus,
@@ -177,23 +181,17 @@ export default function SettingsScreen({ navigation }) {
     return `Ghost #${Math.floor(Math.random() * 999)}`;
   }, [userProfile.nickname]);
 
+  const isDevBuild = __DEV__ === true;
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
   const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';
   const activeThumbColor = '#ffffff';
+  const sliderTrackColor = isDarkMode ? 'rgba(255,255,255,0.22)' : 'rgba(15,10,42,0.12)';
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
   );
-  const brightnessSteps = useMemo(() => {
-    const steps = [0, 10, 20, 30, 40];
-    return steps.filter(
-      (step) =>
-        step >= PREMIUM_ACCENT_BRIGHTNESS_RANGE.min &&
-        step <= PREMIUM_ACCENT_BRIGHTNESS_RANGE.max
-    );
-  }, []);
   const pointsBalance = authProfile?.points ?? 0;
   const premiumExpiryLabel = useMemo(() => {
     if (!authProfile?.premiumExpiresAt) {
@@ -344,7 +342,7 @@ export default function SettingsScreen({ navigation }) {
   }, [redeemPremiumDay, hoursOfPremium]);
 
   const handleTogglePremiumAccent = (value) => {
-    if (value && !premiumUnlocked) {
+    if (value && !premiumUnlocked && !isDevBuild) {
       showPremiumRequiredAlert();
       return;
     }
@@ -352,7 +350,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSelectPremiumAccent = (key) => {
-    if (!premiumUnlocked) {
+    if (!premiumUnlocked && !isDevBuild) {
       showPremiumRequiredAlert();
       return;
     }
@@ -360,12 +358,40 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleSelectBrightness = (value) => {
-    if (!premiumUnlocked) {
+    if (!premiumUnlocked && !isDevBuild) {
       showPremiumRequiredAlert();
       return;
     }
     setPremiumAccentBrightness(value);
   };
+
+  const handleBrightnessSliderChange = useCallback(
+    (rawValue) => {
+      const next = Math.round(rawValue);
+      if (next !== premiumAccentBrightness) {
+        handleSelectBrightness(next);
+      }
+    },
+    [handleSelectBrightness, premiumAccentBrightness]
+  );
+
+  const handleSelectShade = (value) => {
+    if (!premiumUnlocked && !isDevBuild) {
+      showPremiumRequiredAlert();
+      return;
+    }
+    setPremiumAccentShade(value);
+  };
+
+  const handleShadeSliderChange = useCallback(
+    (rawValue) => {
+      const next = Math.round(rawValue);
+      if (next !== premiumAccentShade) {
+        handleSelectShade(next);
+      }
+    },
+    [handleSelectShade, premiumAccentShade]
+  );
 
   const handleSelectSummaryLength = (value) => {
     if (!premiumUnlocked) {
@@ -1196,36 +1222,55 @@ export default function SettingsScreen({ navigation }) {
                     {premiumAccentBrightness ? `+${premiumAccentBrightness}%` : 'Original'}
                   </Text>
                 </View>
-                <View style={styles.premiumBrightnessOptions}>
-                  {brightnessSteps.map((step) => {
-                    const isActive = step === premiumAccentBrightness;
-                    return (
-                      <TouchableOpacity
-                        key={step}
-                        onPress={() => handleSelectBrightness(step)}
-                        style={[
-                          styles.brightnessChip,
-                          {
-                            backgroundColor: isActive ? accentSwitchColor : themeColors.card,
-                            borderColor: isActive ? accentSwitchColor : themeColors.divider
-                          }
-                        ]}
-                        activeOpacity={0.85}
-                      >
-                        <Text
-                          style={[
-                            styles.brightnessChipText,
-                            { color: isActive ? activeThumbColor : themeColors.textPrimary }
-                          ]}
-                        >
-                          {step ? `+${step}%` : 'Original'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={styles.premiumSliderRow}>
+                  <PremiumSlider
+                    style={styles.premiumSlider}
+                    minimumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.min}
+                    maximumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.max}
+                    step={1}
+                    value={premiumAccentBrightness}
+                    onValueChange={handleBrightnessSliderChange}
+                    trackColor={sliderTrackColor}
+                    fillColor={accentSwitchColor}
+                    thumbColor={accentSwitchColor}
+                  />
+                  <View style={[styles.sliderBadge, { backgroundColor: accentSwitchColor }]}>
+                    <Text style={styles.sliderBadgeText}>
+                      {premiumAccentBrightness ? `+${premiumAccentBrightness}%` : 'Original'}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.premiumInputHint}>
                   Dial up to {PREMIUM_ACCENT_BRIGHTNESS_RANGE.max}% for a softer glow.
+                </Text>
+              </View>
+              <View style={styles.premiumShadeBlock}>
+                <View style={styles.premiumBrightnessHeader}>
+                  <Text style={styles.premiumBrightnessTitle}>Theme darkness</Text>
+                  <Text style={styles.premiumBrightnessValue}>
+                    {premiumAccentShade ? `+${premiumAccentShade}%` : 'Original'}
+                  </Text>
+                </View>
+                <View style={styles.premiumSliderRow}>
+                  <PremiumSlider
+                    style={styles.premiumSlider}
+                    minimumValue={PREMIUM_ACCENT_SHADE_RANGE.min}
+                    maximumValue={PREMIUM_ACCENT_SHADE_RANGE.max}
+                    step={1}
+                    value={premiumAccentShade}
+                    onValueChange={handleShadeSliderChange}
+                    trackColor={sliderTrackColor}
+                    fillColor={accentSwitchColor}
+                    thumbColor={accentSwitchColor}
+                  />
+                  <View style={[styles.sliderBadge, { backgroundColor: accentSwitchColor }]}>
+                    <Text style={styles.sliderBadgeText}>
+                      {premiumAccentShade ? `+${premiumAccentShade}%` : 'Original'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.premiumInputHint}>
+                  Add up to {PREMIUM_ACCENT_SHADE_RANGE.max}% depth for a bolder match with the add button.
                 </Text>
               </View>
             </>
@@ -1909,6 +1954,10 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 8,
       paddingVertical: 8
     },
+    premiumShadeBlock: {
+      marginTop: 12,
+      paddingVertical: 8
+    },
     premiumBrightnessHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1925,23 +1974,35 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600',
       color: palette.textSecondary
     },
-    premiumBrightnessOptions: {
+    premiumSliderRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 8
-    },
-    brightnessChip: {
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: 14,
-      borderWidth: 1.5,
-      borderColor: palette.divider,
+      alignItems: 'center',
       backgroundColor: palette.card,
-      marginRight: 8,
-      marginBottom: 8
+      borderRadius: 18,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.25 : 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: isDarkMode ? 4 : 2
     },
-    brightnessChipText: {
-      fontSize: 13,
-      fontWeight: '600'
+    premiumSlider: {
+      flex: 1
+    },
+    sliderBadge: {
+      minWidth: 72,
+      marginLeft: 12,
+      borderRadius: 16,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: palette.textPrimary,
+      alignItems: 'center'
+    },
+    sliderBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#ffffff'
     }
   });

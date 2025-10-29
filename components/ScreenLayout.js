@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, Animated } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Animated, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from './AppHeader';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
+import { useAuth } from '../contexts/AuthContext';
 import CreatePostModal from './CreatePostModal';
 import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
@@ -45,6 +46,7 @@ export default function ScreenLayout({
     markNotificationsRead,
     markNotificationsForThreadRead
   } = usePosts();
+  const { user: firebaseUser } = useAuth();
   const statusStyle = accentPreset.isDark ? 'light' : 'dark';
   const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
   const [composerVisible, setComposerVisible] = useState(false);
@@ -74,16 +76,29 @@ export default function ScreenLayout({
       return;
     }
 
+    if (!firebaseUser?.uid) {
+      Alert.alert('Sign in required', 'Sign in to publish posts to the community.');
+      setComposerVisible(false);
+      return;
+    }
+
     const mergedAuthor = {
       ...userProfile,
       nickname: userProfile?.nickname ?? '',
       city: location.city,
       province: location.province ?? userProfile?.province ?? '',
       country: location.country ?? userProfile?.country ?? '',
-      avatarKey: userProfile?.avatarKey ?? 'default'
+      avatarKey: userProfile?.avatarKey ?? 'default',
+      uid: firebaseUser.uid
     };
 
-    addPost(location.city, title, message, colorKey, mergedAuthor, highlightDescription);
+    const published = addPost(location.city, title, message, colorKey, mergedAuthor, highlightDescription);
+
+    if (!published) {
+      Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+      setComposerVisible(false);
+      return;
+    }
 
     if (!userProfile?.city) {
       updateUserProfile?.({

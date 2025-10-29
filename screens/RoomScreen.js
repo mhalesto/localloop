@@ -5,7 +5,8 @@ import {
   TextInput,
   FlatList,
   StyleSheet,
-  TouchableOpacity
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PostItem from '../components/PostItem';
@@ -14,11 +15,13 @@ import ScreenLayout from '../components/ScreenLayout';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
   const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
   const { accentPreset, accentKey, userProfile, themeColors, isDarkMode } = useSettings();
+  const { user: firebaseUser } = useAuth();
   const posts = getPostsForCity(city);
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
@@ -95,17 +98,49 @@ export default function RoomScreen({ navigation, route }) {
         closeShareModal();
         return;
       }
-      sharePost(city, postToShare.id, targetCity, userProfile);
-      setShareToast(`Shared to ${targetCity}`);
+      if (!firebaseUser?.uid) {
+        Alert.alert('Sign in required', 'Sign in to share posts to another room.');
+        closeShareModal();
+        return;
+      }
+      const shared = sharePost(city, postToShare.id, targetCity, userProfile);
+      if (shared) {
+        setShareToast(`Shared to ${targetCity}`);
+      } else {
+        Alert.alert('Unable to share', 'We could not share that post right now. Please try again soon.');
+      }
       closeShareModal();
     },
-    [city, closeShareModal, postToShare, sharePost, userProfile]
+    [city, closeShareModal, firebaseUser?.uid, postToShare, sharePost, userProfile]
   );
 
   const handleAddPost = () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
-    addPost(city, trimmedTitle, message, selectedColorKey, userProfile, false);
+    if (!firebaseUser?.uid) {
+      Alert.alert('Sign in required', 'Sign in to publish posts to this room.');
+      return;
+    }
+    const created = addPost(
+      city,
+      trimmedTitle,
+      message,
+      selectedColorKey,
+      {
+        ...userProfile,
+        nickname: userProfile?.nickname ?? '',
+        city,
+        province: userProfile?.province ?? '',
+        country: userProfile?.country ?? '',
+        avatarKey: userProfile?.avatarKey ?? 'default',
+        uid: firebaseUser.uid
+      },
+      false
+    );
+    if (!created) {
+      Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+      return;
+    }
     setTitle('');
     setMessage('');
   };
