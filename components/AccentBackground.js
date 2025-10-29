@@ -5,7 +5,8 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 const CLOUD_DEFAULTS = {
   baseColor: '#F9E6FA',
   cloudColors: ['rgba(255,255,255,0.65)', 'rgba(255,255,255,0.42)', 'rgba(255,255,255,0.28)'],
-  animationDuration: 14000
+  animationDuration: 14000,
+  opacityScale: 1
 };
 
 const SHAPES_DEFAULTS = {
@@ -16,11 +17,33 @@ const SHAPES_DEFAULTS = {
     secondary: '#F5D6A5',
     tertiary: '#9DD4FF',
     quaternary: '#7BD8C6'
-  }
+  },
+  opacityScale: 1
 };
 
-function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration }) {
+const clamp01 = (value) => Math.max(0, Math.min(1, value));
+
+const scaleOpacity = (value, scale) => clamp01(value * scale);
+
+const applyAlphaToRgba = (color, scale) => {
+  if (typeof color !== 'string') {
+    return color;
+  }
+  const match = color.match(/rgba\((\d+),(\d+),(\d+),(\d*\.?\d+)\)/i);
+  if (!match) {
+    return color;
+  }
+  const [, r, g, b, a] = match;
+  const nextAlpha = clamp01(Number(a) * scale);
+  return `rgba(${r},${g},${b},${nextAlpha})`;
+};
+
+function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration, opacityScale }) {
   const animated = useRef(new Animated.Value(0)).current;
+  const effectiveScale = clamp01(opacityScale ?? 1);
+  const scaledClouds = (cloudColors ?? CLOUD_DEFAULTS.cloudColors).map((color) =>
+    applyAlphaToRgba(color ?? CLOUD_DEFAULTS.cloudColors[0], effectiveScale)
+  );
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -92,7 +115,7 @@ function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration }) {
             height: 220,
             top: -80,
             left: -40,
-            backgroundColor: cloudColors[0] ?? CLOUD_DEFAULTS.cloudColors[0],
+            backgroundColor: scaledClouds[0] ?? CLOUD_DEFAULTS.cloudColors[0],
             transform: [{ translateX: cloudTransforms[0].translateX }, { translateY: cloudTransforms[0].translateY }]
           }
         ]}
@@ -106,7 +129,7 @@ function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration }) {
             height: 200,
             top: -60,
             right: -60,
-            backgroundColor: cloudColors[1] ?? CLOUD_DEFAULTS.cloudColors[1],
+            backgroundColor: scaledClouds[1] ?? CLOUD_DEFAULTS.cloudColors[1],
             transform: [{ translateX: cloudTransforms[1].translateX }, { translateY: cloudTransforms[1].translateY }]
           }
         ]}
@@ -120,7 +143,7 @@ function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration }) {
             height: 180,
             bottom: -90,
             right: 20,
-            backgroundColor: cloudColors[2] ?? CLOUD_DEFAULTS.cloudColors[2],
+            backgroundColor: scaledClouds[2] ?? CLOUD_DEFAULTS.cloudColors[2],
             transform: [{ translateX: cloudTransforms[2].translateX }, { translateY: cloudTransforms[2].translateY }]
           }
         ]}
@@ -129,26 +152,30 @@ function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration }) {
   );
 }
 
-function ShapesBackground({ baseColor, palette }) {
+function ShapesBackground({ baseColor, palette, opacityScale }) {
   const { backgroundAccent, primary, secondary, tertiary, quaternary } = {
     ...SHAPES_DEFAULTS.palette,
     ...(palette ?? {})
   };
+  const scale = clamp01(opacityScale ?? 1);
 
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: baseColor }]}>
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: backgroundAccent, opacity: 0.55 }]} />
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: backgroundAccent, opacity: scaleOpacity(0.55, scale) }]}
+      />
       <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-        <Rect x="-10" y="64" width="68" height="30" rx="11" fill={secondary} opacity="0.38" />
-        <Circle cx="90" cy="22" r="16" fill={primary} opacity="0.52" />
-        <Path d="M18 6 L38 6 L28 24 Z" fill={tertiary} opacity="0.6" />
-        <Circle cx="70" cy="82" r="11" fill={quaternary} opacity="0.65" />
-        <Path d="M46 40 C52 28, 68 30, 74 44 C78 54, 70 64, 60 64 C50 64, 42 52, 46 40 Z" fill={primary} opacity="0.33" />
-        <Rect x="58" y="54" width="26" height="26" rx="6" fill={secondary} opacity="0.42" />
-        <Path d="M4 82 C10 74, 18 74, 24 82 C30 90, 24 96, 16 94 C8 92, -2 90, 4 82 Z" fill={tertiary} opacity="0.45" />
-        <Circle cx="30" cy="66" r="9" fill={quaternary} opacity="0.5" />
-        <Rect x="78" y="6" width="24" height="24" rx="8" fill={secondary} opacity="0.35" />
-        <Path d="M14 48 L26 32 L38 48 Z" fill={primary} opacity="0.3" />
+        <Rect x="-10" y="64" width="68" height="30" rx="11" fill={secondary} opacity={scaleOpacity(0.38, scale)} />
+        <Circle cx="90" cy="22" r="16" fill={primary} opacity={scaleOpacity(0.52, scale)} />
+        <Path d="M18 6 L38 6 L28 24 Z" fill={tertiary} opacity={scaleOpacity(0.6, scale)} />
+        <Circle cx="70" cy="82" r="11" fill={quaternary} opacity={scaleOpacity(0.65, scale)} />
+        <Path d="M46 40 C52 28, 68 30, 74 44 C78 54, 70 64, 60 64 C50 64, 42 52, 46 40 Z" fill={primary} opacity={scaleOpacity(0.33, scale)} />
+        <Rect x="58" y="54" width="26" height="26" rx="6" fill={secondary} opacity={scaleOpacity(0.42, scale)} />
+        <Path d="M4 82 C10 74, 18 74, 24 82 C30 90, 24 96, 16 94 C8 92, -2 90, 4 82 Z" fill={tertiary} opacity={scaleOpacity(0.45, scale)} />
+        <Circle cx="30" cy="66" r="9" fill={quaternary} opacity={scaleOpacity(0.5, scale)} />
+        <Rect x="78" y="6" width="24" height="24" rx="8" fill={secondary} opacity={scaleOpacity(0.35, scale)} />
+        <Path d="M14 48 L26 32 L38 48 Z" fill={primary} opacity={scaleOpacity(0.3, scale)} />
       </Svg>
     </View>
   );
@@ -175,6 +202,7 @@ export default function AccentBackground({ accent, style }) {
           baseColor={config.baseColor}
           cloudColors={config.cloudColors}
           animationDuration={config.animationDuration}
+          opacityScale={config.opacityScale}
         />
       </View>
     );
@@ -187,7 +215,11 @@ export default function AccentBackground({ accent, style }) {
     };
     return (
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-        <ShapesBackground baseColor={config.baseColor} palette={config.palette} />
+        <ShapesBackground
+          baseColor={config.baseColor}
+          palette={config.palette}
+          opacityScale={config.opacityScale}
+        />
       </View>
     );
   }
