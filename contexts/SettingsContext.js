@@ -228,22 +228,6 @@ const applyShadeToPreset = (preset, shade) => {
   return next;
 };
 
-const ensureHighContrastAccent = (preset, forceLight = false) => {
-  if (!forceLight) {
-    return preset;
-  }
-  return {
-    ...preset,
-    isDark: true,
-    onPrimary: '#FFFFFF',
-    subtitleColor: 'rgba(255,255,255,0.82)',
-    iconTint: '#FFFFFF',
-    iconBackground: 'rgba(255,255,255,0.18)',
-    iconBorder: 'rgba(255,255,255,0.35)',
-    placeholderColor: 'rgba(255,255,255,0.65)'
-  };
-};
-
 export const baseAccentPresets = [
   {
     key: 'royal',
@@ -340,55 +324,6 @@ export const baseAccentPresets = [
 ];
 
 export const premiumAccentPresets = [
-  {
-    key: 'pinkdream',
-    label: 'Pink Dreamscape',
-    tier: 'premium',
-    background: '#F7D7F7',
-    isDark: false,
-    onPrimary: lightColors.textPrimary,
-    subtitleColor: '#B85AA6',
-    metaColor: '#9F7098',
-    iconTint: '#FF7BC4',
-    iconBorder: 'rgba(255,123,196,0.28)',
-    iconBackground: '#ffffff',
-    statCardBackground: 'rgba(255,123,196,0.16)',
-    statValue: '#D25AA5',
-    statLabel: lightColors.textSecondary,
-    buttonBackground: '#FF7BC4',
-    buttonForeground: '#ffffff',
-    badgeBackground: '#F7D7F7',
-    badgeTextColor: '#D25AA5',
-    linkColor: '#FF7BC4',
-    fabBackground: '#FF7BC4',
-    fabForeground: '#ffffff',
-    backgroundImage: require('../assets/themes/pink-dream.png')
-  },
-  {
-    key: 'shapeplay',
-    label: 'Shape Play',
-    tier: 'premium',
-    background: '#E5F1FF',
-    isDark: false,
-    onPrimary: lightColors.textPrimary,
-    subtitleColor: '#1F3B61',
-    metaColor: '#4B5C7A',
-    iconTint: '#436BFF',
-    iconBorder: 'rgba(67,107,255,0.24)',
-    iconBackground: '#ffffff',
-    statCardBackground: 'rgba(67,107,255,0.12)',
-    statValue: '#2E4AA5',
-    statLabel: lightColors.textSecondary,
-    buttonBackground: '#436BFF',
-    buttonForeground: '#ffffff',
-    badgeBackground: '#E5F1FF',
-    badgeTextColor: '#2E4AA5',
-    linkColor: '#436BFF',
-    fabBackground: '#436BFF',
-    fabForeground: '#ffffff',
-    backgroundImage: require('../assets/themes/shape-play.gif')
-  },
-
   {
     key: 'sunrise',
     label: 'Sunrise Glow',
@@ -638,7 +573,7 @@ export function SettingsProvider({ children }) {
         if (value === undefined || value === null) {
           return prev;
         }
-        return clampWithinRange(value, PREMIUM_ACCENT_SHADE_RANGE);
+        return clampWithinRange(value, PREMIUM_ACCENT_BRIGHTNESS_RANGE);
       });
     },
     [hasActivePremium, isDevBuild]
@@ -748,14 +683,11 @@ export function SettingsProvider({ children }) {
   const accentPreset = useMemo(() => {
     const basePreset = accentPresets.find((preset) => preset.key === accentKey) ?? accentPresets[0];
     const isPremiumPreset = premiumAccentPresets.some((preset) => preset.key === basePreset.key);
-    let result = basePreset;
     if (premiumAccentEnabled && isPremiumPreset) {
       const brightened = applyBrightnessToPreset(basePreset, premiumAccentBrightness);
-      const shaded = applyShadeToPreset(brightened, premiumAccentShade);
-      const forceLight = premiumAccentShade >= 50;
-      result = ensureHighContrastAccent(shaded, forceLight);
+      return applyShadeToPreset(brightened, premiumAccentShade);
     }
-    return result;
+    return basePreset;
   }, [accentKey, premiumAccentBrightness, premiumAccentEnabled, premiumAccentShade]);
   const themeColors = isDarkMode ? darkColors : lightColors;
 
