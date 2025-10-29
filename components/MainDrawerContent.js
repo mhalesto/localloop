@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
+import AccentBackground from './AccentBackground';
 
 export default function MainDrawerContent({ navigation, onSelectShortcut, accent }) {
   const { userProfile, accentPreset: globalAccent, themeColors, isDarkMode } = useSettings();
@@ -71,11 +72,12 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
   return (
     <View style={styles.container}>
       <View style={[styles.header, { backgroundColor: preset.background }]}>
+        <AccentBackground accent={preset} style={styles.headerBackground} />
         <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? themeColors.primary }]}>
           {avatarConfig.icon ? (
             <Ionicons name={avatarConfig.icon.name} size={22} color={avatarConfig.icon.color ?? '#fff'} />
           ) : (
-            <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}> 
+            <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}>
               {avatarConfig.emoji ?? '🙂'}
             </Text>
           )}
@@ -83,7 +85,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
         <View style={{ flex: 1 }}>
           <Text style={[styles.nameText, { color: headerTextColor }]}>{userProfile?.nickname?.trim() || 'Anonymous'}</Text>
           {userProfile?.city ? (
-            <Text style={[styles.metaText, { color: headerMetaColor }]}> 
+            <Text style={[styles.metaText, { color: headerMetaColor }]}>
               {[userProfile.city, userProfile.province, userProfile.country].filter(Boolean).join(', ')}
             </Text>
           ) : (
@@ -128,7 +130,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOpacity: isDarkMode ? 0.2 : 0.08,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 4
+      elevation: 4,
+      overflow: 'hidden'
+    },
+    headerBackground: {
+      ...StyleSheet.absoluteFillObject
     },
     avatar: {
       width: 52,

@@ -461,6 +461,73 @@ export const premiumAccentPresets = [
     linkColor: '#4562C7',
     fabBackground: '#4562C7',
     fabForeground: '#ffffff'
+  },
+  {
+    key: 'dreamyClouds',
+    label: 'Dreamy Clouds',
+    tier: 'premium',
+    background: '#F9E6FF',
+    isDark: false,
+    onPrimary: '#4A225F',
+    subtitleColor: '#7A4B89',
+    metaColor: '#945F9D',
+    iconTint: '#E36FB8',
+    iconBorder: 'rgba(227,111,184,0.28)',
+    iconBackground: 'rgba(255,255,255,0.25)',
+    statCardBackground: 'rgba(227,111,184,0.16)',
+    statValue: '#5C2F74',
+    statLabel: 'rgba(74,34,95,0.72)',
+    buttonBackground: '#E36FB8',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#F9E6FF',
+    badgeTextColor: '#5C2F74',
+    linkColor: '#E36FB8',
+    fabBackground: '#E36FB8',
+    fabForeground: '#ffffff',
+    backgroundStyle: {
+      type: 'dreamyClouds',
+      options: {
+        baseColor: '#F9E6FF',
+        cloudColors: ['rgba(255,255,255,0.75)', 'rgba(250,220,255,0.55)', 'rgba(255,255,255,0.35)'],
+        animationDuration: 16000
+      }
+    }
+  },
+  {
+    key: 'playfulShapes',
+    label: 'Playful Shapes',
+    tier: 'premium',
+    background: '#ECE9FF',
+    isDark: false,
+    onPrimary: '#24184F',
+    subtitleColor: '#4E3EA0',
+    metaColor: '#6B5FB4',
+    iconTint: '#7C6CDE',
+    iconBorder: 'rgba(124,108,222,0.22)',
+    iconBackground: 'rgba(255,255,255,0.22)',
+    statCardBackground: 'rgba(124,108,222,0.15)',
+    statValue: '#2A1C58',
+    statLabel: 'rgba(36,24,79,0.7)',
+    buttonBackground: '#7C6CDE',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#ECE9FF',
+    badgeTextColor: '#2A1C58',
+    linkColor: '#7C6CDE',
+    fabBackground: '#7C6CDE',
+    fabForeground: '#ffffff',
+    backgroundStyle: {
+      type: 'playfulShapes',
+      options: {
+        baseColor: '#ECE9FF',
+        palette: {
+          backgroundAccent: 'rgba(255,255,255,0.65)',
+          primary: '#ECB2DE',
+          secondary: '#F6D5A5',
+          tertiary: '#9DD4FF',
+          quaternary: '#7BD8C6'
+        }
+      }
+    }
   }
 ];
 

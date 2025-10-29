@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AccentBackground from './AccentBackground';
 
 const defaultAccent = {
   background: '#6C4DF4',
@@ -52,6 +53,7 @@ export default function AppHeader({
         wrapperStyle
       ]}
     >
+      <AccentBackground accent={accent} style={styles.backgroundLayer} />
       <View style={styles.topRow}>
         <TouchableOpacity
           style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
@@ -124,7 +126,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 6
+    elevation: 6,
+    overflow: 'hidden'
+  },
+  backgroundLayer: {
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30
   },
   topRow: {
     flexDirection: 'row',

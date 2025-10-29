@@ -16,6 +16,7 @@ import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { useAuth } from '../contexts/AuthContext';
+import AccentBackground from '../components/AccentBackground';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
@@ -153,6 +154,7 @@ export default function RoomScreen({ navigation, route }) {
   const renderStickyHeader = () => (
     <View style={[styles.stickyHeaderWrapper, { backgroundColor: accentPreset.background }]}>
       <View style={[styles.headerCard, { backgroundColor: accentPreset.background }]}>
+        <AccentBackground accent={accentPreset} style={styles.headerCardBackground} />
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerMeta, { color: metaColor }]}>Today&apos;s pulse</Text>
         </View>
@@ -352,7 +354,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOpacity: isDarkMode ? 0.25 : 0.12,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 8 },
-      elevation: 6
+      elevation: 6,
+      overflow: 'hidden'
+    },
+    headerCardBackground: {
+      ...StyleSheet.absoluteFillObject
     },
     headerTitleRow: {
       marginBottom: 20,
