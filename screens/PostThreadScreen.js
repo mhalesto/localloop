@@ -2143,6 +2143,7 @@ export default function PostThreadScreen({ route, navigation }) {
       navigation={navigation}
       activeTab="home"
       showFooter={false}
+      enableHeaderOverlap={true}
       contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
       headerBackgroundStyle={{
         height: headerUnderlayHeight,

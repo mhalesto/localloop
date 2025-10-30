@@ -30,6 +30,7 @@ export default function ScreenLayout({
   showFooter = true,
   headerStyle,
   headerBackgroundStyle,
+  enableHeaderOverlap = false,
 }) {
   const {
     showAddShortcut,
@@ -191,8 +192,8 @@ export default function ScreenLayout({
   };
 
   const styles = useMemo(
-    () => createStyles(themeColors, { isDarkMode }),
-    [themeColors, isDarkMode]
+    () => createStyles(themeColors, { isDarkMode, enableHeaderOverlap }),
+    [themeColors, isDarkMode, enableHeaderOverlap]
   );
 
   return (
@@ -288,7 +289,7 @@ export default function ScreenLayout({
   );
 }
 
-const createStyles = (palette, { isDarkMode } = {}) =>
+const createStyles = (palette, { isDarkMode, enableHeaderOverlap } = {}) =>
   StyleSheet.create({
     safe: {
       flex: 1,
@@ -307,11 +308,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     content: {
       flex: 1,
-      paddingTop: 0,
+      paddingTop: enableHeaderOverlap ? 0 : 24,
       paddingHorizontal: 20,
       paddingBottom: 0,
       backgroundColor: palette.background,
-      marginTop: -22,
+      marginTop: enableHeaderOverlap ? -22 : 0,
     },
     drawerContainer: {
       flex: 1,
