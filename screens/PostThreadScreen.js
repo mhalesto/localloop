@@ -2425,15 +2425,15 @@ export default function PostThreadScreen({ route, navigation }) {
       >
         <View style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}>
           {/* Header with back button */}
-          <View style={[styles.fullscreenHeader, { backgroundColor: headerBackground, borderBottomColor: dividerColor }]}>
+          <View style={[styles.fullscreenHeader, { backgroundColor: themeColors.card, borderBottomColor: themeColors.divider }]}>
             <TouchableOpacity
               onPress={() => setIsFullscreenModalVisible(false)}
               style={styles.fullscreenBackButton}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="arrow-back" size={24} color={headerTitleColor} />
+              <Ionicons name="arrow-back" size={24} color={themeColors.textPrimary} />
             </TouchableOpacity>
-            <Text style={[styles.fullscreenTitle, { color: headerTitleColor }]}>Post</Text>
+            <Text style={[styles.fullscreenTitle, { color: themeColors.textPrimary }]}>Post</Text>
             <View style={styles.fullscreenPlaceholder} />
           </View>
 
@@ -2444,8 +2444,8 @@ export default function PostThreadScreen({ route, navigation }) {
             showsVerticalScrollIndicator={true}
           >
             {/* Author Info */}
-            <View style={[styles.fullscreenAuthorRow, { borderBottomColor: dividerColor }]}>
-              <View style={[styles.fullscreenAvatar, { backgroundColor: accentPreset?.primary || linkColor }]}>
+            <View style={[styles.fullscreenAuthorRow, { borderBottomColor: themeColors.divider }]}>
+              <View style={[styles.fullscreenAvatar, { backgroundColor: accentPreset?.primary || themeColors.primary }]}>
                 {authorAvatarConfig?.icon ? (
                   <Ionicons
                     name={authorAvatarConfig.icon.name}
@@ -2481,7 +2481,7 @@ export default function PostThreadScreen({ route, navigation }) {
                 <RichText
                   text={trimmedDescription}
                   textStyle={[styles.fullscreenPostDescription, { color: themeColors.textPrimary }]}
-                  linkStyle={{ color: linkColor }}
+                  linkStyle={{ color: themeColors.primary }}
                 />
               </View>
             ) : null}
