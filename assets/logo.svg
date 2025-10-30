@@ -1,0 +1,55 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8D73FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5333E0;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F5F1FF;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#5333E0" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Main circle background -->
+  <circle cx="100" cy="100" r="90" fill="url(#bgGradient)" filter="url(#shadow)"/>
+
+  <!-- Modern abstract T shape with chat bubble inspiration -->
+  <g transform="translate(100, 100)">
+    <!-- Chat bubble inspired shape -->
+    <path d="M -35 -30
+             Q -35 -40 -25 -40
+             L 25 -40
+             Q 35 -40 35 -30
+             L 35 10
+             Q 35 20 25 20
+             L 5 20
+             L -5 35
+             L -5 20
+             L -25 20
+             Q -35 20 -35 10
+             Z"
+          fill="url(#iconGradient)"
+          opacity="0.95"/>
+
+    <!-- Inner T letterform -->
+    <g fill="#6C4DF4" opacity="0.3">
+      <rect x="-25" y="-30" width="50" height="10" rx="5"/>
+      <rect x="-5" y="-30" width="10" height="45" rx="5"/>
+    </g>
+
+    <!-- Decorative dots -->
+    <circle cx="-15" cy="5" r="3" fill="#FFFFFF" opacity="0.8"/>
+    <circle cx="0" cy="5" r="3" fill="#FFFFFF" opacity="0.8"/>
+    <circle cx="15" cy="5" r="3" fill="#FFFFFF" opacity="0.8"/>
+  </g>
+
+  <!-- Outer ring accent -->
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.3"/>
+</svg>

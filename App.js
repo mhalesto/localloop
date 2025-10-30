@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import LoadingOverlay from './components/LoadingOverlay';
+import CustomSplashScreen from './components/SplashScreen';
 
 import CountryScreen from './screens/CountryScreen';
 import ProvinceScreen from './screens/ProvinceScreen';
@@ -85,6 +86,12 @@ function AuthGate() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
+  if (showSplash) {
+    return <CustomSplashScreen onAnimationComplete={() => setShowSplash(false)} />;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
