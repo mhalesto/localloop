@@ -147,8 +147,8 @@ export default function CustomSplashScreen({ onAnimationComplete }) {
             { opacity: textFadeAnim },
           ]}
         >
-          <Text style={styles.appName}>Toilet</Text>
-          <Text style={styles.tagline}>Connect. Share. Discover.</Text>
+          <Text style={styles.appName}>Share Your Story</Text>
+          <Text style={styles.tagline}>Connect. Express. Inspire.</Text>
         </Animated.View>
 
         {/* Loading indicator */}
@@ -163,10 +163,12 @@ export default function CustomSplashScreen({ onAnimationComplete }) {
               style={[
                 styles.loadingProgress,
                 {
-                  width: shimmerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
+                  transform: [{
+                    scaleX: shimmerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 1],
+                    })
+                  }]
                 },
               ]}
             />
@@ -219,10 +221,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   appName: {
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1,
     marginBottom: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
@@ -248,7 +250,9 @@ const styles = StyleSheet.create({
   },
   loadingProgress: {
     height: '100%',
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 2,
+    transformOrigin: 'left',
   },
 });
