@@ -13,6 +13,7 @@ import CreatePostModal from './CreatePostModal';
 import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
 import NotificationsModal from './NotificationsModal';
+import LoadingOverlay from './LoadingOverlay';
 
 export default function ScreenLayout({
   children,
@@ -62,6 +63,7 @@ export default function ScreenLayout({
   const [composerVisible, setComposerVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [loadingVisible, setLoadingVisible] = useState(false);
 
   const initialLocation = useMemo(
     () =>
@@ -130,7 +132,15 @@ export default function ScreenLayout({
     }
   };
 
-  const handleFooterShortcut = () => setComposerVisible(true);
+  const handleFooterShortcut = () => {
+    // Show loading overlay first
+    setLoadingVisible(true);
+  };
+
+  const handleLoadingComplete = () => {
+    setLoadingVisible(false);
+    setComposerVisible(true);
+  };
 
   const handleTabPress = (tab) => {
     if (!navigation) return;
@@ -288,6 +298,11 @@ export default function ScreenLayout({
           accent={accentPreset}
           themeColors={themeColors}
           onSelectNotification={handleSelectNotification}
+        />
+
+        <LoadingOverlay
+          visible={loadingVisible}
+          onComplete={handleLoadingComplete}
         />
       </View>
     </SafeAreaView>
