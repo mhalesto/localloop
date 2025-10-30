@@ -24,16 +24,16 @@ const tabs = [
 const BAR_HEIGHT = 76;
 const CORNER_R = 28;
 
-const NOTCH_R = 34;   // notch radius (width)
-const NOTCH_DEPTH = 0.68; // deeper U (0.55–0.70)
+const NOTCH_R = 36;   // optimal notch radius for smooth curve
+const NOTCH_DEPTH = 0.75; // balanced depth for natural flow
 
-const SPACER_EXTRA = 12;   // space around the notch between tabs
+const SPACER_EXTRA = 10;   // balanced space around the notch
 
 const FAB_SIZE = 60;
 // move FAB & notch: LEFT(−) / RIGHT(+)
 const FAB_NUDGE_X = -4;   // slightly less left than before
 // lower the FAB (smaller = lower; negative drops it)
-const FAB_RISE = -6;
+const FAB_RISE = -10;  // positioned for best visual balance
 
 const TAB_ROW_PADDING_H = 18; // must match styles.tabRow paddingHorizontal
 // =====================
@@ -76,7 +76,7 @@ export default function FooterMenu({
       <View
         style={[
           styles.barWrap,
-          { shadowOpacity: isDarkMode ? 0.3 : 0.12 }
+          { shadowOpacity: isDarkMode ? 0.12 : 0.08 }
         ]}
         onLayout={(e) => setBarW(e.nativeEvent.layout.width)}
       >
@@ -94,15 +94,14 @@ export default function FooterMenu({
                 maskUnits="userSpaceOnUse"
                 x="0" y="0" width={barW} height={SVG_H}
               >
-                {/* White = visible; Black = HOLE */}
-                <Path d={roundedRectPath(barW, BAR_HEIGHT, CORNER_R, OFFSET_Y)} fill="#fff" />
-                {showShortcut && notchCx != null && (
-                  <Circle
-                    cx={notchCx}
-                    cy={OFFSET_Y - NOTCH_R * NOTCH_DEPTH}
-                    r={NOTCH_R}
-                    fill="#000"
+                {/* White = visible; shape with curved notch */}
+                {showShortcut && notchCx != null ? (
+                  <Path
+                    d={createCurvedFooterPath(barW, BAR_HEIGHT, CORNER_R, OFFSET_Y, notchCx, NOTCH_R, NOTCH_DEPTH)}
+                    fill="#fff"
                   />
+                ) : (
+                  <Path d={roundedRectPath(barW, BAR_HEIGHT, CORNER_R, OFFSET_Y)} fill="#fff" />
                 )}
               </Mask>
             </Defs>
@@ -167,7 +166,7 @@ export default function FooterMenu({
                 left: notchCx - FAB_SIZE / 2,
                 bottom: BAR_HEIGHT / 2 + FAB_RISE,
                 backgroundColor: accentFabBackground,
-                shadowOpacity: isDarkMode ? 0.3 : 0.16
+                shadowOpacity: isDarkMode ? 0.2 : 0.15
               },
             ]}
             onPress={onAddPostShortcut}
@@ -232,6 +231,76 @@ function roundedRectPath(w, h, r, offsetY) {
   ].join(' ');
 }
 
+/** Create footer path with smooth curved notch */
+function createCurvedFooterPath(w, h, r, offsetY, notchCx, notchR, notchDepth) {
+  const left = 0, right = w;
+  const top = offsetY, bottom = h + offsetY;
+
+  // Calculate notch dimensions with smoother transitions
+  const notchLeft = notchCx - notchR;
+  const notchRight = notchCx + notchR;
+  const notchBottom = top + (notchR * notchDepth * 1.2); // Optimal curve depth
+
+  // Transition zones for smoother blending
+  const transitionWidth = notchR * 0.8;
+  const leftTransitionStart = notchLeft - transitionWidth;
+  const rightTransitionEnd = notchRight + transitionWidth;
+
+  // Control points for perfect bezier curves
+  const leftCP1x = leftTransitionStart + transitionWidth * 0.6;
+  const leftCP1y = top;
+  const leftCP2x = notchLeft - notchR * 0.15;
+  const leftCP2y = top + notchR * 0.4;
+
+  const rightCP1x = notchRight + notchR * 0.15;
+  const rightCP1y = top + notchR * 0.4;
+  const rightCP2x = rightTransitionEnd - transitionWidth * 0.6;
+  const rightCP2y = top;
+
+  return [
+    // Start from top left corner
+    `M ${r},${top}`,
+
+    // Top edge to start of transition
+    `H ${Math.max(r, leftTransitionStart)}`,
+
+    // Smooth S-curve down into the notch (left side)
+    `C ${leftCP1x},${leftCP1y} ${leftCP2x},${leftCP2y} ${notchLeft},${notchBottom * 0.6}`,
+
+    // Perfect U-shaped bottom curve
+    `C ${notchLeft + notchR * 0.3},${notchBottom} ${notchRight - notchR * 0.3},${notchBottom} ${notchRight},${notchBottom * 0.6}`,
+
+    // Smooth S-curve up from the notch (right side)
+    `C ${rightCP1x},${rightCP1y} ${rightCP2x},${rightCP2y} ${Math.min(right - r, rightTransitionEnd)},${top}`,
+
+    // Top edge from transition to top right
+    `H ${right - r}`,
+
+    // Top right corner
+    `A ${r},${r} 0 0 1 ${right},${top + r}`,
+
+    // Right edge
+    `V ${bottom - r}`,
+
+    // Bottom right corner
+    `A ${r},${r} 0 0 1 ${right - r},${bottom}`,
+
+    // Bottom edge
+    `H ${r}`,
+
+    // Bottom left corner
+    `A ${r},${r} 0 0 1 0,${bottom - r}`,
+
+    // Left edge
+    `V ${top + r}`,
+
+    // Top left corner
+    `A ${r},${r} 0 0 1 ${r},${top}`,
+
+    `Z`,
+  ].join(' ');
+}
+
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: 'transparent',
@@ -244,12 +313,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent', // SVG draws the pill
     justifyContent: 'center',
     overflow: 'visible',
-    // soft float
+    // refined shadow for clean elevation
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
   tabRow: {
     height: BAR_HEIGHT,
@@ -297,11 +366,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 3,
-    // soft downward shadow (no ring)
+    // refined shadow for FAB button
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
 });
