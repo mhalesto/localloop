@@ -2445,7 +2445,8 @@ const createStyles = (
     postCard: {
       width: '100%',
       borderRadius: 24,
-      paddingVertical: 20,
+      paddingTop: 28,
+      paddingBottom: 20,
       paddingHorizontal: 18,
       marginBottom: 12,
       shadowColor: '#000',
