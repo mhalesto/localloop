@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Animated, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 
 import AppHeader from './AppHeader';
 import FooterMenu from './FooterMenu';
@@ -255,24 +256,28 @@ export default function ScreenLayout({
         <Modal
           visible={drawerVisible}
           transparent
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setDrawerVisible(false)}
         >
           {/* Keep the status bar translucent in the drawer as well */}
           <StatusBar translucent backgroundColor="transparent" style={statusStyle} />
           <View style={styles.drawerContainer}>
-            <View
-              style={[
-                styles.drawerSheet,
-                {
-                  paddingTop: insets.top + 12,
-                  backgroundColor: accentPreset.background,
-                },
-              ]}
+            <BlurView
+              intensity={isDarkMode ? 30 : 20}
+              tint={isDarkMode ? 'dark' : 'light'}
+              style={styles.drawerSheet}
             >
-              <MainDrawerContent accent={accentPreset} onSelectShortcut={handleShortcutSelect} />
-            </View>
-            <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)} />
+              <View style={{ paddingTop: insets.top + 12, flex: 1 }}>
+                <MainDrawerContent accent={accentPreset} onSelectShortcut={handleShortcutSelect} />
+              </View>
+            </BlurView>
+            <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)}>
+              <BlurView
+                intensity={50}
+                tint={isDarkMode ? 'dark' : 'light'}
+                style={StyleSheet.absoluteFill}
+              />
+            </Pressable>
           </View>
         </Modal>
 
@@ -320,15 +325,16 @@ const createStyles = (palette, { isDarkMode, enableHeaderOverlap } = {}) =>
     },
     drawerOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
     },
     drawerSheet: {
-      width: '78%',
-      backgroundColor: isDarkMode ? palette.card : palette.background,
+      width: '82%',
+      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.4)',
       shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.4 : 0.2,
-      shadowRadius: 10,
-      shadowOffset: { width: 4, height: 0 },
-      elevation: 8,
+      shadowOpacity: isDarkMode ? 0.5 : 0.3,
+      shadowRadius: 20,
+      shadowOffset: { width: 8, height: 0 },
+      elevation: 12,
+      borderRightWidth: 1,
+      borderRightColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
     },
   });

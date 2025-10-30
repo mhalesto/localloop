@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useSettings } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import AccentBackground from './AccentBackground';
@@ -26,7 +27,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       }
     },
     {
-      label: 'Top statuses',
+      label: 'Top Statuses',
       icon: 'megaphone-outline',
       key: 'topStatuses',
       onPress: () => {
@@ -39,7 +40,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       }
     },
     {
-      label: 'My replies',
+      label: 'My Replies',
       icon: 'chatbubble-ellipses-outline',
       key: 'myComments',
       onPress: () => {
@@ -50,19 +51,6 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
           navigation.navigate('MyComments');
         }
       }
-    },
-    {
-      label: 'Settings',
-      icon: 'settings-outline',
-      key: 'settings',
-      onPress: () => {
-        if (onSelectShortcut) {
-          onSelectShortcut('settings');
-        } else if (navigation) {
-          navigation.closeDrawer?.();
-          navigation.navigate('Settings');
-        }
-      }
     }
   ];
 
@@ -71,11 +59,12 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
 
   return (
     <View style={styles.container}>
+      {/* Header with accent background */}
       <View style={[styles.header, { backgroundColor: preset.background }]}>
         <AccentBackground accent={preset} style={styles.headerBackground} darkness={themeDarkness} />
         <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? themeColors.primary }]}>
           {avatarConfig.icon ? (
-            <Ionicons name={avatarConfig.icon.name} size={22} color={avatarConfig.icon.color ?? '#fff'} />
+            <Ionicons name={avatarConfig.icon.name} size={26} color={avatarConfig.icon.color ?? '#fff'} />
           ) : (
             <Text style={[styles.avatarEmoji, { color: avatarConfig.foregroundColor ?? '#fff' }]}>
               {avatarConfig.emoji ?? '🙂'}
@@ -94,19 +83,43 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={{ paddingVertical: 12 }}>
-        {shortcuts.map((item) => (
-          <TouchableOpacity
-            key={item.label}
-            style={styles.shortcut}
-            activeOpacity={0.85}
-            onPress={item.onPress}
+      {/* Glassmorphic menu items */}
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.menuContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {shortcuts.map((item, index) => (
+          <BlurView
+            key={item.key}
+            intensity={isDarkMode ? 60 : 40}
+            tint={isDarkMode ? 'dark' : 'light'}
+            style={[
+              styles.glassCard,
+              {
+                marginTop: index === 0 ? 24 : 12,
+                backgroundColor: isDarkMode
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(255,255,255,0.6)'
+              }
+            ]}
           >
-            <Ionicons name={item.icon} size={20} color={themeColors.primaryDark} style={{ marginRight: 14 }} />
-            <Text style={styles.shortcutLabel}>{item.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color={themeColors.textSecondary} style={{ marginLeft: 'auto' }} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shortcut}
+              activeOpacity={0.7}
+              onPress={item.onPress}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: preset.iconTint || themeColors.primary }]}>
+                <Ionicons name={item.icon} size={22} color="#ffffff" />
+              </View>
+              <Text style={[styles.shortcutLabel, { color: themeColors.textPrimary }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          </BlurView>
         ))}
+
+        {/* Decorative gradient */}
+        <View style={styles.decorativeGradient} />
       </ScrollView>
     </View>
   );
@@ -121,57 +134,92 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 24,
+      paddingHorizontal: 24,
+      paddingVertical: 32,
       backgroundColor: palette.card,
-      borderBottomWidth: 1,
-      borderBottomColor: palette.divider,
       shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.2 : 0.08,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 4,
+      shadowOpacity: isDarkMode ? 0.3 : 0.12,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
       overflow: 'hidden'
     },
     headerBackground: {
       ...StyleSheet.absoluteFillObject
     },
     avatar: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 16
+      marginRight: 16,
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4
     },
     avatarEmoji: {
-      fontSize: 24
+      fontSize: 28
     },
     nameText: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '700',
-      color: palette.textPrimary
+      color: palette.textPrimary,
+      marginBottom: 4
     },
     metaText: {
-      fontSize: 12,
+      fontSize: 13,
       color: palette.textSecondary,
-      marginTop: 4
+      opacity: 0.9
     },
     body: {
       flex: 1,
       backgroundColor: palette.background
     },
+    menuContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 32
+    },
+    glassCard: {
+      borderRadius: 20,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.3)',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.3 : 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3
+    },
     shortcut: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 20,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: palette.divider
+      paddingVertical: 18,
+      gap: 14
+    },
+    iconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2
     },
     shortcutLabel: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '600',
-      color: palette.textPrimary
+      color: palette.textPrimary,
+      flex: 1
+    },
+    decorativeGradient: {
+      height: 60,
+      marginTop: 24
     }
   });
