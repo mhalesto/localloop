@@ -59,14 +59,14 @@ export default function PremiumSlider({
       }
       const clampedPosition = clamp(positionX - THUMB_SIZE / 2, 0, effectiveWidth);
       const rawValue = minimumValue + (clampedPosition / effectiveWidth) * range;
-      const snapped = clamp(snapToStep(rawValue, step, minimumValue), minimumValue, maximumValue);
+      const snapped = step > 0
+        ? clamp(snapToStep(rawValue, step, minimumValue), minimumValue, maximumValue)
+        : clamp(rawValue, minimumValue, maximumValue);
 
-      if (snapped !== currentRef.current) {
-        currentRef.current = snapped;
-        const nextPercent = (snapped - minimumValue) / range;
-        animatedPercent.setValue(nextPercent);
-        onValueChange?.(snapped);
-      }
+      currentRef.current = snapped;
+      const nextPercent = (snapped - minimumValue) / range;
+      animatedPercent.setValue(nextPercent);
+      onValueChange?.(snapped);
     },
     [animatedPercent, disabled, effectiveWidth, maximumValue, minimumValue, onValueChange, range, step]
   );
@@ -101,20 +101,9 @@ export default function PremiumSlider({
 
   useEffect(() => {
     if (!isDraggingRef.current) {
-      Animated.spring(animatedPercent, {
-        toValue: percent,
-        tension: 140,
-        friction: 18,
-        useNativeDriver: false
-      }).start();
-    }
-  }, [animatedPercent, percent]);
-
-  useEffect(() => {
-    if (!isDraggingRef.current) {
       animatedPercent.setValue(percent);
     }
-  }, [animatedPercent, percent, effectiveWidth]);
+  }, [animatedPercent, percent]);
 
   const fillWidth = animatedPercent.interpolate({
     inputRange: [0, 1],

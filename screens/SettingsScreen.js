@@ -17,7 +17,7 @@ import {
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
-import PremiumSlider from '../components/PremiumSlider';
+import Slider from '@react-native-community/slider';
 import {
   useSettings,
   DEFAULT_TITLE_FONT_SIZE,
@@ -174,6 +174,8 @@ export default function SettingsScreen({ navigation }) {
     [resetEmailForm, updateEmailMode]
   );
 
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
   const ghostIdentifier = useMemo(() => {
     if (userProfile.nickname?.trim()) {
       return userProfile.nickname.trim();
@@ -182,7 +184,6 @@ export default function SettingsScreen({ navigation }) {
   }, [userProfile.nickname]);
 
   const isDevBuild = __DEV__ === true;
-  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
   const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';
@@ -367,10 +368,16 @@ export default function SettingsScreen({ navigation }) {
 
   const handleBrightnessSliderChange = useCallback(
     (rawValue) => {
-      const next = Math.round(rawValue);
-      handleSelectBrightness(next);
+      setPremiumAccentBrightness(clamp(rawValue, PREMIUM_ACCENT_BRIGHTNESS_RANGE.min, PREMIUM_ACCENT_BRIGHTNESS_RANGE.max));
     },
-    [handleSelectBrightness]
+    [setPremiumAccentBrightness]
+  );
+
+  const handleBrightnessSlidingComplete = useCallback(
+    (rawValue) => {
+      setPremiumAccentBrightness(clamp(Math.round(rawValue), PREMIUM_ACCENT_BRIGHTNESS_RANGE.min, PREMIUM_ACCENT_BRIGHTNESS_RANGE.max));
+    },
+    [setPremiumAccentBrightness]
   );
 
   const handleSelectShade = (value) => {
@@ -383,10 +390,16 @@ export default function SettingsScreen({ navigation }) {
 
   const handleShadeSliderChange = useCallback(
     (rawValue) => {
-      const next = Math.round(rawValue);
-      handleSelectShade(next);
+      setPremiumAccentShade(clamp(rawValue, PREMIUM_ACCENT_SHADE_RANGE.min, PREMIUM_ACCENT_SHADE_RANGE.max));
     },
-    [handleSelectShade]
+    [setPremiumAccentShade]
+  );
+
+  const handleShadeSlidingComplete = useCallback(
+    (rawValue) => {
+      setPremiumAccentShade(clamp(Math.round(rawValue), PREMIUM_ACCENT_SHADE_RANGE.min, PREMIUM_ACCENT_SHADE_RANGE.max));
+    },
+    [setPremiumAccentShade]
   );
 
   const handleSelectSummaryLength = (value) => {
@@ -1215,24 +1228,25 @@ export default function SettingsScreen({ navigation }) {
                 <View style={styles.premiumBrightnessHeader}>
                   <Text style={styles.premiumBrightnessTitle}>Theme brightness</Text>
                   <Text style={styles.premiumBrightnessValue}>
-                    {premiumAccentBrightness ? `+${premiumAccentBrightness}%` : 'Original'}
+                    {premiumAccentBrightness ? `+${Math.round(premiumAccentBrightness)}%` : 'Original'}
                   </Text>
                 </View>
                 <View style={styles.premiumSliderRow}>
-                  <PremiumSlider
+                  <Slider
                     style={styles.premiumSlider}
                     minimumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.min}
                     maximumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.max}
-                    step={0.1}
+                    step={0}
                     value={premiumAccentBrightness}
                     onValueChange={handleBrightnessSliderChange}
-                    trackColor={sliderTrackColor}
-                    fillColor={accentSwitchColor}
-                    thumbColor={accentSwitchColor}
+                    onSlidingComplete={handleBrightnessSlidingComplete}
+                    minimumTrackTintColor={accentSwitchColor}
+                    maximumTrackTintColor={sliderTrackColor}
+                    thumbTintColor={accentSwitchColor}
                   />
                   <View style={[styles.sliderBadge, { backgroundColor: accentSwitchColor }]}>
                     <Text style={styles.sliderBadgeText}>
-                      {premiumAccentBrightness ? `+${premiumAccentBrightness}%` : 'Original'}
+                      {premiumAccentBrightness ? `+${Math.round(premiumAccentBrightness)}%` : 'Original'}
                     </Text>
                   </View>
                 </View>
@@ -1244,24 +1258,25 @@ export default function SettingsScreen({ navigation }) {
                 <View style={styles.premiumBrightnessHeader}>
                   <Text style={styles.premiumBrightnessTitle}>Theme darkness</Text>
                   <Text style={styles.premiumBrightnessValue}>
-                    {premiumAccentShade ? `+${premiumAccentShade}%` : 'Original'}
+                    {premiumAccentShade ? `+${Math.round(premiumAccentShade)}%` : 'Original'}
                   </Text>
                 </View>
                 <View style={styles.premiumSliderRow}>
-                  <PremiumSlider
+                  <Slider
                     style={styles.premiumSlider}
                     minimumValue={PREMIUM_ACCENT_SHADE_RANGE.min}
                     maximumValue={PREMIUM_ACCENT_SHADE_RANGE.max}
-                    step={0.1}
+                    step={0}
                     value={premiumAccentShade}
                     onValueChange={handleShadeSliderChange}
-                    trackColor={sliderTrackColor}
-                    fillColor={accentSwitchColor}
-                    thumbColor={accentSwitchColor}
+                    onSlidingComplete={handleShadeSlidingComplete}
+                    minimumTrackTintColor={accentSwitchColor}
+                    maximumTrackTintColor={sliderTrackColor}
+                    thumbTintColor={accentSwitchColor}
                   />
                   <View style={[styles.sliderBadge, { backgroundColor: accentSwitchColor }]}>
                     <Text style={styles.sliderBadgeText}>
-                      {premiumAccentShade ? `+${premiumAccentShade}%` : 'Original'}
+                      {premiumAccentShade ? `+${Math.round(premiumAccentShade)}%` : 'Original'}
                     </Text>
                   </View>
                 </View>
@@ -1985,7 +2000,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       elevation: isDarkMode ? 4 : 2
     },
     premiumSlider: {
-      flex: 1
+      flex: 1,
+      height: 40
     },
     sliderBadge: {
       minWidth: 72,
