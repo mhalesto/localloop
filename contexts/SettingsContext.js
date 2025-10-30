@@ -204,6 +204,37 @@ const applyBrightnessToPreset = (preset, brightness) => {
   return next;
 };
 
+const interpolateColor = (color1, color2, factor) => {
+  // Parse colors
+  const parse = (color) => {
+    if (color.startsWith('#')) {
+      return parseHexColor(color);
+    }
+    if (color.startsWith('rgba')) {
+      return parseRgbaColor(color);
+    }
+    return null;
+  };
+
+  const c1 = parse(color1);
+  const c2 = parse(color2);
+
+  if (!c1 || !c2) {
+    return factor < 0.5 ? color1 : color2;
+  }
+
+  const r = Math.round(c1.r + (c2.r - c1.r) * factor);
+  const g = Math.round(c1.g + (c2.g - c1.g) * factor);
+  const b = Math.round(c1.b + (c2.b - c1.b) * factor);
+
+  if (color1.startsWith('rgba')) {
+    const a = typeof c1.a === 'number' ? c1.a : 1;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  return rgbToHex({ r, g, b });
+};
+
 const applyShadeToPreset = (preset, shade) => {
   if (!shade) {
     return preset;
@@ -225,6 +256,23 @@ const applyShadeToPreset = (preset, shade) => {
       next[field] = mixRgbaTowards(value, targetColor, shade);
     }
   });
+
+  // Smoothly transition text colors to white when shade is 50-100%
+  if (shade >= 50) {
+    const textTransitionFactor = (shade - 50) / 50; // 0 at 50%, 1 at 100%
+    const originalOnPrimary = next.onPrimary;
+    const originalSubtitle = next.subtitleColor;
+
+    // Interpolate to white
+    next.onPrimary = interpolateColor(originalOnPrimary, '#ffffff', textTransitionFactor);
+    next.subtitleColor = interpolateColor(originalSubtitle, 'rgba(255,255,255,0.9)', textTransitionFactor);
+
+    // Also update icon colors for consistency
+    if (next.iconTint && !preset.isDark) {
+      next.iconTint = interpolateColor(next.iconTint, '#ffffff', textTransitionFactor);
+    }
+  }
+
   return next;
 };
 
