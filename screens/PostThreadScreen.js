@@ -1829,20 +1829,24 @@ export default function PostThreadScreen({ route, navigation }) {
           {trimmedDescription && trimmedDescription !== displayTitle ? (
             <View style={descriptionContainerStyle}>
               {!isExpanded && collapsedPreviewText ? (
-                <View style={styles.postMessagePreviewRow}>
-                  <Text style={[styles.postMessagePreviewText, { color: headerTitleColor }]}>
-                    <Text numberOfLines={showToggleControls ? 3 : undefined}>
-                      {collapsedPreviewText}
-                    </Text>
-                    {showToggleControls ? (
-                      <Text
-                        style={[styles.postMessageToggleTextInline, { color: linkColor }]}
-                        onPress={() => setIsDescriptionExpanded(true)}
-                      >
-                        {'... Show more'}
-                      </Text>
-                    ) : null}
+                <View style={styles.postMessagePreview}>
+                  <Text
+                    style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
+                    numberOfLines={6}
+                    ellipsizeMode="tail"
+                  >
+                    {collapsedPreviewText}
                   </Text>
+                  {showToggleControls ? (
+                    <TouchableOpacity
+                      onPress={() => setIsDescriptionExpanded(true)}
+                      activeOpacity={0.75}
+                      style={styles.postMessagePreviewButton}
+                      hitSlop={toggleHitSlop}
+                    >
+                      <Text style={[styles.postMessagePreviewButtonText, { color: linkColor }]}>Show more</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               ) : (
                 <>
@@ -2692,13 +2696,22 @@ const createStyles = (
       fontWeight: '500',
       lineHeight: resolvedDescriptionLineHeight
     },
-    postMessagePreviewRow: { flexDirection: 'row', alignItems: 'flex-start' },
     postMessagePreviewText: {
-      flex: 1,
       fontSize: resolvedDescriptionFontSize,
       fontWeight: '500',
-      lineHeight: resolvedDescriptionLineHeight
+      lineHeight: resolvedDescriptionLineHeight,
+      maxHeight: resolvedDescriptionLineHeight * 6,
     },
+    postMessagePreview: { marginBottom: 12 },
+    postMessagePreviewButton: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: 'transparent',
+      marginTop: 8,
+    },
+    postMessagePreviewButtonText: { fontSize: 14, fontWeight: '600' },
     postMessageExpandedWrapper: { position: 'relative' },
     postMessageExpandedScroll: { maxHeight: 220 },
     postMessageExpandedContent: {
@@ -2707,10 +2720,9 @@ const createStyles = (
     postMessageExpandedContentIndicator: {
       paddingRight: 18,
     },
-    postMessageToggle: { marginLeft: 12 },
-    postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' },
+    postMessageToggle: { alignSelf: 'flex-end', marginTop: 8 },
+    postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-end' },
     postMessageToggleText: { fontSize: 14, fontWeight: '600' },
-    postMessageToggleTextInline: { fontSize: 14, fontWeight: '600', textDecorationLine: 'none' },
     postMessageToggleHitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
