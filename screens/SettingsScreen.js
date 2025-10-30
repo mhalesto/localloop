@@ -368,11 +368,9 @@ export default function SettingsScreen({ navigation }) {
   const handleBrightnessSliderChange = useCallback(
     (rawValue) => {
       const next = Math.round(rawValue);
-      if (next !== premiumAccentBrightness) {
-        handleSelectBrightness(next);
-      }
+      handleSelectBrightness(next);
     },
-    [handleSelectBrightness, premiumAccentBrightness]
+    [handleSelectBrightness]
   );
 
   const handleSelectShade = (value) => {
@@ -386,11 +384,9 @@ export default function SettingsScreen({ navigation }) {
   const handleShadeSliderChange = useCallback(
     (rawValue) => {
       const next = Math.round(rawValue);
-      if (next !== premiumAccentShade) {
-        handleSelectShade(next);
-      }
+      handleSelectShade(next);
     },
-    [handleSelectShade, premiumAccentShade]
+    [handleSelectShade]
   );
 
   const handleSelectSummaryLength = (value) => {
@@ -1227,7 +1223,7 @@ export default function SettingsScreen({ navigation }) {
                     style={styles.premiumSlider}
                     minimumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.min}
                     maximumValue={PREMIUM_ACCENT_BRIGHTNESS_RANGE.max}
-                    step={1}
+                    step={0.1}
                     value={premiumAccentBrightness}
                     onValueChange={handleBrightnessSliderChange}
                     trackColor={sliderTrackColor}
@@ -1256,7 +1252,7 @@ export default function SettingsScreen({ navigation }) {
                     style={styles.premiumSlider}
                     minimumValue={PREMIUM_ACCENT_SHADE_RANGE.min}
                     maximumValue={PREMIUM_ACCENT_SHADE_RANGE.max}
-                    step={1}
+                    step={0.1}
                     value={premiumAccentShade}
                     onValueChange={handleShadeSliderChange}
                     trackColor={sliderTrackColor}

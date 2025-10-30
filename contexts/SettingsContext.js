@@ -825,7 +825,7 @@ export function SettingsProvider({ children }) {
         if (value === undefined || value === null) {
           return prev;
         }
-        return clampWithinRange(value, PREMIUM_ACCENT_BRIGHTNESS_RANGE);
+        return clampWithinRange(value, PREMIUM_ACCENT_SHADE_RANGE);
       });
     },
     [hasActivePremium, isDevBuild]
