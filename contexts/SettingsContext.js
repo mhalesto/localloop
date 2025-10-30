@@ -528,6 +528,191 @@ export const premiumAccentPresets = [
         }
       }
     }
+  },
+  {
+    key: 'neonCitrus',
+    label: 'Neon Citrus',
+    tier: 'premium',
+    background: '#F0FFD4',
+    isDark: false,
+    onPrimary: '#3A4408',
+    subtitleColor: '#5E6D1A',
+    metaColor: '#7A8636',
+    iconTint: '#A7C410',
+    iconBorder: 'rgba(167,196,16,0.30)',
+    iconBackground: 'rgba(255,255,255,0.35)',
+    statCardBackground: 'rgba(167,196,16,0.18)',
+    statValue: '#6D8C0E',
+    statLabel: 'rgba(58,68,8,0.68)',
+    buttonBackground: '#A7C410',
+    buttonForeground: '#2A3305',
+    badgeBackground: '#F0FFD4',
+    badgeTextColor: '#5E6D1A',
+    linkColor: '#A7C410',
+    fabBackground: '#A7C410',
+    fabForeground: '#2A3305'
+  },
+  {
+    key: 'auroraNight',
+    label: 'Aurora Night',
+    tier: 'premium',
+    background: '#1E1547',
+    isDark: true,
+    onPrimary: '#ffffff',
+    subtitleColor: 'rgba(255,255,255,0.85)',
+    metaColor: 'rgba(255,255,255,0.75)',
+    iconTint: '#A78EFF',
+    iconBorder: 'rgba(167,142,255,0.35)',
+    iconBackground: 'rgba(109,247,255,0.12)',
+    statCardBackground: 'rgba(109,247,255,0.22)',
+    statValue: '#6DF7FF',
+    statLabel: 'rgba(255,255,255,0.82)',
+    buttonBackground: '#6DF7FF',
+    buttonForeground: '#0F0A2D',
+    badgeBackground: '#6DF7FF',
+    badgeTextColor: '#0F0A2D',
+    linkColor: '#6DF7FF',
+    fabBackground: '#6DF7FF',
+    fabForeground: '#0F0A2D'
+  },
+  {
+    key: 'liquidGeometry',
+    label: 'Liquid Geometry',
+    tier: 'premium',
+    background: '#FFE8F5',
+    isDark: false,
+    onPrimary: '#4A1538',
+    subtitleColor: '#7D2D5C',
+    metaColor: '#9C4973',
+    iconTint: '#E84FA8',
+    iconBorder: 'rgba(232,79,168,0.28)',
+    iconBackground: 'rgba(255,255,255,0.30)',
+    statCardBackground: 'rgba(232,79,168,0.16)',
+    statValue: '#B53782',
+    statLabel: 'rgba(74,21,56,0.70)',
+    buttonBackground: '#E84FA8',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#FFE8F5',
+    badgeTextColor: '#B53782',
+    linkColor: '#E84FA8',
+    fabBackground: '#E84FA8',
+    fabForeground: '#ffffff',
+    backgroundStyle: {
+      type: 'liquidGeometry',
+      options: {
+        baseColor: '#FFE8F5',
+        shapes: [
+          {
+            type: 'blob',
+            color: 'rgba(255,182,229,0.55)',
+            size: 180,
+            wobbleIntensity: 12,
+            animationDuration: 6000,
+            shadow: 'rgba(232,79,168,0.25)'
+          },
+          {
+            type: 'blob',
+            color: 'rgba(232,79,168,0.42)',
+            size: 140,
+            wobbleIntensity: 15,
+            animationDuration: 7500,
+            shadow: 'rgba(181,55,130,0.22)'
+          },
+          {
+            type: 'blob',
+            color: 'rgba(255,255,255,0.65)',
+            size: 120,
+            wobbleIntensity: 10,
+            animationDuration: 5500,
+            shadow: 'rgba(0,0,0,0.08)'
+          }
+        ],
+        enableGloss: true,
+        enable3D: true
+      }
+    }
+  },
+  {
+    key: 'floatingSpheres',
+    label: 'Floating Spheres',
+    tier: 'premium',
+    background: '#E8F4FF',
+    isDark: false,
+    onPrimary: '#0A2E4D',
+    subtitleColor: '#1E5280',
+    metaColor: '#3D6B9A',
+    iconTint: '#2B7FD9',
+    iconBorder: 'rgba(43,127,217,0.32)',
+    iconBackground: 'rgba(255,255,255,0.45)',
+    statCardBackground: 'rgba(43,127,217,0.15)',
+    statValue: '#1A5999',
+    statLabel: 'rgba(10,46,77,0.72)',
+    buttonBackground: '#2B7FD9',
+    buttonForeground: '#ffffff',
+    badgeBackground: '#E8F4FF',
+    badgeTextColor: '#1A5999',
+    linkColor: '#2B7FD9',
+    fabBackground: '#2B7FD9',
+    fabForeground: '#ffffff',
+    backgroundStyle: {
+      type: 'floatingSpheres',
+      options: {
+        baseColor: '#E8F4FF',
+        spheres: [
+          {
+            type: 'sphere',
+            gradient: ['#FFB84D', '#FF8C42'],
+            size: 95,
+            floatRange: 40,
+            animationDuration: 8000,
+            shadow: {
+              color: 'rgba(255,140,66,0.35)',
+              blur: 20,
+              offsetY: 12
+            }
+          },
+          {
+            type: 'sphere',
+            gradient: ['#6EC1E4', '#4A9FD8'],
+            size: 75,
+            floatRange: 55,
+            animationDuration: 10000,
+            shadow: {
+              color: 'rgba(74,159,216,0.32)',
+              blur: 18,
+              offsetY: 10
+            }
+          },
+          {
+            type: 'sphere',
+            gradient: ['#B57FE8', '#9B5FD8'],
+            size: 110,
+            floatRange: 35,
+            animationDuration: 9000,
+            shadow: {
+              color: 'rgba(155,95,216,0.38)',
+              blur: 22,
+              offsetY: 14
+            }
+          },
+          {
+            type: 'sphere',
+            gradient: ['#FF7B9C', '#FF5577'],
+            size: 65,
+            floatRange: 48,
+            animationDuration: 7500,
+            shadow: {
+              color: 'rgba(255,85,119,0.30)',
+              blur: 16,
+              offsetY: 8
+            }
+          }
+        ],
+        enable3D: true,
+        enableReflections: true,
+        parallaxIntensity: 0.3
+      }
+    }
   }
 ];
 

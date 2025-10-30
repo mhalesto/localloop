@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect, Defs, RadialGradient, Stop, Ellipse } from 'react-native-svg';
 
 /** ===== Defaults ===== */
 const CLOUD_DEFAULTS = {
@@ -104,6 +104,257 @@ function DreamyCloudsBackground({ baseColor, cloudColors, animationDuration, opa
         backgroundColor: scaledClouds[2] ?? CLOUD_DEFAULTS.cloudColors[2],
         transform: [{ translateX: cloudTransforms[2].translateX }, { translateY: cloudTransforms[2].translateY }]
       }]} />
+    </View>
+  );
+}
+
+/** ===== Liquid Geometry (wobbling blobs) ===== */
+function LiquidGeometryBackground({ baseColor, shapes, enableGloss, enable3D }) {
+  const animatedValues = useRef(shapes.map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const animations = shapes.map((shape, index) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValues[index], {
+            toValue: 1,
+            duration: shape.animationDuration || 6000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true
+          }),
+          Animated.timing(animatedValues[index], {
+            toValue: 0,
+            duration: shape.animationDuration || 6000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true
+          })
+        ])
+      );
+    });
+    animations.forEach((anim) => anim.start());
+    return () => animations.forEach((anim) => anim.stop());
+  }, [shapes, animatedValues]);
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: baseColor }]}>
+      {shapes.map((shape, index) => {
+        const wobble = shape.wobbleIntensity || 10;
+        const size = shape.size || 120;
+
+        // Create wobble path using animated value
+        const animValue = animatedValues[index];
+
+        // Position variations for each blob
+        const positions = [
+          { top: -size * 0.3, left: -size * 0.2 },
+          { top: size * 0.5, right: -size * 0.3 },
+          { bottom: -size * 0.4, left: size * 0.6 }
+        ];
+
+        const pos = positions[index % 3];
+
+        return (
+          <Animated.View
+            key={`blob-${index}`}
+            pointerEvents="none"
+            style={[
+              styles.blobContainer,
+              pos,
+              {
+                width: size,
+                height: size,
+                transform: [
+                  {
+                    translateX: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, wobble, 0]
+                    })
+                  },
+                  {
+                    translateY: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, -wobble * 0.8, 0]
+                    })
+                  },
+                  {
+                    scaleX: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [1, 1.08, 1]
+                    })
+                  },
+                  {
+                    scaleY: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [1, 0.92, 1]
+                    })
+                  }
+                ]
+              }
+            ]}
+          >
+            <Svg width={size} height={size} viewBox="0 0 100 100">
+              <Defs>
+                <RadialGradient id={`blob-grad-${index}`} cx="40%" cy="35%">
+                  {enableGloss && (
+                    <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+                  )}
+                  <Stop offset={enableGloss ? "40%" : "0%"} stopColor={shape.color} stopOpacity={enableGloss ? "0.9" : "1"} />
+                  {enableGloss && (
+                    <Stop offset="100%" stopColor={shape.color} stopOpacity="1" />
+                  )}
+                </RadialGradient>
+              </Defs>
+              {/* Wobbling blob shape using ellipses for smooth organic look */}
+              <Path
+                d="M50,10 C70,10 90,30 90,50 C90,70 70,90 50,90 C30,90 10,70 10,50 C10,30 30,10 50,10 Z"
+                fill={`url(#blob-grad-${index})`}
+                opacity={0.95}
+              />
+              {enable3D && shape.shadow && (
+                <Ellipse
+                  cx="50"
+                  cy="92"
+                  rx="35"
+                  ry="8"
+                  fill={shape.shadow}
+                  opacity="0.4"
+                />
+              )}
+            </Svg>
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** ===== Floating Spheres (3D spheres with shadows) ===== */
+function FloatingSpheresBackground({ baseColor, spheres, enable3D, enableReflections }) {
+  const animatedValues = useRef(spheres.map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const animations = spheres.map((sphere, index) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValues[index], {
+            toValue: 1,
+            duration: sphere.animationDuration || 8000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true
+          }),
+          Animated.timing(animatedValues[index], {
+            toValue: 0,
+            duration: sphere.animationDuration || 8000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true
+          })
+        ])
+      );
+    });
+    animations.forEach((anim) => anim.start());
+    return () => animations.forEach((anim) => anim.stop());
+  }, [spheres, animatedValues]);
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: baseColor }]}>
+      {spheres.map((sphere, index) => {
+        const size = sphere.size || 80;
+        const floatRange = sphere.floatRange || 40;
+
+        // Different starting positions for each sphere
+        const positions = [
+          { top: '15%', left: '10%' },
+          { top: '45%', right: '15%' },
+          { bottom: '25%', left: '20%' },
+          { top: '60%', right: '25%' }
+        ];
+
+        const pos = positions[index % 4];
+        const animValue = animatedValues[index];
+
+        return (
+          <Animated.View
+            key={`sphere-${index}`}
+            pointerEvents="none"
+            style={[
+              styles.sphereContainer,
+              pos,
+              {
+                width: size,
+                height: size,
+                transform: [
+                  {
+                    translateY: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, -floatRange, 0]
+                    })
+                  },
+                  {
+                    translateX: animValue.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0, floatRange * 0.3, 0]
+                    })
+                  }
+                ]
+              }
+            ]}
+          >
+            <Svg width={size} height={size + 20} viewBox="0 0 100 120">
+              <Defs>
+                <RadialGradient id={`sphere-grad-${index}`} cx="35%" cy="30%">
+                  <Stop offset="0%" stopColor={sphere.gradient[0]} stopOpacity="1" />
+                  <Stop offset="60%" stopColor={sphere.gradient[1] || sphere.gradient[0]} stopOpacity="1" />
+                  <Stop offset="100%" stopColor={sphere.gradient[1] || sphere.gradient[0]} stopOpacity="0.85" />
+                </RadialGradient>
+              </Defs>
+
+              {/* Shadow */}
+              {enable3D && sphere.shadow && (
+                <Ellipse
+                  cx="50"
+                  cy={100 + (sphere.shadow.offsetY || 10)}
+                  rx="40"
+                  ry="10"
+                  fill={sphere.shadow.color}
+                  opacity="0.5"
+                  style={{ filter: `blur(${sphere.shadow.blur || 15}px)` }}
+                />
+              )}
+
+              {/* Main sphere */}
+              <Circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill={`url(#sphere-grad-${index})`}
+              />
+
+              {/* Highlight for 3D effect */}
+              {enable3D && (
+                <Circle
+                  cx="38"
+                  cy="35"
+                  r="15"
+                  fill="#ffffff"
+                  opacity="0.4"
+                />
+              )}
+
+              {/* Reflection */}
+              {enableReflections && (
+                <Ellipse
+                  cx="50"
+                  cy="85"
+                  rx="30"
+                  ry="8"
+                  fill={sphere.gradient[0]}
+                  opacity="0.15"
+                />
+              )}
+            </Svg>
+          </Animated.View>
+        );
+      })}
     </View>
   );
 }
@@ -263,6 +514,36 @@ export default function AccentBackground({ accent, style, region = 'body' }) {
     );
   }
 
+  // Liquid Geometry - wobbling blobs
+  if (backgroundStyle.type === 'liquidGeometry') {
+    const config = backgroundStyle.options || {};
+    return (
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]} onLayout={onLayout}>
+        <LiquidGeometryBackground
+          baseColor={config.baseColor}
+          shapes={config.shapes || []}
+          enableGloss={config.enableGloss}
+          enable3D={config.enable3D}
+        />
+      </View>
+    );
+  }
+
+  // Floating Spheres - 3D spheres with shadows
+  if (backgroundStyle.type === 'floatingSpheres') {
+    const config = backgroundStyle.options || {};
+    return (
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, style]} onLayout={onLayout}>
+        <FloatingSpheresBackground
+          baseColor={config.baseColor}
+          spheres={config.spheres || []}
+          enable3D={config.enable3D}
+          enableReflections={config.enableReflections}
+        />
+      </View>
+    );
+  }
+
   return null;
 }
 
@@ -275,5 +556,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 26,
     shadowOffset: { width: 0, height: 6 }
+  },
+  blobContainer: {
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  sphereContainer: {
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 }
   }
 });
