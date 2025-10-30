@@ -2418,81 +2418,93 @@ export default function PostThreadScreen({ route, navigation }) {
       ) : null}
 
       {/* Fullscreen Post Modal */}
-      <Modal
-        visible={isFullscreenModalVisible}
-        animationType="slide"
-        onRequestClose={() => setIsFullscreenModalVisible(false)}
-      >
-        <View style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}>
-          {/* Header with back button */}
-          <View style={[styles.fullscreenHeader, { backgroundColor: themeColors.card, borderBottomColor: themeColors.divider }]}>
-            <TouchableOpacity
-              onPress={() => setIsFullscreenModalVisible(false)}
-              style={styles.fullscreenBackButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="arrow-back" size={24} color={themeColors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={[styles.fullscreenTitle, { color: themeColors.textPrimary }]}>Post</Text>
-            <View style={styles.fullscreenPlaceholder} />
-          </View>
+      {isFullscreenModalVisible && post ? (() => {
+        const trimmedTitle = post?.title?.trim?.() ?? '';
+        const trimmedDescription = post?.message?.trim?.() ?? '';
+        const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
+        const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
+        const authorLocation = authorLocationParts.join(', ');
+        const authorAvatar = getAvatarConfig(post.author?.avatarKey);
+        const authorAvatarBackground = authorAvatar.backgroundColor ?? (accentPreset?.primary || themeColors.primary);
 
-          {/* Post Content */}
-          <ScrollView
-            style={styles.fullscreenScrollView}
-            contentContainerStyle={styles.fullscreenScrollContent}
-            showsVerticalScrollIndicator={true}
+        return (
+          <Modal
+            visible={isFullscreenModalVisible}
+            animationType="slide"
+            onRequestClose={() => setIsFullscreenModalVisible(false)}
           >
-            {/* Author Info */}
-            <View style={[styles.fullscreenAuthorRow, { borderBottomColor: themeColors.divider }]}>
-              <View style={[styles.fullscreenAvatar, { backgroundColor: accentPreset?.primary || themeColors.primary }]}>
-                {authorAvatarConfig?.icon ? (
-                  <Ionicons
-                    name={authorAvatarConfig.icon.name}
-                    size={20}
-                    color={authorAvatarConfig.icon.color ?? '#fff'}
-                  />
-                ) : (
-                  <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatarConfig?.foregroundColor ?? '#fff' }]}>
-                    {authorAvatarConfig?.emoji ?? '🙂'}
-                  </Text>
-                )}
+            <View style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}>
+              {/* Header with back button */}
+              <View style={[styles.fullscreenHeader, { backgroundColor: themeColors.card, borderBottomColor: themeColors.divider }]}>
+                <TouchableOpacity
+                  onPress={() => setIsFullscreenModalVisible(false)}
+                  style={styles.fullscreenBackButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="arrow-back" size={24} color={themeColors.textPrimary} />
+                </TouchableOpacity>
+                <Text style={[styles.fullscreenTitle, { color: themeColors.textPrimary }]}>Post</Text>
+                <View style={styles.fullscreenPlaceholder} />
               </View>
-              <View style={styles.fullscreenAuthorInfo}>
-                <Text style={[styles.fullscreenAuthorName, { color: themeColors.textPrimary }]}>
-                  {post.authorNickname || 'Anonymous'}
+
+              {/* Post Content */}
+              <ScrollView
+                style={styles.fullscreenScrollView}
+                contentContainerStyle={styles.fullscreenScrollContent}
+                showsVerticalScrollIndicator={true}
+              >
+                {/* Author Info */}
+                <View style={[styles.fullscreenAuthorRow, { borderBottomColor: themeColors.divider }]}>
+                  <View style={[styles.fullscreenAvatar, { backgroundColor: authorAvatarBackground }]}>
+                    {authorAvatar?.icon ? (
+                      <Ionicons
+                        name={authorAvatar.icon.name}
+                        size={20}
+                        color={authorAvatar.icon.color ?? '#fff'}
+                      />
+                    ) : (
+                      <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatar?.foregroundColor ?? '#fff' }]}>
+                        {authorAvatar?.emoji ?? '🙂'}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.fullscreenAuthorInfo}>
+                    <Text style={[styles.fullscreenAuthorName, { color: themeColors.textPrimary }]}>
+                      {post.authorNickname || 'Anonymous'}
+                    </Text>
+                    {authorLocation ? (
+                      <Text style={[styles.fullscreenAuthorLocation, { color: themeColors.textSecondary }]}>
+                        {authorLocation}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                {/* Title */}
+                <Text style={[styles.fullscreenPostTitle, { color: themeColors.textPrimary }]}>
+                  {displayTitle}
                 </Text>
-                {authorLocation ? (
-                  <Text style={[styles.fullscreenAuthorLocation, { color: themeColors.textSecondary }]}>
-                    {authorLocation}
-                  </Text>
+
+                {/* Description */}
+                {trimmedDescription && trimmedDescription !== displayTitle ? (
+                  <View style={styles.fullscreenDescriptionContainer}>
+                    <RichText
+                      text={trimmedDescription}
+                      textStyle={[styles.fullscreenPostDescription, { color: themeColors.textPrimary }]}
+                      linkStyle={{ color: themeColors.primary }}
+                    />
+                  </View>
                 ) : null}
-              </View>
+
+                {/* Meta */}
+                <Text style={[styles.fullscreenMeta, { color: themeColors.textSecondary }]}>
+                  {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+                </Text>
+              </ScrollView>
             </View>
-
-            {/* Title */}
-            <Text style={[styles.fullscreenPostTitle, { color: themeColors.textPrimary }]}>
-              {displayTitle}
-            </Text>
-
-            {/* Description */}
-            {trimmedDescription && trimmedDescription !== displayTitle ? (
-              <View style={styles.fullscreenDescriptionContainer}>
-                <RichText
-                  text={trimmedDescription}
-                  textStyle={[styles.fullscreenPostDescription, { color: themeColors.textPrimary }]}
-                  linkStyle={{ color: themeColors.primary }}
-                />
-              </View>
-            ) : null}
-
-            {/* Meta */}
-            <Text style={[styles.fullscreenMeta, { color: themeColors.textSecondary }]}>
-              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-            </Text>
-          </ScrollView>
-        </View>
-      </Modal>
+          </Modal>
+        );
+      })() : null}
     </ScreenLayout>
   );
 }
