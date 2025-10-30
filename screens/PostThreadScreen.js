@@ -456,6 +456,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [ownerMenuVisible, setOwnerMenuVisible] = useState(false);
   const [ownerMenuPosition, setOwnerMenuPosition] = useState({ top: 0, right: 12 });
+  const [isFullscreenModalVisible, setIsFullscreenModalVisible] = useState(false);
   const ownerMenuAnchorRef = useRef(null);
   const sharePreviewRef = useRef(null);
   const [isSharingOutside, setIsSharingOutside] = useState(false);
@@ -1778,6 +1779,21 @@ export default function PostThreadScreen({ route, navigation }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  onPress={() => setIsFullscreenModalVisible(true)}
+                  style={[styles.notificationButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="View post fullscreen"
+                >
+                  <Ionicons
+                    name="expand-outline"
+                    size={18}
+                    color={linkColor}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={handleShareOutside}
                   style={[styles.shareExternalButton, styles.shareExternalButtonWithLabel]}
                   activeOpacity={0.7}
@@ -1816,20 +1832,20 @@ export default function PostThreadScreen({ route, navigation }) {
                   <Text
                     style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
                     numberOfLines={3}
-                    ellipsizeMode="tail"
                   >
                     {collapsedPreviewText}
+                    {showToggleControls ? (
+                      <>
+                        {'... '}
+                        <Text
+                          style={[styles.postMessageToggleTextInline, { color: linkColor }]}
+                          onPress={() => setIsDescriptionExpanded(true)}
+                        >
+                          Show more
+                        </Text>
+                      </>
+                    ) : null}
                   </Text>
-                  {showToggleControls ? (
-                    <TouchableOpacity
-                      onPress={() => setIsDescriptionExpanded(true)}
-                      activeOpacity={0.7}
-                      style={styles.postMessageToggle}
-                      hitSlop={toggleHitSlop}
-                    >
-                      <Text style={[styles.postMessageToggleText, { color: linkColor }]}>Show more</Text>
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
               ) : (
                 <>
@@ -2400,6 +2416,83 @@ export default function PostThreadScreen({ route, navigation }) {
           <Text style={styles.toastText}>{feedbackMessage}</Text>
         </View>
       ) : null}
+
+      {/* Fullscreen Post Modal */}
+      <Modal
+        visible={isFullscreenModalVisible}
+        animationType="slide"
+        onRequestClose={() => setIsFullscreenModalVisible(false)}
+      >
+        <View style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}>
+          {/* Header with back button */}
+          <View style={[styles.fullscreenHeader, { backgroundColor: headerBackground, borderBottomColor: dividerColor }]}>
+            <TouchableOpacity
+              onPress={() => setIsFullscreenModalVisible(false)}
+              style={styles.fullscreenBackButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="arrow-back" size={24} color={headerTitleColor} />
+            </TouchableOpacity>
+            <Text style={[styles.fullscreenTitle, { color: headerTitleColor }]}>Post</Text>
+            <View style={styles.fullscreenPlaceholder} />
+          </View>
+
+          {/* Post Content */}
+          <ScrollView
+            style={styles.fullscreenScrollView}
+            contentContainerStyle={styles.fullscreenScrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* Author Info */}
+            <View style={[styles.fullscreenAuthorRow, { borderBottomColor: dividerColor }]}>
+              <View style={[styles.fullscreenAvatar, { backgroundColor: accentPreset?.primary || linkColor }]}>
+                {authorAvatarConfig?.icon ? (
+                  <Ionicons
+                    name={authorAvatarConfig.icon.name}
+                    size={20}
+                    color={authorAvatarConfig.icon.color ?? '#fff'}
+                  />
+                ) : (
+                  <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatarConfig?.foregroundColor ?? '#fff' }]}>
+                    {authorAvatarConfig?.emoji ?? '🙂'}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.fullscreenAuthorInfo}>
+                <Text style={[styles.fullscreenAuthorName, { color: themeColors.textPrimary }]}>
+                  {post.authorNickname || 'Anonymous'}
+                </Text>
+                {authorLocation ? (
+                  <Text style={[styles.fullscreenAuthorLocation, { color: themeColors.textSecondary }]}>
+                    {authorLocation}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={[styles.fullscreenPostTitle, { color: themeColors.textPrimary }]}>
+              {displayTitle}
+            </Text>
+
+            {/* Description */}
+            {trimmedDescription && trimmedDescription !== displayTitle ? (
+              <View style={styles.fullscreenDescriptionContainer}>
+                <RichText
+                  text={trimmedDescription}
+                  textStyle={[styles.fullscreenPostDescription, { color: themeColors.textPrimary }]}
+                  linkStyle={{ color: linkColor }}
+                />
+              </View>
+            ) : null}
+
+            {/* Meta */}
+            <Text style={[styles.fullscreenMeta, { color: themeColors.textSecondary }]}>
+              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+            </Text>
+          </ScrollView>
+        </View>
+      </Modal>
     </ScreenLayout>
   );
 }
@@ -2537,6 +2630,7 @@ const createStyles = (
     postMessageToggle: { marginLeft: 12 },
     postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-start' },
     postMessageToggleText: { fontSize: 14, fontWeight: '600' },
+    postMessageToggleTextInline: { fontSize: 14, fontWeight: '600', textDecorationLine: 'none' },
     postMessageToggleHitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
@@ -2933,6 +3027,84 @@ const createStyles = (
       shadowOffset: { width: 0, height: 6 },
       elevation: 4
     },
-    notice: { fontSize: 16, marginBottom: 16, color: palette.textPrimary, textAlign: 'center' }
+    notice: { fontSize: 16, marginBottom: 16, color: palette.textPrimary, textAlign: 'center' },
+
+    // Fullscreen modal styles
+    fullscreenModalContainer: {
+      flex: 1,
+    },
+    fullscreenHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    fullscreenBackButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+    },
+    fullscreenTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    fullscreenPlaceholder: {
+      width: 40,
+    },
+    fullscreenScrollView: {
+      flex: 1,
+    },
+    fullscreenScrollContent: {
+      padding: 20,
+    },
+    fullscreenAuthorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingBottom: 16,
+      marginBottom: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    fullscreenAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    fullscreenAvatarEmoji: {
+      fontSize: 24,
+    },
+    fullscreenAuthorInfo: {
+      flex: 1,
+    },
+    fullscreenAuthorName: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    fullscreenAuthorLocation: {
+      fontSize: 14,
+    },
+    fullscreenPostTitle: {
+      fontSize: resolvedTitleFontSize + 4,
+      fontWeight: '700',
+      marginBottom: 16,
+      lineHeight: (resolvedTitleFontSize + 4) * 1.3,
+    },
+    fullscreenDescriptionContainer: {
+      marginBottom: 20,
+    },
+    fullscreenPostDescription: {
+      fontSize: resolvedDescriptionFontSize,
+      lineHeight: resolvedDescriptionFontSize * 1.5,
+    },
+    fullscreenMeta: {
+      fontSize: 14,
+      marginTop: 8,
+    }
   });
 };
