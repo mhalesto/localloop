@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Animated, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import AppHeader from './AppHeader';
 import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
@@ -36,23 +37,29 @@ export default function ScreenLayout({
     userProfile,
     updateUserProfile,
     themeColors,
-    isDarkMode
+    isDarkMode,
   } = useSettings();
+
   const {
     addPost,
     getReplyNotificationCount,
     getNotificationCount,
     getNotifications,
     markNotificationsRead,
-    markNotificationsForThreadRead
+    markNotificationsForThreadRead,
   } = usePosts();
+
   const { user: firebaseUser } = useAuth();
-  const statusStyle = accentPreset.isDark ? 'light' : 'dark';
+  const insets = useSafeAreaInsets();
+
+  // Status bar icons (white on dark headers, dark on light headers)
+  const statusStyle = accentPreset?.isDark ? 'light' : 'dark';
+
   const myRepliesBadge = getReplyNotificationCount ? getReplyNotificationCount() : 0;
+
   const [composerVisible, setComposerVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
-  const insets = useSafeAreaInsets();
 
   const initialLocation = useMemo(
     () =>
@@ -60,7 +67,7 @@ export default function ScreenLayout({
         ? {
           city: userProfile.city,
           province: userProfile.province ?? '',
-          country: userProfile.country ?? ''
+          country: userProfile.country ?? '',
         }
         : null,
     [userProfile]
@@ -70,12 +77,12 @@ export default function ScreenLayout({
     () => getAvatarConfig(userProfile?.avatarKey),
     [userProfile?.avatarKey]
   );
+
   const handleSubmitPost = ({ location, colorKey, title, message, highlightDescription }) => {
     if (!location?.city || !title?.trim?.()) {
       setComposerVisible(false);
       return;
     }
-
     if (!firebaseUser?.uid) {
       Alert.alert('Sign in required', 'Sign in to publish posts to the community.');
       setComposerVisible(false);
@@ -89,10 +96,17 @@ export default function ScreenLayout({
       province: location.province ?? userProfile?.province ?? '',
       country: location.country ?? userProfile?.country ?? '',
       avatarKey: userProfile?.avatarKey ?? 'default',
-      uid: firebaseUser.uid
+      uid: firebaseUser.uid,
     };
 
-    const published = addPost(location.city, title, message, colorKey, mergedAuthor, highlightDescription);
+    const published = addPost(
+      location.city,
+      title,
+      message,
+      colorKey,
+      mergedAuthor,
+      highlightDescription
+    );
 
     if (!published) {
       Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
@@ -104,7 +118,7 @@ export default function ScreenLayout({
       updateUserProfile?.({
         city: location.city,
         province: location.province ?? '',
-        country: location.country ?? ''
+        country: location.country ?? '',
       });
     }
 
@@ -114,9 +128,7 @@ export default function ScreenLayout({
     }
   };
 
-  const handleFooterShortcut = () => {
-    setComposerVisible(true);
-  };
+  const handleFooterShortcut = () => setComposerVisible(true);
 
   const handleTabPress = (tab) => {
     if (!navigation) return;
@@ -136,22 +148,15 @@ export default function ScreenLayout({
     }
   };
 
-  const handleMenuPress = () => {
-    setDrawerVisible(true);
-  };
+  const handleMenuPress = () => setDrawerVisible(true);
 
   const handleShortcutSelect = (key) => {
     setDrawerVisible(false);
     if (!navigation) return;
-    if (key === 'home') {
-      navigation.navigate('Country');
-    } else if (key === 'myComments') {
-      navigation.navigate('MyComments');
-    } else if (key === 'topStatuses') {
-      navigation.navigate('TopStatuses');
-    } else if (key === 'settings') {
-      navigation.navigate('Settings');
-    }
+    if (key === 'home') navigation.navigate('Country');
+    else if (key === 'myComments') navigation.navigate('MyComments');
+    else if (key === 'topStatuses') navigation.navigate('TopStatuses');
+    else if (key === 'settings') navigation.navigate('Settings');
   };
 
   const headerNotificationCount = getNotificationCount ? getNotificationCount() : 0;
@@ -159,26 +164,25 @@ export default function ScreenLayout({
     () => (getNotifications ? getNotifications() : []),
     [getNotifications]
   );
-  const defaultRightIcon = rightIcon ?? (headerNotificationCount > 0 ? 'notifications' : 'notifications-outline');
-  const handleHeaderRightPress = onRightPress ?? (() => {
-    setNotificationsVisible(true);
-    markNotificationsRead?.();
-  });
+  const defaultRightIcon =
+    rightIcon ?? (headerNotificationCount > 0 ? 'notifications' : 'notifications-outline');
+
+  const handleHeaderRightPress =
+    onRightPress ??
+    (() => {
+      setNotificationsVisible(true);
+      markNotificationsRead?.();
+    });
+
   const headerBadgeCount = onRightPress ? undefined : headerNotificationCount;
 
-  const handleCloseNotifications = () => {
-    setNotificationsVisible(false);
-  };
+  const handleCloseNotifications = () => setNotificationsVisible(false);
 
   const handleSelectNotification = (notification) => {
     setNotificationsVisible(false);
-    if (!notification) {
-      return;
-    }
+    if (!notification) return;
     markNotificationsForThreadRead?.(notification.city, notification.postId);
-    if (!navigation) {
-      return;
-    }
+    if (!navigation) return;
     navigation.navigate('PostThread', {
       city: notification.city,
       postId: notification.postId,
@@ -192,12 +196,19 @@ export default function ScreenLayout({
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: accentPreset.background }]}>
-      <StatusBar style={statusStyle} backgroundColor={accentPreset.background} />
+    // IMPORTANT:
+    // - We do NOT paint the safe area with the header color anymore.
+    // - We let AppHeader handle the top inset and background so shapes can bleed into the status bar.
+    <SafeAreaView style={[styles.safe, { backgroundColor: themeColors.background }]} edges={['bottom']}>
+      {/* Translucent status bar so the header’s background/shapes are visible underneath */}
+      <StatusBar style={statusStyle} translucent backgroundColor="transparent" />
+
       <View style={styles.safeOverlay}>
+        {/* Optional external header overlay (kept non-blocking & behind header) */}
         {headerBackgroundStyle ? (
           <Animated.View pointerEvents="none" style={[styles.headerBackground, headerBackgroundStyle]} />
         ) : null}
+
         <AppHeader
           title={title}
           subtitle={subtitle}
@@ -210,25 +221,24 @@ export default function ScreenLayout({
           searchPlaceholder={searchPlaceholder}
           searchValue={searchValue}
           onSearchChange={onSearchChange}
-          wrapperStyle={[
-            headerStyle,
-            { backgroundColor: accentPreset.background }
-          ]}
+          wrapperStyle={headerStyle}
           accent={accentPreset}
         />
-        <View style={[styles.content, contentStyle]}>{children}</View>
-        {showFooter ? (
-        <FooterMenu
-          activeTab={activeTab}
-          onPressTab={handleTabPress}
-          onAddPostShortcut={handleFooterShortcut}
-          showShortcut={showAddShortcut}
-          accent={accentPreset}
-          myRepliesBadge={myRepliesBadge}
-        />
-      ) : null}
 
-      <CreatePostModal
+        <View style={[styles.content, contentStyle]}>{children}</View>
+
+        {showFooter ? (
+          <FooterMenu
+            activeTab={activeTab}
+            onPressTab={handleTabPress}
+            onAddPostShortcut={handleFooterShortcut}
+            showShortcut={showAddShortcut}
+            accent={accentPreset}
+            myRepliesBadge={myRepliesBadge}
+          />
+        ) : null}
+
+        <CreatePostModal
           visible={composerVisible}
           onClose={() => setComposerVisible(false)}
           initialLocation={initialLocation}
@@ -237,7 +247,7 @@ export default function ScreenLayout({
           authorProfile={{
             nickname: userProfile?.nickname ?? '',
             avatarConfig: authorAvatarConfig,
-            avatarKey: userProfile?.avatarKey
+            avatarKey: userProfile?.avatarKey,
           }}
         />
 
@@ -247,21 +257,19 @@ export default function ScreenLayout({
           animationType="slide"
           onRequestClose={() => setDrawerVisible(false)}
         >
-          <StatusBar backgroundColor={accentPreset.background} style={statusStyle} />
+          {/* Keep the status bar translucent in the drawer as well */}
+          <StatusBar translucent backgroundColor="transparent" style={statusStyle} />
           <View style={styles.drawerContainer}>
             <View
               style={[
                 styles.drawerSheet,
                 {
                   paddingTop: insets.top + 12,
-                  backgroundColor: accentPreset.background
-                }
+                  backgroundColor: accentPreset.background,
+                },
               ]}
             >
-              <MainDrawerContent
-                accent={accentPreset}
-                onSelectShortcut={handleShortcutSelect}
-              />
+              <MainDrawerContent accent={accentPreset} onSelectShortcut={handleShortcutSelect} />
             </View>
             <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)} />
           </View>
@@ -283,12 +291,12 @@ export default function ScreenLayout({
 const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
     safe: {
-      flex: 1
+      flex: 1,
     },
     safeOverlay: {
       flex: 1,
       backgroundColor: palette.background,
-      position: 'relative'
+      position: 'relative',
     },
     headerBackground: {
       position: 'absolute',
@@ -302,15 +310,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingTop: 24,
       paddingHorizontal: 20,
       paddingBottom: 0,
-      backgroundColor: palette.background
+      backgroundColor: palette.background,
     },
     drawerContainer: {
       flex: 1,
-      flexDirection: 'row'
+      flexDirection: 'row',
     },
     drawerOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)'
+      backgroundColor: 'rgba(0,0,0,0.35)',
     },
     drawerSheet: {
       width: '78%',
@@ -319,6 +327,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOpacity: isDarkMode ? 0.4 : 0.2,
       shadowRadius: 10,
       shadowOffset: { width: 4, height: 0 },
-      elevation: 8
-    }
+      elevation: 8,
+    },
   });

@@ -6,7 +6,7 @@ import { getAvatarConfig } from '../constants/avatars';
 import AccentBackground from './AccentBackground';
 
 export default function MainDrawerContent({ navigation, onSelectShortcut, accent }) {
-  const { userProfile, accentPreset: globalAccent, themeColors, isDarkMode } = useSettings();
+  const { userProfile, accentPreset: globalAccent, themeColors, isDarkMode, themeDarkness = 0 } = useSettings();
   const preset = accent ?? globalAccent;
   const avatarConfig = getAvatarConfig(userProfile?.avatarKey);
   const styles = React.useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -72,7 +72,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
   return (
     <View style={styles.container}>
       <View style={[styles.header, { backgroundColor: preset.background }]}>
-        <AccentBackground accent={preset} style={styles.headerBackground} />
+        <AccentBackground accent={preset} style={styles.headerBackground} darkness={themeDarkness} />
         <View style={[styles.avatar, { backgroundColor: avatarConfig.backgroundColor ?? themeColors.primary }]}>
           {avatarConfig.icon ? (
             <Ionicons name={avatarConfig.icon.name} size={22} color={avatarConfig.icon.color ?? '#fff'} />

@@ -21,7 +21,7 @@ import AccentBackground from '../components/AccentBackground';
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
   const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
-  const { accentPreset, accentKey, userProfile, themeColors, isDarkMode } = useSettings();
+  const { accentPreset, accentKey, userProfile, themeColors, isDarkMode, themeDarkness = 0 } = useSettings();
   const { user: firebaseUser } = useAuth();
   const posts = getPostsForCity(city);
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
@@ -46,28 +46,16 @@ export default function RoomScreen({ navigation, route }) {
   }, [accentKey]);
 
   useEffect(() => {
-    if (!shareToast) {
-      return;
-    }
+    if (!shareToast) return;
     const timeout = setTimeout(() => setShareToast(''), 2000);
     return () => clearTimeout(timeout);
   }, [shareToast]);
 
   const { totalPosts, totalComments, averageReplies } = useMemo(() => {
     const postCount = posts.length;
-    const commentCount = posts.reduce(
-      (sum, post) => sum + (post.comments?.length ?? 0),
-      0
-    );
-
-    const average =
-      postCount === 0 ? 0 : Number((commentCount / postCount).toFixed(1));
-
-    return {
-      totalPosts: postCount,
-      totalComments: commentCount,
-      averageReplies: average
-    };
+    const commentCount = posts.reduce((sum, post) => sum + (post.comments?.length ?? 0), 0);
+    const average = postCount === 0 ? 0 : Number((commentCount / postCount).toFixed(1));
+    return { totalPosts: postCount, totalComments: commentCount, averageReplies: average };
   }, [posts]);
 
   const listData = useMemo(
@@ -150,11 +138,10 @@ export default function RoomScreen({ navigation, route }) {
     navigation.navigate('PostThread', { city, postId });
   };
 
-
   const renderStickyHeader = () => (
     <View style={[styles.stickyHeaderWrapper, { backgroundColor: accentPreset.background }]}>
       <View style={[styles.headerCard, { backgroundColor: accentPreset.background }]}>
-        <AccentBackground accent={accentPreset} style={styles.headerCardBackground} />
+        <AccentBackground accent={accentPreset} style={styles.headerCardBackground} darkness={themeDarkness} />
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerMeta, { color: metaColor }]}>Today&apos;s pulse</Text>
         </View>
@@ -257,10 +244,7 @@ export default function RoomScreen({ navigation, route }) {
   );
 
   const renderItem = ({ item }) => {
-    if (item.type === 'composer') {
-      return renderComposer();
-    }
-
+    if (item.type === 'composer') return renderComposer();
     return (
       <PostItem
         post={item.data}
@@ -270,12 +254,12 @@ export default function RoomScreen({ navigation, route }) {
         onShare={() => openShareModal(item.data)}
         onViewOriginal={
           item.data.sourcePostId && item.data.sourceCity &&
-          !(item.data.sourceCity === city && item.data.sourcePostId === item.data.id)
+            !(item.data.sourceCity === city && item.data.sourcePostId === item.data.id)
             ? () =>
-                navigation.navigate('PostThread', {
-                  city: item.data.sourceCity,
-                  postId: item.data.sourcePostId
-                })
+              navigation.navigate('PostThread', {
+                city: item.data.sourceCity,
+                postId: item.data.sourcePostId
+              })
             : undefined
         }
       />
@@ -363,14 +347,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     headerTitleRow: {
       marginBottom: 20,
       flexDirection: 'column'
-    },
-    headerSubtitle: {
-      fontSize: 14,
-      marginBottom: 4
-    },
-    headerTitle: {
-      fontSize: 24,
-      fontWeight: '600'
     },
     headerMeta: {
       fontSize: 14,

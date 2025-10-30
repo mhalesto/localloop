@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AccentBackground from './AccentBackground';
 
@@ -10,7 +11,8 @@ const defaultAccent = {
   iconTint: '#ffffff',
   iconBackground: 'rgba(255,255,255,0.1)',
   iconBorder: 'rgba(255,255,255,0.25)',
-  placeholderColor: '#7A76A9'
+  placeholderColor: '#7A76A9',
+  isDark: true
 };
 
 export default function AppHeader({
@@ -28,6 +30,9 @@ export default function AppHeader({
   accent = defaultAccent,
   rightBadgeCount = 0
 }) {
+  const insets = useSafeAreaInsets();
+
+  // derive
   let {
     background = defaultAccent.background,
     onPrimary = defaultAccent.onPrimary,
@@ -35,25 +40,27 @@ export default function AppHeader({
     iconTint = defaultAccent.iconTint,
     iconBackground = defaultAccent.iconBackground,
     iconBorder = defaultAccent.iconBorder,
-    placeholderColor = defaultAccent.placeholderColor
+    placeholderColor = accent?.isDark ? 'rgba(255,255,255,0.7)' : defaultAccent.placeholderColor,
+    isDark = defaultAccent.isDark
   } = accent ?? defaultAccent;
 
-  if (accent?.isDark && !accent?.placeholderColor) {
-    placeholderColor = 'rgba(255,255,255,0.7)';
-  }
-
-  const searchBackground = accent?.isDark ? 'rgba(255,255,255,0.2)' : '#ffffff';
-  const searchTextColor = accent?.isDark ? '#ffffff' : '#1F1845';
+  const searchBackground = isDark ? 'rgba(255,255,255,0.2)' : '#ffffff';
+  const searchTextColor = isDark ? '#ffffff' : '#1F1845';
 
   return (
     <View
       style={[
         styles.wrapper,
-        { backgroundColor: background },
+        { backgroundColor: background, paddingTop: insets.top + 12 }, // bleed into status bar
         wrapperStyle
       ]}
     >
-      <AccentBackground accent={accent} style={styles.backgroundLayer} />
+      {/* Make the OS status bar translucent and match icon color */}
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      {/* Shapes/background now bleed under the status bar */}
+      <AccentBackground accent={accent} style={styles.backgroundLayer} bleedIntoStatusBar />
+
       <View style={styles.topRow}>
         <TouchableOpacity
           style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
@@ -61,17 +68,11 @@ export default function AppHeader({
           disabled={!onBack && !onMenu}
           activeOpacity={0.8}
         >
-          <Ionicons
-            name={onBack ? 'chevron-back' : 'menu'}
-            size={22}
-            color={iconTint}
-          />
+          <Ionicons name={onBack ? 'chevron-back' : 'menu'} size={22} color={iconTint} />
         </TouchableOpacity>
 
         <View style={styles.titleBlock}>
-          {subtitle ? (
-            <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text>
-          ) : null}
+          {subtitle ? <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text> : null}
           {title ? <Text style={[styles.title, { color: onPrimary }]}>{title}</Text> : null}
         </View>
 
@@ -82,16 +83,10 @@ export default function AppHeader({
           activeOpacity={0.8}
         >
           <View style={styles.iconWithBadge}>
-            <Ionicons
-              name={rightIcon ?? 'notifications-outline'}
-              size={22}
-              color={iconTint}
-            />
+            <Ionicons name={rightIcon ?? 'notifications-outline'} size={22} color={iconTint} />
             {rightBadgeCount ? (
               <View style={styles.badge}>
-                <Text style={styles.badgeText} numberOfLines={1}>
-                  {rightBadgeCount > 99 ? '99+' : rightBadgeCount}
-                </Text>
+                <Text style={styles.badgeText} numberOfLines={1}>{rightBadgeCount > 99 ? '99+' : rightBadgeCount}</Text>
               </View>
             ) : null}
           </View>
@@ -120,7 +115,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     paddingHorizontal: 20,
-    paddingTop: 16,
     paddingBottom: 24,
     shadowColor: '#000',
     shadowOpacity: 0.12,
@@ -151,7 +145,7 @@ const styles = StyleSheet.create({
   iconWithBadge: {
     position: 'relative',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   badge: {
     position: 'absolute',
@@ -163,25 +157,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B6B',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 4
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  titleBlock: {
-    flex: 1,
-    marginHorizontal: 12
-  },
-  subtitle: {
-    fontSize: 13,
-    marginBottom: 2
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600'
-  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  titleBlock: { flex: 1, marginHorizontal: 12 },
+  subtitle: { fontSize: 13, marginBottom: 2 },
+  title: { fontSize: 20, fontWeight: '600' },
   searchWrapper: {
     marginTop: 18,
     flexDirection: 'row',
@@ -191,9 +172,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12
   },
-  searchInput: {
-    marginLeft: 10,
-    flex: 1,
-    fontSize: 14
-  }
+  searchInput: { marginLeft: 10, flex: 1, fontSize: 14 }
 });
