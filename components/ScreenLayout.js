@@ -303,6 +303,7 @@ export default function ScreenLayout({
         <LoadingOverlay
           visible={loadingVisible}
           onComplete={handleLoadingComplete}
+          duration={1000}
         />
       </View>
     </SafeAreaView>
