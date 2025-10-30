@@ -12,7 +12,9 @@ const defaultAccent = {
   iconBackground: 'rgba(255,255,255,0.1)',
   iconBorder: 'rgba(255,255,255,0.25)',
   placeholderColor: '#7A76A9',
-  isDark: true
+  isDark: true,
+  // optional: if you keep colors in accent, you can set this there and skip the prop
+  postUnderlayColor: undefined,
 };
 
 export default function AppHeader({
@@ -28,7 +30,12 @@ export default function AppHeader({
   searchValue,
   wrapperStyle,
   accent = defaultAccent,
-  rightBadgeCount = 0
+  rightBadgeCount = 0,
+
+  // NEW: square filler that extends below the rounded header
+  bottomFillColor,           // set this to your top post card color (e.g. themeColors.card)
+  bottomFillHeight = 24,     // how far it extends
+  showBottomFill = true,     // toggle on/off
 }) {
   const insets = useSafeAreaInsets();
 
@@ -41,25 +48,44 @@ export default function AppHeader({
     iconBackground = defaultAccent.iconBackground,
     iconBorder = defaultAccent.iconBorder,
     placeholderColor = accent?.isDark ? 'rgba(255,255,255,0.7)' : defaultAccent.placeholderColor,
-    isDark = defaultAccent.isDark
+    isDark = defaultAccent.isDark,
+    postUnderlayColor = accent?.postUnderlayColor,
   } = accent ?? defaultAccent;
 
   const searchBackground = isDark ? 'rgba(255,255,255,0.2)' : '#ffffff';
   const searchTextColor = isDark ? '#ffffff' : '#1F1845';
 
+  // prefer explicit prop; fall back to accent.postUnderlayColor; otherwise no fill
+  const seamColor = bottomFillColor ?? postUnderlayColor ?? 'transparent';
+
   return (
     <View
       style={[
         styles.wrapper,
-        { backgroundColor: background, paddingTop: insets.top + 12 }, // bleed into status bar
+        { backgroundColor: background, paddingTop: insets.top + 12 },
         wrapperStyle
       ]}
     >
-      {/* Make the OS status bar translucent and match icon color */}
+      {/* OS status bar matches header brightness; header bleeds under it */}
       <StatusBar translucent backgroundColor="transparent" barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Shapes/background now bleed under the status bar */}
+      {/* SHAPES (still clipped to the rounded header) */}
       <AccentBackground accent={accent} style={styles.backgroundLayer} bleedIntoStatusBar />
+
+      {/* BOTTOM FILLER (square, no radius) that extends OUTSIDE the rounded header */}
+      {showBottomFill && seamColor !== 'transparent' ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.bottomFill,
+            {
+              height: bottomFillHeight,
+              bottom: -bottomFillHeight, // extend outside the header
+              backgroundColor: seamColor,
+            }
+          ]}
+        />
+      ) : null}
 
       <View style={styles.topRow}>
         <TouchableOpacity
@@ -121,11 +147,19 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
-    overflow: 'hidden'
+    overflow: 'visible',    // <— allow the square filler to extend out
+    zIndex: 10,             // keep header above content so the filler covers the seam
   },
   backgroundLayer: {
     borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',     // <— shapes stay clipped to rounded header
+  },
+  bottomFill: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    // square: no border radius on purpose
   },
   topRow: {
     flexDirection: 'row',
