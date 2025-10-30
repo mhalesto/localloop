@@ -257,9 +257,17 @@ const applyShadeToPreset = (preset, shade) => {
     }
   });
 
-  // Smoothly transition text colors to white when shade is 50-100%
+  // Smoothly transition text colors to white when shade is 50-55%, then keep white 56-100%
   if (shade >= 50) {
-    const textTransitionFactor = (shade - 50) / 50; // 0 at 50%, 1 at 100%
+    let textTransitionFactor;
+    if (shade <= 55) {
+      // Transition from 50% to 55% (5% range)
+      textTransitionFactor = (shade - 50) / 5; // 0 at 50%, 1 at 55%
+    } else {
+      // Stay fully white from 56% onwards
+      textTransitionFactor = 1;
+    }
+
     const originalOnPrimary = next.onPrimary;
     const originalSubtitle = next.subtitleColor;
 
