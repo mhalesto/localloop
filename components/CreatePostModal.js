@@ -26,7 +26,8 @@ import {
   MAILTO_PREFIX_STRING,
   hasRichFormatting
 } from '../utils/textFormatting';
-import { summarizePostDescription } from '../services/summarizationService'; // or ../api/summaryApi if that’s your path
+import { summarizePostDescription } from '../services/summarizationService'; // or ../api/summaryApi if that's your path
+import { enhancedSummarize } from '../services/enhancedSummarizationService';
 
 const LENGTH_STEPS = ['concise', 'balanced', 'detailed']; // [AI-SUMMARY]
 const SUMMARY_CACHE_DEFAULT = Object.freeze({
@@ -87,7 +88,7 @@ export default function CreatePostModal({
   const [summaryVisible, setSummaryVisible] = useState(false);      // show preview card
   const [summaryMeta, setSummaryMeta] = useState(null);
   const [summaryLength, setSummaryLength] = useState(premiumSummaryLength || 'balanced');
-  const [summaryQuality, setSummaryQuality] = useState('fast');     // 'fast' | 'best'
+  const [summaryQuality, setSummaryQuality] = useState('best');     // 'fast' | 'best'
   const scrollRef = useRef(null);                                   // for auto-scroll
   const [summaryCardY, setSummaryCardY] = useState(0);              // y-pos to scroll to
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,7 +118,7 @@ export default function CreatePostModal({
       setSummaryVisible(false);
       setSummaryMeta(null);
       setSummaryLength(premiumSummaryLength || 'balanced');
-      setSummaryQuality('fast');        // default each time
+      setSummaryQuality('best');        // default to best quality for HF API
       summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
       if (summarizationControllerRef.current) {
         summarizationControllerRef.current.abort?.();
@@ -409,6 +410,42 @@ export default function CreatePostModal({
       scrollSummaryIntoView();
     } catch (error) {
       if (error?.name === 'AbortError') return;
+
+      // Try enhanced fallback summarization
+      try {
+        const fallbackResult = await enhancedSummarize(sanitized, {
+          lengthPreference: lengthPref,
+          quality: quality === 'best' ? 'best' : 'fast',
+          strategy: 'auto'
+        });
+
+        if (fallbackResult && fallbackResult.summary) {
+          const nextSummary = fallbackResult.summary.trim();
+          const nextMeta = {
+            model: `fallback:${fallbackResult.method}`,
+            fallback: true,
+            quality: fallbackResult.quality
+          };
+
+          setSummaryText(nextSummary);
+          setSummaryVisible(true);
+          setSummaryMeta(nextMeta);
+          summaryCacheRef.current = {
+            text: sanitized,
+            length: lengthPref,
+            quality: nextMeta.quality,
+            summary: nextSummary,
+            meta: nextMeta
+          };
+
+          scrollSummaryIntoView();
+          setSummaryError(''); // Clear error since we have a fallback
+          return;
+        }
+      } catch (fallbackError) {
+        console.log('Enhanced fallback also failed:', fallbackError);
+      }
+
       setSummaryError(error instanceof Error ? error.message : 'Unable to generate a summary right now.');
     } finally {
       if (summarizationControllerRef.current === controller) {

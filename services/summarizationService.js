@@ -1,6 +1,7 @@
 // src/services/summarizationService.js
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { enhancedSummarize } from './enhancedSummarizationService';
 
 const DEFAULT_PORT = 4000;
 const SUMMARY_PATH = '/summaries';
@@ -118,6 +119,32 @@ export async function summarizePostDescription(
     throw new Error('Add a description before requesting a summary.');
   }
 
+  // Try enhanced summarizer with HF API first if quality is 'best'
+  if (quality === 'best' || !quality) {
+    try {
+      console.log('[SummaryService] Trying enhanced summarizer with HF API...');
+      const enhancedResult = await enhancedSummarize(text, {
+        lengthPreference: lengthPreference || 'balanced',
+        quality: 'best',
+        strategy: 'auto'
+      });
+
+      if (enhancedResult && enhancedResult.summary) {
+        console.log('[SummaryService] Enhanced summarizer success! Method:', enhancedResult.method);
+        return {
+          summary: clean(String(enhancedResult.summary)).normalize('NFC'),
+          model: enhancedResult.method,
+          options: { lengthPreference },
+          fallback: !enhancedResult.method.startsWith('huggingface'),
+          quality: 'best',
+        };
+      }
+    } catch (hfError) {
+      console.log('[SummaryService] Enhanced summarizer failed:', hfError.message);
+    }
+  }
+
+  // Fall back to original API service
   const options = {};
   if (typeof lengthPreference === 'string' && lengthPreference) {
     options.lengthPreference = lengthPreference;
