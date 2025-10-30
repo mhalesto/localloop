@@ -24,16 +24,16 @@ const tabs = [
 const BAR_HEIGHT = 76;
 const CORNER_R = 28;
 
-const NOTCH_R = 36;   // optimal notch radius for smooth curve
-const NOTCH_DEPTH = 0.75; // balanced depth for natural flow
+const NOTCH_R = 40;   // wider notch for better FAB accommodation
+const NOTCH_DEPTH = 1.1; // deeper curve so FAB sits within, not on top
 
-const SPACER_EXTRA = 10;   // balanced space around the notch
+const SPACER_EXTRA = 6;   // reduced for tighter integration
 
 const FAB_SIZE = 60;
 // move FAB & notch: LEFT(−) / RIGHT(+)
 const FAB_NUDGE_X = -4;   // slightly less left than before
 // lower the FAB (smaller = lower; negative drops it)
-const FAB_RISE = -10;  // positioned for best visual balance
+const FAB_RISE = 4;  // raised so FAB sits within the curve, not below
 
 const TAB_ROW_PADDING_H = 18; // must match styles.tabRow paddingHorizontal
 // =====================
@@ -62,8 +62,8 @@ export default function FooterMenu({
   const accentFabBackground = accent?.fabBackground ?? themeColors.primary;
   const accentFabForeground = accent?.fabForeground ?? '#fff';
 
-  // Keep notch inside SVG viewport
-  const OFFSET_Y = NOTCH_R * NOTCH_DEPTH;
+  // Keep notch inside SVG viewport - increased for deeper curve
+  const OFFSET_Y = NOTCH_R * NOTCH_DEPTH * 1.2;
   const SVG_H = BAR_HEIGHT + OFFSET_Y;
 
   // Equal tab widths (3 tabs) with spacer width for the notch
@@ -236,26 +236,32 @@ function createCurvedFooterPath(w, h, r, offsetY, notchCx, notchR, notchDepth) {
   const left = 0, right = w;
   const top = offsetY, bottom = h + offsetY;
 
-  // Calculate notch dimensions with smoother transitions
+  // Calculate notch dimensions with deeper curve
   const notchLeft = notchCx - notchR;
   const notchRight = notchCx + notchR;
-  const notchBottom = top + (notchR * notchDepth * 1.2); // Optimal curve depth
+  const notchBottom = top + (notchR * notchDepth); // Deep curve for FAB
 
-  // Transition zones for smoother blending
-  const transitionWidth = notchR * 0.8;
+  // Wider transition zones for smoother curve
+  const transitionWidth = notchR * 0.6;
   const leftTransitionStart = notchLeft - transitionWidth;
   const rightTransitionEnd = notchRight + transitionWidth;
 
-  // Control points for perfect bezier curves
-  const leftCP1x = leftTransitionStart + transitionWidth * 0.6;
+  // Control points for smooth, encompassing curve
+  const leftCP1x = leftTransitionStart + transitionWidth * 0.5;
   const leftCP1y = top;
-  const leftCP2x = notchLeft - notchR * 0.15;
-  const leftCP2y = top + notchR * 0.4;
+  const leftCP2x = notchLeft - notchR * 0.1;
+  const leftCP2y = top + notchR * 0.5;
 
-  const rightCP1x = notchRight + notchR * 0.15;
-  const rightCP1y = top + notchR * 0.4;
-  const rightCP2x = rightTransitionEnd - transitionWidth * 0.6;
+  const rightCP1x = notchRight + notchR * 0.1;
+  const rightCP1y = top + notchR * 0.5;
+  const rightCP2x = rightTransitionEnd - transitionWidth * 0.5;
   const rightCP2y = top;
+
+  // Middle curve control for deeper notch
+  const middleCP1x = notchLeft + notchR * 0.4;
+  const middleCP1y = notchBottom;
+  const middleCP2x = notchRight - notchR * 0.4;
+  const middleCP2y = notchBottom;
 
   return [
     // Start from top left corner
@@ -265,10 +271,10 @@ function createCurvedFooterPath(w, h, r, offsetY, notchCx, notchR, notchDepth) {
     `H ${Math.max(r, leftTransitionStart)}`,
 
     // Smooth S-curve down into the notch (left side)
-    `C ${leftCP1x},${leftCP1y} ${leftCP2x},${leftCP2y} ${notchLeft},${notchBottom * 0.6}`,
+    `C ${leftCP1x},${leftCP1y} ${leftCP2x},${leftCP2y} ${notchLeft},${notchBottom * 0.75}`,
 
-    // Perfect U-shaped bottom curve
-    `C ${notchLeft + notchR * 0.3},${notchBottom} ${notchRight - notchR * 0.3},${notchBottom} ${notchRight},${notchBottom * 0.6}`,
+    // Deep U-shaped bottom curve that encompasses the FAB
+    `C ${middleCP1x},${middleCP1y} ${middleCP2x},${middleCP2y} ${notchRight},${notchBottom * 0.75}`,
 
     // Smooth S-curve up from the notch (right side)
     `C ${rightCP1x},${rightCP1y} ${rightCP2x},${rightCP2y} ${Math.min(right - r, rightTransitionEnd)},${top}`,
