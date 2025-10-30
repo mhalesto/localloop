@@ -31,6 +31,9 @@ import ShareLocationModal from '../components/ShareLocationModal';
 import { avatarOptions, getAvatarConfig } from '../constants/avatars';
 import { SIGNUP_BONUS_POINTS } from '../constants/authConfig';
 import { useAuth } from '../contexts/AuthContext';
+import PremiumBadge from '../components/PremiumBadge';
+import PremiumSuccessModal from '../components/PremiumSuccessModal';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -114,6 +117,8 @@ export default function SettingsScreen({ navigation }) {
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [emailLocalError, setEmailLocalError] = useState('');
   const [emailStatusMessage, setEmailStatusMessage] = useState('');
+  const [premiumSuccessVisible, setPremiumSuccessVisible] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
   const isEmailBusy = isSigningIn || isResettingPassword;
 
@@ -242,7 +247,9 @@ export default function SettingsScreen({ navigation }) {
   );
 
   const handleGoogleSignInPress = useCallback(async () => {
+    setAuthLoading(true);
     await startGoogleSignIn();
+    setTimeout(() => setAuthLoading(false), 2000);
   }, [startGoogleSignIn]);
 
   const handleEmailAuthSubmit = useCallback(async () => {
@@ -250,16 +257,19 @@ export default function SettingsScreen({ navigation }) {
     setEmailLocalError('');
     setEmailStatusMessage('');
     clearAuthError();
+    setAuthLoading(true);
 
     const emailPattern = /.+@.+\..+/;
     if (!trimmedEmail || !emailPattern.test(trimmedEmail)) {
       setEmailLocalError('Enter a valid email address.');
+      setAuthLoading(false);
       return;
     }
 
     if (emailAuthMode === 'signIn') {
       if (!passwordInput) {
         setEmailLocalError('Enter your password to continue.');
+        setAuthLoading(false);
         return;
       }
       const result = await signInWithEmail({ email: trimmedEmail, password: passwordInput });
@@ -267,20 +277,24 @@ export default function SettingsScreen({ navigation }) {
         resetEmailForm();
         setEmailStatusMessage('Signed in successfully.');
       }
+      setTimeout(() => setAuthLoading(false), 2000);
       return;
     }
 
     if (emailAuthMode === 'signUp') {
       if (!displayNameInput.trim()) {
         setEmailLocalError('Add a display name so friends recognize you.');
+        setAuthLoading(false);
         return;
       }
       if (passwordInput.length < 6) {
         setEmailLocalError('Passwords must be at least 6 characters.');
+        setAuthLoading(false);
         return;
       }
       if (passwordInput !== confirmPasswordInput) {
         setEmailLocalError('Passwords do not match.');
+        setAuthLoading(false);
         return;
       }
       const result = await signUpWithEmail({
@@ -292,6 +306,7 @@ export default function SettingsScreen({ navigation }) {
         resetEmailForm();
         setEmailStatusMessage('Account created! You are ready to explore.');
       }
+      setTimeout(() => setAuthLoading(false), 2000);
       return;
     }
 
@@ -300,6 +315,7 @@ export default function SettingsScreen({ navigation }) {
     if (result?.ok) {
       setEmailStatusMessage('Password reset email sent. Check your inbox.');
     }
+    setTimeout(() => setAuthLoading(false), 2000);
   }, [
     emailInput,
     passwordInput,
@@ -335,12 +351,9 @@ export default function SettingsScreen({ navigation }) {
   const handleRedeemPremium = useCallback(async () => {
     const result = await redeemPremiumDay();
     if (result?.ok) {
-      Alert.alert(
-        'Premium activated',
-        `Enjoy premium features for the next ${hoursOfPremium} hours.`
-      );
+      setPremiumSuccessVisible(true);
     }
-  }, [redeemPremiumDay, hoursOfPremium]);
+  }, [redeemPremiumDay]);
 
   const handleTogglePremiumAccent = (value) => {
     if (value && !premiumUnlocked && !isDevBuild) {
@@ -772,7 +785,10 @@ export default function SettingsScreen({ navigation }) {
               <View style={styles.rewardsCard}>
                 <View style={styles.rewardsHeader}>
                   <Text style={styles.rewardsLabel}>Point balance</Text>
-                  <Text style={styles.rewardsPoints}>{pointsBalance} pts</Text>
+                  <View style={styles.rewardsPointsRow}>
+                    <Text style={styles.rewardsPoints}>{pointsBalance} pts</Text>
+                    {premiumUnlocked && <PremiumBadge size={32} style={styles.premiumBadge} />}
+                  </View>
                 </View>
                 <Text style={styles.rewardsMeta}>
                   {premiumUnlocked
@@ -1410,6 +1426,17 @@ export default function SettingsScreen({ navigation }) {
         initialCountry={userProfile.country || undefined}
         initialProvince={userProfile.province || undefined}
       />
+
+      <PremiumSuccessModal
+        visible={premiumSuccessVisible}
+        onClose={() => setPremiumSuccessVisible(false)}
+      />
+
+      <LoadingOverlay
+        visible={authLoading}
+        onComplete={() => setAuthLoading(false)}
+        duration={2000}
+      />
     </ScreenLayout>
   );
 }
@@ -1662,10 +1689,18 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600',
       color: palette.textSecondary
     },
+    rewardsPointsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     rewardsPoints: {
       fontSize: 18,
       fontWeight: '700',
       color: palette.primary
+    },
+    premiumBadge: {
+      marginLeft: 4,
     },
     rewardsMeta: {
       fontSize: 12,

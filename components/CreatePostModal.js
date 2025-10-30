@@ -17,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
+import LoadingOverlay from './LoadingOverlay';
 import {
   EMAIL_ADDRESS_REGEX,
   EMAIL_LABEL_PLACEHOLDER,
@@ -89,6 +90,7 @@ export default function CreatePostModal({
   const [summaryQuality, setSummaryQuality] = useState('fast');     // 'fast' | 'best'
   const scrollRef = useRef(null);                                   // for auto-scroll
   const [summaryCardY, setSummaryCardY] = useState(0);              // y-pos to scroll to
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -440,8 +442,14 @@ export default function CreatePostModal({
     try { await Clipboard.setStringAsync(summaryText); } catch { }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (submitDisabled) return;
+
+    setIsSubmitting(true);
+
+    // Small delay to show loader animation
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const trimmedMessage = message.trim();
     submitHandler({
       location: selectedLocation,
@@ -459,6 +467,11 @@ export default function CreatePostModal({
       setSummaryText('');
     }
     setLocationModalVisible(false);
+
+    // Keep loader for 2 seconds then close
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 2000);
   };
 
   // ---------- UI ----------
@@ -794,6 +807,12 @@ export default function CreatePostModal({
         initialProvince={selectedLocation?.province || initialLocation?.province}
         accentColor={selectedPreset.linkColor ?? themeColors.primaryDark}
         title="Choose a room"
+      />
+
+      <LoadingOverlay
+        visible={isSubmitting}
+        onComplete={() => setIsSubmitting(false)}
+        duration={2000}
       />
     </Modal>
   );

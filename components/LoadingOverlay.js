@@ -5,18 +5,20 @@ import { useSettings } from '../contexts/SettingsContext';
 
 const { width, height } = Dimensions.get('window');
 
-export default function LoadingOverlay({ visible, onComplete }) {
+export default function LoadingOverlay({ visible, onComplete, animationSource, duration = 5000 }) {
   const { themeColors, isDarkMode } = useSettings();
 
   useEffect(() => {
     if (visible) {
-      // Auto-dismiss after 5 seconds
+      // Auto-dismiss after specified duration
       const timer = setTimeout(() => {
         onComplete?.();
-      }, 5000);
+      }, duration);
       return () => clearTimeout(timer);
     }
-  }, [visible, onComplete]);
+  }, [visible, onComplete, duration]);
+
+  const source = animationSource || require('../assets/sandy-loading.json');
 
   return (
     <Modal
@@ -25,10 +27,19 @@ export default function LoadingOverlay({ visible, onComplete }) {
       animationType="fade"
       statusBarTranslucent
     >
-      <View style={[styles.container, { backgroundColor: `${themeColors.background}F0` }]}>
-        <View style={[styles.animationContainer, { backgroundColor: themeColors.card }]}>
+      <View style={[
+        styles.container,
+        { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.3)' }
+      ]}>
+        <View style={[
+          styles.animationContainer,
+          {
+            backgroundColor: themeColors.card,
+            shadowOpacity: isDarkMode ? 0.4 : 0.2
+          }
+        ]}>
           <LottieView
-            source={require('../assets/sandy-loading.json')}
+            source={source}
             autoPlay
             loop
             style={styles.animation}
@@ -46,19 +57,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   animationContainer: {
-    width: width * 0.6,
-    height: width * 0.6,
-    borderRadius: 20,
+    width: width * 0.7,
+    height: width * 0.7,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 15,
+    shadowRadius: 25,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 20,
   },
   animation: {
-    width: '80%',
-    height: '80%',
+    width: '85%',
+    height: '85%',
   },
 });

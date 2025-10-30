@@ -1,12 +1,13 @@
 // App.js
 import 'react-native-gesture-handler';
-import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import LoadingOverlay from './components/LoadingOverlay';
 
 import CountryScreen from './screens/CountryScreen';
 import ProvinceScreen from './screens/ProvinceScreen';
@@ -58,11 +59,24 @@ function RootNavigator() {
  */
 function AuthGate() {
   const { isInitializing } = useAuth();
+  const [showLoader, setShowLoader] = useState(true);
 
-  if (isInitializing) {
+  useEffect(() => {
+    if (!isInitializing) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => setShowLoader(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitializing]);
+
+  if (isInitializing || showLoader) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1 }}>
+        <LoadingOverlay
+          visible={true}
+          onComplete={() => {}}
+          duration={2000}
+        />
       </View>
     );
   }
