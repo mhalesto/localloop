@@ -167,14 +167,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)'
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2
   },
   iconWithBadge: {
     position: 'relative',
