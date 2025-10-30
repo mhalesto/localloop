@@ -307,10 +307,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     content: {
       flex: 1,
-      paddingTop: 24,
+      paddingTop: 0,
       paddingHorizontal: 20,
       paddingBottom: 0,
       backgroundColor: palette.background,
+      marginTop: -22,
     },
     drawerContainer: {
       flex: 1,

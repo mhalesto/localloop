@@ -138,8 +138,8 @@ export default function AppHeader({
 
 const styles = StyleSheet.create({
   wrapper: {
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingHorizontal: 20,
     paddingBottom: 24,
     shadowColor: '#000',
@@ -147,13 +147,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
-    overflow: 'visible',    // <— allow the square filler to extend out
-    zIndex: 10,             // keep header above content so the filler covers the seam
+    overflow: 'visible',
+    zIndex: 10,
   },
   backgroundLayer: {
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    overflow: 'hidden',     // <— shapes stay clipped to rounded header
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
   },
   bottomFill: {
     position: 'absolute',
