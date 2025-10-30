@@ -19,9 +19,10 @@ import {
   Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { StatusBar } from 'expo-status-bar';
 import { useIsFocused } from '@react-navigation/native';
 import { LongPressGestureHandler } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
@@ -1829,21 +1830,17 @@ export default function PostThreadScreen({ route, navigation }) {
             <View style={descriptionContainerStyle}>
               {!isExpanded && collapsedPreviewText ? (
                 <View style={styles.postMessagePreviewRow}>
-                  <Text
-                    style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
-                    numberOfLines={3}
-                  >
-                    {collapsedPreviewText}
+                  <Text style={[styles.postMessagePreviewText, { color: headerTitleColor }]}>
+                    <Text numberOfLines={showToggleControls ? 3 : undefined}>
+                      {collapsedPreviewText}
+                    </Text>
                     {showToggleControls ? (
-                      <>
-                        {'... '}
-                        <Text
-                          style={[styles.postMessageToggleTextInline, { color: linkColor }]}
-                          onPress={() => setIsDescriptionExpanded(true)}
-                        >
-                          Show more
-                        </Text>
-                      </>
+                      <Text
+                        style={[styles.postMessageToggleTextInline, { color: linkColor }]}
+                        onPress={() => setIsDescriptionExpanded(true)}
+                      >
+                        {'... Show more'}
+                      </Text>
                     ) : null}
                   </Text>
                 </View>
@@ -2425,83 +2422,154 @@ export default function PostThreadScreen({ route, navigation }) {
         const authorLocationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
         const authorLocation = authorLocationParts.join(', ');
         const authorAvatar = getAvatarConfig(post.author?.avatarKey);
-        const authorAvatarBackground = authorAvatar.backgroundColor ?? (accentPreset?.primary || themeColors.primary);
+        const postPreset = accentPresets.find((p) => p.key === post.colorKey) ?? accentPreset;
+        const headerColor = postPreset.background;
+        const headerTitleColor = postPreset.onPrimary ?? (postPreset.isDark ? '#fff' : themeColors.textPrimary);
+        const badgeBackground = postPreset.badgeBackground ?? themeColors.primaryLight;
+        const authorAvatarBackground = authorAvatar.backgroundColor ?? badgeBackground;
+
+        const headerDividerColor = postPreset.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(31,24,69,0.12)';
+        const dividerColor = postPreset.isDark ? 'rgba(255,255,255,0.18)' : themeColors.divider;
+        const bodyTextColor = themeColors.textPrimary;
+        const subtleTextColor = themeColors.textSecondary;
+        const metaBadgeBackground =
+          postPreset.metaBadgeBackground ??
+          (postPreset.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(108,77,244,0.12)');
+        const metaBadgeBorderColor =
+          postPreset.metaBadgeBorderColor ??
+          (postPreset.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(108,77,244,0.22)');
+        const accentInk = postPreset.linkColor ?? themeColors.primaryDark;
+        const statusBarStyle = postPreset.isDark ? 'light' : isDarkMode ? 'light' : 'dark';
 
         return (
           <Modal
             visible={isFullscreenModalVisible}
             animationType="slide"
+            presentationStyle="fullScreen"
+            statusBarTranslucent
             onRequestClose={() => setIsFullscreenModalVisible(false)}
           >
-            <View style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}>
+            <SafeAreaView
+              style={[styles.fullscreenModalContainer, { backgroundColor: themeColors.background }]}
+              edges={['top', 'bottom']}
+            >
+              <StatusBar style={statusBarStyle} animated />
+              <View style={[styles.fullscreenHeroBackground, { backgroundColor: headerColor }]} />
+
               {/* Header with back button */}
-              <View style={[styles.fullscreenHeader, { backgroundColor: themeColors.card, borderBottomColor: themeColors.divider }]}>
+              <View
+                style={[
+                  styles.fullscreenHeader,
+                  {
+                    borderBottomColor: headerDividerColor,
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   onPress={() => setIsFullscreenModalVisible(false)}
                   style={styles.fullscreenBackButton}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="arrow-back" size={24} color={themeColors.textPrimary} />
+                  <Ionicons name="arrow-back" size={26} color={headerTitleColor} />
                 </TouchableOpacity>
-                <Text style={[styles.fullscreenTitle, { color: themeColors.textPrimary }]}>Post</Text>
+                <Text style={[styles.fullscreenTitle, { color: headerTitleColor }]}>Post</Text>
                 <View style={styles.fullscreenPlaceholder} />
               </View>
 
               {/* Post Content */}
               <ScrollView
                 style={styles.fullscreenScrollView}
-                contentContainerStyle={styles.fullscreenScrollContent}
-                showsVerticalScrollIndicator={true}
+                contentContainerStyle={[
+                  styles.fullscreenScrollContent,
+                  { paddingBottom: Math.max(insets.bottom, 16) + 32 },
+                ]}
+                showsVerticalScrollIndicator={false}
+                bounces
               >
-                {/* Author Info */}
-                <View style={[styles.fullscreenAuthorRow, { borderBottomColor: themeColors.divider }]}>
-                  <View style={[styles.fullscreenAvatar, { backgroundColor: authorAvatarBackground }]}>
-                    {authorAvatar?.icon ? (
-                      <Ionicons
-                        name={authorAvatar.icon.name}
-                        size={20}
-                        color={authorAvatar.icon.color ?? '#fff'}
-                      />
-                    ) : (
-                      <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatar?.foregroundColor ?? '#fff' }]}>
-                        {authorAvatar?.emoji ?? '🙂'}
+                <View
+                  style={[
+                    styles.fullscreenCard,
+                    {
+                      backgroundColor: themeColors.card,
+                      shadowOpacity: isDarkMode ? 0.35 : 0.12,
+                      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(31,24,69,0.08)',
+                    },
+                  ]}
+                >
+                  <View style={[styles.fullscreenAccentBar, { backgroundColor: badgeBackground }]} />
+
+                  {/* Author Info */}
+                  <View
+                    style={[
+                      styles.fullscreenAuthorRow,
+                      { borderBottomColor: dividerColor },
+                    ]}
+                  >
+                    <View style={[styles.fullscreenAvatar, { backgroundColor: authorAvatarBackground }]}>
+                      {authorAvatar?.icon ? (
+                        <Ionicons
+                          name={authorAvatar.icon.name}
+                          size={20}
+                          color={authorAvatar.icon.color ?? '#fff'}
+                        />
+                      ) : (
+                        <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatar?.foregroundColor ?? '#fff' }]}>
+                          {authorAvatar?.emoji ?? '🙂'}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.fullscreenAuthorInfo}>
+                      <Text style={[styles.fullscreenAuthorName, { color: bodyTextColor }]}>
+                        {post.authorNickname || 'Anonymous'}
                       </Text>
-                    )}
+                      {authorLocation ? (
+                        <Text style={[styles.fullscreenAuthorLocation, { color: subtleTextColor }]}>
+                          {authorLocation}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                  <View style={styles.fullscreenAuthorInfo}>
-                    <Text style={[styles.fullscreenAuthorName, { color: themeColors.textPrimary }]}>
-                      {post.authorNickname || 'Anonymous'}
+
+                  {/* Title */}
+                  <Text style={[styles.fullscreenPostTitle, { color: bodyTextColor }]}>
+                    {displayTitle}
+                  </Text>
+
+                  {/* Description */}
+                  {trimmedDescription && trimmedDescription !== displayTitle ? (
+                    <View style={styles.fullscreenDescriptionContainer}>
+                      <RichText
+                        text={trimmedDescription}
+                        textStyle={[styles.fullscreenPostDescription, { color: bodyTextColor }]}
+                        linkStyle={{ color: postPreset.linkColor ?? themeColors.primary }}
+                      />
+                    </View>
+                  ) : null}
+
+                  {/* Meta */}
+                  <View
+                    style={[
+                      styles.fullscreenMetaRow,
+                      {
+                        backgroundColor: metaBadgeBackground,
+                        borderColor: metaBadgeBorderColor,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={16}
+                      color={accentInk}
+                      style={styles.fullscreenMetaIcon}
+                    />
+                    <Text style={[styles.fullscreenMeta, { color: subtleTextColor }]}>
+                      {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
                     </Text>
-                    {authorLocation ? (
-                      <Text style={[styles.fullscreenAuthorLocation, { color: themeColors.textSecondary }]}>
-                        {authorLocation}
-                      </Text>
-                    ) : null}
                   </View>
                 </View>
-
-                {/* Title */}
-                <Text style={[styles.fullscreenPostTitle, { color: themeColors.textPrimary }]}>
-                  {displayTitle}
-                </Text>
-
-                {/* Description */}
-                {trimmedDescription && trimmedDescription !== displayTitle ? (
-                  <View style={styles.fullscreenDescriptionContainer}>
-                    <RichText
-                      text={trimmedDescription}
-                      textStyle={[styles.fullscreenPostDescription, { color: themeColors.textPrimary }]}
-                      linkStyle={{ color: themeColors.primary }}
-                    />
-                  </View>
-                ) : null}
-
-                {/* Meta */}
-                <Text style={[styles.fullscreenMeta, { color: themeColors.textSecondary }]}>
-                  {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-                </Text>
               </ScrollView>
-            </View>
+            </SafeAreaView>
           </Modal>
         );
       })() : null}
@@ -3044,39 +3112,69 @@ const createStyles = (
     // Fullscreen modal styles
     fullscreenModalContainer: {
       flex: 1,
+      backgroundColor: palette.background,
+    },
+    fullscreenHeroBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 240,
     },
     fullscreenHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: 20,
+      paddingTop: 32,
+      paddingBottom: 24,
       borderBottomWidth: StyleSheet.hairlineWidth,
+      zIndex: 2,
     },
     fullscreenBackButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       justifyContent: 'center',
       alignItems: 'flex-start',
     },
     fullscreenTitle: {
       fontSize: 18,
       fontWeight: '600',
+      letterSpacing: 0.25,
     },
     fullscreenPlaceholder: {
-      width: 40,
+      width: 44,
     },
     fullscreenScrollView: {
       flex: 1,
+      zIndex: 1,
     },
     fullscreenScrollContent: {
-      padding: 20,
+      paddingHorizontal: 20,
+      paddingTop: 40,
+      paddingBottom: 32,
+    },
+    fullscreenCard: {
+      borderRadius: 28,
+      padding: 24,
+      marginTop: -32,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 16 },
+      shadowRadius: 32,
+      elevation: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+    },
+    fullscreenAccentBar: {
+      width: 48,
+      height: 4,
+      borderRadius: 999,
+      marginBottom: 20,
     },
     fullscreenAuthorRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingBottom: 16,
-      marginBottom: 16,
+      paddingBottom: 18,
+      marginBottom: 20,
       borderBottomWidth: StyleSheet.hairlineWidth,
     },
     fullscreenAvatar: {
@@ -3094,8 +3192,8 @@ const createStyles = (
       flex: 1,
     },
     fullscreenAuthorName: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 17,
+      fontWeight: '700',
       marginBottom: 2,
     },
     fullscreenAuthorLocation: {
@@ -3108,15 +3206,29 @@ const createStyles = (
       lineHeight: (resolvedTitleFontSize + 4) * 1.3,
     },
     fullscreenDescriptionContainer: {
-      marginBottom: 20,
+      marginBottom: 24,
     },
     fullscreenPostDescription: {
       fontSize: resolvedDescriptionFontSize,
       lineHeight: resolvedDescriptionFontSize * 1.5,
     },
+    fullscreenMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      marginTop: 24,
+    },
+    fullscreenMetaIcon: {
+      marginRight: 8,
+    },
     fullscreenMeta: {
       fontSize: 14,
-      marginTop: 8,
+      fontWeight: '600',
+      letterSpacing: 0.2,
     }
   });
 };
