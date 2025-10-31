@@ -339,14 +339,23 @@ export default function CreatePostModal({
       .trim();
 
   const scrollSummaryIntoView = () => {
+    // Wait for layout to complete before scrolling
     requestAnimationFrame(() => {
       setTimeout(() => {
-        if (scrollRef.current?.scrollTo) {
-          scrollRef.current.scrollTo({ y: Math.max(summaryCardY - 16, 0), animated: true });
+        if (scrollRef.current?.scrollTo && summaryCardY > 0) {
+          // Scroll to position the summary card near the top with some padding
+          scrollRef.current.scrollTo({ y: Math.max(summaryCardY - 80, 0), animated: true });
         }
-      }, 12);
+      }, 200); // Increased delay to ensure layout is complete
     });
   };
+
+  // Auto-scroll when summary becomes visible
+  useEffect(() => {
+    if (summaryVisible && summaryCardY > 0) {
+      scrollSummaryIntoView();
+    }
+  }, [summaryVisible, summaryCardY]);
 
   // --------- Summarize + Expand ----------
   const runSummarize = async (lengthPref, quality) => {
