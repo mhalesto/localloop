@@ -728,15 +728,14 @@ export default function PostThreadScreen({ route, navigation }) {
       fullscreenContentHeight <= 0 ||
       fullscreenContentHeight <= fullscreenLayoutHeight
     ) {
-      return fullscreenIndicatorTrackHeight;
+      return Math.min(fullscreenIndicatorTrackHeight * 0.25, fullscreenIndicatorTrackHeight);
     }
     const visibleRatio = fullscreenLayoutHeight / fullscreenContentHeight;
-    const minThumb = Math.min(fullscreenIndicatorTrackHeight, 32);
-    const computed = fullscreenIndicatorTrackHeight * visibleRatio;
-    return Math.max(
-      Math.min(computed, fullscreenIndicatorTrackHeight),
-      minThumb
-    );
+    const baseHeight = fullscreenIndicatorTrackHeight * visibleRatio;
+    const scaledHeight = baseHeight * 0.25;
+    const maxThumb = Math.min(fullscreenIndicatorTrackHeight * 0.3, fullscreenIndicatorTrackHeight);
+    const minThumb = Math.min(Math.max(fullscreenIndicatorTrackHeight * 0.08, 8), maxThumb);
+    return Math.max(Math.min(scaledHeight, maxThumb), minThumb);
   }, [
     fullscreenContentHeight,
     fullscreenIndicatorTrackHeight,
@@ -3576,14 +3575,14 @@ const createStyles = (
       top: 18,
       bottom: 24,
       right: 6,
-      width: 18,
+      width: 14,
     },
     fullscreenScrollIndicatorTrack: {
-      width: 6,
+      width: 4,
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(31,24,69,0.08)',
     },
     fullscreenScrollIndicatorThumb: {
-      width: 12,
+      width: 8,
       shadowOpacity: isDarkMode ? 0.28 : 0.14,
       shadowRadius: 8,
     },
@@ -3591,7 +3590,7 @@ const createStyles = (
       backgroundColor: '#ffffff',
     },
     fullscreenScrollIndicatorHalo: {
-      width: 18,
+      width: 14,
     },
   });
 };
