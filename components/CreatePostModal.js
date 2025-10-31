@@ -567,7 +567,12 @@ export default function CreatePostModal({
             ) : null}
 
             <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Card style</Text>
-            <View style={styles.swatchRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.swatchScrollView}
+              contentContainerStyle={styles.swatchRow}
+            >
               {accentPresets.map((preset) => {
                 const isActive = preset.key === selectedColor;
                 return (
@@ -585,7 +590,7 @@ export default function CreatePostModal({
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {advancedEnabled ? (
               <View style={styles.formatToolbar}>
@@ -903,10 +908,23 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     summarizeSubtitle: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
     summarizeErrorText: { marginTop: 8, fontSize: 12, color: '#D64545' },
 
-    swatchRow: { flexDirection: 'row', flexWrap: 'wrap' },
+    swatchScrollView: {
+      marginVertical: 4,
+    },
+    swatchRow: {
+      flexDirection: 'row',
+      paddingVertical: 8,
+      paddingRight: 12,
+    },
     swatch: {
-      width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-      marginRight: 12, marginBottom: 12, borderWidth: 2, borderColor: 'transparent'
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      borderWidth: 2,
+      borderColor: 'transparent'
     },
     swatchActive: {
       borderColor: '#fff',
