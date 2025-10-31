@@ -24,7 +24,7 @@ const tabs = [
 const BAR_HEIGHT = 76;
 const CORNER_R = 28;
 
-const NOTCH_R = 34;
+const NOTCH_R = 38;
 const SPACER_EXTRA = -16;
 
 const FAB_SIZE = 56;
