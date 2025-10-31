@@ -41,6 +41,7 @@ import ShareLocationModal from '../components/ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 import RichText from '../components/RichText';
 import { stripRichFormatting } from '../utils/textFormatting';
+import { TagList } from '../components/TagBadge';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
@@ -2070,6 +2071,18 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
 
           <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
+
+          {/* Auto-generated tags */}
+          {post.tags && post.tags.length > 0 ? (
+            <TagList
+              tags={post.tags}
+              maxTags={4}
+              showIcons={false}
+              size="small"
+              style={styles.postTags}
+            />
+          ) : null}
+
           {trimmedDescription && trimmedDescription !== displayTitle ? (
             <View style={descriptionContainerStyle}>
               {!isExpanded && collapsedPreviewText ? (
@@ -3013,6 +3026,10 @@ const createStyles = (
       marginBottom: 10,
       fontWeight: '700',
       lineHeight: resolvedTitleLineHeight
+    },
+    postTags: {
+      marginTop: 8,
+      marginBottom: 8,
     },
     postMessageContainer: { marginBottom: 18 },
     postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },

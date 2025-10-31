@@ -4,6 +4,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ScreenLayout from '../components/ScreenLayout';
 import { usePosts } from '../contexts/PostsContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { TagList } from '../components/TagBadge';
 
 const STATUS_META = {
   pending_review: {
@@ -66,6 +67,9 @@ function Section({ title, items, emptyMessage, onOpenPost, highlightId }) {
               </View>
             </View>
             <Text style={styles.metaText}>{post.city}</Text>
+            {post.tags && post.tags.length > 0 ? (
+              <TagList tags={post.tags} maxTags={3} showIcons={false} size="small" style={styles.tagList} />
+            ) : null}
             {post.message ? (
               <Text style={styles.messageText} numberOfLines={3}>
                 {post.message}
@@ -262,6 +266,10 @@ const createStyles = (palette) =>
     metaText: {
       fontSize: 13,
       color: palette.textSecondary
+    },
+    tagList: {
+      marginTop: 8,
+      marginBottom: 8
     },
     messageText: {
       fontSize: 14,

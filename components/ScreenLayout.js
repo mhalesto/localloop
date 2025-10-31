@@ -15,6 +15,7 @@ import { getAvatarConfig } from '../constants/avatars';
 import NotificationsModal from './NotificationsModal';
 import LoadingOverlay from './LoadingOverlay';
 import { analyzePostContent } from '../services/moderationService';
+import { autoTagPost } from '../services/autoTaggingService';
 
 export default function ScreenLayout({
   children,
@@ -139,38 +140,55 @@ export default function ScreenLayout({
       navigation.navigate('MyPosts', { focusPostId: published.id, pendingPost: { ...published } });
     }
 
-    // Run moderation in background and update post afterwards
-    analyzePostContent({
-      title,
-      message
-    }).then(moderation => {
+    // Run moderation AND auto-tagging in background
+    Promise.all([
+      analyzePostContent({ title, message }),
+      autoTagPost(title, message, { strategy: 'auto', maxTags: 4 })
+    ]).then(([moderation, tagging]) => {
       const moderationUpdate = moderation || { action: 'approve' };
+      const updates = { moderation: moderationUpdate };
 
+      // Add tags if available
+      if (tagging && tagging.tags && tagging.tags.length > 0) {
+        updates.tags = tagging.tags;
+        updates.tagConfidence = tagging.confidence;
+        updates.tagMethod = tagging.method;
+        console.log('[ScreenLayout] Auto-tagged post:', published.id, tagging.tags);
+      }
+
+      // Determine moderation status
       if (moderation?.action === 'block') {
-        // Update post to blocked status
-        updatePost(location.city, published.id, {
-          moderation: moderationUpdate,
-          moderationStatus: 'blocked'
-        });
+        updates.moderationStatus = 'blocked';
         console.log('[ScreenLayout] Post blocked after moderation:', published.id);
       } else if (moderation?.action === 'review') {
-        // Keep as pending review
-        updatePost(location.city, published.id, {
-          moderation: moderationUpdate,
-          moderationStatus: 'pending_review'
-        });
+        updates.moderationStatus = 'pending_review';
         console.log('[ScreenLayout] Post pending review:', published.id);
       } else {
-        // Approve the post - update to approved status
-        updatePost(location.city, published.id, {
-          moderation: moderationUpdate,
-          moderationStatus: 'approved'
-        });
+        updates.moderationStatus = 'approved';
         console.log('[ScreenLayout] Post approved:', published.id);
       }
+
+      // Update post with both moderation and tags
+      updatePost(location.city, published.id, updates);
     }).catch(error => {
-      console.warn('[ScreenLayout] Background moderation failed', error);
+      console.warn('[ScreenLayout] Background processing failed', error);
       // Post stays as pending_review on error
+
+      // Try tagging alone as fallback
+      autoTagPost(title, message, { strategy: 'keywords', maxTags: 4 })
+        .then(tagging => {
+          if (tagging && tagging.tags && tagging.tags.length > 0) {
+            updatePost(location.city, published.id, {
+              tags: tagging.tags,
+              tagConfidence: tagging.confidence,
+              tagMethod: tagging.method,
+            });
+            console.log('[ScreenLayout] Fallback tagged post:', published.id, tagging.tags);
+          }
+        })
+        .catch(() => {
+          console.warn('[ScreenLayout] Fallback tagging also failed');
+        });
     });
 
     return true;
