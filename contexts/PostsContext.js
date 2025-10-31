@@ -945,7 +945,8 @@ export function PostsProvider({ children }) {
       description = '',
       colorKey = 'royal',
       authorProfile = null,
-      highlightDescription = false
+      highlightDescription = false,
+      moderation = null
     ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
@@ -983,7 +984,8 @@ export function PostsProvider({ children }) {
         shareCount: 0,
         sharedFrom: null,
         author,
-        highlightDescription: !!highlightDescription
+        highlightDescription: !!highlightDescription,
+        moderation: moderation ?? null
       };
 
       setPostsWithPersist((prev) => {
@@ -1503,7 +1505,8 @@ export function PostsProvider({ children }) {
         userVote: null,
         votes: {},
         shareCount: 0,
-        author
+        author,
+        moderation: basePost.moderation ?? null
       };
 
       setPostsWithPersist((prev) => {

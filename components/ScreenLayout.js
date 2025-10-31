@@ -14,6 +14,7 @@ import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
 import NotificationsModal from './NotificationsModal';
 import LoadingOverlay from './LoadingOverlay';
+import { analyzePostContent } from '../services/moderationService';
 
 export default function ScreenLayout({
   children,
@@ -82,15 +83,15 @@ export default function ScreenLayout({
     [userProfile?.avatarKey]
   );
 
-  const handleSubmitPost = ({ location, colorKey, title, message, highlightDescription }) => {
+  const handleSubmitPost = async ({ location, colorKey, title, message, highlightDescription }) => {
     if (!location?.city || !title?.trim?.()) {
       setComposerVisible(false);
-      return;
+      return false;
     }
     if (!firebaseUser?.uid) {
       Alert.alert('Sign in required', 'Sign in to publish posts to the community.');
       setComposerVisible(false);
-      return;
+      return false;
     }
 
     const mergedAuthor = {
@@ -103,19 +104,41 @@ export default function ScreenLayout({
       uid: firebaseUser.uid,
     };
 
+    let moderation = null;
+    try {
+      moderation = await analyzePostContent({
+        title,
+        message
+      });
+    } catch (error) {
+      console.warn('[ScreenLayout] moderation analyze failed', error);
+    }
+
+    if (moderation?.action === 'block') {
+      const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
+      Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
+      return false;
+    }
+
+    if (moderation?.action === 'review') {
+      const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
+      Alert.alert('Pending review', `This post contains ${reasons}. It will be queued for moderator review before being visible.`);
+    }
+
     const published = addPost(
       location.city,
       title,
       message,
       colorKey,
       mergedAuthor,
-      highlightDescription
+      highlightDescription,
+      moderation ?? null
     );
 
     if (!published) {
       Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
       setComposerVisible(false);
-      return;
+      return false;
     }
 
     if (!userProfile?.city) {
@@ -130,6 +153,7 @@ export default function ScreenLayout({
     if (navigation) {
       navigation.navigate('Room', { city: location.city });
     }
+    return true;
   };
 
   const handleFooterShortcut = () => {

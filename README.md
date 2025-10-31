@@ -27,3 +27,17 @@ With the service running, premium users can tap **Summarize description** in the
 When model downloads are unavailable the backend falls back to an on-device extractive summarizer that respects the same
 length preferences. Premium members can choose between *Shorter*, *Balanced*, or *Longer* summaries from the **AI description
 summaries** section in Settings to control how much detail the assistant retains.
+
+## Hugging Face moderation
+
+Posts are now screened with Hugging Face text-classification models before they are queued for publication. Configure your
+API key with an Expo public env variable so the client can call the Inference API:
+
+```bash
+EXPO_PUBLIC_HF_API_KEY="hf_your_token_here" npm run web
+```
+
+If the key is not set the app falls back to allowing the post while logging a warning, so make sure to add the variable in
+development and production builds. The moderation service labels content for toxicity, hate/harassment, sexual/NSFW, and
+self-harm signals—posts above the block threshold are stopped, while borderline content is sent for moderator review and
+tagged on the post object for admin tooling.

@@ -17,6 +17,7 @@ import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { useAuth } from '../contexts/AuthContext';
 import AccentBackground from '../components/AccentBackground';
+import { analyzePostContent } from '../services/moderationService';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
@@ -32,6 +33,7 @@ export default function RoomScreen({ navigation, route }) {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [postToShare, setPostToShare] = useState(null);
   const [shareToast, setShareToast] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColorKey) ?? accentPresets[0],
     [selectedColorKey]
@@ -103,36 +105,69 @@ export default function RoomScreen({ navigation, route }) {
     [city, closeShareModal, firebaseUser?.uid, postToShare, sharePost, userProfile]
   );
 
-  const handleAddPost = () => {
+  const handleAddPost = useCallback(async () => {
+    if (isPublishing) return;
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
     if (!firebaseUser?.uid) {
       Alert.alert('Sign in required', 'Sign in to publish posts to this room.');
       return;
     }
-    const created = addPost(
-      city,
-      trimmedTitle,
-      message,
-      selectedColorKey,
-      {
-        ...userProfile,
-        nickname: userProfile?.nickname ?? '',
+    setIsPublishing(true);
+    try {
+      let moderation = null;
+      try {
+        moderation = await analyzePostContent({ title: trimmedTitle, message });
+      } catch (error) {
+        console.warn('[RoomScreen] moderation analyze failed', error);
+      }
+
+      if (moderation?.action === 'block') {
+        const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
+        Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
+        return;
+      }
+      if (moderation?.action === 'review') {
+        const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
+        Alert.alert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`);
+      }
+
+      const created = addPost(
         city,
-        province: userProfile?.province ?? '',
-        country: userProfile?.country ?? '',
-        avatarKey: userProfile?.avatarKey ?? 'default',
-        uid: firebaseUser.uid
-      },
-      false
-    );
-    if (!created) {
-      Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
-      return;
+        trimmedTitle,
+        message,
+        selectedColorKey,
+        {
+          ...userProfile,
+          nickname: userProfile?.nickname ?? '',
+          city,
+          province: userProfile?.province ?? '',
+          country: userProfile?.country ?? '',
+          avatarKey: userProfile?.avatarKey ?? 'default',
+          uid: firebaseUser.uid
+        },
+        false,
+        moderation ?? null
+      );
+      if (!created) {
+        Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+        return;
+      }
+      setTitle('');
+      setMessage('');
+    } finally {
+      setIsPublishing(false);
     }
-    setTitle('');
-    setMessage('');
-  };
+  }, [
+    addPost,
+    city,
+    firebaseUser?.uid,
+    isPublishing,
+    message,
+    selectedColorKey,
+    title,
+    userProfile
+  ]);
 
   const handleOpenPost = (postId) => {
     navigation.navigate('PostThread', { city, postId });
@@ -232,11 +267,11 @@ export default function RoomScreen({ navigation, route }) {
         style={[
           styles.primaryButton,
           { backgroundColor: buttonBackground },
-          !title.trim() && styles.primaryButtonDisabled,
+          (!title.trim() || isPublishing) && styles.primaryButtonDisabled,
         ]}
         onPress={handleAddPost}
         activeOpacity={0.85}
-        disabled={!title.trim()}
+        disabled={!title.trim() || isPublishing}
       >
         <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
       </TouchableOpacity>

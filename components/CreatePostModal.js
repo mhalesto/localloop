@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Switch
+  Switch,
+  Alert
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard'; // [AI-SUMMARY]
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -488,14 +489,25 @@ export default function CreatePostModal({
     await new Promise(resolve => setTimeout(resolve, 100));
 
     const trimmedMessage = message.trim();
-    submitHandler({
-      location: selectedLocation,
-      colorKey: selectedColor,
-      title: trimmedTitle,
-      message: trimmedMessage,
-      description: trimmedMessage,
-      highlightDescription
-    });
+    let result = true;
+    try {
+      result = await submitHandler({
+        location: selectedLocation,
+        colorKey: selectedColor,
+        title: trimmedTitle,
+        message: trimmedMessage,
+        description: trimmedMessage,
+        highlightDescription
+      });
+    } catch (error) {
+      console.warn('[CreatePostModal] submit failed', error);
+      result = false;
+      Alert.alert('Unable to publish', error?.message ?? 'Please try again in a moment.');
+    }
+    if (result === false) {
+      setIsSubmitting(false);
+      return;
+    }
     if (mode === 'create') {
       setTitle('');
       updateMessageValue('');
