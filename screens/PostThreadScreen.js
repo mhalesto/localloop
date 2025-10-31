@@ -482,6 +482,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const [listContentHeight, setListContentHeight] = useState(0);
   const [descriptionLayoutHeight, setDescriptionLayoutHeight] = useState(0);
   const [descriptionContentHeight, setDescriptionContentHeight] = useState(0);
+  const [fullscreenLayoutHeight, setFullscreenLayoutHeight] = useState(0);
+  const [fullscreenContentHeight, setFullscreenContentHeight] = useState(0);
 
   const post = getPostById(city, postId);
   const hasPost = Boolean(post);
@@ -514,6 +516,12 @@ export default function PostThreadScreen({ route, navigation }) {
   const descriptionIndicatorHideTimeoutRef = useRef(null);
   const descriptionIndicatorAnimationRef = useRef(null);
   const descriptionIndicatorShouldShowRef = useRef(false);
+  const fullscreenScrollY = useRef(new Animated.Value(0)).current;
+  const fullscreenIndicatorOpacity = useRef(new Animated.Value(0)).current;
+  const fullscreenIndicatorPulse = useRef(new Animated.Value(0)).current;
+  const fullscreenIndicatorHideTimeoutRef = useRef(null);
+  const fullscreenIndicatorAnimationRef = useRef(null);
+  const fullscreenIndicatorShouldShowRef = useRef(false);
   useEffect(() => {
     const listenerId = scrollY.addListener(({ value }) => {
       scrollYValueRef.current = value;
@@ -704,6 +712,56 @@ export default function PostThreadScreen({ route, navigation }) {
       isDescriptionExpanded,
     ]
   );
+  const fullscreenIndicatorTrackHeight = useMemo(
+    () => Math.max(fullscreenLayoutHeight - 36, 0),
+    [fullscreenLayoutHeight]
+  );
+  const fullscreenScrollableRange = useMemo(
+    () => Math.max(fullscreenContentHeight - fullscreenLayoutHeight, 0),
+    [fullscreenContentHeight, fullscreenLayoutHeight]
+  );
+  const fullscreenIndicatorThumbHeight = useMemo(() => {
+    if (fullscreenIndicatorTrackHeight <= 0) {
+      return 0;
+    }
+    if (
+      fullscreenContentHeight <= 0 ||
+      fullscreenContentHeight <= fullscreenLayoutHeight
+    ) {
+      return fullscreenIndicatorTrackHeight;
+    }
+    const visibleRatio = fullscreenLayoutHeight / fullscreenContentHeight;
+    const minThumb = Math.min(fullscreenIndicatorTrackHeight, 32);
+    const computed = fullscreenIndicatorTrackHeight * visibleRatio;
+    return Math.max(
+      Math.min(computed, fullscreenIndicatorTrackHeight),
+      minThumb
+    );
+  }, [
+    fullscreenContentHeight,
+    fullscreenIndicatorTrackHeight,
+    fullscreenLayoutHeight,
+  ]);
+  const fullscreenIndicatorTravelRange = useMemo(
+    () =>
+      Math.max(fullscreenIndicatorTrackHeight - fullscreenIndicatorThumbHeight, 0),
+    [fullscreenIndicatorThumbHeight, fullscreenIndicatorTrackHeight]
+  );
+  const shouldShowFullscreenIndicator = useMemo(
+    () =>
+      dreamyScrollIndicatorEnabled &&
+      isFullscreenModalVisible &&
+      fullscreenScrollableRange > 8 &&
+      fullscreenIndicatorTrackHeight > 20 &&
+      fullscreenIndicatorThumbHeight > 0,
+    [
+      dreamyScrollIndicatorEnabled,
+      fullscreenIndicatorThumbHeight,
+      fullscreenIndicatorTrackHeight,
+      fullscreenScrollableRange,
+      isFullscreenModalVisible,
+    ]
+  );
   const dreamyIndicatorTranslateY = useMemo(
     () =>
       scrollY.interpolate({
@@ -790,6 +848,51 @@ export default function PostThreadScreen({ route, navigation }) {
       }),
     [descriptionIndicatorPulse]
   );
+  const fullscreenIndicatorTranslateY = useMemo(
+    () =>
+      fullscreenScrollY.interpolate({
+        inputRange: [0, Math.max(fullscreenScrollableRange, 1)],
+        outputRange: [0, fullscreenIndicatorTravelRange],
+        extrapolate: 'clamp',
+      }),
+    [
+      fullscreenIndicatorTravelRange,
+      fullscreenScrollableRange,
+      fullscreenScrollY,
+    ]
+  );
+  const fullscreenIndicatorScale = useMemo(
+    () =>
+      fullscreenIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.96, 1.05],
+      }),
+    [fullscreenIndicatorPulse]
+  );
+  const fullscreenIndicatorHaloScale = useMemo(
+    () =>
+      fullscreenIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.98, 1.1],
+      }),
+    [fullscreenIndicatorPulse]
+  );
+  const fullscreenIndicatorGlowOpacity = useMemo(
+    () =>
+      fullscreenIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.2, 0.5],
+      }),
+    [fullscreenIndicatorPulse]
+  );
+  const fullscreenIndicatorHaloOpacity = useMemo(
+    () =>
+      fullscreenIndicatorPulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.12, 0.24],
+      }),
+    [fullscreenIndicatorPulse]
+  );
   const cancelDreamyIndicatorFade = useCallback(() => {
     if (dreamyIndicatorHideTimeoutRef.current) {
       clearTimeout(dreamyIndicatorHideTimeoutRef.current);
@@ -800,6 +903,12 @@ export default function PostThreadScreen({ route, navigation }) {
     if (descriptionIndicatorHideTimeoutRef.current) {
       clearTimeout(descriptionIndicatorHideTimeoutRef.current);
       descriptionIndicatorHideTimeoutRef.current = null;
+    }
+  }, []);
+  const cancelFullscreenIndicatorFade = useCallback(() => {
+    if (fullscreenIndicatorHideTimeoutRef.current) {
+      clearTimeout(fullscreenIndicatorHideTimeoutRef.current);
+      fullscreenIndicatorHideTimeoutRef.current = null;
     }
   }, []);
   const startDreamyIndicatorPulse = useCallback(() => {
@@ -848,6 +957,29 @@ export default function PostThreadScreen({ route, navigation }) {
     descriptionIndicatorAnimationRef.current = animation;
     animation.start();
   }, [descriptionIndicatorPulse]);
+  const startFullscreenIndicatorPulse = useCallback(() => {
+    if (fullscreenIndicatorAnimationRef.current) {
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fullscreenIndicatorPulse, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fullscreenIndicatorPulse, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    fullscreenIndicatorAnimationRef.current = animation;
+    animation.start();
+  }, [fullscreenIndicatorPulse]);
   const stopDreamyIndicatorPulse = useCallback(() => {
     if (dreamyIndicatorAnimationRef.current?.stop) {
       dreamyIndicatorAnimationRef.current.stop();
@@ -864,6 +996,14 @@ export default function PostThreadScreen({ route, navigation }) {
     descriptionIndicatorPulse.stopAnimation();
     descriptionIndicatorPulse.setValue(0);
   }, [descriptionIndicatorPulse]);
+  const stopFullscreenIndicatorPulse = useCallback(() => {
+    if (fullscreenIndicatorAnimationRef.current?.stop) {
+      fullscreenIndicatorAnimationRef.current.stop();
+      fullscreenIndicatorAnimationRef.current = null;
+    }
+    fullscreenIndicatorPulse.stopAnimation();
+    fullscreenIndicatorPulse.setValue(0);
+  }, [fullscreenIndicatorPulse]);
   const showDreamyIndicator = useCallback(() => {
     if (!dreamyIndicatorShouldShowRef.current) {
       return;
@@ -899,6 +1039,24 @@ export default function PostThreadScreen({ route, navigation }) {
     cancelDescriptionIndicatorFade,
     descriptionIndicatorOpacity,
     startDescriptionIndicatorPulse,
+  ]);
+  const showFullscreenIndicator = useCallback(() => {
+    if (!fullscreenIndicatorShouldShowRef.current) {
+      return;
+    }
+    cancelFullscreenIndicatorFade();
+    startFullscreenIndicatorPulse();
+    Animated.spring(fullscreenIndicatorOpacity, {
+      toValue: 1,
+      stiffness: 320,
+      damping: 26,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [
+    cancelFullscreenIndicatorFade,
+    fullscreenIndicatorOpacity,
+    startFullscreenIndicatorPulse,
   ]);
   const scheduleDreamyIndicatorFadeOut = useCallback(
     (delay = 600) => {
@@ -946,6 +1104,29 @@ export default function PostThreadScreen({ route, navigation }) {
       stopDescriptionIndicatorPulse,
     ]
   );
+  const scheduleFullscreenIndicatorFadeOut = useCallback(
+    (delay = 600) => {
+      if (!fullscreenIndicatorShouldShowRef.current) {
+        return;
+      }
+      cancelFullscreenIndicatorFade();
+      fullscreenIndicatorHideTimeoutRef.current = setTimeout(() => {
+        Animated.timing(fullscreenIndicatorOpacity, {
+          toValue: 0,
+          duration: 320,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }).start(() => {
+          stopFullscreenIndicatorPulse();
+        });
+      }, delay);
+    },
+    [
+      cancelFullscreenIndicatorFade,
+      fullscreenIndicatorOpacity,
+      stopFullscreenIndicatorPulse,
+    ]
+  );
   useLayoutEffect(() => {
     dreamyIndicatorShouldShowRef.current = shouldShowDreamyIndicator;
     if (!shouldShowDreamyIndicator) {
@@ -972,6 +1153,19 @@ export default function PostThreadScreen({ route, navigation }) {
     shouldShowDescriptionIndicator,
     stopDescriptionIndicatorPulse,
   ]);
+  useLayoutEffect(() => {
+    fullscreenIndicatorShouldShowRef.current = shouldShowFullscreenIndicator;
+    if (!shouldShowFullscreenIndicator) {
+      cancelFullscreenIndicatorFade();
+      stopFullscreenIndicatorPulse();
+      fullscreenIndicatorOpacity.setValue(0);
+    }
+  }, [
+    cancelFullscreenIndicatorFade,
+    fullscreenIndicatorOpacity,
+    shouldShowFullscreenIndicator,
+    stopFullscreenIndicatorPulse,
+  ]);
   useEffect(
     () => () => {
       cancelDreamyIndicatorFade();
@@ -986,6 +1180,13 @@ export default function PostThreadScreen({ route, navigation }) {
     },
     [cancelDescriptionIndicatorFade, stopDescriptionIndicatorPulse]
   );
+  useEffect(
+    () => () => {
+      cancelFullscreenIndicatorFade();
+      stopFullscreenIndicatorPulse();
+    },
+    [cancelFullscreenIndicatorFade, stopFullscreenIndicatorPulse]
+  );
   useEffect(() => {
     if (!isDescriptionExpanded) {
       cancelDescriptionIndicatorFade();
@@ -999,6 +1200,22 @@ export default function PostThreadScreen({ route, navigation }) {
     descriptionScrollY,
     isDescriptionExpanded,
     stopDescriptionIndicatorPulse,
+  ]);
+  useEffect(() => {
+    if (!isFullscreenModalVisible) {
+      cancelFullscreenIndicatorFade();
+      stopFullscreenIndicatorPulse();
+      fullscreenIndicatorOpacity.setValue(0);
+      fullscreenScrollY.setValue(0);
+      setFullscreenLayoutHeight(0);
+      setFullscreenContentHeight(0);
+    }
+  }, [
+    cancelFullscreenIndicatorFade,
+    fullscreenIndicatorOpacity,
+    fullscreenScrollY,
+    isFullscreenModalVisible,
+    stopFullscreenIndicatorPulse,
   ]);
   const handleAnimatedScroll = useMemo(
     () =>
@@ -1053,6 +1270,34 @@ export default function PostThreadScreen({ route, navigation }) {
   const handleDescriptionScrollEnd = useCallback(() => {
     scheduleDescriptionIndicatorFadeOut(700);
   }, [scheduleDescriptionIndicatorFadeOut]);
+  const handleFullscreenScroll = useMemo(
+    () =>
+      Animated.event(
+        [{ nativeEvent: { contentOffset: { y: fullscreenScrollY } } }],
+        {
+          useNativeDriver: true,
+          listener: () => {
+            if (fullscreenIndicatorShouldShowRef.current) {
+              showFullscreenIndicator();
+              scheduleFullscreenIndicatorFadeOut(900);
+            }
+          },
+        }
+      ),
+    [
+      fullscreenScrollY,
+      scheduleFullscreenIndicatorFadeOut,
+      showFullscreenIndicator,
+    ]
+  );
+  const handleFullscreenScrollBegin = useCallback(() => {
+    if (fullscreenIndicatorShouldShowRef.current) {
+      showFullscreenIndicator();
+    }
+  }, [showFullscreenIndicator]);
+  const handleFullscreenScrollEnd = useCallback(() => {
+    scheduleFullscreenIndicatorFadeOut(700);
+  }, [scheduleFullscreenIndicatorFadeOut]);
 
   const isMomentumScrollingRef = useRef(false);
   const maybeSnapHeader = useCallback(
@@ -2482,30 +2727,52 @@ export default function PostThreadScreen({ route, navigation }) {
               </View>
 
               {/* Post Content */}
-              <ScrollView
-                style={styles.fullscreenScrollView}
-                contentContainerStyle={[
-                  styles.fullscreenScrollContent,
-                  { paddingBottom: Math.max(insets.bottom, 16) + 32 },
-                ]}
-                showsVerticalScrollIndicator={false}
-                bounces
+              <View
+                style={styles.fullscreenScrollContainer}
+                onLayout={({ nativeEvent }) => {
+                  const measured = nativeEvent?.layout?.height ?? 0;
+                  const nextHeight = Number.isFinite(measured) ? measured : 0;
+                  setFullscreenLayoutHeight((prev) =>
+                    Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight
+                  );
+                }}
               >
-                <View
-                  style={[
-                    styles.fullscreenCard,
-                    {
-                      backgroundColor: themeColors.card,
-                      shadowOpacity: isDarkMode ? 0.35 : 0.12,
-                      borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(31,24,69,0.08)',
-                    },
+                <Animated.ScrollView
+                  style={styles.fullscreenScrollView}
+                  contentContainerStyle={[
+                    styles.fullscreenScrollContent,
+                    { paddingBottom: Math.max(insets.bottom, 16) + 32 },
                   ]}
+                  showsVerticalScrollIndicator={false}
+                  bounces
+                  scrollEventThrottle={16}
+                  onScroll={handleFullscreenScroll}
+                  onScrollBeginDrag={handleFullscreenScrollBegin}
+                  onScrollEndDrag={handleFullscreenScrollEnd}
+                  onMomentumScrollBegin={handleFullscreenScrollBegin}
+                  onMomentumScrollEnd={handleFullscreenScrollEnd}
+                  onContentSizeChange={(_, height) => {
+                    const nextHeight = Number.isFinite(height) ? height : 0;
+                    setFullscreenContentHeight((prev) =>
+                      Math.abs(prev - nextHeight) < 0.5 ? prev : nextHeight
+                    );
+                  }}
                 >
-                  <View style={[styles.fullscreenAccentBar, { backgroundColor: badgeBackground }]} />
-
-                  {/* Author Info */}
                   <View
                     style={[
+                      styles.fullscreenCard,
+                      {
+                        backgroundColor: themeColors.card,
+                        shadowOpacity: isDarkMode ? 0.35 : 0.12,
+                        borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(31,24,69,0.08)',
+                      },
+                    ]}
+                  >
+                    <View style={[styles.fullscreenAccentBar, { backgroundColor: badgeBackground }]} />
+
+                    {/* Author Info */}
+                    <View
+                      style={[
                       styles.fullscreenAuthorRow,
                       { borderBottomColor: dividerColor },
                     ]}
@@ -2571,8 +2838,67 @@ export default function PostThreadScreen({ route, navigation }) {
                       {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
                     </Text>
                   </View>
-                </View>
-              </ScrollView>
+                  </View>
+                </Animated.ScrollView>
+                {shouldShowFullscreenIndicator ? (
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.scrollIndicatorHost,
+                      styles.fullscreenScrollIndicatorHost,
+                      { opacity: fullscreenIndicatorOpacity },
+                    ]}
+                  >
+                    <Animated.View
+                      style={[
+                        styles.scrollIndicatorHalo,
+                        styles.fullscreenScrollIndicatorHalo,
+                        {
+                          height: fullscreenIndicatorThumbHeight,
+                          backgroundColor: accentInk,
+                          opacity: fullscreenIndicatorHaloOpacity,
+                          transform: [
+                            { translateY: fullscreenIndicatorTranslateY },
+                            { scaleX: fullscreenIndicatorHaloScale },
+                            { scaleY: fullscreenIndicatorHaloScale },
+                          ],
+                        },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.scrollIndicatorTrack,
+                        styles.fullscreenScrollIndicatorTrack,
+                        { height: fullscreenIndicatorTrackHeight },
+                      ]}
+                    />
+                    <Animated.View
+                      style={[
+                        styles.scrollIndicatorThumb,
+                        styles.fullscreenScrollIndicatorThumb,
+                        {
+                          height: fullscreenIndicatorThumbHeight,
+                          backgroundColor: accentInk,
+                          shadowColor: accentInk,
+                          transform: [
+                            { translateY: fullscreenIndicatorTranslateY },
+                            { scaleX: fullscreenIndicatorScale },
+                            { scaleY: fullscreenIndicatorScale },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Animated.View
+                        style={[
+                          styles.scrollIndicatorGlow,
+                          styles.fullscreenScrollIndicatorGlow,
+                          { opacity: fullscreenIndicatorGlowOpacity },
+                        ]}
+                      />
+                    </Animated.View>
+                  </Animated.View>
+                ) : null}
+              </View>
             </SafeAreaView>
           </Modal>
         );
@@ -3161,6 +3487,10 @@ const createStyles = (
       flex: 1,
       zIndex: 1,
     },
+    fullscreenScrollContainer: {
+      flex: 1,
+      position: 'relative',
+    },
     fullscreenScrollContent: {
       paddingHorizontal: 20,
       paddingTop: 40,
@@ -3241,6 +3571,27 @@ const createStyles = (
       fontSize: 14,
       fontWeight: '600',
       letterSpacing: 0.2,
-    }
+    },
+    fullscreenScrollIndicatorHost: {
+      top: 18,
+      bottom: 24,
+      right: 6,
+      width: 18,
+    },
+    fullscreenScrollIndicatorTrack: {
+      width: 6,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(31,24,69,0.08)',
+    },
+    fullscreenScrollIndicatorThumb: {
+      width: 12,
+      shadowOpacity: isDarkMode ? 0.28 : 0.14,
+      shadowRadius: 8,
+    },
+    fullscreenScrollIndicatorGlow: {
+      backgroundColor: '#ffffff',
+    },
+    fullscreenScrollIndicatorHalo: {
+      width: 18,
+    },
   });
 };
