@@ -303,6 +303,16 @@ export function PostsProvider({ children }) {
   const threadListenersRef = useRef(new Map());
   const { awardEngagementPoints, user: firebaseUser } = useAuth();
 
+  const deriveModerationStatus = useCallback((moderation) => {
+    if (!moderation || typeof moderation !== 'object') {
+      return 'approved';
+    }
+    const action = moderation.action;
+    if (action === 'block') return 'blocked';
+    if (action === 'review') return 'pending_review';
+    return 'approved';
+  }, []);
+
   const normalizePostsForClient = useCallback((data) => {
     if (!data || typeof data !== 'object') {
       return data;
@@ -352,6 +362,9 @@ export function PostsProvider({ children }) {
         const reports = typeof post.reports === 'object' ? post.reports : {};
         const isHidden = Boolean(post.isHidden);
 
+        const moderation = post.moderation && typeof post.moderation === 'object' ? post.moderation : null;
+        const moderationStatus = deriveModerationStatus(moderation);
+
         return {
           ...post,
           votes: rawVotes,
@@ -366,19 +379,24 @@ export function PostsProvider({ children }) {
           reports,
           reportCount,
           isHidden,
+          moderation,
+          moderationStatus
         };
       });
 
       result[cityName] = normalized.filter((item) => {
         if (!item) return false;
         if (item.createdByMe) return true;
+        if (item.moderationStatus === 'pending_review' || item.moderationStatus === 'blocked') {
+          return false;
+        }
         if (item.isHidden) return false;
         if (item.reportCount >= POST_REPORT_THRESHOLD) return false;
         return true;
       });
     });
     return result;
-  }, []);
+  }, [deriveModerationStatus]);
 
   const persistPosts = useCallback((data) => {
     AsyncStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(data)).catch((error) =>
@@ -1238,6 +1256,26 @@ export function PostsProvider({ children }) {
     );
   }, [postsByCity]);
 
+  const getMyPosts = useCallback(() => {
+    const firebaseUid = firebaseUser?.uid ?? null;
+    const localClientId = clientIdRef.current;
+    const entries = [];
+
+    Object.entries(postsByCity).forEach(([cityName, posts]) => {
+      (posts ?? []).forEach((post) => {
+        const authoredByUid = firebaseUid && post.author?.uid === firebaseUid;
+        const createdByClient = post.clientId && post.clientId === localClientId;
+        if (!authoredByUid && !createdByClient && !post.createdByMe) {
+          return;
+        }
+        entries.push({ ...post, city: cityName });
+      });
+    });
+
+    entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return entries;
+  }, [firebaseUser?.uid, postsByCity]);
+
   const getRecentCityActivity = useCallback(
     ({ limit = 6, province, country } = {}) => {
       const entries = [];
@@ -1798,6 +1836,7 @@ export function PostsProvider({ children }) {
       getPostById,
       getPostsForCity,
       getAllPosts,
+      getMyPosts,
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,
@@ -1827,6 +1866,7 @@ export function PostsProvider({ children }) {
       getPostById,
       getPostsForCity,
       getAllPosts,
+      getMyPosts,
       sharePost,
       getRecentCityActivity,
       getReplyNotificationCount,

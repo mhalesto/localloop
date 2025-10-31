@@ -191,6 +191,7 @@ export default function ScreenLayout({
     if (!navigation) return;
     if (key === 'home') navigation.navigate('Country');
     else if (key === 'myComments') navigation.navigate('MyComments');
+    else if (key === 'myPosts') navigation.navigate('MyPosts');
     else if (key === 'topStatuses') navigation.navigate('TopStatuses');
     else if (key === 'settings') navigation.navigate('Settings');
   };

@@ -51,6 +51,19 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
           navigation.navigate('MyComments');
         }
       }
+    },
+    {
+      label: 'My Posts',
+      icon: 'document-text-outline',
+      key: 'myPosts',
+      onPress: () => {
+        if (onSelectShortcut) {
+          onSelectShortcut('myPosts');
+        } else if (navigation) {
+          navigation.closeDrawer?.();
+          navigation.navigate('MyPosts');
+        }
+      }
     }
   ];
 
