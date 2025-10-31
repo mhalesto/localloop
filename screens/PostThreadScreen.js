@@ -3337,7 +3337,7 @@ const createStyles = (
       right: 0,
       backgroundColor: palette.background,
       paddingTop: 8,
-      paddingHorizontal: 8,
+      paddingHorizontal: 6,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: palette.divider
     },
@@ -3345,7 +3345,7 @@ const createStyles = (
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 6,
-      marginHorizontal: 14
+      marginHorizontal: 10
     },
     typingDot: {
       width: 6,
@@ -3366,7 +3366,7 @@ const createStyles = (
       paddingVertical: 8,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: palette.divider,
-      marginHorizontal: 6,
+      marginHorizontal: 0,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.14 : 0.04,
       shadowRadius: 6,
@@ -3376,7 +3376,7 @@ const createStyles = (
     replyPreview: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginHorizontal: 14,
+      marginHorizontal: 10,
       marginBottom: 8,
       backgroundColor: palette.card,
       borderRadius: 16,

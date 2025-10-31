@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, Mask, Rect, Path, Circle } from 'react-native-svg';
+import Svg, { Defs, Mask, Rect, Circle } from 'react-native-svg';
 import { useSettings } from '../contexts/SettingsContext';
 
 /**
@@ -24,18 +24,14 @@ const tabs = [
 const BAR_HEIGHT = 76;
 const CORNER_R = 28;
 
-const NOTCH_R = 40;   // wider notch for better FAB accommodation
-const NOTCH_DEPTH = 1.1; // deeper curve so FAB sits within, not on top
+const NOTCH_R = 34;
+const SPACER_EXTRA = -16;
 
-const SPACER_EXTRA = 6;   // reduced for tighter integration
+const FAB_SIZE = 56;
+const FAB_NUDGE_X = 0;
+const FAB_RISE = 8;
 
-const FAB_SIZE = 60;
-// move FAB & notch: LEFT(−) / RIGHT(+)
-const FAB_NUDGE_X = -4;   // slightly less left than before
-// lower the FAB (smaller = lower; negative drops it)
-const FAB_RISE = 4;  // raised so FAB sits within the curve, not below
-
-const TAB_ROW_PADDING_H = 18; // must match styles.tabRow paddingHorizontal
+const TAB_ROW_PADDING_H = 6;
 // =====================
 
 export default function FooterMenu({
@@ -63,7 +59,7 @@ export default function FooterMenu({
   const accentFabForeground = accent?.fabForeground ?? '#fff';
 
   // Keep notch inside SVG viewport - increased for deeper curve
-  const OFFSET_Y = NOTCH_R * NOTCH_DEPTH * 1.2;
+  const OFFSET_Y = NOTCH_R;
   const SVG_H = BAR_HEIGHT + OFFSET_Y;
 
   // Equal tab widths (3 tabs) with spacer width for the notch
@@ -89,20 +85,19 @@ export default function FooterMenu({
             pointerEvents="none"
           >
             <Defs>
-              <Mask
-                id={maskId}
-                maskUnits="userSpaceOnUse"
-                x="0" y="0" width={barW} height={SVG_H}
-              >
-                {/* White = visible; shape with curved notch */}
+              <Mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={barW} height={SVG_H}>
+                <Rect
+                  x="0"
+                  y={OFFSET_Y}
+                  width={barW}
+                  height={BAR_HEIGHT}
+                  rx={CORNER_R}
+                  ry={CORNER_R}
+                  fill="#fff"
+                />
                 {showShortcut && notchCx != null ? (
-                  <Path
-                    d={createCurvedFooterPath(barW, BAR_HEIGHT, CORNER_R, OFFSET_Y, notchCx, NOTCH_R, NOTCH_DEPTH)}
-                    fill="#fff"
-                  />
-                ) : (
-                  <Path d={roundedRectPath(barW, BAR_HEIGHT, CORNER_R, OFFSET_Y)} fill="#fff" />
-                )}
+                  <Circle cx={notchCx + FAB_NUDGE_X} cy={OFFSET_Y} r={NOTCH_R} fill="#000" />
+                ) : null}
               </Mask>
             </Defs>
             <Rect
@@ -211,100 +206,6 @@ function TabItem({ tab, active, onPress, width, activeColor, inactiveColor, badg
       </Text>
     </TouchableOpacity>
   );
-}
-
-/** Rounded pill path (no notch) */
-function roundedRectPath(w, h, r, offsetY) {
-  const left = 0, right = w;
-  const top = offsetY, bottom = h + offsetY;
-  return [
-    `M ${r},${top}`,
-    `H ${right - r}`,
-    `A ${r},${r} 0 0 1 ${right},${top + r}`,
-    `V ${bottom - r}`,
-    `A ${r},${r} 0 0 1 ${right - r},${bottom}`,
-    `H ${r}`,
-    `A ${r},${r} 0 0 1 0,${bottom - r}`,
-    `V ${top + r}`,
-    `A ${r},${r} 0 0 1 ${r},${top}`,
-    `Z`,
-  ].join(' ');
-}
-
-/** Create footer path with smooth curved notch */
-function createCurvedFooterPath(w, h, r, offsetY, notchCx, notchR, notchDepth) {
-  const left = 0, right = w;
-  const top = offsetY, bottom = h + offsetY;
-
-  // Calculate notch dimensions with deeper curve
-  const notchLeft = notchCx - notchR;
-  const notchRight = notchCx + notchR;
-  const notchBottom = top + (notchR * notchDepth); // Deep curve for FAB
-
-  // Wider transition zones for smoother curve
-  const transitionWidth = notchR * 0.6;
-  const leftTransitionStart = notchLeft - transitionWidth;
-  const rightTransitionEnd = notchRight + transitionWidth;
-
-  // Control points for smooth, encompassing curve
-  const leftCP1x = leftTransitionStart + transitionWidth * 0.5;
-  const leftCP1y = top;
-  const leftCP2x = notchLeft - notchR * 0.1;
-  const leftCP2y = top + notchR * 0.5;
-
-  const rightCP1x = notchRight + notchR * 0.1;
-  const rightCP1y = top + notchR * 0.5;
-  const rightCP2x = rightTransitionEnd - transitionWidth * 0.5;
-  const rightCP2y = top;
-
-  // Middle curve control for deeper notch
-  const middleCP1x = notchLeft + notchR * 0.4;
-  const middleCP1y = notchBottom;
-  const middleCP2x = notchRight - notchR * 0.4;
-  const middleCP2y = notchBottom;
-
-  return [
-    // Start from top left corner
-    `M ${r},${top}`,
-
-    // Top edge to start of transition
-    `H ${Math.max(r, leftTransitionStart)}`,
-
-    // Smooth S-curve down into the notch (left side)
-    `C ${leftCP1x},${leftCP1y} ${leftCP2x},${leftCP2y} ${notchLeft},${notchBottom * 0.75}`,
-
-    // Deep U-shaped bottom curve that encompasses the FAB
-    `C ${middleCP1x},${middleCP1y} ${middleCP2x},${middleCP2y} ${notchRight},${notchBottom * 0.75}`,
-
-    // Smooth S-curve up from the notch (right side)
-    `C ${rightCP1x},${rightCP1y} ${rightCP2x},${rightCP2y} ${Math.min(right - r, rightTransitionEnd)},${top}`,
-
-    // Top edge from transition to top right
-    `H ${right - r}`,
-
-    // Top right corner
-    `A ${r},${r} 0 0 1 ${right},${top + r}`,
-
-    // Right edge
-    `V ${bottom - r}`,
-
-    // Bottom right corner
-    `A ${r},${r} 0 0 1 ${right - r},${bottom}`,
-
-    // Bottom edge
-    `H ${r}`,
-
-    // Bottom left corner
-    `A ${r},${r} 0 0 1 0,${bottom - r}`,
-
-    // Left edge
-    `V ${top + r}`,
-
-    // Top left corner
-    `A ${r},${r} 0 0 1 ${r},${top}`,
-
-    `Z`,
-  ].join(' ');
 }
 
 const styles = StyleSheet.create({
