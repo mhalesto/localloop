@@ -155,11 +155,13 @@ export default function RoomScreen({ navigation, route }) {
       }
       setTitle('');
       setMessage('');
+      navigation.navigate('MyPosts', { focusPostId: created.id, pendingPost: { ...created, city } });
     } finally {
       setIsPublishing(false);
     }
   }, [
     addPost,
+    navigation,
     city,
     firebaseUser?.uid,
     isPublishing,

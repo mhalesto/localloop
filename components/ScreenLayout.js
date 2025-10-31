@@ -151,7 +151,7 @@ export default function ScreenLayout({
 
     setComposerVisible(false);
     if (navigation) {
-      navigation.navigate('Room', { city: location.city });
+      navigation.navigate('MyPosts', { focusPostId: published.id, pendingPost: { ...published } });
     }
     return true;
   };

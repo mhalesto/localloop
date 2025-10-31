@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import ScreenLayout from '../components/ScreenLayout';
 import { usePosts } from '../contexts/PostsContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -29,7 +29,7 @@ const formatDate = (timestamp) => {
   return date.toLocaleString();
 };
 
-function Section({ title, items, emptyMessage, onOpenPost }) {
+function Section({ title, items, emptyMessage, onOpenPost, highlightId }) {
   const { themeColors } = useSettings();
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
@@ -52,7 +52,7 @@ function Section({ title, items, emptyMessage, onOpenPost }) {
         return (
           <TouchableOpacity
             key={post.id}
-            style={styles.postCard}
+            style={[styles.postCard, post.id === highlightId && styles.highlightedCard]}
             activeOpacity={0.82}
             onPress={() => onOpenPost?.(post)}
             disabled={post.moderationStatus === 'pending_review' || post.moderationStatus === 'blocked'}
@@ -84,14 +84,65 @@ function Section({ title, items, emptyMessage, onOpenPost }) {
 
 export default function MyPostsScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const { getMyPosts } = usePosts();
   const { themeColors } = useSettings();
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
   const posts = useMemo(() => getMyPosts(), [getMyPosts]);
-  const pending = posts.filter((post) => post.moderationStatus === 'pending_review');
-  const blocked = posts.filter((post) => post.moderationStatus === 'blocked');
-  const published = posts.filter(
+  const [localPending, setLocalPending] = useState([]);
+  const [highlightId, setHighlightId] = useState(route.params?.focusPostId ?? null);
+
+  useEffect(() => {
+    const pendingPost = route.params?.pendingPost;
+    if (pendingPost) {
+      setLocalPending((prev) => {
+        if (prev.some((post) => post.id === pendingPost.id)) {
+          return prev;
+        }
+        return [{ ...pendingPost, moderationStatus: pendingPost.moderationStatus ?? 'pending_review' }, ...prev];
+      });
+    }
+  }, [route.params?.pendingPost]);
+
+  useEffect(() => {
+    setLocalPending((prev) => prev.filter((pendingPost) => !posts.some((post) => post.id === pendingPost.id)));
+  }, [posts]);
+
+  useEffect(() => {
+    const nextFocus = route.params?.focusPostId ?? null;
+    if (nextFocus) {
+      setHighlightId(nextFocus);
+      const timer = setTimeout(() => setHighlightId(null), 4000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [route.params?.focusPostId, posts]);
+
+  useEffect(() => {
+    if (route.params?.focusPostId || route.params?.pendingPost) {
+      navigation.setParams({ ...route.params, focusPostId: undefined, pendingPost: undefined });
+    }
+  }, [navigation, route.params]);
+
+  const combinedPosts = useMemo(() => {
+    const byId = new Map();
+    posts.forEach((post) => {
+      byId.set(post.id, post);
+    });
+    localPending.forEach((post) => {
+      if (!byId.has(post.id)) {
+        byId.set(post.id, { ...post, moderationStatus: post.moderationStatus ?? 'pending_review' });
+      }
+    });
+    const merged = Array.from(byId.values());
+    merged.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return merged;
+  }, [localPending, posts]);
+
+  const pending = combinedPosts.filter((post) => post.moderationStatus === 'pending_review');
+  const blocked = combinedPosts.filter((post) => post.moderationStatus === 'blocked');
+  const published = combinedPosts.filter(
     (post) => post.moderationStatus !== 'pending_review' && post.moderationStatus !== 'blocked'
   );
 
@@ -115,17 +166,20 @@ export default function MyPostsScreen() {
           title="Pending review"
           items={pending}
           emptyMessage="No posts are waiting for review right now."
+          highlightId={highlightId}
         />
         <Section
           title="Published"
           items={published}
           emptyMessage="You have not published any posts yet."
           onOpenPost={handleOpenPost}
+          highlightId={highlightId}
         />
         <Section
           title="Blocked"
           items={blocked}
           emptyMessage="No posts are currently blocked."
+          highlightId={highlightId}
         />
       </ScrollView>
     </ScreenLayout>
@@ -174,6 +228,13 @@ const createStyles = (palette) =>
       shadowOffset: { width: 0, height: 6 },
       elevation: 4,
       gap: 8
+    },
+    highlightedCard: {
+      borderWidth: 2,
+      borderColor: palette.primaryLight ?? palette.primary,
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 6
     },
     postHeader: {
       flexDirection: 'row',

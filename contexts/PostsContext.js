@@ -983,6 +983,7 @@ export function PostsProvider({ children }) {
         uid: firebaseUser.uid
       });
       const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const moderationStatus = deriveModerationStatus(moderation);
       const newPost = {
         id: newPostId,
         city,
@@ -1003,7 +1004,8 @@ export function PostsProvider({ children }) {
         sharedFrom: null,
         author,
         highlightDescription: !!highlightDescription,
-        moderation: moderation ?? null
+        moderation: moderation ?? null,
+        moderationStatus
       };
 
       setPostsWithPersist((prev) => {
@@ -1012,9 +1014,9 @@ export function PostsProvider({ children }) {
       });
 
       enqueueOperation({ type: 'addPost', payload: { post: newPost } });
-      return true;
+      return newPost;
     },
-    [enqueueOperation, ensureClientId, firebaseUser?.uid, setPostsWithPersist]
+    [deriveModerationStatus, enqueueOperation, ensureClientId, firebaseUser?.uid, setPostsWithPersist]
   );
 
   const addComment = useCallback(
@@ -1544,7 +1546,8 @@ export function PostsProvider({ children }) {
         votes: {},
         shareCount: 0,
         author,
-        moderation: basePost.moderation ?? null
+        moderation: basePost.moderation ?? null,
+        moderationStatus: basePost.moderationStatus ?? deriveModerationStatus(basePost.moderation ?? null)
       };
 
       setPostsWithPersist((prev) => {
