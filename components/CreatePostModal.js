@@ -485,9 +485,6 @@ export default function CreatePostModal({
 
     setIsSubmitting(true);
 
-    // Small delay to show loader animation
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     const trimmedMessage = message.trim();
     let result = true;
     try {
@@ -504,10 +501,14 @@ export default function CreatePostModal({
       result = false;
       Alert.alert('Unable to publish', error?.message ?? 'Please try again in a moment.');
     }
+
+    setIsSubmitting(false);
+
     if (result === false) {
-      setIsSubmitting(false);
       return;
     }
+
+    // Clear form for next use (only in create mode)
     if (mode === 'create') {
       setTitle('');
       updateMessageValue('');
@@ -517,10 +518,7 @@ export default function CreatePostModal({
     }
     setLocationModalVisible(false);
 
-    // Keep loader for 2 seconds then close
-    setTimeout(() => {
-      setIsSubmitting(false);
-    }, 2000);
+    // Parent component (ScreenLayout) will close the modal via onClose and handle navigation
   };
 
   // ---------- UI ----------
@@ -831,15 +829,19 @@ export default function CreatePostModal({
           <TouchableOpacity
             style={[
               styles.submitButton,
-              { backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark, opacity: submitDisabled ? 0.6 : 1 }
+              { backgroundColor: selectedPreset.buttonBackground ?? themeColors.primaryDark, opacity: (submitDisabled || isSubmitting) ? 0.6 : 1 }
             ]}
             onPress={handleSubmit}
             activeOpacity={0.85}
-            disabled={submitDisabled}
+            disabled={submitDisabled || isSubmitting}
           >
-            <Text style={[styles.submitButtonText, { color: selectedPreset.buttonForeground ?? '#fff' }]}>
-              {computedSubmitLabel}
-            </Text>
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={selectedPreset.buttonForeground ?? '#fff'} />
+            ) : (
+              <Text style={[styles.submitButtonText, { color: selectedPreset.buttonForeground ?? '#fff' }]}>
+                {computedSubmitLabel}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -858,11 +860,6 @@ export default function CreatePostModal({
         title="Choose a room"
       />
 
-      <LoadingOverlay
-        visible={isSubmitting}
-        onComplete={() => setIsSubmitting(false)}
-        duration={2000}
-      />
     </Modal>
   );
 }

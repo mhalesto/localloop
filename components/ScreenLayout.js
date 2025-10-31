@@ -46,6 +46,7 @@ export default function ScreenLayout({
 
   const {
     addPost,
+    updatePost,
     getReplyNotificationCount,
     getNotificationCount,
     getNotifications,
@@ -104,26 +105,9 @@ export default function ScreenLayout({
       uid: firebaseUser.uid,
     };
 
-    let moderation = null;
-    try {
-      moderation = await analyzePostContent({
-        title,
-        message
-      });
-    } catch (error) {
-      console.warn('[ScreenLayout] moderation analyze failed', error);
-    }
-
-    if (moderation?.action === 'block') {
-      const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
-      Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
-      return false;
-    }
-
-    if (moderation?.action === 'review') {
-      const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
-      Alert.alert('Pending review', `This post contains ${reasons}. It will be queued for moderator review before being visible.`);
-    }
+    // Create post immediately with pending_review status
+    // Moderation will run in background and update the post
+    const tempModeration = { action: 'review', matchedLabels: [] };
 
     const published = addPost(
       location.city,
@@ -132,7 +116,7 @@ export default function ScreenLayout({
       colorKey,
       mergedAuthor,
       highlightDescription,
-      moderation ?? null
+      tempModeration
     );
 
     if (!published) {
@@ -149,10 +133,46 @@ export default function ScreenLayout({
       });
     }
 
+    // Close modal and navigate immediately - don't wait for moderation
     setComposerVisible(false);
     if (navigation) {
       navigation.navigate('MyPosts', { focusPostId: published.id, pendingPost: { ...published } });
     }
+
+    // Run moderation in background and update post afterwards
+    analyzePostContent({
+      title,
+      message
+    }).then(moderation => {
+      const moderationUpdate = moderation || { action: 'approve' };
+
+      if (moderation?.action === 'block') {
+        // Update post to blocked status
+        updatePost(location.city, published.id, {
+          moderation: moderationUpdate,
+          moderationStatus: 'blocked'
+        });
+        console.log('[ScreenLayout] Post blocked after moderation:', published.id);
+      } else if (moderation?.action === 'review') {
+        // Keep as pending review
+        updatePost(location.city, published.id, {
+          moderation: moderationUpdate,
+          moderationStatus: 'pending_review'
+        });
+        console.log('[ScreenLayout] Post pending review:', published.id);
+      } else {
+        // Approve the post - update to approved status
+        updatePost(location.city, published.id, {
+          moderation: moderationUpdate,
+          moderationStatus: 'approved'
+        });
+        console.log('[ScreenLayout] Post approved:', published.id);
+      }
+    }).catch(error => {
+      console.warn('[ScreenLayout] Background moderation failed', error);
+      // Post stays as pending_review on error
+    });
+
     return true;
   };
 
