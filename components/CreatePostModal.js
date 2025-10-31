@@ -27,8 +27,7 @@ import {
   MAILTO_PREFIX_STRING,
   hasRichFormatting
 } from '../utils/textFormatting';
-import { summarizePostDescription } from '../services/summarizationService'; // or ../api/summaryApi if that's your path
-import { enhancedSummarize } from '../services/enhancedSummarizationService';
+import { smartSummarize } from '../services/openai/summarizationService';
 
 const LENGTH_STEPS = ['concise', 'balanced', 'detailed']; // [AI-SUMMARY]
 const SUMMARY_CACHE_DEFAULT = Object.freeze({
@@ -393,17 +392,19 @@ export default function CreatePostModal({
     setIsSummarizing(true);
 
     try {
-      const { summary, model, fallback, quality: resolvedQuality } = await summarizePostDescription(sanitized, {
-        signal: controller?.signal,
-        lengthPreference: lengthPref,
-        quality
+      // OpenAI uses quality levels: 'fast', 'balanced', 'best'
+      const qualityLevel = quality || 'best';
+
+      const result = await smartSummarize(sanitized, {
+        quality: qualityLevel,
+        timeout: 15000
       });
 
-      const nextSummary = (summary ?? '').trim();
+      const nextSummary = (result.summary ?? '').trim();
       const nextMeta = {
-        model: model || '',
-        fallback: Boolean(fallback),
-        quality: resolvedQuality || quality
+        model: result.model || result.method || 'openai',
+        fallback: result.method !== 'openai',
+        quality: result.quality || qualityLevel
       };
 
       setSummaryText(nextSummary);
@@ -420,42 +421,7 @@ export default function CreatePostModal({
       scrollSummaryIntoView();
     } catch (error) {
       if (error?.name === 'AbortError') return;
-
-      // Try enhanced fallback summarization
-      try {
-        const fallbackResult = await enhancedSummarize(sanitized, {
-          lengthPreference: lengthPref,
-          quality: quality === 'best' ? 'best' : 'fast',
-          strategy: 'auto'
-        });
-
-        if (fallbackResult && fallbackResult.summary) {
-          const nextSummary = fallbackResult.summary.trim();
-          const nextMeta = {
-            model: `fallback:${fallbackResult.method}`,
-            fallback: true,
-            quality: fallbackResult.quality
-          };
-
-          setSummaryText(nextSummary);
-          setSummaryVisible(true);
-          setSummaryMeta(nextMeta);
-          summaryCacheRef.current = {
-            text: sanitized,
-            length: lengthPref,
-            quality: nextMeta.quality,
-            summary: nextSummary,
-            meta: nextMeta
-          };
-
-          scrollSummaryIntoView();
-          setSummaryError(''); // Clear error since we have a fallback
-          return;
-        }
-      } catch (fallbackError) {
-        console.log('Enhanced fallback also failed:', fallbackError);
-      }
-
+      console.warn('[CreatePostModal] Summarization failed', error);
       setSummaryError(error instanceof Error ? error.message : 'Unable to generate a summary right now.');
     } finally {
       if (summarizationControllerRef.current === controller) {

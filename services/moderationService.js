@@ -45,7 +45,10 @@ const sanitizeText = (title = '', message = '') => {
   const segments = [title, message]
     .map((segment) => (segment ?? '').toString().trim())
     .filter(Boolean);
-  return segments.length ? segments.join('\n\n') : '';
+  const combined = segments.length ? segments.join('\n\n') : '';
+
+  // Truncate to 1000 chars to prevent API timeouts with very long posts
+  return combined.length > 1000 ? combined.substring(0, 1000) : combined;
 };
 
 const scoreLabels = (classification = []) => {

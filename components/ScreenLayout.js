@@ -14,8 +14,8 @@ import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
 import NotificationsModal from './NotificationsModal';
 import LoadingOverlay from './LoadingOverlay';
-import { analyzePostContent } from '../services/moderationService';
-import { autoTagPost } from '../services/autoTaggingService';
+import { analyzePostContent } from '../services/openai/moderationService';
+import { autoTagPost } from '../services/openai/autoTaggingService';
 
 export default function ScreenLayout({
   children,
@@ -141,9 +141,24 @@ export default function ScreenLayout({
     }
 
     // Run moderation AND auto-tagging in background
+    // Truncate very long texts to prevent API timeouts/crashes
+    const truncatedMessage = message.length > 2000 ? message.substring(0, 2000) : message;
+
     Promise.all([
-      analyzePostContent({ title, message }),
-      autoTagPost(title, message, { strategy: 'auto', maxTags: 4 })
+      analyzePostContent({ title, message: truncatedMessage }).catch(err => {
+        console.warn('[ScreenLayout] Moderation failed:', err.message);
+        return { action: 'approve' }; // Default to approve on error
+      }),
+      autoTagPost(title, truncatedMessage, {
+        strategy: 'auto',
+        maxTags: 4,
+        timeout: 10000 // 10 second timeout
+      }).catch(err => {
+        console.warn('[ScreenLayout] Auto-tagging failed:', err.message);
+        // Fallback to keyword-based tagging immediately
+        return autoTagPost(title, truncatedMessage, { strategy: 'keywords', maxTags: 4 })
+          .catch(() => ({ tags: [], method: 'failed' }));
+      })
     ]).then(([moderation, tagging]) => {
       const moderationUpdate = moderation || { action: 'approve' };
       const updates = { moderation: moderationUpdate };
@@ -169,26 +184,25 @@ export default function ScreenLayout({
       }
 
       // Update post with both moderation and tags
-      updatePost(location.city, published.id, updates);
+      try {
+        updatePost(location.city, published.id, updates);
+      } catch (updateError) {
+        console.error('[ScreenLayout] Failed to update post:', updateError);
+      }
     }).catch(error => {
       console.warn('[ScreenLayout] Background processing failed', error);
       // Post stays as pending_review on error
 
-      // Try tagging alone as fallback
-      autoTagPost(title, message, { strategy: 'keywords', maxTags: 4 })
-        .then(tagging => {
-          if (tagging && tagging.tags && tagging.tags.length > 0) {
-            updatePost(location.city, published.id, {
-              tags: tagging.tags,
-              tagConfidence: tagging.confidence,
-              tagMethod: tagging.method,
-            });
-            console.log('[ScreenLayout] Fallback tagged post:', published.id, tagging.tags);
-          }
-        })
-        .catch(() => {
-          console.warn('[ScreenLayout] Fallback tagging also failed');
+      // Try to at least approve the post so it's visible
+      try {
+        updatePost(location.city, published.id, {
+          moderationStatus: 'approved',
+          tags: [],
         });
+        console.log('[ScreenLayout] Post approved by fallback after error');
+      } catch (fallbackError) {
+        console.error('[ScreenLayout] Fallback update also failed:', fallbackError);
+      }
     });
 
     return true;

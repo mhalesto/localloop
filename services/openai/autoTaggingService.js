@@ -1,11 +1,12 @@
 /**
- * Auto-tagging service using zero-shot classification
- * Automatically categorizes posts into relevant topics/tags
+ * OpenAI Auto-tagging Service
+ * Uses GPT-3.5-turbo for intelligent post categorization
+ * Much more reliable than Hugging Face with better accuracy
  */
 
-const HUGGING_FACE_API_URL = 'https://api-inference.huggingface.co/models/facebook/bart-large-mnli';
+const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
-// Comprehensive category taxonomy
+// Same comprehensive category taxonomy
 const CATEGORIES = {
   // Life domains
   RELATIONSHIPS: 'relationships',
@@ -45,39 +46,7 @@ const CATEGORIES = {
   EVENTS: 'events',
 };
 
-// Category labels for zero-shot classification
 const CATEGORY_LABELS = Object.values(CATEGORIES);
-
-// Candidate labels with descriptions for better classification
-const ENHANCED_LABELS = {
-  'relationships': 'dating, love, breakup, marriage, friendship, romance',
-  'money': 'finance, salary, debt, bills, rent, expenses, financial problems',
-  'work': 'job, employment, career, workplace, boss, colleague, unemployment',
-  'school': 'education, university, college, studying, exams, teachers, students',
-  'family': 'parents, children, siblings, relatives, family problems',
-  'health': 'medical, healthcare, illness, hospital, doctor, mental health',
-  'housing': 'apartment, landlord, rent, mortgage, property, living space',
-  'rant': 'complaint, frustration, venting, angry, upset, annoyed',
-  'advice': 'help, suggestion, guidance, recommendation, tips, asking for help',
-  'celebration': 'happy, success, achievement, good news, proud, excited',
-  'question': 'asking, wondering, need help, curious, inquiry',
-  'story': 'experience, narrative, happened to me, tale, anecdote',
-  'joke': 'funny, humor, comedy, laugh, amusing, entertaining',
-  'crime': 'theft, robbery, violence, illegal, criminal activity, mugging',
-  'safety': 'security, danger, risk, protection, unsafe, precaution',
-  'corruption': 'bribery, fraud, dishonest officials, government corruption',
-  'service delivery': 'municipality, government services, infrastructure, utilities, water, electricity',
-  'transport': 'taxi, bus, train, traffic, commute, public transport',
-  'food': 'restaurant, cooking, eating, meal, recipe, cuisine',
-  'entertainment': 'movies, music, shows, nightlife, fun activities',
-  'sports': 'football, rugby, soccer, cricket, athletics, sports teams',
-  'politics': 'government, elections, political party, parliament, president',
-  'news': 'current events, headlines, breaking news, announcement',
-  'tech': 'technology, gadgets, apps, internet, smartphones, computers',
-  'community': 'neighborhood, neighbors, local area, community issues',
-  'local business': 'shop, store, restaurant, local services, small business',
-  'events': 'happening, festival, concert, gathering, upcoming event',
-};
 
 /**
  * Clean and prepare text for classification
@@ -87,9 +56,9 @@ function prepareText(title, description) {
   const descText = (description || '').trim();
 
   // Combine title and first part of description for context
-  // Limit to 500 chars total to prevent API timeouts with long posts
+  // Limit to 1000 chars for OpenAI (much more generous than HF)
   const combined = descText
-    ? `${titleText}. ${descText.substring(0, 500)}`
+    ? `${titleText}. ${descText.substring(0, 1000)}`
     : titleText;
 
   const cleaned = combined
@@ -98,73 +67,16 @@ function prepareText(title, description) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Ensure we don't exceed 512 chars (API limit)
-  return cleaned.length > 512 ? cleaned.substring(0, 512) : cleaned;
+  return cleaned;
 }
 
 /**
- * Call Hugging Face zero-shot classification API
- */
-async function classifyWithHuggingFace(text, candidateLabels, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_HF_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('Hugging Face API key not configured');
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000); // Reduced to 15s
-
-  try {
-    const response = await fetch(HUGGING_FACE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: text,
-        parameters: {
-          candidate_labels: candidateLabels,
-          multi_label: true, // Allow multiple categories
-        },
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn('[AutoTagging] HF API error:', response.status, errorText);
-
-      if (response.status === 503) {
-        // Model is loading
-        throw new Error('MODEL_LOADING');
-      }
-
-      throw new Error(`HF API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Classification timeout');
-    }
-    throw error;
-  }
-}
-
-/**
- * Fallback keyword-based classification
+ * Fallback keyword-based classification (same as before)
  */
 function keywordBasedClassification(text) {
   const lowerText = text.toLowerCase();
   const tags = [];
 
-  // Define keyword patterns for each category
   const patterns = {
     money: /\b(money|cash|salary|pay|rent|bill|debt|loan|finance|afford|expensive|cheap|price|cost|R\d+|rand)\b/i,
     relationships: /\b(boyfriend|girlfriend|dating|love|breakup|break up|relationship|partner|husband|wife|crush|romantic)\b/i,
@@ -186,19 +98,97 @@ function keywordBasedClassification(text) {
     corruption: /\b(corrupt|bribe|fraud|dishonest|illegal|scam|cheat)\b/i,
   };
 
-  // Check each pattern
   for (const [category, pattern] of Object.entries(patterns)) {
     if (pattern.test(lowerText)) {
       tags.push(category);
     }
   }
 
-  // If no tags found, classify as 'story' (neutral)
   if (tags.length === 0) {
     tags.push('story');
   }
 
-  return tags.slice(0, 5); // Limit to top 5 tags
+  return tags.slice(0, 5);
+}
+
+/**
+ * Call OpenAI GPT-3.5-turbo for classification
+ */
+async function classifyWithOpenAI(text, maxTags = 4) {
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+  try {
+    const systemPrompt = `You are a post categorization assistant. Analyze the post and categorize it into the most relevant categories from this list:
+
+${CATEGORY_LABELS.join(', ')}
+
+Return ONLY a JSON array of the top ${maxTags} most relevant categories, ordered by relevance. For example: ["money", "work", "advice"]
+
+Be accurate and selective. Only choose categories that truly fit the content.`;
+
+    const userPrompt = `Categorize this post:\n\n${text}`;
+
+    const response = await fetch(OPENAI_CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3, // Lower temperature for more consistent categorization
+        max_tokens: 50,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn('[OpenAI AutoTag] API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('No content in OpenAI response');
+    }
+
+    // Parse the JSON array from the response
+    try {
+      const tags = JSON.parse(content.trim());
+      if (Array.isArray(tags) && tags.length > 0) {
+        // Validate that all tags are in our category list
+        const validTags = tags.filter(tag => CATEGORY_LABELS.includes(tag));
+        return validTags.length > 0 ? validTags : ['story'];
+      }
+    } catch (parseError) {
+      console.warn('[OpenAI AutoTag] Failed to parse response:', content);
+      throw new Error('Invalid JSON response from OpenAI');
+    }
+
+    return ['story'];
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Classification timeout');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -211,7 +201,6 @@ function keywordBasedClassification(text) {
 export async function autoTagPost(title, description, options = {}) {
   const {
     maxTags = 4,
-    minConfidence = 0.3,
     strategy = 'auto', // 'auto', 'ai', 'keywords'
   } = options;
 
@@ -229,31 +218,18 @@ export async function autoTagPost(title, description, options = {}) {
   let confidence = {};
   let method = 'keywords';
 
-  // Try AI classification first (if strategy allows)
+  // Try OpenAI classification first (if strategy allows)
   if (strategy === 'auto' || strategy === 'ai') {
     try {
-      const result = await classifyWithHuggingFace(text, CATEGORY_LABELS, {
-        timeout: options.timeout || 15000,
-      });
+      tags = await classifyWithOpenAI(text, maxTags);
 
-      if (result && result.labels && result.scores) {
-        // Filter by confidence threshold and limit to maxTags
-        const tagged = result.labels
-          .map((label, i) => ({
-            label,
-            score: result.scores[i],
-          }))
-          .filter(item => item.score >= minConfidence)
-          .slice(0, maxTags);
-
-        if (tagged.length > 0) {
-          tags = tagged.map(t => t.label);
-          confidence = Object.fromEntries(tagged.map(t => [t.label, t.score]));
-          method = 'ai';
-        }
+      if (tags.length > 0) {
+        // OpenAI doesn't provide confidence scores, so we assign high confidence
+        confidence = Object.fromEntries(tags.map((t, i) => [t, 0.9 - (i * 0.1)]));
+        method = 'openai';
       }
     } catch (error) {
-      console.warn('[AutoTagging] AI classification failed, using fallback:', error.message);
+      console.warn('[OpenAI AutoTag] AI classification failed, using fallback:', error.message);
 
       // Use keyword fallback
       if (strategy === 'auto') {
@@ -287,7 +263,7 @@ export async function autoTagPost(title, description, options = {}) {
 }
 
 /**
- * Get tag display information
+ * Get tag display information (same as before)
  */
 export function getTagInfo(tag) {
   const colors = {
