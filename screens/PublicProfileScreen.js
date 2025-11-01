@@ -670,12 +670,12 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    padding: 20,
   },
   emptyState: {
     alignItems: 'center',
     paddingTop: 60,
     gap: 12,
+    paddingHorizontal: 20,
   },
   emptyText: {
     fontSize: 18,
@@ -690,14 +690,14 @@ const styles = StyleSheet.create({
   postsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    padding: 16,
+    gap: 8,
+    padding: 8,
   },
   postCard: {
-    width: '48%',
+    width: '48.5%',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 14,
+    minHeight: 120,
   },
   postTitle: {
     fontSize: 14,
