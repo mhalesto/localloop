@@ -22,6 +22,7 @@ import {
 } from '../api/statusService';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
+import { preloadImages } from '../utils/imageUtils';
 
 const StatusesContext = createContext(null);
 
@@ -59,6 +60,18 @@ export function StatusesProvider({ children }) {
           setStatuses(items);
           setIsLoading(false);
           setStatusesError('');
+
+          // Preload first 10 status images for instant display
+          const imageUrls = items
+            .slice(0, 10)
+            .map(status => status?.imageUrl)
+            .filter(Boolean);
+
+          if (imageUrls.length > 0) {
+            preloadImages(imageUrls).catch(err =>
+              console.warn('[StatusesProvider] Image preload failed:', err)
+            );
+          }
         },
         onError: (error) => {
           setStatuses([]);

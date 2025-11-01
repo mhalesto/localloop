@@ -14,10 +14,16 @@ LocalLoop uses **expo-image** with progressive loading for optimal image perform
 - Smoothly transitions to full-quality image
 - Optional blurhash placeholder for elegant loading states
 
+### ✅ Smart Preloading
+- **First 10 statuses**: Automatically preloaded when feed loads
+- Instant display when scrolling through status stories
+- Background preloading doesn't block UI
+
 ### ✅ Better Performance
 - Reduces data usage with thumbnail preloading
 - Faster perceived loading times
 - Optimized memory management
+- Smooth scrolling with instant image display
 
 ## Usage
 
@@ -125,6 +131,29 @@ await preloadImages([
 ]);
 ```
 
+**Automatic Preloading:**
+
+The `StatusesContext` automatically preloads the first 10 status images when statuses load:
+
+```jsx
+// In StatusesContext.js
+onChange: (items) => {
+  setStatuses(items);
+
+  // Preload first 10 status images for instant display
+  const imageUrls = items
+    .slice(0, 10)
+    .map(status => status?.imageUrl)
+    .filter(Boolean);
+
+  if (imageUrls.length > 0) {
+    preloadImages(imageUrls);
+  }
+}
+```
+
+This means when users scroll through status stories, the first 10 appear instantly!
+
 ### clearImageCache()
 
 Clear all cached images (useful for troubleshooting or freeing space).
@@ -196,6 +225,11 @@ useEffect(() => {
 }, [status?.imageUrl]);
 ```
 
+**Already Implemented:**
+- ✅ First 10 status images are automatically preloaded in `StatusesContext`
+- ✅ No additional code needed for status story preloading
+- ✅ Works on `CountryScreen`, `TopStatusesScreen`, and all screens using statuses
+
 ## Implementation Status
 
 ### ✅ Currently Using ProgressiveImage
@@ -209,6 +243,9 @@ useEffect(() => {
 - `DiscoverScreen.js` - User profile avatars
 - `FollowersScreen.js` - User profile avatars
 - `FollowingScreen.js` - User profile avatars
+
+**Contexts:**
+- `StatusesContext.js` - **Automatic preloading of first 10 status images** 🚀
 
 ### 🔄 Recommended Updates
 
