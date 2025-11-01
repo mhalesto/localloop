@@ -22,42 +22,79 @@ export const buildConversationId = (a, b) => {
 };
 
 export async function ensureConversation(conversationId, participants) {
+  console.log('[Messages] Ensuring conversation exists:', { conversationId, participants });
   const ref = conversationDoc(conversationId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
+
+  try {
+    // Try to create the conversation
+    // If it already exists, this will fail but that's okay
+    console.log('[Messages] Attempting to create conversation...');
     await setDoc(ref, {
       participants,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       lastMessagePreview: ''
+    }).catch((error) => {
+      // If the error is NOT "already exists", rethrow it
+      if (error.code !== 'already-exists') {
+        throw error;
+      }
+      console.log('[Messages] Conversation already exists, continuing...');
     });
-  } else {
-    await updateDoc(ref, {
-      participants,
-      updatedAt: serverTimestamp()
-    }).catch(() => {});
+    console.log('[Messages] Conversation ensured successfully');
+  } catch (error) {
+    console.error('[Messages] Error ensuring conversation:', error.code, error.message);
+    throw error;
   }
 }
 
 export async function sendDirectMessage({ conversationId, senderId, recipientId, text }) {
+  console.log('[Messages] sendDirectMessage called:', { conversationId, senderId, recipientId, textLength: text?.length });
+
   if (!conversationId || !senderId || !recipientId || !text?.trim()) {
     throw new Error('Incomplete message payload');
   }
-  const participants = [senderId, recipientId];
-  await ensureConversation(conversationId, participants);
 
-  const messagesRef = conversationMessagesCollection(conversationId);
-  await addDoc(messagesRef, {
-    senderId,
-    recipientId,
-    text: text.trim(),
-    createdAt: serverTimestamp()
-  });
+  try {
+    const participants = [senderId, recipientId];
+    console.log('[Messages] Participants array:', participants);
 
-  await updateDoc(conversationDoc(conversationId), {
-    lastMessagePreview: text.trim().slice(0, 120),
-    updatedAt: serverTimestamp()
-  }).catch(() => {});
+    // Ensure conversation exists first
+    console.log('[Messages] Step 1: Ensuring conversation exists...');
+    await ensureConversation(conversationId, participants);
+
+    // Small delay to ensure Firestore has processed the conversation creation
+    console.log('[Messages] Step 2: Waiting 100ms for Firestore to process...');
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Now create the message
+    console.log('[Messages] Step 3: Creating message document...');
+    const messagesRef = conversationMessagesCollection(conversationId);
+    const messageData = {
+      senderId,
+      recipientId,
+      text: text.trim(),
+      createdAt: serverTimestamp()
+    };
+    console.log('[Messages] Message data:', messageData);
+
+    await addDoc(messagesRef, messageData);
+    console.log('[Messages] Message created successfully!');
+
+    // Update last message preview
+    console.log('[Messages] Step 4: Updating conversation preview...');
+    await updateDoc(conversationDoc(conversationId), {
+      lastMessagePreview: text.trim().slice(0, 120),
+      updatedAt: serverTimestamp()
+    }).catch((err) => {
+      console.warn('[Messages] Failed to update last message preview:', err.code, err.message);
+    });
+
+    console.log('[Messages] Message sent successfully!');
+  } catch (error) {
+    console.error('[Messages] Error sending message:', error.code, error.message, error);
+    throw error;
+  }
 }
 
 export function subscribeToMessages(conversationId, callback) {

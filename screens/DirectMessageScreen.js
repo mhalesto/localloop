@@ -51,24 +51,35 @@ export default function DirectMessageScreen() {
   }, [conversationId]);
 
   const handleSend = useCallback(async () => {
+    console.log('[DirectMessageScreen] handleSend called');
+    console.log('[DirectMessageScreen] conversationId:', conversationId);
+    console.log('[DirectMessageScreen] user.uid:', user?.uid);
+    console.log('[DirectMessageScreen] recipientId:', recipientId);
+    console.log('[DirectMessageScreen] messageText:', messageText);
+
     if (!conversationId || !user?.uid || !recipientId) {
+      console.warn('[DirectMessageScreen] Missing required data, redirecting to Settings');
       navigation.navigate('Settings');
       return;
     }
     if (!messageText.trim() || sending) {
+      console.warn('[DirectMessageScreen] Empty message or already sending');
       return;
     }
     setSending(true);
     try {
-      await sendDirectMessage({
+      const payload = {
         conversationId,
         senderId: user.uid,
         recipientId,
         text: messageText
-      });
+      };
+      console.log('[DirectMessageScreen] Calling sendDirectMessage with payload:', payload);
+      await sendDirectMessage(payload);
+      console.log('[DirectMessageScreen] Message sent successfully!');
       setMessageText('');
     } catch (error) {
-      console.error('[DirectMessage] send failed', error);
+      console.error('[DirectMessage] send failed', error.code, error.message, error);
     } finally {
       setSending(false);
     }

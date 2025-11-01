@@ -127,16 +127,6 @@ service cloud.firestore {
     }
 
     match /directMessages/{conversationId} {
-      function conversationExists() {
-        return exists(/databases/$(database)/documents/directMessages/$(conversationId));
-      }
-
-      function isParticipantByConversationId() {
-        // Conversation IDs are built as "userId1_userId2" in sorted order
-        // Check if current user ID is part of the conversation ID
-        return isSignedIn() && conversationId.matches('.*' + request.auth.uid + '.*');
-      }
-
       allow read: if isConversationParticipant(resource.data);
       allow create: if isSignedIn()
         && areParticipantsValid(request.resource.data.participants);
@@ -145,23 +135,21 @@ service cloud.firestore {
       allow delete: if isConversationParticipant(resource.data);
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (
-          !conversationExists() && isParticipantByConversationId() ||
-          conversationExists() && isConversationParticipant(
+        allow read: if isSignedIn()
+          && exists(/databases/$(database)/documents/directMessages/$(conversationId))
+          && isConversationParticipant(
             get(/databases/$(database)/documents/directMessages/$(conversationId)).data
-          )
-        );
+          );
         allow create: if isSignedIn()
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.recipientId != null
+          && request.resource.data.recipientId is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000
-          && (
-            !conversationExists() && isParticipantByConversationId() ||
-            conversationExists() && isConversationParticipant(
-              get(/databases/$(database)/documents/directMessages/$(conversationId)).data
-            )
+          && exists(/databases/$(database)/documents/directMessages/$(conversationId))
+          && isConversationParticipant(
+            get(/databases/$(database)/documents/directMessages/$(conversationId)).data
           );
         allow update, delete: if messageSentByRequester();
       }
