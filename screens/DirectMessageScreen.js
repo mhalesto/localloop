@@ -131,8 +131,8 @@ export default function DirectMessageScreen() {
     >
       <KeyboardAvoidingView
         style={styles.wrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
       >
         <FlatList
           ref={listRef}
@@ -142,6 +142,7 @@ export default function DirectMessageScreen() {
           style={styles.list}
           contentContainerStyle={styles.listContent}
           onContentSizeChange={() => listRef.current?.scrollToEnd?.({ animated: true })}
+          keyboardShouldPersistTaps="handled"
         />
         <View style={[styles.inputRow, { borderTopColor: themeColors.divider, backgroundColor: themeColors.card }]}
         >
@@ -152,6 +153,7 @@ export default function DirectMessageScreen() {
             value={messageText}
             onChangeText={setMessageText}
             multiline
+            maxLength={2000}
           />
           <TouchableOpacity
             style={[styles.sendButton, { backgroundColor: themeColors.primary, opacity: sending || !messageText.trim() ? 0.6 : 1 }]}

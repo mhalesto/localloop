@@ -26,7 +26,13 @@ export function listenToAlbum(userId, callback) {
     });
     callback(items);
   }, (error) => {
-    console.warn('[albumService] listenToAlbum error', error);
+    // Silently handle permission errors - this can happen if Firestore rules aren't deployed yet
+    // or if there's a temporary auth state issue
+    if (error.code === 'permission-denied') {
+      console.warn('[albumService] Album read permission denied - rules may not be deployed');
+    } else {
+      console.warn('[albumService] listenToAlbum error:', error);
+    }
     callback([]);
   });
 
@@ -105,6 +111,12 @@ export async function updateAlbumPreferences(userId, preferences = {}) {
   }
   if (preferences.shape) {
     payload.albumShape = preferences.shape;
+  }
+  if (preferences.layoutType) {
+    payload.albumLayoutType = preferences.layoutType; // 'grid' or 'masonry'
+  }
+  if (typeof preferences.masonryColumns === 'number') {
+    payload.albumMasonryColumns = preferences.masonryColumns;
   }
 
   await updateDoc(doc(db, 'users', userId), payload).catch((error) => {

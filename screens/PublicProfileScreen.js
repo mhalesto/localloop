@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -74,6 +74,16 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [photoPreviewSource, setPhotoPreviewSource] = useState(null);
   const [showAlbumSettings, setShowAlbumSettings] = useState(false);
 
+  // Track original values for change detection
+  const [originalAlbumColumns, setOriginalAlbumColumns] = useState(3);
+  const [originalAlbumShape, setOriginalAlbumShape] = useState('square');
+  const [originalAlbumLayout, setOriginalAlbumLayout] = useState('masonry');
+  const [originalMasonryColumns, setOriginalMasonryColumns] = useState(3);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Store the pending navigation action when user tries to leave with unsaved changes
+  const pendingNavigationRef = useRef(null);
+
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
 
@@ -87,9 +97,15 @@ export default function PublicProfileScreen({ navigation, route }) {
       setProfile(profileData);
       setPosts(userPosts);
 
+      // Only check follow status if user is authenticated
       if (!isOwnProfile && user?.uid) {
-        const following = await isFollowing(user.uid, userId);
-        setIsFollowingUser(following);
+        try {
+          const following = await isFollowing(user.uid, userId);
+          setIsFollowingUser(following);
+        } catch (error) {
+          console.warn('[PublicProfile] Could not check follow status (user may not be signed in):', error.code);
+          setIsFollowingUser(false);
+        }
       }
     } catch (error) {
       console.error('[PublicProfile] Error loading profile:', error);
@@ -111,16 +127,46 @@ export default function PublicProfileScreen({ navigation, route }) {
     return unsubscribe;
   }, [navigation, loadProfile]);
 
+  // Prevent navigation if there are unsaved changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // Only prevent if user has unsaved changes
+      if (!hasUnsavedChanges()) {
+        // Clear any pending navigation
+        pendingNavigationRef.current = null;
+        return;
+      }
+
+      // Prevent default behavior of leaving the screen
+      e.preventDefault();
+
+      // Store the navigation action so we can retry it after save/discard
+      pendingNavigationRef.current = e.data.action;
+
+      // Show save confirmation modal
+      setShowSaveModal(true);
+    });
+
+    return unsubscribe;
+  }, [navigation, hasUnsavedChanges]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadProfile();
   }, [loadProfile]);
 
   useEffect(() => {
+    if (!userId) {
+      setAlbumPhotos([]);
+      setAlbumLoading(false);
+      return;
+    }
+
     const unsubscribe = listenToAlbum(userId, (items) => {
       setAlbumPhotos(items);
       setAlbumLoading(false);
     });
+
     return () => {
       unsubscribe?.();
     };
@@ -130,8 +176,24 @@ export default function PublicProfileScreen({ navigation, route }) {
     if (profile) {
       const preferredColumns = Number(profile.albumLayout);
       const preferredShape = typeof profile.albumShape === 'string' ? profile.albumShape : null;
-      setAlbumColumns([2, 3].includes(preferredColumns) ? preferredColumns : 3);
-      setAlbumShape(['square', 'portrait'].includes(preferredShape) ? preferredShape : 'square');
+      const preferredLayoutType = profile.albumLayoutType || 'masonry';
+      const preferredMasonryColumns = Number(profile.albumMasonryColumns) || 3;
+
+      const columns = [2, 3, 4].includes(preferredColumns) ? preferredColumns : 3;
+      const shape = ['square', 'portrait'].includes(preferredShape) ? preferredShape : 'square';
+      const layoutType = ['grid', 'masonry'].includes(preferredLayoutType) ? preferredLayoutType : 'masonry';
+      const masonryCols = [2, 3, 4].includes(preferredMasonryColumns) ? preferredMasonryColumns : 3;
+
+      setAlbumColumns(columns);
+      setAlbumShape(shape);
+      setAlbumLayout(layoutType);
+      setMasonryColumns(masonryCols);
+
+      // Set original values
+      setOriginalAlbumColumns(columns);
+      setOriginalAlbumShape(shape);
+      setOriginalAlbumLayout(layoutType);
+      setOriginalMasonryColumns(masonryCols);
     }
   }, [profile]);
 
@@ -240,15 +302,78 @@ export default function PublicProfileScreen({ navigation, route }) {
     ]);
   }, [isOwnProfile, user?.uid]);
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useCallback(() => {
+    return (
+      albumColumns !== originalAlbumColumns ||
+      albumShape !== originalAlbumShape ||
+      albumLayout !== originalAlbumLayout ||
+      masonryColumns !== originalMasonryColumns
+    );
+  }, [albumColumns, originalAlbumColumns, albumShape, originalAlbumShape, albumLayout, originalAlbumLayout, masonryColumns, originalMasonryColumns]);
+
+  // Save all preferences
+  const handleSavePreferences = useCallback(async () => {
+    if (!isOwnProfile) return;
+
+    try {
+      await updateAlbumPreferences(userId, {
+        columns: albumColumns,
+        shape: albumShape,
+        layoutType: albumLayout,
+        masonryColumns: masonryColumns
+      });
+
+      // Update original values after successful save
+      setOriginalAlbumColumns(albumColumns);
+      setOriginalAlbumShape(albumShape);
+      setOriginalAlbumLayout(albumLayout);
+      setOriginalMasonryColumns(masonryColumns);
+      setShowSaveModal(false);
+      setShowAlbumSettings(false);
+
+      // If there was a pending navigation, execute it now
+      if (pendingNavigationRef.current) {
+        navigation.dispatch(pendingNavigationRef.current);
+        pendingNavigationRef.current = null;
+      }
+    } catch (error) {
+      console.warn('[PublicProfile] save preferences failed', error);
+      Alert.alert('Error', 'Failed to save preferences. Please try again.');
+    }
+  }, [isOwnProfile, userId, albumColumns, albumShape, albumLayout, masonryColumns, navigation]);
+
+  // Discard changes and revert to original values
+  const handleDiscardChanges = useCallback(() => {
+    setAlbumColumns(originalAlbumColumns);
+    setAlbumShape(originalAlbumShape);
+    setAlbumLayout(originalAlbumLayout);
+    setMasonryColumns(originalMasonryColumns);
+    setShowSaveModal(false);
+    setShowAlbumSettings(false);
+
+    // If there was a pending navigation, execute it now
+    if (pendingNavigationRef.current) {
+      navigation.dispatch(pendingNavigationRef.current);
+      pendingNavigationRef.current = null;
+    }
+  }, [originalAlbumColumns, originalAlbumShape, originalAlbumLayout, originalMasonryColumns, navigation]);
+
+  // Handle closing settings - check for unsaved changes
+  const handleCloseSettings = useCallback(() => {
+    if (hasUnsavedChanges()) {
+      setShowSaveModal(true);
+    } else {
+      setShowAlbumSettings(false);
+    }
+  }, [hasUnsavedChanges]);
+
   const handleChangeAlbumColumns = useCallback((columns) => {
     if (![2, 3, 4].includes(columns)) {
       return;
     }
     setAlbumColumns(columns);
-    if (isOwnProfile) {
-      updateAlbumPreferences(userId, { columns });
-    }
-  }, [isOwnProfile, userId]);
+  }, []);
 
   const handleChangeMasonryColumns = useCallback((columns) => {
     if (![2, 3, 4].includes(columns)) {
@@ -262,10 +387,7 @@ export default function PublicProfileScreen({ navigation, route }) {
       return;
     }
     setAlbumShape(shape);
-    if (isOwnProfile) {
-      updateAlbumPreferences(userId, { shape });
-    }
-  }, [isOwnProfile, userId]);
+  }, []);
 
   const renderAlbumTab = useCallback(() => {
     if (albumLoading) {
@@ -313,7 +435,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                 {`You can add up to ${ALBUM_MAX_ITEMS} photos (${Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0)} slots left).`}
               </Text>
               <TouchableOpacity
-                onPress={() => setShowAlbumSettings(!showAlbumSettings)}
+                onPress={() => showAlbumSettings ? handleCloseSettings() : setShowAlbumSettings(true)}
                 style={styles.settingsIconButton}
                 activeOpacity={0.7}
               >
@@ -548,6 +670,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     handleChangeAlbumColumns,
     handleChangeMasonryColumns,
     handleChangeAlbumShape,
+    handleCloseSettings,
     handlePreviewPhoto,
     isOwnProfile,
     primaryColor,
@@ -724,6 +847,49 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+
+      {/* Save Confirmation Modal */}
+      <Modal
+        visible={showSaveModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowSaveModal(false)}
+      >
+        <View style={styles.saveModalBackdrop}>
+          <View style={[styles.saveModalContent, { backgroundColor: themeColors.card }]}>
+            <View style={styles.saveModalHeader}>
+              <Ionicons name="alert-circle-outline" size={48} color={primaryColor} />
+              <Text style={[styles.saveModalTitle, { color: themeColors.textPrimary }]}>
+                Save Changes?
+              </Text>
+              <Text style={[styles.saveModalMessage, { color: themeColors.textSecondary }]}>
+                You have unsaved changes to your album layout. Would you like to save them?
+              </Text>
+            </View>
+            <View style={styles.saveModalButtons}>
+              <TouchableOpacity
+                style={[styles.saveModalButton, styles.saveModalButtonDiscard, { borderColor: themeColors.divider }]}
+                onPress={handleDiscardChanges}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.saveModalButtonText, { color: themeColors.textSecondary }]}>
+                  Discard
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveModalButton, styles.saveModalButtonSave, { backgroundColor: primaryColor }]}
+                onPress={handleSavePreferences}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.saveModalButtonText, { color: '#fff', fontWeight: '700' }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -1544,5 +1710,62 @@ const styles = StyleSheet.create({
   statusMeta: {
     fontSize: 13,
     lineHeight: 20,
+  },
+  // Save Modal Styles
+  saveModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  saveModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  saveModalHeader: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  saveModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  saveModalMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  saveModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  saveModalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveModalButtonDiscard: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+  },
+  saveModalButtonSave: {
+    // backgroundColor set dynamically
+  },
+  saveModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

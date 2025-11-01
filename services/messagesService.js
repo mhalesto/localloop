@@ -76,6 +76,16 @@ export function subscribeToMessages(conversationId, callback) {
       };
     });
     callback(items);
+  }, (error) => {
+    // Handle permission errors gracefully
+    // This happens when the conversation document doesn't exist yet
+    if (error.code === 'permission-denied') {
+      console.warn('[Messages] Permission denied - conversation may not exist yet');
+      callback([]);
+    } else {
+      console.error('[Messages] Error subscribing to messages:', error);
+      callback([]);
+    }
   });
   return unsubscribe;
 }
