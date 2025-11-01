@@ -147,8 +147,8 @@ export default function CustomSplashScreen({ onAnimationComplete }) {
             { opacity: textFadeAnim },
           ]}
         >
-          <Text style={styles.appName}>Share Your Story</Text>
-          <Text style={styles.tagline}>Connect. Express. Inspire.</Text>
+          <Text style={styles.appName}>LocalLoop</Text>
+          <Text style={styles.tagline}>Where Your Neighborhood Connects</Text>
         </Animated.View>
 
         {/* Loading indicator */}

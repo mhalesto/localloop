@@ -24,7 +24,7 @@ const readList = (key) =>
 // ── Identity (must match your project) ────────────────────────────────────────
 export const EXPO_USERNAME = read('EXPO_PUBLIC_EXPO_USERNAME', '');
 export const EXPO_SLUG = read('EXPO_PUBLIC_EXPO_SLUG', '');
-export const APP_SCHEME = read('EXPO_PUBLIC_SCHEME', 'toilet');
+export const APP_SCHEME = read('EXPO_PUBLIC_SCHEME', 'localloop');
 
 // ── Google OAuth client IDs ───────────────────────────────────────────────────
 // NOTE: In Expo Go, expoClientId MUST be the **Web** client ID.

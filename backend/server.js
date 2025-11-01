@@ -44,7 +44,7 @@ const {
   SESSION_TOKEN_TTL
 } = process.env;
 
-const RESOLVED_COOKIE_NAME = AUTH_COOKIE_NAME || 'toilet_session';
+const RESOLVED_COOKIE_NAME = AUTH_COOKIE_NAME || 'localloop_session';
 const SESSION_TTL = SESSION_TOKEN_TTL || '7d';
 const SESSION_MAX_AGE_MS = Math.max(Number(process.env.SESSION_MAX_AGE_DAYS || 7), 1) * 24 * 60 * 60 * 1000;
 

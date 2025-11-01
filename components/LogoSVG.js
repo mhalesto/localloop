@@ -19,7 +19,7 @@ const LogoSVG = ({ width = 200, height = 200, ...props }) => {
       {/* Main circle background */}
       <Circle cx="100" cy="100" r="90" fill="url(#bgGradient)" />
 
-      {/* Modern abstract S shape with story/speech bubble inspiration */}
+      {/* LocalLoop LL design */}
       <G transform="translate(100, 100)">
         {/* Speech bubble background shape */}
         <Path
@@ -39,29 +39,36 @@ const LogoSVG = ({ width = 200, height = 200, ...props }) => {
           opacity={0.95}
         />
 
-        {/* Inner S letterform */}
+        {/* First L (left, slightly higher) */}
         <Path
-          d="M 20 -20
-             Q 20 -30 5 -30
-             L -10 -30
-             Q -25 -30 -25 -15
-             Q -25 -5 -15 -5
-             L 10 -5
-             Q 25 -5 25 10
-             Q 25 20 10 20
-             L -5 20
-             Q -20 20 -20 10"
+          d="M -18 -20
+             L -18 5
+             L -3 5"
           fill="none"
           stroke="#6C4DF4"
-          strokeWidth="8"
+          strokeWidth="7"
           strokeLinecap="round"
+          strokeLinejoin="round"
           opacity={0.4}
         />
 
-        {/* Decorative story dots (like ellipsis for continuing story) */}
-        <Circle cx="-15" cy="8" r="3" fill="#FFFFFF" opacity={0.8} />
-        <Circle cx="0" cy="8" r="3" fill="#FFFFFF" opacity={0.8} />
-        <Circle cx="15" cy="8" r="3" fill="#FFFFFF" opacity={0.8} />
+        {/* Second L (right, slightly lower) */}
+        <Path
+          d="M 3 -15
+             L 3 10
+             L 18 10"
+          fill="none"
+          stroke="#6C4DF4"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.4}
+        />
+
+        {/* Decorative dots for community connection */}
+        <Circle cx="-15" cy="8" r="2.5" fill="#FFFFFF" opacity={0.7} />
+        <Circle cx="0" cy="8" r="2.5" fill="#FFFFFF" opacity={0.7} />
+        <Circle cx="15" cy="8" r="2.5" fill="#FFFFFF" opacity={0.7} />
       </G>
 
       {/* Outer ring accent */}

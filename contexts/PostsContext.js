@@ -26,12 +26,12 @@ import { useAuth } from './AuthContext';
 
 const PostsContext = createContext(null);
 
-const POSTS_CACHE_KEY = '@toilet.postsCache';
-const QUEUE_CACHE_KEY = '@toilet.postsQueue';
-const CLIENT_ID_KEY = '@toilet.clientId';
-const THREAD_READS_CACHE_KEY = '@toilet.threadReads';
-const SUBSCRIPTIONS_CACHE_KEY = '@toilet.postSubscriptions';
-const NOTIFICATIONS_CACHE_KEY = '@toilet.postNotifications';
+const POSTS_CACHE_KEY = '@localloop.postsCache';
+const QUEUE_CACHE_KEY = '@localloop.postsQueue';
+const CLIENT_ID_KEY = '@localloop.clientId';
+const THREAD_READS_CACHE_KEY = '@localloop.threadReads';
+const SUBSCRIPTIONS_CACHE_KEY = '@localloop.postSubscriptions';
+const NOTIFICATIONS_CACHE_KEY = '@localloop.postNotifications';
 
 const MAX_NOTIFICATIONS = 60;
 const TYPING_STALE_MS = 12000;

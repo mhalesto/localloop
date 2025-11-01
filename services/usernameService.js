@@ -9,7 +9,7 @@ import { db } from '../api/firebaseClient';
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/;
 const RESERVED_USERNAMES = [
   'admin', 'moderator', 'support', 'help', 'official',
-  'toilet', 'system', 'anonymous', 'deleted', 'banned',
+  'localloop', 'system', 'anonymous', 'deleted', 'banned',
   'user', 'test', 'demo', 'null', 'undefined'
 ];
 

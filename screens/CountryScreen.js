@@ -21,7 +21,7 @@ const PAGE_SIZE = 30;
 const TOP_TRENDING_TO_SHOW = 6;
 const CHIP_ROW_MAX = 4;
 const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
-const COUNTRIES_CACHE_KEY = '@toilet.countriesCache';
+const COUNTRIES_CACHE_KEY = '@localloop.countriesCache';
 const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
 const FALLBACK_COUNTRIES = [
   { name: 'United States', iso2: 'US', iso3: 'USA' },
