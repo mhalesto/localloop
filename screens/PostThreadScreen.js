@@ -475,6 +475,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showDescriptionWhenScrolled, setShowDescriptionWhenScrolled] = useState(false);
   const [isScrolledPastThreshold, setIsScrolledPastThreshold] = useState(false);
+  const descriptionCollapseAnim = useRef(new Animated.Value(1)).current; // 1 = visible, 0 = collapsed
 
   // [AI-FEATURES] Thread summarization, comment suggestions, translation
   const [threadSummary, setThreadSummary] = useState(null);
@@ -552,6 +553,16 @@ export default function PostThreadScreen({ route, navigation }) {
       scrollY.removeListener(listenerId);
     };
   }, [scrollY, isScrolledPastThreshold]);
+
+  // Animate description collapse/expand
+  useEffect(() => {
+    const shouldShow = showDescriptionWhenScrolled || !isScrolledPastThreshold;
+    Animated.timing(descriptionCollapseAnim, {
+      toValue: shouldShow ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [showDescriptionWhenScrolled, isScrolledPastThreshold, descriptionCollapseAnim]);
 
   const collapsedHeaderHorizontalPadding = useMemo(
     () => Math.max(insets.left || 0, insets.right || 0),
@@ -2214,8 +2225,11 @@ export default function PostThreadScreen({ route, navigation }) {
                 style={[
                   descriptionContainerStyle,
                   {
-                    opacity: showDescriptionWhenScrolled ? 1 : descriptionOpacity,
-                    height: showDescriptionWhenScrolled || !isScrolledPastThreshold ? 'auto' : 0,
+                    opacity: descriptionCollapseAnim,
+                    maxHeight: descriptionCollapseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 500],
+                    }),
                     overflow: 'hidden',
                   }
                 ]}
