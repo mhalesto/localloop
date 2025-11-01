@@ -15,6 +15,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile } from '../services/userProfileService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
+import { getUserPosts } from '../services/publicPostsService';
 import { ENGAGEMENT_POINT_RULES } from '../constants/authConfig';
 
 export default function PublicProfileScreen({ navigation, route }) {
@@ -22,6 +23,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const { themeColors, accentPreset, userProfile: currentUserProfile } = useSettings();
   const { user, profile: authProfile, hasActivePremium, pointsToNextPremium, premiumDayCost, premiumAccessDurationMs } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
@@ -33,8 +35,13 @@ export default function PublicProfileScreen({ navigation, route }) {
 
   const loadProfile = useCallback(async () => {
     try {
-      const profileData = await getUserProfile(userId);
+      const [profileData, userPosts] = await Promise.all([
+        getUserProfile(userId),
+        getUserPosts(userId, 50),
+      ]);
+
       setProfile(profileData);
+      setPosts(userPosts);
 
       if (!isOwnProfile && user?.uid) {
         const following = await isFollowing(user.uid, userId);
@@ -355,17 +362,52 @@ export default function PublicProfileScreen({ navigation, route }) {
         {/* Tab Content */}
         <View style={styles.contentContainer}>
           {activeTab === 'posts' ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="document-text-outline" size={64} color={themeColors.textSecondary} />
-              <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                {isOwnProfile ? 'No public posts yet' : 'No posts to show'}
-              </Text>
-              <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
-                {isOwnProfile
-                  ? 'Posts you create in public mode will appear here'
-                  : 'This user hasn\'t posted publicly yet'}
-              </Text>
-            </View>
+            posts.length > 0 ? (
+              <View style={styles.postsGrid}>
+                {posts.map(post => (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[styles.postCard, { backgroundColor: themeColors.card }]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.postTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
+                      {post.title}
+                    </Text>
+                    {post.message && (
+                      <Text style={[styles.postMessage, { color: themeColors.textSecondary }]} numberOfLines={3}>
+                        {post.message}
+                      </Text>
+                    )}
+                    <View style={styles.postStats}>
+                      <View style={styles.postStat}>
+                        <Ionicons name="heart-outline" size={14} color={themeColors.textSecondary} />
+                        <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
+                          {post.likesCount || 0}
+                        </Text>
+                      </View>
+                      <View style={styles.postStat}>
+                        <Ionicons name="chatbubble-outline" size={14} color={themeColors.textSecondary} />
+                        <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
+                          {post.commentsCount || 0}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text-outline" size={64} color={themeColors.textSecondary} />
+                <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+                  {isOwnProfile ? 'No public posts yet' : 'No posts to show'}
+                </Text>
+                <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
+                  {isOwnProfile
+                    ? 'Posts you create in public mode will appear here'
+                    : 'This user hasn\'t posted publicly yet'}
+                </Text>
+              </View>
+            )
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="flash-outline" size={64} color={themeColors.textSecondary} />
@@ -643,6 +685,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  // Posts grid
+  postsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 16,
+  },
+  postCard: {
+    width: '48%',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  postTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  postMessage: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  postStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  postStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  postStatText: {
+    fontSize: 11,
   },
   // Account overview section styles
   accountSection: {
