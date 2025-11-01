@@ -2034,10 +2034,17 @@ export default function PostThreadScreen({ route, navigation }) {
       const collapsedPreviewText = strippedDescription?.length
         ? strippedDescription
         : trimmedDescription;
+
+      // Truncate text to leave room for "Show more" on the 3rd line
+      const maxCharsForThreeLines = 180; // Approximate chars for ~2.8 lines
+      const truncatedPreviewText = collapsedPreviewText?.length > maxCharsForThreeLines
+        ? collapsedPreviewText.substring(0, maxCharsForThreeLines).trim() + '...'
+        : collapsedPreviewText;
+
       const canToggleDescription =
         trimmedDescription && trimmedDescription !== displayTitle && collapsedPreviewText?.length;
       const isExpanded = forceExpanded || isDescriptionExpanded;
-      const showToggleControls = canToggleDescription && !forceExpanded;
+      const showToggleControls = canToggleDescription && !forceExpanded && collapsedPreviewText?.length > maxCharsForThreeLines;
       const toggleHitSlop = StyleSheet.flatten(styles.postMessageToggleHitSlop);
       const highlightFill =
         post.highlightDescription
@@ -2177,23 +2184,17 @@ export default function PostThreadScreen({ route, navigation }) {
             <View style={descriptionContainerStyle}>
               {!isExpanded && collapsedPreviewText ? (
                 <View style={styles.postMessagePreview}>
-                  <Text
-                    style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
-                    numberOfLines={3}
-                    ellipsizeMode="tail"
-                  >
-                    {collapsedPreviewText}
+                  <Text style={[styles.postMessagePreviewText, { color: headerTitleColor }]}>
+                    {truncatedPreviewText}
+                    {showToggleControls ? (
+                      <Text
+                        style={[styles.postMessagePreviewButtonText, { color: linkColor }]}
+                        onPress={() => setIsFullscreenModalVisible(true)}
+                      >
+                        {' '}Show more
+                      </Text>
+                    ) : null}
                   </Text>
-                  {showToggleControls ? (
-                    <TouchableOpacity
-                      onPress={() => setIsFullscreenModalVisible(true)}
-                      activeOpacity={0.75}
-                      style={styles.postMessagePreviewButton}
-                      hitSlop={toggleHitSlop}
-                    >
-                      <Text style={[styles.postMessagePreviewButtonText, { color: linkColor }]}>Show more</Text>
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
               ) : (
                 <>
@@ -3249,7 +3250,7 @@ const createStyles = (
       lineHeight: resolvedDescriptionLineHeight,
       maxHeight: resolvedDescriptionLineHeight * 6,
     },
-    postMessagePreview: { marginBottom: 12 },
+    postMessagePreview: { marginBottom: 6 },
     postMessagePreviewButton: {
       alignSelf: 'flex-end',
       paddingHorizontal: 10,
