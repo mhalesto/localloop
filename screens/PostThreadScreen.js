@@ -2111,21 +2111,6 @@ export default function PostThreadScreen({ route, navigation }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => setIsFullscreenModalVisible(true)}
-                  style={[styles.notificationButton, showViewOriginal && styles.shareExternalButtonWithLabel]}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="View post fullscreen"
-                >
-                  <Ionicons
-                    name="expand-outline"
-                    size={18}
-                    color={linkColor}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
                   onPress={handleShareOutside}
                   style={[styles.shareExternalButton, styles.shareExternalButtonWithLabel]}
                   activeOpacity={0.7}
@@ -2175,7 +2160,7 @@ export default function PostThreadScreen({ route, navigation }) {
               warnings={post.contentWarnings}
               size="small"
               maxDisplay={3}
-              style={styles.postTags}
+              style={[styles.postTags, { marginBottom: 12 }]}
             />
           ) : null}
 
@@ -2194,14 +2179,14 @@ export default function PostThreadScreen({ route, navigation }) {
                 <View style={styles.postMessagePreview}>
                   <Text
                     style={[styles.postMessagePreviewText, { color: headerTitleColor }]}
-                    numberOfLines={6}
+                    numberOfLines={3}
                     ellipsizeMode="tail"
                   >
                     {collapsedPreviewText}
                   </Text>
                   {showToggleControls ? (
                     <TouchableOpacity
-                      onPress={() => setIsDescriptionExpanded(true)}
+                      onPress={() => setIsFullscreenModalVisible(true)}
                       activeOpacity={0.75}
                       style={styles.postMessagePreviewButton}
                       hitSlop={toggleHitSlop}
@@ -2934,71 +2919,101 @@ export default function PostThreadScreen({ route, navigation }) {
                     {/* Author Info */}
                     <View
                       style={[
-                      styles.fullscreenAuthorRow,
-                      { borderBottomColor: dividerColor },
-                    ]}
-                  >
-                    <View style={[styles.fullscreenAvatar, { backgroundColor: authorAvatarBackground }]}>
-                      {authorAvatar?.icon ? (
-                        <Ionicons
-                          name={authorAvatar.icon.name}
-                          size={20}
-                          color={authorAvatar.icon.color ?? '#fff'}
-                        />
-                      ) : (
-                        <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatar?.foregroundColor ?? '#fff' }]}>
-                          {authorAvatar?.emoji ?? '🙂'}
+                        styles.fullscreenAuthorRow,
+                        { borderBottomColor: dividerColor },
+                      ]}
+                    >
+                      <View style={[styles.fullscreenAvatar, { backgroundColor: authorAvatarBackground }]}>
+                        {authorAvatar?.icon ? (
+                          <Ionicons
+                            name={authorAvatar.icon.name}
+                            size={20}
+                            color={authorAvatar.icon.color ?? '#fff'}
+                          />
+                        ) : (
+                          <Text style={[styles.fullscreenAvatarEmoji, { color: authorAvatar?.foregroundColor ?? '#fff' }]}>
+                            {authorAvatar?.emoji ?? '🙂'}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.fullscreenAuthorInfo}>
+                        <Text style={[styles.fullscreenAuthorName, { color: bodyTextColor }]}>
+                          {post.authorNickname || 'Anonymous'}
                         </Text>
-                      )}
+                        {authorLocation ? (
+                          <Text style={[styles.fullscreenAuthorLocation, { color: subtleTextColor }]}>
+                            {authorLocation}
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
-                    <View style={styles.fullscreenAuthorInfo}>
-                      <Text style={[styles.fullscreenAuthorName, { color: bodyTextColor }]}>
-                        {post.authorNickname || 'Anonymous'}
-                      </Text>
-                      {authorLocation ? (
-                        <Text style={[styles.fullscreenAuthorLocation, { color: subtleTextColor }]}>
-                          {authorLocation}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
 
-                  {/* Title */}
-                  <Text style={[styles.fullscreenPostTitle, { color: bodyTextColor }]}>
-                    {displayTitle}
-                  </Text>
-
-                  {/* Description */}
-                  {trimmedDescription && trimmedDescription !== displayTitle ? (
-                    <View style={styles.fullscreenDescriptionContainer}>
-                      <RichText
-                        text={trimmedDescription}
-                        textStyle={[styles.fullscreenPostDescription, { color: bodyTextColor }]}
-                        linkStyle={{ color: postPreset.linkColor ?? themeColors.primary }}
-                      />
-                    </View>
-                  ) : null}
-
-                  {/* Meta */}
-                  <View
-                    style={[
-                      styles.fullscreenMetaRow,
-                      {
-                        backgroundColor: metaBadgeBackground,
-                        borderColor: metaBadgeBorderColor,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses-outline"
-                      size={16}
-                      color={accentInk}
-                      style={styles.fullscreenMetaIcon}
-                    />
-                    <Text style={[styles.fullscreenMeta, { color: subtleTextColor }]}>
-                      {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+                    {/* Title */}
+                    <Text style={[styles.fullscreenPostTitle, { color: bodyTextColor }]}>
+                      {displayTitle}
                     </Text>
-                  </View>
+
+                    {/* Auto-generated tags */}
+                    {post.tags && post.tags.length > 0 ? (
+                      <TagList
+                        tags={post.tags}
+                        maxTags={4}
+                        showIcons={false}
+                        size="small"
+                        style={styles.postTags}
+                      />
+                    ) : null}
+
+                    {/* Content warnings */}
+                    {post.contentWarnings && post.contentWarnings.length > 0 ? (
+                      <ContentWarningList
+                        warnings={post.contentWarnings}
+                        size="small"
+                        maxDisplay={3}
+                        style={styles.postTags}
+                      />
+                    ) : null}
+
+                    {/* Sentiment badge */}
+                    {post.sentiment ? (
+                      <SentimentBadge
+                        sentiment={post.sentiment}
+                        size="small"
+                        style={{ marginTop: 6 }}
+                      />
+                    ) : null}
+
+                    {/* Description */}
+                    {trimmedDescription && trimmedDescription !== displayTitle ? (
+                      <View style={styles.fullscreenDescriptionContainer}>
+                        <RichText
+                          text={trimmedDescription}
+                          textStyle={[styles.fullscreenPostDescription, { color: bodyTextColor }]}
+                          linkStyle={{ color: postPreset.linkColor ?? themeColors.primary }}
+                        />
+                      </View>
+                    ) : null}
+
+                    {/* Meta */}
+                    <View
+                      style={[
+                        styles.fullscreenMetaRow,
+                        {
+                          backgroundColor: metaBadgeBackground,
+                          borderColor: metaBadgeBorderColor,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name="chatbubble-ellipses-outline"
+                        size={16}
+                        color={accentInk}
+                        style={styles.fullscreenMetaIcon}
+                      />
+                      <Text style={[styles.fullscreenMeta, { color: subtleTextColor }]}>
+                        {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+                      </Text>
+                    </View>
                   </View>
                 </Animated.ScrollView>
                 {shouldShowFullscreenIndicator ? (
@@ -3221,7 +3236,7 @@ const createStyles = (
       marginTop: 8,
       marginBottom: 8,
     },
-    postMessageContainer: { marginBottom: 18 },
+    postMessageContainer: { marginTop: 20, marginBottom: 18 },
     postMessageHighlighted: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 },
     postMessage: {
       fontSize: resolvedDescriptionFontSize,

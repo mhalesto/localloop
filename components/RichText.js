@@ -36,11 +36,25 @@ function RichText({
   textStyle,
   linkStyle,
   containerStyle,
+  numberOfLines,
 }) {
   const blocks = useMemo(() => parseRichTextBlocks(text ?? ''), [text]);
 
   if (!text) {
     return null;
+  }
+
+  // If numberOfLines is specified, render as a simple text with truncation
+  if (numberOfLines) {
+    return (
+      <Text
+        style={[textStyle, containerStyle]}
+        numberOfLines={numberOfLines}
+        ellipsizeMode="tail"
+      >
+        {text}
+      </Text>
+    );
   }
 
   return (

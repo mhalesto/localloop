@@ -140,6 +140,7 @@ export default function PostItem({
               text={trimmedDescription}
               textStyle={[styles.message, { color: primaryTextColor }]}
               linkStyle={{ color: linkColor }}
+              numberOfLines={3}
             />
           </View>
         ) : null}
