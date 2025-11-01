@@ -179,21 +179,18 @@ export default function RoomScreen({ navigation, route }) {
     <View style={[styles.stickyHeaderWrapper, { backgroundColor: accentPreset.background }]}>
       <View style={[styles.headerCard, { backgroundColor: accentPreset.background }]}>
         <AccentBackground accent={accentPreset} style={styles.headerCardBackground} darkness={themeDarkness} />
-        <View style={styles.headerTitleRow}>
-          <Text style={[styles.headerMeta, { color: metaColor }]}>Today&apos;s pulse</Text>
-        </View>
         <View style={styles.statsRow}>
-          <View style={[styles.statCardBase, styles.statCardLeft, { backgroundColor: statCardBackground }]}>
-            <Text style={[styles.statValue, { color: statValueColor }]}>{totalPosts}</Text>
-            <Text style={[styles.statLabel, { color: statLabelColor }]}>Posts</Text>
+          <View style={styles.statItem}>
+            <Text style={styles.statValueBold}>{totalPosts}</Text>
+            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Posts</Text>
           </View>
-          <View style={[styles.statCardBase, styles.statCardMiddle, { backgroundColor: statCardBackground }]}>
-            <Text style={[styles.statValue, { color: statValueColor }]}>{totalComments}</Text>
-            <Text style={[styles.statLabel, { color: statLabelColor }]}>Comments</Text>
+          <View style={styles.statItem}>
+            <Text style={styles.statValueBold}>{totalComments}</Text>
+            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Comments</Text>
           </View>
-          <View style={[styles.statCardBase, styles.statCardRight, { backgroundColor: statCardBackground }]}>
-            <Text style={[styles.statValue, { color: statValueColor }]}>{averageReplies}</Text>
-            <Text style={[styles.statLabel, { color: statLabelColor }]}>Avg Replies</Text>
+          <View style={styles.statItem}>
+            <Text style={styles.statValueBold}>{averageReplies}</Text>
+            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Avg Replies</Text>
           </View>
         </View>
       </View>
@@ -203,81 +200,103 @@ export default function RoomScreen({ navigation, route }) {
   const previewPrimary = selectedPreset.onPrimary ?? (selectedPreset.isDark ? '#fff' : themeColors.textPrimary);
   const previewMeta = selectedPreset.metaColor ?? (selectedPreset.isDark ? 'rgba(255,255,255,0.75)' : themeColors.textSecondary);
 
+  const [showComposer, setShowComposer] = useState(false);
+
+  const renderComposerButton = () => (
+    <TouchableOpacity
+      style={[styles.dropPostButton, { backgroundColor: accentPreset.buttonBackground }]}
+      onPress={() => setShowComposer(true)}
+      activeOpacity={0.85}
+    >
+      <Ionicons name="add-circle" size={24} color={accentPreset.buttonForeground || '#fff'} />
+      <Text style={[styles.dropPostButtonText, { color: accentPreset.buttonForeground || '#fff' }]}>
+        Drop a new post
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderComposer = () => (
-    <View style={styles.composerCard}>
-      <Text style={styles.composerLabel}>Drop a new post</Text>
-      <Text style={styles.composerHint}>Pick a vibe for your card</Text>
-      <View style={styles.composerSwatches}>
-        {accentPresets.map((preset) => {
-          const isActive = preset.key === selectedColorKey;
-          return (
-            <TouchableOpacity
-              key={preset.key}
-              activeOpacity={0.85}
-              onPress={() => setSelectedColorKey(preset.key)}
-              style={[
-                styles.colorDot,
-                {
-                  backgroundColor: preset.background,
-                  borderColor: isActive ? themeColors.textPrimary : 'transparent'
-                }
-              ]}
-            />
-          );
-        })}
-      </View>
-      <View style={[styles.previewCard, { backgroundColor: selectedPreset.background }]}>
-        <View style={styles.previewHeaderRow}>
-          <View style={[styles.previewAvatar, { backgroundColor: authorAvatarConfig.backgroundColor ?? previewPrimary }]}>
-            {authorAvatarConfig.icon ? (
-              <Ionicons
-                name={authorAvatarConfig.icon.name}
-                size={18}
-                color={authorAvatarConfig.icon.color ?? '#fff'}
-              />
-            ) : (
-              <Text style={[styles.previewAvatarEmoji, { color: authorAvatarConfig.foregroundColor ?? '#fff' }]}>
-                {authorAvatarConfig.emoji ?? '🙂'}
-              </Text>
-            )}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.previewTitle, { color: previewPrimary }]}>
-              {userProfile?.nickname?.trim() || 'Anonymous'}
-            </Text>
-            <Text style={[styles.previewMeta, { color: previewMeta }]}>{city} Room</Text>
-          </View>
+    showComposer ? (
+      <View style={styles.composerCard}>
+        <View style={styles.composerHeader}>
+          <Text style={styles.composerLabel}>Drop a new post</Text>
+          <TouchableOpacity onPress={() => setShowComposer(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={themeColors.textSecondary} />
+          </TouchableOpacity>
         </View>
-        <TextInput
-          placeholder="Post title"
-          value={title}
-          onChangeText={setTitle}
-          style={[styles.previewTitleInput, { color: previewPrimary }]}
-          placeholderTextColor={previewMeta}
-          returnKeyType="next"
-        />
-        <TextInput
-          placeholder="What's happening in this room?"
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          style={[styles.previewInput, { color: previewPrimary }]}
-          placeholderTextColor={previewMeta}
-        />
+        <Text style={styles.composerHint}>Pick a vibe for your card</Text>
+        <View style={styles.composerSwatches}>
+          {accentPresets.map((preset) => {
+            const isActive = preset.key === selectedColorKey;
+            return (
+              <TouchableOpacity
+                key={preset.key}
+                activeOpacity={0.85}
+                onPress={() => setSelectedColorKey(preset.key)}
+                style={[
+                  styles.colorDot,
+                  {
+                    backgroundColor: preset.background,
+                    borderColor: isActive ? themeColors.textPrimary : 'transparent'
+                  }
+                ]}
+              />
+            );
+          })}
+        </View>
+        <View style={[styles.previewCard, { backgroundColor: selectedPreset.background }]}>
+          <View style={styles.previewHeaderRow}>
+            <View style={[styles.previewAvatar, { backgroundColor: authorAvatarConfig.backgroundColor ?? previewPrimary }]}>
+              {authorAvatarConfig.icon ? (
+                <Ionicons
+                  name={authorAvatarConfig.icon.name}
+                  size={18}
+                  color={authorAvatarConfig.icon.color ?? '#fff'}
+                />
+              ) : (
+                <Text style={[styles.previewAvatarEmoji, { color: authorAvatarConfig.foregroundColor ?? '#fff' }]}>
+                  {authorAvatarConfig.emoji ?? '🙂'}
+                </Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.previewTitle, { color: previewPrimary }]}>
+                {userProfile?.nickname?.trim() || 'Anonymous'}
+              </Text>
+              <Text style={[styles.previewMeta, { color: previewMeta }]}>{city} Room</Text>
+            </View>
+          </View>
+          <TextInput
+            placeholder="Post title"
+            value={title}
+            onChangeText={setTitle}
+            style={[styles.previewTitleInput, { color: previewPrimary }]}
+            placeholderTextColor={previewMeta}
+            returnKeyType="next"
+          />
+          <TextInput
+            placeholder="What's happening in this room?"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            style={[styles.previewInput, { color: previewPrimary }]}
+            placeholderTextColor={previewMeta}
+          />
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.primaryButton,
+            { backgroundColor: buttonBackground },
+            (!title.trim() || isPublishing) && styles.primaryButtonDisabled,
+          ]}
+          onPress={handleAddPost}
+          activeOpacity={0.85}
+          disabled={!title.trim() || isPublishing}
+        >
+          <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        style={[
-          styles.primaryButton,
-          { backgroundColor: buttonBackground },
-          (!title.trim() || isPublishing) && styles.primaryButtonDisabled,
-        ]}
-        onPress={handleAddPost}
-        activeOpacity={0.85}
-        disabled={!title.trim() || isPublishing}
-      >
-        <Text style={[styles.primaryButtonText, { color: buttonForeground }]}>Post</Text>
-      </TouchableOpacity>
-    </View>
+    ) : renderComposerButton()
   );
 
   const renderItem = ({ item }) => {
@@ -369,8 +388,8 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderBottomLeftRadius: 0,
       borderBottomRightRadius: 0,
       paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 24,
+      paddingTop: 8,
+      paddingBottom: 12,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.25 : 0.12,
       shadowRadius: 12,
@@ -391,7 +410,25 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     statsRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between'
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      paddingVertical: 16
+    },
+    statItem: {
+      alignItems: 'center',
+      flex: 1
+    },
+    statValueBold: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: '#fff',
+      letterSpacing: 0.5,
+      marginBottom: 4
+    },
+    statLabelCompact: {
+      fontSize: 11,
+      fontWeight: '500',
+      opacity: 0.85
     },
     statCardBase: {
       borderRadius: 14,
@@ -417,6 +454,27 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 12,
       marginTop: 4
     },
+    dropPostButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      paddingVertical: 16,
+      borderRadius: 14,
+      marginHorizontal: 20,
+      marginTop: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3
+    },
+    dropPostButtonText: {
+      fontSize: 17,
+      fontWeight: '700',
+      letterSpacing: 0.2
+    },
     composerCard: {
       backgroundColor: palette.card,
       borderRadius: 16,
@@ -430,11 +488,16 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       shadowOffset: { width: 0, height: 4 },
       elevation: 2
     },
+    composerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12
+    },
     composerLabel: {
       color: palette.textPrimary,
       fontSize: 16,
-      fontWeight: '500',
-      marginBottom: 12
+      fontWeight: '500'
     },
     composerHint: {
       fontSize: 12,
