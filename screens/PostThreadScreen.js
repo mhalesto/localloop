@@ -2235,115 +2235,115 @@ export default function PostThreadScreen({ route, navigation }) {
                     </Text>
                   </View>
                 ) : (
-                <>
-                  {forceExpanded ? (
-                    <ScrollView
-                      style={styles.postMessageExpandedScroll}
-                      contentContainerStyle={styles.postMessageExpandedContent}
-                      nestedScrollEnabled
-                      showsVerticalScrollIndicator={false}
-                    >
-                      <RichText
-                        text={trimmedDescription}
-                        textStyle={[styles.postMessage, { color: headerTitleColor }]}
-                        linkStyle={{ color: linkColor }}
-                      />
-                    </ScrollView>
-                  ) : (
-                    <View style={styles.postMessageExpandedWrapper}>
-                      <Animated.ScrollView
+                  <>
+                    {forceExpanded ? (
+                      <ScrollView
                         style={styles.postMessageExpandedScroll}
-                        contentContainerStyle={[
-                          styles.postMessageExpandedContent,
-                          styles.postMessageExpandedContentIndicator,
-                        ]}
+                        contentContainerStyle={styles.postMessageExpandedContent}
                         nestedScrollEnabled
                         showsVerticalScrollIndicator={false}
-                        onLayout={handleDescriptionLayout}
-                        onContentSizeChange={handleDescriptionContentSizeChange}
-                        onScroll={handleDescriptionScroll}
-                        scrollEventThrottle={16}
-                        onScrollBeginDrag={handleDescriptionScrollBegin}
-                        onScrollEndDrag={handleDescriptionScrollEnd}
-                        onMomentumScrollBegin={handleDescriptionScrollBegin}
-                        onMomentumScrollEnd={handleDescriptionScrollEnd}
                       >
                         <RichText
                           text={trimmedDescription}
                           textStyle={[styles.postMessage, { color: headerTitleColor }]}
                           linkStyle={{ color: linkColor }}
                         />
-                      </Animated.ScrollView>
-                      {dreamyScrollIndicatorEnabled ? (
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.scrollIndicatorHost,
-                            styles.descriptionScrollIndicatorHost,
-                            shouldShowDescriptionIndicator
-                              ? { opacity: descriptionIndicatorOpacity }
-                              : { opacity: 0 },
+                      </ScrollView>
+                    ) : (
+                      <View style={styles.postMessageExpandedWrapper}>
+                        <Animated.ScrollView
+                          style={styles.postMessageExpandedScroll}
+                          contentContainerStyle={[
+                            styles.postMessageExpandedContent,
+                            styles.postMessageExpandedContentIndicator,
                           ]}
+                          nestedScrollEnabled
+                          showsVerticalScrollIndicator={false}
+                          onLayout={handleDescriptionLayout}
+                          onContentSizeChange={handleDescriptionContentSizeChange}
+                          onScroll={handleDescriptionScroll}
+                          scrollEventThrottle={16}
+                          onScrollBeginDrag={handleDescriptionScrollBegin}
+                          onScrollEndDrag={handleDescriptionScrollEnd}
+                          onMomentumScrollBegin={handleDescriptionScrollBegin}
+                          onMomentumScrollEnd={handleDescriptionScrollEnd}
                         >
-                          <Animated.View
-                            style={[
-                              styles.scrollIndicatorHalo,
-                              {
-                                height: descriptionIndicatorThumbHeight,
-                                backgroundColor: linkColor,
-                                opacity: descriptionIndicatorHaloOpacity,
-                                transform: [
-                                  { translateY: descriptionIndicatorTranslateY },
-                                  { scaleX: descriptionIndicatorHaloScale },
-                                  { scaleY: descriptionIndicatorHaloScale },
-                                ],
-                              },
-                            ]}
+                          <RichText
+                            text={trimmedDescription}
+                            textStyle={[styles.postMessage, { color: headerTitleColor }]}
+                            linkStyle={{ color: linkColor }}
                           />
-                          <View
-                            style={[
-                              styles.scrollIndicatorTrack,
-                              { height: descriptionIndicatorTrackHeight },
-                            ]}
-                          />
+                        </Animated.ScrollView>
+                        {dreamyScrollIndicatorEnabled ? (
                           <Animated.View
+                            pointerEvents="none"
                             style={[
-                              styles.scrollIndicatorThumb,
-                              {
-                                height: descriptionIndicatorThumbHeight,
-                                backgroundColor: linkColor,
-                                shadowColor: linkColor,
-                                transform: [
-                                  { translateY: descriptionIndicatorTranslateY },
-                                  { scaleX: descriptionIndicatorScale },
-                                  { scaleY: descriptionIndicatorScale },
-                                ],
-                              },
+                              styles.scrollIndicatorHost,
+                              styles.descriptionScrollIndicatorHost,
+                              shouldShowDescriptionIndicator
+                                ? { opacity: descriptionIndicatorOpacity }
+                                : { opacity: 0 },
                             ]}
                           >
                             <Animated.View
                               style={[
-                                styles.scrollIndicatorGlow,
-                                { opacity: descriptionIndicatorGlowOpacity },
+                                styles.scrollIndicatorHalo,
+                                {
+                                  height: descriptionIndicatorThumbHeight,
+                                  backgroundColor: linkColor,
+                                  opacity: descriptionIndicatorHaloOpacity,
+                                  transform: [
+                                    { translateY: descriptionIndicatorTranslateY },
+                                    { scaleX: descriptionIndicatorHaloScale },
+                                    { scaleY: descriptionIndicatorHaloScale },
+                                  ],
+                                },
                               ]}
                             />
+                            <View
+                              style={[
+                                styles.scrollIndicatorTrack,
+                                { height: descriptionIndicatorTrackHeight },
+                              ]}
+                            />
+                            <Animated.View
+                              style={[
+                                styles.scrollIndicatorThumb,
+                                {
+                                  height: descriptionIndicatorThumbHeight,
+                                  backgroundColor: linkColor,
+                                  shadowColor: linkColor,
+                                  transform: [
+                                    { translateY: descriptionIndicatorTranslateY },
+                                    { scaleX: descriptionIndicatorScale },
+                                    { scaleY: descriptionIndicatorScale },
+                                  ],
+                                },
+                              ]}
+                            >
+                              <Animated.View
+                                style={[
+                                  styles.scrollIndicatorGlow,
+                                  { opacity: descriptionIndicatorGlowOpacity },
+                                ]}
+                              />
+                            </Animated.View>
                           </Animated.View>
-                        </Animated.View>
-                      ) : null}
-                    </View>
-                  )}
-                  {showToggleControls ? (
-                    <TouchableOpacity
-                      onPress={() => setIsDescriptionExpanded(false)}
-                      activeOpacity={0.7}
-                      style={[styles.postMessageToggle, styles.postMessageToggleExpanded]}
-                      hitSlop={toggleHitSlop}
-                    >
-                      <Text style={[styles.postMessageToggleText, { color: linkColor }]}>Show less</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </>
-              )}
+                        ) : null}
+                      </View>
+                    )}
+                    {showToggleControls ? (
+                      <TouchableOpacity
+                        onPress={() => setIsDescriptionExpanded(false)}
+                        activeOpacity={0.7}
+                        style={[styles.postMessageToggle, styles.postMessageToggleExpanded]}
+                        hitSlop={toggleHitSlop}
+                      >
+                        <Text style={[styles.postMessageToggleText, { color: linkColor }]}>Show less</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </>
+                )}
               </Animated.View>
             </>
           ) : null}
@@ -2356,46 +2356,46 @@ export default function PostThreadScreen({ route, navigation }) {
               </Text>
 
               <View style={styles.aiButtonsRow}>
-              {/* Translate Button */}
-              <TouchableOpacity
-                style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isTranslating ? 0.6 : 1 }]}
-                onPress={() => setShowTranslationPicker(true)}
-                disabled={isTranslating}
-                activeOpacity={0.7}
-              >
-                {isTranslating ? (
-                  <ActivityIndicator size="small" color={linkColor} />
-                ) : (
-                  <Ionicons name="language-outline" size={14} color={linkColor} />
-                )}
-                <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
-                  {isTranslating ? 'Translating...' : 'Translate'}
-                </Text>
-              </TouchableOpacity>
+                {/* Translate Button */}
+                <TouchableOpacity
+                  style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isTranslating ? 0.6 : 1 }]}
+                  onPress={() => setShowTranslationPicker(true)}
+                  disabled={isTranslating}
+                  activeOpacity={0.7}
+                >
+                  {isTranslating ? (
+                    <ActivityIndicator size="small" color={linkColor} />
+                  ) : (
+                    <Ionicons name="language-outline" size={14} color={linkColor} />
+                  )}
+                  <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                    {isTranslating ? 'Translating...' : 'Translate'}
+                  </Text>
+                </TouchableOpacity>
 
-              {/* Thread Summarization Button */}
-              {comments.length >= 10 && (() => {
-                console.log('[ThreadSummary] Rendering button, isSummarizing:', isSummarizing);
-                return (
-                  <TouchableOpacity
-                    style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
-                    onPress={handleSummarizeThread}
-                    disabled={isSummarizing}
-                    activeOpacity={0.7}
-                  >
-                    {isSummarizing ? (
-                      <ActivityIndicator size="small" color={linkColor} />
-                    ) : (
-                      <Ionicons name="bulb-outline" size={14} color={linkColor} />
-                    )}
-                    <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
-                      {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })()}
+                {/* Thread Summarization Button */}
+                {comments.length >= 10 && (() => {
+                  console.log('[ThreadSummary] Rendering button, isSummarizing:', isSummarizing);
+                  return (
+                    <TouchableOpacity
+                      style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
+                      onPress={handleSummarizeThread}
+                      disabled={isSummarizing}
+                      activeOpacity={0.7}
+                    >
+                      {isSummarizing ? (
+                        <ActivityIndicator size="small" color={linkColor} />
+                      ) : (
+                        <Ionicons name="bulb-outline" size={14} color={linkColor} />
+                      )}
+                      <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                        {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
+              </View>
             </View>
-          </View>
           )}
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
@@ -3332,7 +3332,7 @@ const createStyles = (
       padding: 4,
     },
     postMeta: { fontSize: 13, marginBottom: 12 },
-    actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+    actionsFooter: { marginTop: -10, paddingTop: 0, paddingBottom: 4, borderTopWidth: StyleSheet.hairlineWidth },
     actionsFooterRow: {
       flexDirection: 'row',
       alignItems: 'center',
