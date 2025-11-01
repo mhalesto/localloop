@@ -473,6 +473,8 @@ export default function PostThreadScreen({ route, navigation }) {
   const [replyingToComment, setReplyingToComment] = useState(null);
   const [reactionPickerCommentId, setReactionPickerCommentId] = useState(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [showDescriptionWhenScrolled, setShowDescriptionWhenScrolled] = useState(false);
+  const [isScrolledPastThreshold, setIsScrolledPastThreshold] = useState(false);
 
   // [AI-FEATURES] Thread summarization, comment suggestions, translation
   const [threadSummary, setThreadSummary] = useState(null);
@@ -540,11 +542,16 @@ export default function PostThreadScreen({ route, navigation }) {
   useEffect(() => {
     const listenerId = scrollY.addListener(({ value }) => {
       scrollYValueRef.current = value;
+      const threshold = HEADER_SCROLL_DISTANCE * 0.5;
+      const isPastThreshold = value >= threshold;
+      if (isPastThreshold !== isScrolledPastThreshold) {
+        setIsScrolledPastThreshold(isPastThreshold);
+      }
     });
     return () => {
       scrollY.removeListener(listenerId);
     };
-  }, [scrollY]);
+  }, [scrollY, isScrolledPastThreshold]);
 
   const collapsedHeaderHorizontalPadding = useMemo(
     () => Math.max(insets.left || 0, insets.right || 0),
@@ -629,6 +636,27 @@ export default function PostThreadScreen({ route, navigation }) {
         extrapolate: 'clamp',
       }),
     [collapsedBackdropInset, headerReveal]
+  );
+
+  // Description visibility when scrolled
+  const descriptionHeight = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: [1, 0, 0],
+        extrapolate: 'clamp',
+      }),
+    [headerReveal]
+  );
+
+  const descriptionOpacity = useMemo(
+    () =>
+      headerReveal.interpolate({
+        inputRange: [0, 0.3, 1],
+        outputRange: [1, 0, 0],
+        extrapolate: 'clamp',
+      }),
+    [headerReveal]
   );
   const headerUnderlayOpacity = useMemo(
     () =>
@@ -2181,22 +2209,32 @@ export default function PostThreadScreen({ route, navigation }) {
           ) : null}
 
           {trimmedDescription && trimmedDescription !== displayTitle ? (
-            <View style={descriptionContainerStyle}>
-              {!isExpanded && collapsedPreviewText ? (
-                <View style={styles.postMessagePreview}>
-                  <Text style={[styles.postMessagePreviewText, { color: headerTitleColor }]}>
-                    {truncatedPreviewText}
-                    {showToggleControls ? (
-                      <Text
-                        style={[styles.postMessagePreviewButtonText, { color: linkColor }]}
-                        onPress={() => setIsFullscreenModalVisible(true)}
-                      >
-                        {' '}Show more
-                      </Text>
-                    ) : null}
-                  </Text>
-                </View>
-              ) : (
+            <>
+              <Animated.View
+                style={[
+                  descriptionContainerStyle,
+                  {
+                    opacity: showDescriptionWhenScrolled ? 1 : descriptionOpacity,
+                    height: showDescriptionWhenScrolled || !isScrolledPastThreshold ? 'auto' : 0,
+                    overflow: 'hidden',
+                  }
+                ]}
+              >
+                {!isExpanded && collapsedPreviewText ? (
+                  <View style={styles.postMessagePreview}>
+                    <Text style={[styles.postMessagePreviewText, { color: headerTitleColor }]}>
+                      {truncatedPreviewText}
+                      {showToggleControls ? (
+                        <Text
+                          style={[styles.postMessagePreviewButtonText, { color: linkColor }]}
+                          onPress={() => setIsFullscreenModalVisible(true)}
+                        >
+                          {' '}Show more
+                        </Text>
+                      ) : null}
+                    </Text>
+                  </View>
+                ) : (
                 <>
                   {forceExpanded ? (
                     <ScrollView
@@ -2306,15 +2344,18 @@ export default function PostThreadScreen({ route, navigation }) {
                   ) : null}
                 </>
               )}
-            </View>
+              </Animated.View>
+            </>
           ) : null}
 
-          <View style={styles.commentHeaderRow}>
-            <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-            </Text>
+          {/* Hide comment count and translate when description is collapsed */}
+          {(showDescriptionWhenScrolled || !isScrolledPastThreshold) && (
+            <View style={styles.commentHeaderRow}>
+              <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+                {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+              </Text>
 
-            <View style={styles.aiButtonsRow}>
+              <View style={styles.aiButtonsRow}>
               {/* Translate Button */}
               <TouchableOpacity
                 style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isTranslating ? 0.6 : 1 }]}
@@ -2355,6 +2396,7 @@ export default function PostThreadScreen({ route, navigation }) {
               })()}
             </View>
           </View>
+          )}
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
             <View style={styles.actionsFooterRow}>
@@ -2391,6 +2433,18 @@ export default function PostThreadScreen({ route, navigation }) {
                   <Text style={[styles.actionLabel, { color: linkColor }]}>Share</Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Expand description button when scrolled */}
+              {trimmedDescription && trimmedDescription !== displayTitle && isScrolledPastThreshold && !showDescriptionWhenScrolled ? (
+                <TouchableOpacity
+                  onPress={() => setShowDescriptionWhenScrolled(true)}
+                  style={styles.expandDescriptionButton}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chevron-down-circle-outline" size={22} color={linkColor} />
+                </TouchableOpacity>
+              ) : null}
+
               {!hideHeaderActions && showViewOriginal ? (
                 <TouchableOpacity
                   onPress={() =>
@@ -2434,6 +2488,8 @@ export default function PostThreadScreen({ route, navigation }) {
       toggleVote,
       styles,
       isDescriptionExpanded,
+      showDescriptionWhenScrolled,
+      isScrolledPastThreshold,
       dreamyScrollIndicatorEnabled,
       handleDescriptionContentSizeChange,
       handleDescriptionLayout,
@@ -3272,6 +3328,9 @@ const createStyles = (
     postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-end' },
     postMessageToggleText: { fontSize: 14, fontWeight: '600' },
     postMessageToggleHitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
+    expandDescriptionButton: {
+      padding: 4,
+    },
     postMeta: { fontSize: 13, marginBottom: 12 },
     actionsFooter: { marginTop: 4, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
     actionsFooterRow: {
