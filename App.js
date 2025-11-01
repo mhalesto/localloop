@@ -25,6 +25,8 @@ import StatusComposerScreen from './screens/StatusComposerScreen';
 import ModerationScreen from './screens/ModerationScreen';
 import TopStatusesScreen from './screens/TopStatusesScreen';
 import StatusStoryViewerScreen from './screens/StatusStoryViewerScreen';
+import SubscriptionScreen from './screens/SubscriptionScreen';
+import PaymentScreen from './screens/PaymentScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -54,6 +56,8 @@ function RootNavigator() {
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="TopStatuses" component={TopStatusesScreen} />
       <Stack.Screen name="StatusStoryViewer" component={StatusStoryViewerScreen} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+      <Stack.Screen name="Payment" component={PaymentScreen} />
     </Stack.Navigator>
   );
 }

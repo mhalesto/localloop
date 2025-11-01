@@ -833,6 +833,19 @@ export default function SettingsScreen({ navigation }) {
                 {!premiumUnlocked && pointsGap > 0 ? (
                   <Text style={styles.rewardsProgress}>{`${pointsGap} pts to go`}</Text>
                 ) : null}
+
+                {/* Subscription Plans Button */}
+                <TouchableOpacity
+                  style={styles.subscriptionButton}
+                  onPress={() => navigation.navigate('Subscription')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="star-outline" size={20} color={themeColors.primary} />
+                  <Text style={[styles.subscriptionButtonText, { color: themeColors.primary }]}>
+                    {premiumUnlocked ? 'Manage Subscription' : 'View Subscription Plans'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+                </TouchableOpacity>
               </View>
             </>
           ) : (
@@ -1737,6 +1750,24 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 12,
       fontWeight: '600',
       color: palette.textSecondary
+    },
+    subscriptionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 12,
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    subscriptionButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      flex: 1,
+      marginLeft: 8,
     },
     redeemButton: {
       marginTop: 16,
