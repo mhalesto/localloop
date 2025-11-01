@@ -16,7 +16,9 @@ import { useSettings } from '../contexts/SettingsContext';
 
 const tabs = [
   { key: 'home', label: 'Explore', icon: 'home-outline' },
-  { key: 'myComments', label: 'My Replies', icon: 'chatbubble-ellipses-outline' },
+  { key: 'feed', label: 'Feed', icon: 'people-outline' },
+  { key: 'discover', label: 'Discover', icon: 'compass-outline' },
+  { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' },
   { key: 'settings', label: 'Settings', icon: 'settings-outline' },
 ];
 
@@ -62,10 +64,10 @@ export default function FooterMenu({
   const OFFSET_Y = NOTCH_R;
   const SVG_H = BAR_HEIGHT + OFFSET_Y;
 
-  // Equal tab widths (3 tabs) with spacer width for the notch
+  // Equal tab widths (5 tabs) with spacer width for the notch
   const spacerW = NOTCH_R * 2 + SPACER_EXTRA * 2;
   const contentW = Math.max(0, barW - TAB_ROW_PADDING_H * 2 - (showShortcut ? spacerW : 0));
-  const tabItemW = contentW > 0 ? contentW / 3 : 90;
+  const tabItemW = contentW > 0 ? contentW / 5 : 70;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { paddingBottom: bottomPad }]}>
@@ -113,6 +115,7 @@ export default function FooterMenu({
 
         {/* Tabs (equal spacing) */}
         <View style={styles.tabRow}>
+          {/* Tab 0: Explore */}
           <TabItem
             width={tabItemW}
             tab={tabs[0]}
@@ -122,6 +125,17 @@ export default function FooterMenu({
             inactiveColor={accentInactiveColor}
           />
 
+          {/* Tab 1: Feed */}
+          <TabItem
+            width={tabItemW}
+            tab={tabs[1]}
+            active={activeTab === tabs[1].key}
+            onPress={() => onPressTab?.(tabs[1].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
+          />
+
+          {/* FAB Spacer */}
           {showShortcut ? (
             <View
               style={{ width: spacerW, height: 1 }}
@@ -133,20 +147,33 @@ export default function FooterMenu({
             />
           ) : null}
 
-          <TabItem
-            width={tabItemW}
-            tab={tabs[1]}
-            active={activeTab === tabs[1].key}
-            onPress={() => onPressTab?.(tabs[1].key)}
-            activeColor={accentActiveColor}
-            inactiveColor={accentInactiveColor}
-            badgeCount={myRepliesBadge}
-          />
+          {/* Tab 2: Discover */}
           <TabItem
             width={tabItemW}
             tab={tabs[2]}
             active={activeTab === tabs[2].key}
             onPress={() => onPressTab?.(tabs[2].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
+          />
+
+          {/* Tab 3: Replies */}
+          <TabItem
+            width={tabItemW}
+            tab={tabs[3]}
+            active={activeTab === tabs[3].key}
+            onPress={() => onPressTab?.(tabs[3].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
+            badgeCount={myRepliesBadge}
+          />
+
+          {/* Tab 4: Settings */}
+          <TabItem
+            width={tabItemW}
+            tab={tabs[4]}
+            active={activeTab === tabs[4].key}
+            onPress={() => onPressTab?.(tabs[4].key)}
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
           />

@@ -964,7 +964,9 @@ export function PostsProvider({ children }) {
       colorKey = 'royal',
       authorProfile = null,
       highlightDescription = false,
-      moderation = null
+      moderation = null,
+      postingMode = 'anonymous', // [PUBLIC-MODE] New parameter
+      publicProfile = null // [PUBLIC-MODE] User's public profile data
     ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
@@ -984,6 +986,8 @@ export function PostsProvider({ children }) {
       });
       const newPostId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const moderationStatus = deriveModerationStatus(moderation);
+
+      // [PUBLIC-MODE] Build post object with mode-specific fields
       const newPost = {
         id: newPostId,
         city,
@@ -1005,7 +1009,16 @@ export function PostsProvider({ children }) {
         author,
         highlightDescription: !!highlightDescription,
         moderation: moderation ?? null,
-        moderationStatus
+        moderationStatus,
+        // [PUBLIC-MODE] Add mode and public profile fields
+        postingMode, // 'anonymous' or 'public'
+        isPublic: postingMode === 'public',
+        ...(postingMode === 'public' && publicProfile ? {
+          authorId: firebaseUser.uid,
+          authorUsername: publicProfile.username,
+          authorDisplayName: publicProfile.displayName,
+          authorAvatar: publicProfile.profilePhoto,
+        } : {})
       };
 
       setPostsWithPersist((prev) => {

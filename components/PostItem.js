@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
@@ -38,11 +38,24 @@ export default function PostItem({
   const shareCount = post.shareCount ?? 0;
   const userVote = post.userVote ?? null;     // 'up' | 'down' | null
   const commentCount = post.comments?.length ?? 0;
-  const authorName = (post.author?.nickname ?? '').trim() || 'Anonymous';
+
+  // [PUBLIC-MODE] Determine if this is a public post
+  const isPublicPost = post.isPublic || post.postingMode === 'public';
+
+  // [PUBLIC-MODE] Use public profile info if available, otherwise use anonymous info
+  const authorName = isPublicPost && post.authorDisplayName
+    ? post.authorDisplayName
+    : (post.author?.nickname ?? '').trim() || 'Anonymous';
+
+  const authorUsername = isPublicPost && post.authorUsername ? `@${post.authorUsername}` : null;
+
   const locationParts = [post.author?.city, post.author?.province, post.author?.country].filter(Boolean);
-  const authorLocation = locationParts.join(', ');
+  const authorLocation = !isPublicPost && locationParts.length > 0 ? locationParts.join(', ') : null;
+
   const avatarConfig = getAvatarConfig(post.author?.avatarKey);
   const avatarBackground = avatarConfig.backgroundColor ?? badgeBg;
+  const hasProfilePhoto = isPublicPost && post.authorAvatar;
+
   const trimmedTitle = post.title?.trim?.() ?? '';
   const trimmedDescription = post.message?.trim?.() ?? '';
   const displayTitle = trimmedTitle || trimmedDescription || 'Untitled post';
@@ -56,7 +69,10 @@ export default function PostItem({
           <View style={styles.headerLeft}>
             <View style={[styles.avatar, { backgroundColor: avatarBackground }]}>
               <View style={styles.avatarRing} />
-              {avatarConfig.icon ? (
+              {/* [PUBLIC-MODE] Show profile photo for public posts */}
+              {hasProfilePhoto ? (
+                <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
+              ) : avatarConfig.icon ? (
                 <Ionicons
                   name={avatarConfig.icon.name}
                   size={22}
@@ -71,7 +87,16 @@ export default function PostItem({
 
             <View style={styles.authorBlock}>
               <Text style={[styles.posterName, { color: primaryTextColor }]}>{authorName}</Text>
-              {authorLocation ? (
+              {/* [PUBLIC-MODE] Show username for public posts, location for anonymous */}
+              {authorUsername ? (
+                <Text
+                  style={[styles.posterMeta, { color: metaColor }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {authorUsername}
+                </Text>
+              ) : authorLocation ? (
                 <Text
                   style={[styles.posterMeta, { color: metaColor }]}
                   numberOfLines={1}
@@ -234,6 +259,12 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 18,
     textAlign: 'center',
+  },
+  // [PUBLIC-MODE] Avatar image style for public posts
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
 
   viewOriginal: {

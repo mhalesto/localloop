@@ -19,6 +19,7 @@ import { autoTagPost } from '../services/openai/autoTaggingService';
 import { analyzeContent } from '../services/openai/contentAnalysisService';
 import { scorePostQuality } from '../services/openai/qualityScoringService';
 import { isFeatureEnabled } from '../config/aiFeatures';
+import { createPublicPost } from '../services/publicPostsService'; // [PUBLIC-MODE]
 
 export default function ScreenLayout({
   children,
@@ -88,7 +89,7 @@ export default function ScreenLayout({
     [userProfile?.avatarKey]
   );
 
-  const handleSubmitPost = async ({ location, colorKey, title, message, highlightDescription }) => {
+  const handleSubmitPost = async ({ location, colorKey, title, message, highlightDescription, postingMode, isPublic }) => {
     if (!location?.city || !title?.trim?.()) {
       setComposerVisible(false);
       return false;
@@ -113,6 +114,7 @@ export default function ScreenLayout({
     // Moderation will run in background and update the post
     const tempModeration = { action: 'review', matchedLabels: [] };
 
+    // [PUBLIC-MODE] Pass posting mode and public profile to addPost
     const published = addPost(
       location.city,
       title,
@@ -120,7 +122,9 @@ export default function ScreenLayout({
       colorKey,
       mergedAuthor,
       highlightDescription,
-      tempModeration
+      tempModeration,
+      postingMode || 'anonymous', // Default to anonymous if not specified
+      isPublic ? userProfile : null // Pass public profile data if posting publicly
     );
 
     if (!published) {
@@ -141,6 +145,23 @@ export default function ScreenLayout({
     setComposerVisible(false);
     if (navigation) {
       navigation.navigate('MyPosts', { focusPostId: published.id, pendingPost: { ...published } });
+    }
+
+    // [PUBLIC-MODE] If posting publicly, also save to publicPosts collection
+    if (isPublic && userProfile?.isPublicProfile) {
+      createPublicPost(firebaseUser.uid, {
+        title,
+        message,
+        authorUsername: userProfile.username,
+        authorDisplayName: userProfile.displayName,
+        authorAvatar: userProfile.profilePhoto,
+        city: location.city,
+        province: location.province,
+        country: location.country,
+        colorKey,
+      }).catch(err => {
+        console.warn('[ScreenLayout] Failed to save public post:', err.message);
+      });
     }
 
     // Run moderation AND auto-tagging in background
@@ -292,6 +313,16 @@ export default function ScreenLayout({
         navigation.popToTop();
       }
       navigation.navigate('Country');
+    } else if (tab === 'feed') {
+      // [PUBLIC-MODE] Navigate to Feed screen
+      if (navigation.getCurrentRoute?.()?.name !== 'Feed') {
+        navigation.navigate('Feed');
+      }
+    } else if (tab === 'discover') {
+      // [PUBLIC-MODE] Navigate to Discover screen
+      if (navigation.getCurrentRoute?.()?.name !== 'Discover') {
+        navigation.navigate('Discover');
+      }
     } else if (tab === 'myComments') {
       if (navigation.getCurrentRoute?.()?.name !== 'MyComments') {
         navigation.navigate('MyComments');

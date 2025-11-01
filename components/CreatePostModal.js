@@ -63,7 +63,8 @@ export default function CreatePostModal({
     isDarkMode,
     premiumSummariesEnabled,
     premiumSummaryLength,
-    userProfile
+    userProfile,
+    updateUserProfile
   } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
@@ -101,6 +102,9 @@ export default function CreatePostModal({
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [titleError, setTitleError] = useState('');
 
+  // [PUBLIC-MODE] Posting mode state
+  const [postingMode, setPostingMode] = useState(userProfile?.currentMode || 'anonymous');
+
   useEffect(() => {
     if (visible) {
       const nextTitle = initialTitle ?? '';
@@ -118,6 +122,9 @@ export default function CreatePostModal({
       setHighlightDescription(initialHighlightDescription ?? false);
       const caret = nextMessage.length;
       setMessageSelection({ start: caret, end: caret });
+
+      // [PUBLIC-MODE] Reset to user's preferred mode
+      setPostingMode(userProfile?.currentMode || 'anonymous');
 
       // [AI-SUMMARY] reset summary UI each open
       setSummaryError('');
@@ -334,6 +341,17 @@ export default function CreatePostModal({
     if (!value) setHighlightDescription(false);
   };
 
+  // [PUBLIC-MODE] Toggle posting mode
+  const handleTogglePostingMode = async (mode) => {
+    setPostingMode(mode);
+    // Save user's current mode preference
+    try {
+      await updateUserProfile({ currentMode: mode });
+    } catch (error) {
+      console.warn('[CreatePostModal] Failed to save mode preference:', error);
+    }
+  };
+
   const sanitizeDescriptionForSummary = (value) =>
     String(value ?? '')
       .replace(/\r\n/g, '\n')
@@ -515,7 +533,9 @@ export default function CreatePostModal({
         title: trimmedTitle,
         message: trimmedMessage,
         description: trimmedMessage,
-        highlightDescription
+        highlightDescription,
+        postingMode, // [PUBLIC-MODE] Include posting mode
+        isPublic: postingMode === 'public' // Helper flag
       });
     } catch (error) {
       console.warn('[CreatePostModal] submit failed', error);
@@ -559,6 +579,65 @@ export default function CreatePostModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* [PUBLIC-MODE] Mode toggle */}
+            {userProfile?.isPublicProfile ? (
+              <>
+                <Text style={styles.sectionLabel}>Posting as</Text>
+                <View style={styles.modeToggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeToggleButton,
+                      postingMode === 'anonymous' && [styles.modeToggleButtonActive, { backgroundColor: summaryAccentColor }]
+                    ]}
+                    onPress={() => handleTogglePostingMode('anonymous')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="eye-off-outline"
+                      size={18}
+                      color={postingMode === 'anonymous' ? '#fff' : themeColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.modeToggleText,
+                        { color: postingMode === 'anonymous' ? '#fff' : themeColors.textSecondary }
+                      ]}
+                    >
+                      Anonymous
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.modeToggleButton,
+                      postingMode === 'public' && [styles.modeToggleButtonActive, { backgroundColor: summaryAccentColor }]
+                    ]}
+                    onPress={() => handleTogglePostingMode('public')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name="person-outline"
+                      size={18}
+                      color={postingMode === 'public' ? '#fff' : themeColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.modeToggleText,
+                        { color: postingMode === 'public' ? '#fff' : themeColors.textSecondary }
+                      ]}
+                    >
+                      @{userProfile.username || 'Public'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.helperText}>
+                  {postingMode === 'anonymous'
+                    ? 'Post anonymously in this city. Others won\'t see your profile.'
+                    : 'Post from your public profile. Followers will see this in their feed.'}
+                </Text>
+              </>
+            ) : null}
+
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionLabel}>Advanced options</Text>
               <Switch
@@ -1041,5 +1120,37 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       marginTop: 4,
       fontSize: 12,
       color: '#D64545',
+    },
+
+    // [PUBLIC-MODE] Mode toggle styles
+    modeToggleContainer: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 8,
+    },
+    modeToggleButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      backgroundColor: palette.background,
+      gap: 8,
+    },
+    modeToggleButtonActive: {
+      borderColor: 'transparent',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.12,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+    modeToggleText: {
+      fontSize: 14,
+      fontWeight: '600',
     },
   });

@@ -27,6 +27,12 @@ import TopStatusesScreen from './screens/TopStatusesScreen';
 import StatusStoryViewerScreen from './screens/StatusStoryViewerScreen';
 import SubscriptionScreen from './screens/SubscriptionScreen';
 import PaymentScreen from './screens/PaymentScreen';
+import ProfileSetupScreen from './screens/ProfileSetupScreen';
+import PublicProfileScreen from './screens/PublicProfileScreen';
+import FollowersScreen from './screens/FollowersScreen';
+import FollowingScreen from './screens/FollowingScreen';
+import FeedScreen from './screens/FeedScreen';
+import DiscoverScreen from './screens/DiscoverScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -58,6 +64,12 @@ function RootNavigator() {
       <Stack.Screen name="StatusStoryViewer" component={StatusStoryViewerScreen} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />
+      <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+      <Stack.Screen name="PublicProfile" component={PublicProfileScreen} />
+      <Stack.Screen name="Followers" component={FollowersScreen} />
+      <Stack.Screen name="Following" component={FollowingScreen} />
+      <Stack.Screen name="Feed" component={FeedScreen} />
+      <Stack.Screen name="Discover" component={DiscoverScreen} />
     </Stack.Navigator>
   );
 }

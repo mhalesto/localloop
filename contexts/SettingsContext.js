@@ -805,11 +805,37 @@ export function SettingsProvider({ children }) {
     PREMIUM_SUMMARY_LENGTH_DEFAULT
   );
   const [userProfile, setUserProfile] = useState({
+    // Location data
     nickname: '',
     country: '',
     province: '',
     city: '',
-    avatarKey: 'default'
+    avatarKey: 'default',
+
+    // Public profile data
+    username: '',              // Unique username for public profile
+    displayName: '',           // Display name
+    bio: '',                   // Profile bio
+    profilePhoto: '',          // Profile photo URL
+    isPublicProfile: false,    // Has set up public profile?
+
+    // Mode preference
+    defaultMode: 'anonymous',  // 'anonymous' or 'public'
+    currentMode: 'anonymous',  // Current posting mode
+
+    // Social stats
+    followersCount: 0,
+    followingCount: 0,
+    publicPostsCount: 0,
+
+    // Privacy settings
+    allowFollows: true,
+    showFollowers: true,
+    showFollowing: true,
+
+    // Subscription
+    subscriptionPlan: 'basic',
+    premiumUnlocked: false,
   });
   const { hasActivePremium } = useAuth();
 
