@@ -748,7 +748,7 @@ export default function SettingsScreen({ navigation }) {
               <View style={styles.item}>
                 <View>
                   <Text style={styles.itemTitle}>
-                    {authProfile?.displayName || user.displayName || 'Mystery guest'}
+                    {userProfile?.displayName || authProfile?.displayName || user.displayName || 'Mystery guest'}
                   </Text>
                   <Text style={styles.itemSubtitle}>
                     {authProfile?.email || user.email || 'Signed in with Google'}
