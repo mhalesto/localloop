@@ -29,6 +29,14 @@ export async function followUser(followerId, followedId) {
 
   try {
     await runTransaction(db, async (transaction) => {
+      // ALL READS FIRST (Firestore requirement)
+      const followedUserRef = doc(db, 'users', followedId);
+      const followerUserRef = doc(db, 'users', followerId);
+
+      const followedSnap = await transaction.get(followedUserRef);
+      const followerSnap = await transaction.get(followerUserRef);
+
+      // NOW DO ALL WRITES
       // Create follower relationship
       const followerRef = doc(db, 'followers', followedId, 'followers', followerId);
       transaction.set(followerRef, {
@@ -44,8 +52,6 @@ export async function followUser(followerId, followedId) {
       });
 
       // Increment follower count for followed user
-      const followedUserRef = doc(db, 'users', followedId);
-      const followedSnap = await transaction.get(followedUserRef);
       if (followedSnap.exists()) {
         transaction.update(followedUserRef, {
           followersCount: (followedSnap.data().followersCount || 0) + 1,
@@ -53,8 +59,6 @@ export async function followUser(followerId, followedId) {
       }
 
       // Increment following count for follower
-      const followerUserRef = doc(db, 'users', followerId);
-      const followerSnap = await transaction.get(followerUserRef);
       if (followerSnap.exists()) {
         transaction.update(followerUserRef, {
           followingCount: (followerSnap.data().followingCount || 0) + 1,
@@ -75,6 +79,14 @@ export async function followUser(followerId, followedId) {
 export async function unfollowUser(followerId, followedId) {
   try {
     await runTransaction(db, async (transaction) => {
+      // ALL READS FIRST (Firestore requirement)
+      const followedUserRef = doc(db, 'users', followedId);
+      const followerUserRef = doc(db, 'users', followerId);
+
+      const followedSnap = await transaction.get(followedUserRef);
+      const followerSnap = await transaction.get(followerUserRef);
+
+      // NOW DO ALL WRITES
       // Delete follower relationship
       const followerRef = doc(db, 'followers', followedId, 'followers', followerId);
       transaction.delete(followerRef);
@@ -84,8 +96,6 @@ export async function unfollowUser(followerId, followedId) {
       transaction.delete(followingRef);
 
       // Decrement follower count for followed user
-      const followedUserRef = doc(db, 'users', followedId);
-      const followedSnap = await transaction.get(followedUserRef);
       if (followedSnap.exists()) {
         transaction.update(followedUserRef, {
           followersCount: Math.max((followedSnap.data().followersCount || 0) - 1, 0),
@@ -93,8 +103,6 @@ export async function unfollowUser(followerId, followedId) {
       }
 
       // Decrement following count for follower
-      const followerUserRef = doc(db, 'users', followerId);
-      const followerSnap = await transaction.get(followerUserRef);
       if (followerSnap.exists()) {
         transaction.update(followerUserRef, {
           followingCount: Math.max((followerSnap.data().followingCount || 0) - 1, 0),
