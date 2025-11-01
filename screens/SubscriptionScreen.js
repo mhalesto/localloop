@@ -122,13 +122,17 @@ export default function SubscriptionScreen({ navigation }) {
 
               {/* Price */}
               <View style={styles.priceContainer}>
-                <Text style={[styles.price, { color: themeColors.textPrimary }]}>
-                  {formatPrice(plan)}
-                </Text>
-                {plan.savings && (
-                  <Text style={[styles.savings, { color: primaryColor }]}>
-                    {plan.savings}
+                <View style={styles.priceRow}>
+                  <Text style={[styles.price, { color: themeColors.textPrimary }]}>
+                    {formatPrice(plan)}
                   </Text>
+                </View>
+                {plan.savings && (
+                  <View style={[styles.savingsBadge, { backgroundColor: `${primaryColor}20` }]}>
+                    <Text style={[styles.savings, { color: primaryColor }]}>
+                      {plan.savings}
+                    </Text>
+                  </View>
                 )}
               </View>
 
@@ -253,17 +257,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   priceContainer: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
-    marginBottom: 16,
   },
   price: {
     fontSize: 32,
     fontWeight: '700',
   },
+  savingsBadge: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
   savings: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   featuresContainer: {
