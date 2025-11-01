@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
-import { ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ProgressiveImage from './ProgressiveImage';
+import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const FALLBACK_COLORS = ['#705CF6', '#4B8BFF', '#9B5BFF', '#FF6FA9'];
 
@@ -44,6 +46,15 @@ export default function StatusStoryCard({ status, onPress }) {
   const relativeTime = formatRelativeTime(status?.createdAt);
   const imageUrl = status?.imageUrl;
 
+  // Generate thumbnail and blurhash for progressive loading
+  const thumbnailUrl = useMemo(() => {
+    return imageUrl ? getThumbnailUrl(imageUrl, 140, 50) : null;
+  }, [imageUrl]);
+
+  const blurhash = useMemo(() => {
+    return imageUrl ? (status?.blurhash || getBlurhash(imageUrl)) : null;
+  }, [imageUrl, status?.blurhash]);
+
   const content = (
     <View style={styles.overlay}>
       <View style={styles.metaRow}>
@@ -64,14 +75,20 @@ export default function StatusStoryCard({ status, onPress }) {
         onPress={() => onPress?.(status)}
       >
         {imageUrl ? (
-          <ImageBackground
-            source={{ uri: imageUrl }}
-            style={styles.imageBackground}
-            imageStyle={styles.image}
-          >
+          <View style={styles.imageBackground}>
+            {/* Progressive image with caching and thumbnail */}
+            <ProgressiveImage
+              source={imageUrl}
+              thumbnail={thumbnailUrl}
+              blurhash={blurhash}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={200}
+              priority="high"
+            />
             <View style={styles.scrim} />
             {content}
-          </ImageBackground>
+          </View>
         ) : (
           <View style={[styles.imageBackground, styles.fallbackBackground, { backgroundColor: fallbackColor }]}>
             <View style={styles.scrim} />
@@ -105,8 +122,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     padding: 16,
-  },
-  image: {
+    overflow: 'hidden',
     borderRadius: 28,
   },
   scrim: {

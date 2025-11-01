@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import ProgressiveImage from './ProgressiveImage';
+import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const RELATIVE_TIME_THRESHOLDS = [
   { unit: 'minute', seconds: 60 },
@@ -138,7 +140,14 @@ export default function StatusCard({ status, onPress, onReact, onReport }) {
       <Text style={styles.message}>{message}</Text>
 
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        <ProgressiveImage
+          source={imageUrl}
+          thumbnail={getThumbnailUrl(imageUrl, 400, 60)}
+          blurhash={status?.blurhash || getBlurhash(imageUrl)}
+          style={styles.image}
+          contentFit="cover"
+          transition={250}
+        />
       ) : null}
 
       <View style={styles.footerRow}>

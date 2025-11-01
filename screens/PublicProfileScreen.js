@@ -6,19 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   RefreshControl,
   Modal,
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import ProgressiveImage from '../components/ProgressiveImage';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile } from '../services/userProfileService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
 import { getUserPosts } from '../services/publicPostsService';
 import { ENGAGEMENT_POINT_RULES } from '../constants/authConfig';
+import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 import * as ImagePicker from 'expo-image-picker';
 import * as ScreenCapture from 'expo-screen-capture';
 import {
@@ -609,10 +610,13 @@ export default function PublicProfileScreen({ navigation, route }) {
                           onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
                           delayLongPress={250}
                         >
-                          <Image
-                            source={{ uri: photo.downloadUrl }}
+                          <ProgressiveImage
+                            source={photo.downloadUrl}
+                            thumbnail={getThumbnailUrl(photo.downloadUrl, 200, 60)}
+                            blurhash={photo.blurhash || getBlurhash(photo.downloadUrl)}
                             style={[styles.masonryImage, { aspectRatio }]}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            transition={200}
                           />
                         </TouchableOpacity>
                       );
@@ -632,10 +636,13 @@ export default function PublicProfileScreen({ navigation, route }) {
                   onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
                   delayLongPress={250}
                 >
-                  <Image
-                    source={{ uri: photo.downloadUrl }}
+                  <ProgressiveImage
+                    source={photo.downloadUrl}
+                    thumbnail={getThumbnailUrl(photo.downloadUrl, 200, 60)}
+                    blurhash={photo.blurhash || getBlurhash(photo.downloadUrl)}
                     style={[styles.albumImage, { aspectRatio }]}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    transition={200}
                   />
                 </TouchableOpacity>
               ))}
@@ -842,7 +849,13 @@ export default function PublicProfileScreen({ navigation, route }) {
               <Ionicons name="close" size={24} color={themeColors.textPrimary} />
             </TouchableOpacity>
             {photoPreviewSource ? (
-              <Image source={photoPreviewSource} style={styles.photoModalImage} resizeMode="contain" />
+              <ProgressiveImage
+                source={photoPreviewSource}
+                style={styles.photoModalImage}
+                contentFit="contain"
+                transition={150}
+                priority="high"
+              />
             ) : null}
           </View>
         </View>
@@ -910,7 +923,15 @@ export default function PublicProfileScreen({ navigation, route }) {
                 activeOpacity={0.85}
                 onPress={() => handlePreviewPhoto(profile.profilePhoto)}
               >
-                <Image source={{ uri: profile.profilePhoto }} style={styles.photo} />
+                <ProgressiveImage
+                  source={profile.profilePhoto}
+                  thumbnail={getThumbnailUrl(profile.profilePhoto, 100, 70)}
+                  blurhash={profile.blurhash || getBlurhash(profile.profilePhoto)}
+                  style={styles.photo}
+                  contentFit="cover"
+                  transition={200}
+                  priority="high"
+                />
               </TouchableOpacity>
             ) : (
               <View style={[styles.photoPlaceholder, { backgroundColor: withAlpha(primaryColor, 0.12) }]}>

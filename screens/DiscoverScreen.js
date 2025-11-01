@@ -7,14 +7,15 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   TextInput,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import ProgressiveImage from '../components/ProgressiveImage';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { getThumbnailUrl } from '../utils/imageUtils';
 import {
   getTrendingUsers,
   getUsersByLocation,
@@ -114,7 +115,13 @@ export default function DiscoverScreen({ navigation }) {
     >
       <View style={[styles.avatar, { borderColor: primaryColor }]}>
         {item.profilePhoto ? (
-          <Image source={{ uri: item.profilePhoto }} style={styles.avatarImage} />
+          <ProgressiveImage
+            source={item.profilePhoto}
+            thumbnail={getThumbnailUrl(item.profilePhoto, 60, 70)}
+            style={styles.avatarImage}
+            contentFit="cover"
+            transition={150}
+          />
         ) : (
           <View style={[styles.avatarPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
             <Ionicons name="person" size={32} color={primaryColor} />

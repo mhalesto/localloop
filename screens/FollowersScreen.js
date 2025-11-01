@@ -6,14 +6,15 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   TextInput,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import ProgressiveImage from '../components/ProgressiveImage';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { getThumbnailUrl } from '../utils/imageUtils';
 import { getFollowers } from '../services/followService';
 
 export default function FollowersScreen({ navigation, route }) {
@@ -75,7 +76,13 @@ export default function FollowersScreen({ navigation, route }) {
     >
       <View style={[styles.avatar, { borderColor: primaryColor }]}>
         {item.profilePhoto ? (
-          <Image source={{ uri: item.profilePhoto }} style={styles.avatarImage} />
+          <ProgressiveImage
+            source={item.profilePhoto}
+            thumbnail={getThumbnailUrl(item.profilePhoto, 50, 70)}
+            style={styles.avatarImage}
+            contentFit="cover"
+            transition={150}
+          />
         ) : (
           <View style={[styles.avatarPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
             <Ionicons name="person" size={24} color={primaryColor} />
