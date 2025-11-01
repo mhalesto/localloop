@@ -1,4 +1,4 @@
-// screens/PostThreadScreen.js
+// screens/PostThreadScreen.js - AI Features Enabled
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -42,6 +42,11 @@ import { getAvatarConfig } from '../constants/avatars';
 import RichText from '../components/RichText';
 import { stripRichFormatting } from '../utils/textFormatting';
 import { TagList } from '../components/TagBadge';
+import { ContentWarningList, SentimentBadge } from '../components/ContentWarningBadge';
+import { summarizeThread } from '../services/openai/threadSummarizationService';
+import { suggestComment, SUGGESTION_TYPES } from '../services/openai/commentSuggestionService';
+import { translatePost, LANGUAGES, COMMON_LANGUAGES } from '../services/openai/translationService';
+import { isFeatureEnabled } from '../config/aiFeatures';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
@@ -468,6 +473,15 @@ export default function PostThreadScreen({ route, navigation }) {
   const [replyingToComment, setReplyingToComment] = useState(null);
   const [reactionPickerCommentId, setReactionPickerCommentId] = useState(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+  // [AI-FEATURES] Thread summarization, comment suggestions, translation
+  const [threadSummary, setThreadSummary] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
+  const [translatedPost, setTranslatedPost] = useState(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [showTranslationPicker, setShowTranslationPicker] = useState(false);
 
   const typingActiveRef = useRef(false);
   const typingTimeoutRef = useRef(null);
@@ -1619,6 +1633,51 @@ export default function PostThreadScreen({ route, navigation }) {
     sendTypingUpdate(false);
   };
 
+  // [AI-FEATURES] Thread Summarization
+  const handleSummarizeThread = async () => {
+    if (comments.length < 10) {
+      Alert.alert('Too few comments', 'Threads need at least 10 comments to summarize');
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const result = await summarizeThread(comments, post);
+      setThreadSummary(result.summary);
+    } catch (error) {
+      Alert.alert('Summary failed', error.message);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  // [AI-FEATURES] Comment Suggestions
+  const handleGetSuggestion = async (type = SUGGESTION_TYPES.THOUGHTFUL) => {
+    setIsLoadingSuggestion(true);
+    try {
+      const result = await suggestComment(post, type);
+      setReply(result.suggestion);
+    } catch (error) {
+      Alert.alert('Suggestion failed', error.message);
+    } finally {
+      setIsLoadingSuggestion(false);
+    }
+  };
+
+  // [AI-FEATURES] Translation
+  const handleTranslate = async (targetLang) => {
+    setIsTranslating(true);
+    setShowTranslationPicker(false);
+    try {
+      const result = await translatePost(post, targetLang);
+      setTranslatedPost({ ...result, targetLang });
+    } catch (error) {
+      Alert.alert('Translation failed', error.message);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   if (!post) {
     return (
       <ScreenLayout title="Thread" subtitle={`${city} Room`} onBack={() => navigation.goBack()}>
@@ -2083,6 +2142,25 @@ export default function PostThreadScreen({ route, navigation }) {
             />
           ) : null}
 
+          {/* Content warnings */}
+          {post.contentWarnings && post.contentWarnings.length > 0 ? (
+            <ContentWarningList
+              warnings={post.contentWarnings}
+              size="small"
+              maxDisplay={3}
+              style={styles.postTags}
+            />
+          ) : null}
+
+          {/* Sentiment badge */}
+          {post.sentiment ? (
+            <SentimentBadge
+              sentiment={post.sentiment}
+              size="small"
+              style={{ marginTop: 6 }}
+            />
+          ) : null}
+
           {trimmedDescription && trimmedDescription !== displayTitle ? (
             <View style={descriptionContainerStyle}>
               {!isExpanded && collapsedPreviewText ? (
@@ -2217,9 +2295,40 @@ export default function PostThreadScreen({ route, navigation }) {
               )}
             </View>
           ) : null}
-          <Text style={[styles.postMeta, { color: headerMetaColor }]}>
-            {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
-          </Text>
+          <View style={styles.commentHeaderRow}>
+            <Text style={[styles.postMeta, { color: headerMetaColor }]}>
+              {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
+            </Text>
+
+            {/* Thread Summarization Button */}
+            {comments.length >= 10 && (
+              <TouchableOpacity
+                style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15` }]}
+                onPress={handleSummarizeThread}
+                disabled={isSummarizing}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="bulb-outline" size={14} color={linkColor} />
+                <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                  {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Thread Summary Display */}
+          {threadSummary && (
+            <View style={[styles.summaryCard, { backgroundColor: themeColors.card, borderColor: linkColor }]}>
+              <View style={styles.summaryHeader}>
+                <Ionicons name="bulb" size={18} color={linkColor} />
+                <Text style={[styles.summaryTitle, { color: themeColors.textPrimary }]}>Thread Summary</Text>
+                <TouchableOpacity onPress={() => setThreadSummary(null)} style={styles.summaryClose}>
+                  <Ionicons name="close-circle" size={20} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.summaryText, { color: themeColors.textSecondary }]}>{threadSummary}</Text>
+            </View>
+          )}
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
             <View style={styles.actionsFooterRow}>
@@ -3608,6 +3717,51 @@ const createStyles = (
     },
     fullscreenScrollIndicatorHalo: {
       width: 14,
+    },
+    // AI Features Styles
+    commentHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    aiFeatureButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      gap: 4,
+    },
+    aiFeatureButtonText: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    summaryCard: {
+      marginTop: 12,
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    summaryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+    },
+    summaryTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      flex: 1,
+    },
+    summaryClose: {
+      padding: 4,
+    },
+    summaryText: {
+      fontSize: 13,
+      lineHeight: 19,
     },
   });
 };

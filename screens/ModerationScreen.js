@@ -5,13 +5,15 @@ import ScreenLayout from '../components/ScreenLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 export default function ModerationScreen({ navigation }) {
   const { isAdmin } = useAuth();
   const { reportedPosts, refreshReportedPosts } = usePosts();
   const { reportedStatuses, refreshReportedStatuses } = useStatuses();
+  const { themeColors } = useSettings();
   const [loading, setLoading] = useState(true);
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
   useEffect(() => {
     let mounted = true;
@@ -109,7 +111,7 @@ export default function ModerationScreen({ navigation }) {
   );
 }
 
-const createStyles = () =>
+const createStyles = (palette) =>
   StyleSheet.create({
     center: {
       flex: 1,
@@ -121,38 +123,40 @@ const createStyles = () =>
       fontSize: 18,
       fontWeight: '700',
       marginBottom: 8,
+      color: palette.textPrimary,
     },
     restrictedBody: {
       fontSize: 14,
       textAlign: 'center',
-      color: '#6b7280',
+      color: palette.textSecondary,
     },
     listContent: {
       padding: 20,
       paddingBottom: 40,
     },
     itemCard: {
-      backgroundColor: '#fff',
+      backgroundColor: palette.card,
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: 'rgba(15,23,42,0.08)',
+      borderColor: palette.divider,
     },
     itemType: {
       fontSize: 12,
       fontWeight: '700',
       textTransform: 'uppercase',
-      color: '#4f46e5',
+      color: palette.primary,
     },
     itemTitle: {
       fontSize: 15,
       fontWeight: '600',
       marginTop: 4,
       marginBottom: 6,
+      color: palette.textPrimary,
     },
     itemMeta: {
       fontSize: 12,
-      color: '#6b7280',
+      color: palette.textSecondary,
     },
   });

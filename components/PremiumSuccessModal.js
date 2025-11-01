@@ -95,7 +95,7 @@ export default function PremiumSuccessModal({ visible, onClose }) {
             </View>
 
             {/* Title */}
-            <Text style={[styles.title, { color: themeColors.text }]}>
+            <Text style={[styles.title, { color: themeColors.textPrimary }]}>
               Welcome to Premium!
             </Text>
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
@@ -110,7 +110,7 @@ export default function PremiumSuccessModal({ visible, onClose }) {
                     <Ionicons name={feature.icon} size={24} color={themeColors.primary} />
                   </View>
                   <View style={styles.featureText}>
-                    <Text style={[styles.featureTitle, { color: themeColors.text }]}>
+                    <Text style={[styles.featureTitle, { color: themeColors.textPrimary }]}>
                       {feature.title}
                     </Text>
                     <Text style={[styles.featureDescription, { color: themeColors.textSecondary }]}>

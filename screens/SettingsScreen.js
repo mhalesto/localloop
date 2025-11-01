@@ -34,6 +34,7 @@ import { useAuth } from '../contexts/AuthContext';
 import PremiumBadge from '../components/PremiumBadge';
 import PremiumSuccessModal from '../components/PremiumSuccessModal';
 import LoadingOverlay from '../components/LoadingOverlay';
+import AIFeaturesSettings from '../components/AIFeaturesSettings';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -584,6 +585,16 @@ export default function SettingsScreen({ navigation }) {
     if (userProfile.country) parts.push(userProfile.country);
     return parts.join(', ');
   }, [userProfile.city, userProfile.country, userProfile.province]);
+
+  // [AI-FEATURES] Handler for toggling AI features
+  const handleToggleAIFeature = (featureName, value) => {
+    updateUserProfile({
+      aiPreferences: {
+        ...(userProfile.aiPreferences || {}),
+        [featureName]: value,
+      },
+    });
+  };
 
   return (
     <ScreenLayout
@@ -1302,6 +1313,20 @@ export default function SettingsScreen({ navigation }) {
               </View>
             </>
           ) : null}
+        </View>
+
+        {/* [AI-FEATURES] AI Features Settings Section */}
+        <View style={styles.section}>
+          <AIFeaturesSettings
+            isPremium={premiumUnlocked}
+            userPreferences={userProfile?.aiPreferences || {}}
+            onToggleFeature={handleToggleAIFeature}
+            themeColors={themeColors}
+            accentColor={accentSwitchColor}
+            inactiveTrackColor={inactiveTrackColor}
+            activeThumbColor={activeThumbColor}
+            inactiveThumbColor={inactiveThumbColor}
+          />
         </View>
 
         <View style={styles.section}>

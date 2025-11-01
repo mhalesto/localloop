@@ -28,6 +28,9 @@ import {
   hasRichFormatting
 } from '../utils/textFormatting';
 import { smartSummarize } from '../services/openai/summarizationService';
+import { generateTitle, TITLE_STYLES } from '../services/openai/titleGenerationService';
+import { checkDuplicate } from '../services/openai/embeddingsService';
+import { isFeatureEnabled } from '../config/aiFeatures';
 
 const LENGTH_STEPS = ['concise', 'balanced', 'detailed']; // [AI-SUMMARY]
 const SUMMARY_CACHE_DEFAULT = Object.freeze({
@@ -59,7 +62,8 @@ export default function CreatePostModal({
     themeColors,
     isDarkMode,
     premiumSummariesEnabled,
-    premiumSummaryLength
+    premiumSummaryLength,
+    userProfile
   } = useSettings();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
@@ -92,6 +96,10 @@ export default function CreatePostModal({
   const scrollRef = useRef(null);                                   // for auto-scroll
   const [summaryCardY, setSummaryCardY] = useState(0);              // y-pos to scroll to
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // [AI-TITLE] Title generation state
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [titleError, setTitleError] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -455,8 +463,46 @@ export default function CreatePostModal({
     try { await Clipboard.setStringAsync(summaryText); } catch { }
   };
 
+  // [AI-TITLE] Title generation
+  const handleGenerateTitle = async () => {
+    if (!message || message.length < 20) {
+      setTitleError('Write some content first (at least 20 characters)');
+      return;
+    }
+
+    setIsGeneratingTitle(true);
+    setTitleError('');
+
+    try {
+      const result = await generateTitle(message, TITLE_STYLES.CATCHY);
+      setTitle(result.title);
+    } catch (error) {
+      console.warn('[CreatePostModal] Title generation failed', error);
+      setTitleError(error instanceof Error ? error.message : 'Unable to generate title right now');
+    } finally {
+      setIsGeneratingTitle(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (submitDisabled) return;
+
+    // [AI-DUPLICATE] Check for duplicates if feature enabled
+    const isPremium = userProfile?.isPremium || false;
+    const aiPreferences = userProfile?.aiPreferences || {};
+
+    if (isFeatureEnabled('duplicateDetection', isPremium, aiPreferences)) {
+      try {
+        // Note: In a real implementation, we'd get recent posts from the same city
+        // For now, we'll skip this check as it requires access to the posts context
+        // which isn't available in this modal. This should be handled in ScreenLayout
+        // during the submit process instead.
+        console.log('[CreatePostModal] Duplicate detection enabled (will check in ScreenLayout)');
+      } catch (error) {
+        console.warn('[CreatePostModal] Duplicate check failed:', error);
+        // Continue anyway
+      }
+    }
 
     setIsSubmitting(true);
 
@@ -626,15 +672,35 @@ export default function CreatePostModal({
                 </View>
               </View>
 
-              <TextInput
-                style={[styles.previewTitleInput, { color: previewPrimary }]}
-                placeholder="Post title"
-                placeholderTextColor={previewMuted}
-                value={title}
-                onChangeText={setTitle}
-                autoCapitalize="sentences"
-                returnKeyType="next"
-              />
+              <View style={{ marginBottom: 10 }}>
+                <TextInput
+                  style={[styles.previewTitleInput, { color: previewPrimary, marginBottom: 0 }]}
+                  placeholder="Post title"
+                  placeholderTextColor={previewMuted}
+                  value={title}
+                  onChangeText={setTitle}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                />
+                {isFeatureEnabled('titleGeneration', userProfile?.isPremium || false, userProfile?.aiPreferences || {}) && message.length >= 20 && (
+                  <TouchableOpacity
+                    style={[styles.generateTitleButton, { backgroundColor: summaryButtonBackground }]}
+                    onPress={handleGenerateTitle}
+                    disabled={isGeneratingTitle}
+                    activeOpacity={0.85}
+                  >
+                    {isGeneratingTitle ? (
+                      <ActivityIndicator size="small" color={summaryAccentColor} />
+                    ) : (
+                      <Ionicons name="sparkles" size={14} color={summaryAccentColor} />
+                    )}
+                    <Text style={[styles.generateTitleText, { color: summaryAccentColor }]}>
+                      {isGeneratingTitle ? 'Generating...' : 'Generate Title'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {titleError ? <Text style={styles.titleErrorText}>{titleError}</Text> : null}
+              </View>
               <TextInput
                 style={[
                   styles.previewBodyInput,
@@ -955,4 +1021,25 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     aiButtonText: { fontSize: 14, fontWeight: '700' },
     expandButton: { marginTop: 6, alignSelf: 'flex-start' },
     expandButtonText: { fontSize: 13, fontWeight: '700' },
+
+    // [AI-TITLE] Title generation button
+    generateTitleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      marginTop: 8,
+      alignSelf: 'flex-start',
+    },
+    generateTitleText: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginLeft: 6,
+    },
+    titleErrorText: {
+      marginTop: 4,
+      fontSize: 12,
+      color: '#D64545',
+    },
   });

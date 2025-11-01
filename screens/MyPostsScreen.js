@@ -5,6 +5,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import { usePosts } from '../contexts/PostsContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { TagList } from '../components/TagBadge';
+import { ContentWarningList, SentimentBadge } from '../components/ContentWarningBadge';
 
 const STATUS_META = {
   pending_review: {
@@ -69,6 +70,12 @@ function Section({ title, items, emptyMessage, onOpenPost, highlightId }) {
             <Text style={styles.metaText}>{post.city}</Text>
             {post.tags && post.tags.length > 0 ? (
               <TagList tags={post.tags} maxTags={3} showIcons={false} size="small" style={styles.tagList} />
+            ) : null}
+            {post.contentWarnings && post.contentWarnings.length > 0 ? (
+              <ContentWarningList warnings={post.contentWarnings} size="small" maxDisplay={2} style={styles.tagList} />
+            ) : null}
+            {post.sentiment ? (
+              <SentimentBadge sentiment={post.sentiment} size="small" style={{ marginTop: 4 }} />
             ) : null}
             {post.message ? (
               <Text style={styles.messageText} numberOfLines={3}>

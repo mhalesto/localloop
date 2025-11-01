@@ -16,6 +16,9 @@ import NotificationsModal from './NotificationsModal';
 import LoadingOverlay from './LoadingOverlay';
 import { analyzePostContent } from '../services/openai/moderationService';
 import { autoTagPost } from '../services/openai/autoTaggingService';
+import { analyzeContent } from '../services/openai/contentAnalysisService';
+import { scorePostQuality } from '../services/openai/qualityScoringService';
+import { isFeatureEnabled } from '../config/aiFeatures';
 
 export default function ScreenLayout({
   children,
@@ -144,22 +147,66 @@ export default function ScreenLayout({
     // Truncate very long texts to prevent API timeouts/crashes
     const truncatedMessage = message.length > 2000 ? message.substring(0, 2000) : message;
 
-    Promise.all([
+    // Check feature flags
+    const isPremium = userProfile?.isPremium || false;
+    const aiPreferences = userProfile?.aiPreferences || {};
+
+    // Build promises array based on enabled features
+    const promises = [];
+
+    // Moderation (always runs - forced enabled)
+    promises.push(
       analyzePostContent({ title, message: truncatedMessage }).catch(err => {
         console.warn('[ScreenLayout] Moderation failed:', err.message);
-        return { action: 'approve' }; // Default to approve on error
-      }),
-      autoTagPost(title, truncatedMessage, {
-        strategy: 'auto',
-        maxTags: 4,
-        timeout: 10000 // 10 second timeout
-      }).catch(err => {
-        console.warn('[ScreenLayout] Auto-tagging failed:', err.message);
-        // Fallback to keyword-based tagging immediately
-        return autoTagPost(title, truncatedMessage, { strategy: 'keywords', maxTags: 4 })
-          .catch(() => ({ tags: [], method: 'failed' }));
+        return { action: 'approve' };
       })
-    ]).then(([moderation, tagging]) => {
+    );
+
+    // Auto-tagging (check if enabled)
+    if (isFeatureEnabled('autoTagging', isPremium, aiPreferences)) {
+      promises.push(
+        autoTagPost(title, truncatedMessage, {
+          strategy: 'auto',
+          maxTags: 4,
+          timeout: 10000
+        }).catch(err => {
+          console.warn('[ScreenLayout] Auto-tagging failed:', err.message);
+          return autoTagPost(title, truncatedMessage, { strategy: 'keywords', maxTags: 4 })
+            .catch(() => ({ tags: [], method: 'failed' }));
+        })
+      );
+    } else {
+      promises.push(Promise.resolve({ tags: [], method: 'disabled' }));
+    }
+
+    // Content warnings and sentiment (check if enabled)
+    if (
+      isFeatureEnabled('contentWarnings', isPremium, aiPreferences) ||
+      isFeatureEnabled('sentimentAnalysis', isPremium, aiPreferences)
+    ) {
+      promises.push(
+        analyzeContent(title, truncatedMessage).catch(err => {
+          console.warn('[ScreenLayout] Content analysis failed:', err.message);
+          return { warnings: [], sentiment: null, hasWarnings: false };
+        })
+      );
+    } else {
+      promises.push(Promise.resolve({ warnings: [], sentiment: null, hasWarnings: false }));
+    }
+
+    // Quality scoring (check if enabled)
+    if (isFeatureEnabled('qualityScoring', isPremium, aiPreferences)) {
+      promises.push(
+        scorePostQuality(published).catch(err => {
+          console.warn('[ScreenLayout] Quality scoring failed:', err.message);
+          return null;
+        })
+      );
+    } else {
+      promises.push(Promise.resolve(null));
+    }
+
+    Promise.all(promises).then(([moderation, tagging, contentAnalysis, qualityScore]) => {
       const moderationUpdate = moderation || { action: 'approve' };
       const updates = { moderation: moderationUpdate };
 
@@ -169,6 +216,26 @@ export default function ScreenLayout({
         updates.tagConfidence = tagging.confidence;
         updates.tagMethod = tagging.method;
         console.log('[ScreenLayout] Auto-tagged post:', published.id, tagging.tags);
+      }
+
+      // Add content warnings and sentiment (FREE!)
+      if (contentAnalysis) {
+        if (contentAnalysis.warnings && contentAnalysis.warnings.length > 0) {
+          updates.contentWarnings = contentAnalysis.warnings;
+          console.log('[ScreenLayout] Content warnings:', published.id, contentAnalysis.warnings.map(w => w.label));
+        }
+        if (contentAnalysis.sentiment) {
+          updates.sentiment = contentAnalysis.sentiment;
+          console.log('[ScreenLayout] Sentiment:', published.id, contentAnalysis.sentiment.label);
+        }
+      }
+
+      // Add quality score
+      if (qualityScore) {
+        updates.qualityScore = qualityScore.overall;
+        updates.qualityTier = qualityScore.tier.label;
+        updates.qualityScores = qualityScore.scores;
+        console.log('[ScreenLayout] Quality score:', published.id, qualityScore.overall, qualityScore.tier.label);
       }
 
       // Determine moderation status
