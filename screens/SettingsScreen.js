@@ -781,19 +781,32 @@ export default function SettingsScreen({ navigation }) {
                 <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
               </TouchableOpacity>
 
-              {/* [PUBLIC-MODE] Edit Public Profile button */}
+              {/* [PUBLIC-MODE] View/Edit Public Profile buttons */}
               {userProfile?.isPublicProfile ? (
-                <TouchableOpacity
-                  style={styles.profileLinkRow}
-                  onPress={() => navigation.navigate('ProfileSetup', { isEditing: true })}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.profileLinkCopy}>
-                    <Text style={styles.profileLinkLabel}>Edit public profile</Text>
-                    <Text style={styles.profileLinkHint}>Update username, photo, and bio</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={styles.profileLinkRow}
+                    onPress={() => navigation.navigate('PublicProfile', { userId: user?.uid })}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.profileLinkCopy}>
+                      <Text style={styles.profileLinkLabel}>View public profile</Text>
+                      <Text style={styles.profileLinkHint}>@{userProfile.username} · {userProfile.followersCount || 0} followers</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.profileLinkRow}
+                    onPress={() => navigation.navigate('ProfileSetup', { isEditing: true })}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.profileLinkCopy}>
+                      <Text style={styles.profileLinkLabel}>Edit public profile</Text>
+                      <Text style={styles.profileLinkHint}>Update username, photo, and bio</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+                  </TouchableOpacity>
+                </>
               ) : (
                 <TouchableOpacity
                   style={styles.profileLinkRow}
