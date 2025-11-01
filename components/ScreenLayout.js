@@ -327,9 +327,13 @@ export default function ScreenLayout({
       if (navigation.getCurrentRoute?.()?.name !== 'MyComments') {
         navigation.navigate('MyComments');
       }
-    } else if (tab === 'settings') {
-      if (navigation.getCurrentRoute?.()?.name !== 'Settings') {
-        navigation.navigate('Settings');
+    } else if (tab === 'profile') {
+      // [PUBLIC-MODE] Navigate to user's own public profile
+      if (firebaseUser?.uid && userProfile?.username) {
+        navigation.navigate('PublicProfile', {
+          userId: firebaseUser.uid,
+          username: userProfile.username
+        });
       }
     }
   };

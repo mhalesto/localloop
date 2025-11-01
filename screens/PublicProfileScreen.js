@@ -587,6 +587,8 @@ export default function PublicProfileScreen({ navigation, route }) {
       navigation={navigation}
       onBack={() => navigation.goBack()}
       showFooter={false}
+      rightIcon={isOwnProfile ? "settings-outline" : null}
+      onRightPress={isOwnProfile ? () => navigation.navigate('Settings') : null}
     >
       <Modal
         visible={photoModalVisible}

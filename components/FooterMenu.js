@@ -19,7 +19,7 @@ const tabs = [
   { key: 'feed', label: 'Feed', icon: 'people-outline' },
   { key: 'discover', label: 'Discover', icon: 'compass-outline' },
   { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' },
-  { key: 'settings', label: 'Settings', icon: 'settings-outline' },
+  { key: 'profile', label: 'Profile', icon: 'person-outline' },
 ];
 
 // ===== TUNABLES =====
@@ -168,7 +168,7 @@ export default function FooterMenu({
             badgeCount={myRepliesBadge}
           />
 
-          {/* Tab 4: Settings */}
+          {/* Tab 4: Profile */}
           <TabItem
             width={tabItemW}
             tab={tabs[4]}
