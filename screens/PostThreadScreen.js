@@ -559,7 +559,8 @@ export default function PostThreadScreen({ route, navigation }) {
     const shouldShow = showDescriptionWhenScrolled || !isScrolledPastThreshold;
     Animated.timing(descriptionCollapseAnim, {
       toValue: shouldShow ? 1 : 0,
-      duration: 300,
+      duration: 400,
+      easing: Easing.bezier(0.4, 0.0, 0.2, 1),
       useNativeDriver: false,
     }).start();
   }, [showDescriptionWhenScrolled, isScrolledPastThreshold, descriptionCollapseAnim]);
@@ -2187,7 +2188,7 @@ export default function PostThreadScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          <Text style={[styles.postTitle, { color: headerTitleColor }]}>{displayTitle}</Text>
+          <Text style={[styles.postTitle, { color: headerTitleColor, paddingTop: isScrolledPastThreshold ? 20 : 0 }]}>{displayTitle}</Text>
 
           {/* Auto-generated tags */}
           {post.tags && post.tags.length > 0 ? (
