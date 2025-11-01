@@ -769,44 +769,19 @@ export default function SettingsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.profileLinkRow}
-                onPress={() => navigation.navigate('Profile')}
-                activeOpacity={0.85}
-              >
-                <View style={styles.profileLinkCopy}>
-                  <Text style={styles.profileLinkLabel}>View full profile</Text>
-                  <Text style={styles.profileLinkHint}>See rewards and premium status</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
-              </TouchableOpacity>
-
-              {/* [PUBLIC-MODE] View/Edit Public Profile buttons */}
+              {/* [PUBLIC-MODE] View Public Profile button */}
               {userProfile?.isPublicProfile ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.profileLinkRow}
-                    onPress={() => navigation.navigate('PublicProfile', { userId: user?.uid })}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.profileLinkCopy}>
-                      <Text style={styles.profileLinkLabel}>View public profile</Text>
-                      <Text style={styles.profileLinkHint}>@{userProfile.username} · {userProfile.followersCount || 0} followers</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.profileLinkRow}
-                    onPress={() => navigation.navigate('ProfileSetup', { isEditing: true })}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.profileLinkCopy}>
-                      <Text style={styles.profileLinkLabel}>Edit public profile</Text>
-                      <Text style={styles.profileLinkHint}>Update username, photo, and bio</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
-                  </TouchableOpacity>
-                </>
+                <TouchableOpacity
+                  style={styles.profileLinkRow}
+                  onPress={() => navigation.navigate('PublicProfile', { userId: user?.uid })}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.profileLinkCopy}>
+                    <Text style={styles.profileLinkLabel}>View public profile</Text>
+                    <Text style={styles.profileLinkHint}>@{userProfile.username} · {userProfile.followersCount || 0} followers</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+                </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={styles.profileLinkRow}

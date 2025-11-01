@@ -15,11 +15,12 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile } from '../services/userProfileService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
+import { ENGAGEMENT_POINT_RULES } from '../constants/authConfig';
 
 export default function PublicProfileScreen({ navigation, route }) {
   const { userId, username } = route.params;
   const { themeColors, accentPreset, userProfile: currentUserProfile } = useSettings();
-  const { user } = useAuth();
+  const { user, profile: authProfile, hasActivePremium, pointsToNextPremium, premiumDayCost, premiumAccessDurationMs } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -366,6 +367,108 @@ export default function PublicProfileScreen({ navigation, route }) {
             </View>
           )}
         </View>
+
+        {/* Account Overview Section - Only show for own profile */}
+        {isOwnProfile && (
+          <>
+            {/* Reward Points Card */}
+            <View style={[styles.accountSection, { backgroundColor: themeColors.primary, marginTop: 20, marginHorizontal: 20 }]}>
+              <Text style={styles.pointsLabel}>Reward points</Text>
+              <Text style={styles.pointsValue}>{authProfile?.points || 0}</Text>
+              <Text style={styles.pointsHint}>
+                {hasActivePremium
+                  ? 'Premium access is active—enjoy the perks!'
+                  : pointsToNextPremium > 0
+                  ? `${pointsToNextPremium} pts away from unlocking ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`
+                  : `Redeem ${premiumDayCost} pts at any time for ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`}
+              </Text>
+            </View>
+
+            {/* Account Overview */}
+            <View style={[styles.accountSection, { backgroundColor: themeColors.card, marginHorizontal: 20 }]}>
+              <Text style={[styles.accountSectionTitle, { color: themeColors.textPrimary }]}>Account overview</Text>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>Display name</Text>
+                <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
+                  {(authProfile?.displayName || user?.displayName || '').trim() || 'Mystery guest'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>Email</Text>
+                <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
+                  {(authProfile?.email || user?.email || '').trim() || 'No email on file'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>Nickname</Text>
+                <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
+                  {currentUserProfile?.nickname?.trim() || 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: themeColors.textSecondary }]}>Home base</Text>
+                <Text style={[styles.detailValue, { color: themeColors.textPrimary }]}>
+                  {[currentUserProfile?.city, currentUserProfile?.province, currentUserProfile?.country].filter(Boolean).join(', ') || 'Not shared'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Earn More Points */}
+            <View style={[styles.accountSection, { backgroundColor: themeColors.card, marginHorizontal: 20 }]}>
+              <Text style={[styles.accountSectionTitle, { color: themeColors.textPrimary }]}>Earn more points</Text>
+              <Text style={[styles.sectionHint, { color: themeColors.textSecondary }]}>
+                Keep the conversation lively—your engagement boosts your balance automatically.
+              </Text>
+              {[
+                {
+                  key: 'comment',
+                  label: 'Leave a thoughtful comment',
+                  points: ENGAGEMENT_POINT_RULES.comment,
+                  icon: 'chatbubble-ellipses-outline',
+                },
+                {
+                  key: 'upvote',
+                  label: 'Cheer on a post you love',
+                  points: ENGAGEMENT_POINT_RULES.upvote,
+                  icon: 'arrow-up-circle-outline',
+                },
+              ].filter((item) => Number(item.points) > 0).map((perk) => (
+                <View key={perk.key} style={styles.perkRow}>
+                  <View style={[styles.perkIconWrap, { backgroundColor: themeColors.primaryLight || `${primaryColor}20` }]}>
+                    <Ionicons name={perk.icon} size={16} color={themeColors.primaryDark || primaryColor} />
+                  </View>
+                  <View style={styles.perkCopy}>
+                    <Text style={[styles.perkLabel, { color: themeColors.textPrimary }]}>{perk.label}</Text>
+                    <Text style={[styles.perkMeta, { color: themeColors.primaryDark || primaryColor }]}>+{perk.points} pts</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Premium Status */}
+            <View style={[styles.accountSection, { backgroundColor: themeColors.card, marginHorizontal: 20, marginBottom: 40 }]}>
+              <Text style={[styles.accountSectionTitle, { color: themeColors.textPrimary }]}>Premium status</Text>
+              <View style={[styles.statusCard, { backgroundColor: themeColors.background, borderColor: themeColors.divider }]}>
+                <Ionicons
+                  name={hasActivePremium ? 'sparkles' : 'lock-closed-outline'}
+                  size={20}
+                  color={themeColors.primaryDark || primaryColor}
+                  style={styles.statusIcon}
+                />
+                <View style={styles.statusCopy}>
+                  <Text style={[styles.statusLabel, { color: themeColors.textPrimary }]}>
+                    {hasActivePremium ? 'Premium unlocked' : 'Premium locked'}
+                  </Text>
+                  <Text style={[styles.statusMeta, { color: themeColors.textSecondary }]}>
+                    {hasActivePremium
+                      ? 'Enjoy richer themes, typography, and faster replies.'
+                      : `Redeem ${premiumDayCost} pts in Settings to unlock the premium toolkit.`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </ScreenLayout>
   );
@@ -532,5 +635,108 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  // Account overview section styles
+  accountSection: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+  },
+  accountSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  pointsLabel: {
+    color: '#ffffffcc',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pointsValue: {
+    color: '#ffffff',
+    fontSize: 40,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  pointsHint: {
+    color: '#ffffffcc',
+    fontSize: 13,
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  sectionHint: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  perkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  perkIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  perkCopy: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  perkLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+    marginRight: 12,
+  },
+  perkMeta: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  statusIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  statusCopy: {
+    flex: 1,
+  },
+  statusLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statusMeta: {
+    fontSize: 13,
+    lineHeight: 20,
   },
 });
