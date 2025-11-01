@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { darkColors, lightColors } from '../constants/colors';
 import { useAuth } from './AuthContext';
+import { getUserProfile } from '../services/userProfileService'; // [PUBLIC-MODE]
 
 const clampNumber = (value, min, max) => {
   if (Number.isNaN(Number(value))) {
@@ -837,7 +838,7 @@ export function SettingsProvider({ children }) {
     subscriptionPlan: 'basic',
     premiumUnlocked: false,
   });
-  const { hasActivePremium } = useAuth();
+  const { hasActivePremium, user } = useAuth();
 
   useEffect(() => {
     if (hasActivePremium || isDevBuild) {
@@ -851,6 +852,39 @@ export function SettingsProvider({ children }) {
     setPremiumSummariesEnabled(false);
     setPremiumAccentShade(0);
   }, [hasActivePremium, baseAccentKey, isDevBuild]);
+
+  // [PUBLIC-MODE] Load user profile from Firebase when user signs in
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.uid) return;
+
+      try {
+        const profile = await getUserProfile(user.uid);
+        if (profile && profile.isPublicProfile) {
+          setUserProfile(prev => ({
+            ...prev,
+            username: profile.username || '',
+            displayName: profile.displayName || '',
+            bio: profile.bio || '',
+            profilePhoto: profile.profilePhoto || '',
+            isPublicProfile: true,
+            currentMode: profile.currentMode || 'anonymous',
+            defaultMode: profile.defaultMode || 'anonymous',
+            followersCount: profile.followersCount || 0,
+            followingCount: profile.followingCount || 0,
+            publicPostsCount: profile.publicPostsCount || 0,
+            allowFollows: profile.allowFollows !== false,
+            showFollowers: profile.showFollowers !== false,
+            showFollowing: profile.showFollowing !== false,
+          }));
+        }
+      } catch (error) {
+        console.warn('[SettingsContext] Error loading profile:', error);
+      }
+    };
+
+    loadProfile();
+  }, [user?.uid]);
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
