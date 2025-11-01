@@ -70,6 +70,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [albumUploading, setAlbumUploading] = useState(false);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [photoPreviewSource, setPhotoPreviewSource] = useState(null);
+  const [showAlbumSettings, setShowAlbumSettings] = useState(false);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
@@ -298,83 +299,100 @@ export default function PublicProfileScreen({ navigation, route }) {
                 </>
               )}
             </TouchableOpacity>
-            <View style={styles.albumSettingsRow}>
-              <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Grid</Text>
-              {[2, 3].map((columns) => (
-                <TouchableOpacity
-                  key={`columns-${columns}`}
-                  style={[
-                    styles.albumOption,
-                    {
-                      borderColor: themeColors.divider,
-                      backgroundColor: themeColors.card
-                    },
-                    albumColumns === columns && [
-                      styles.albumOptionActive,
-                      {
-                        borderColor: primaryColor,
-                        backgroundColor: withAlpha(primaryColor, 0.12)
-                      }
-                    ]
-                  ]}
-                  onPress={() => handleChangeAlbumColumns(columns)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.albumOptionText,
-                      { color: themeColors.textSecondary },
-                      albumColumns === columns && [
-                        styles.albumOptionTextActive,
-                        { color: primaryColor }
-                      ]
-                    ]}
-                  >
-                    {columns} columns
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.albumHeaderRow}>
+              <Text style={[styles.albumHint, { color: themeColors.textSecondary, marginBottom: 0 }]}>
+                {`You can add up to ${ALBUM_MAX_ITEMS} photos (${Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0)} slots left).`}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowAlbumSettings(!showAlbumSettings)}
+                style={styles.settingsIconButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={showAlbumSettings ? "close-circle" : "options-outline"}
+                  size={22}
+                  color={showAlbumSettings ? primaryColor : themeColors.textSecondary}
+                />
+              </TouchableOpacity>
             </View>
-            <View style={styles.albumSettingsRow}>
-              <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Shape</Text>
-              {['square', 'portrait'].map((shapeKey) => (
-                <TouchableOpacity
-                  key={`shape-${shapeKey}`}
-                  style={[
-                    styles.albumOption,
-                    {
-                      borderColor: themeColors.divider,
-                      backgroundColor: themeColors.card
-                    },
-                    albumShape === shapeKey && [
-                      styles.albumOptionActive,
-                      {
-                        borderColor: primaryColor,
-                        backgroundColor: withAlpha(primaryColor, 0.12)
-                      }
-                    ]
-                  ]}
-                  onPress={() => handleChangeAlbumShape(shapeKey)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.albumOptionText,
-                      { color: themeColors.textSecondary },
-                      albumShape === shapeKey && [
-                        styles.albumOptionTextActive,
-                        { color: primaryColor }
-                      ]
-                    ]}
-                  >
-                    {shapeKey === 'square' ? 'Square' : 'Portrait'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={[styles.albumHint, { color: themeColors.textSecondary }]}>
-              {`You can add up to ${ALBUM_MAX_ITEMS} photos (${Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0)} slots left).`}
-            </Text>
+            {showAlbumSettings && (
+              <View style={[styles.albumSettingsContainer, { backgroundColor: withAlpha(primaryColor, 0.06), borderColor: withAlpha(primaryColor, 0.15) }]}>
+                <View style={styles.albumSettingsRow}>
+                  <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Grid</Text>
+                  {[2, 3].map((columns) => (
+                    <TouchableOpacity
+                      key={`columns-${columns}`}
+                      style={[
+                        styles.albumOption,
+                        {
+                          borderColor: themeColors.divider,
+                          backgroundColor: themeColors.card
+                        },
+                        albumColumns === columns && [
+                          styles.albumOptionActive,
+                          {
+                            borderColor: primaryColor,
+                            backgroundColor: withAlpha(primaryColor, 0.12)
+                          }
+                        ]
+                      ]}
+                      onPress={() => handleChangeAlbumColumns(columns)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.albumOptionText,
+                          { color: themeColors.textSecondary },
+                          albumColumns === columns && [
+                            styles.albumOptionTextActive,
+                            { color: primaryColor }
+                          ]
+                        ]}
+                      >
+                        {columns} columns
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.albumSettingsRow}>
+                  <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Shape</Text>
+                  {['square', 'portrait'].map((shapeKey) => (
+                    <TouchableOpacity
+                      key={`shape-${shapeKey}`}
+                      style={[
+                        styles.albumOption,
+                        {
+                          borderColor: themeColors.divider,
+                          backgroundColor: themeColors.card
+                        },
+                        albumShape === shapeKey && [
+                          styles.albumOptionActive,
+                          {
+                            borderColor: primaryColor,
+                            backgroundColor: withAlpha(primaryColor, 0.12)
+                          }
+                        ]
+                      ]}
+                      onPress={() => handleChangeAlbumShape(shapeKey)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.albumOptionText,
+                          { color: themeColors.textSecondary },
+                          albumShape === shapeKey && [
+                            styles.albumOptionTextActive,
+                            { color: primaryColor }
+                          ]
+                        ]}
+                      >
+                        {shapeKey === 'square' ? 'Square' : 'Portrait'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -418,6 +436,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     albumPhotos,
     albumShape,
     albumUploading,
+    showAlbumSettings,
     handleAddAlbumPhotos,
     handleDeleteAlbumPhoto,
     handleChangeAlbumColumns,
@@ -1107,15 +1126,33 @@ const styles = StyleSheet.create({
   albumHint: {
     fontSize: 12,
     color: 'rgba(0,0,0,0.45)',
+    marginBottom: 12,
+  },
+  albumHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  settingsIconButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+  albumSettingsContainer: {
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+    borderWidth: 1,
+    marginBottom: 8,
   },
   albumGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    marginHorizontal: -3,
   },
   albumItem: {
-    paddingHorizontal: 6,
-    marginBottom: 12,
+    paddingHorizontal: 3,
+    marginBottom: 6,
     alignItems: 'center',
   },
   albumImage: {
