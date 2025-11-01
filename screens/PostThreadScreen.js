@@ -2188,7 +2188,7 @@ export default function PostThreadScreen({ route, navigation }) {
             ) : null}
           </View>
 
-          <Text style={[styles.postTitle, { color: headerTitleColor, paddingTop: isScrolledPastThreshold ? 20 : 0 }]}>{displayTitle}</Text>
+          <Text style={[styles.postTitle, { color: headerTitleColor, paddingTop: isScrolledPastThreshold ? 10 : 0 }]}>{displayTitle}</Text>
 
           {/* Auto-generated tags */}
           {post.tags && post.tags.length > 0 ? (
@@ -3212,6 +3212,7 @@ const createStyles = (
       width: '100%',
       alignSelf: 'stretch',
       backgroundColor: palette.background,
+      marginTop: 12,
       paddingTop: 24,
       paddingBottom: 12,
       paddingHorizontal: 20,
