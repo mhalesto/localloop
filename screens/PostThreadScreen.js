@@ -2036,7 +2036,7 @@ export default function PostThreadScreen({ route, navigation }) {
         : trimmedDescription;
 
       // Truncate text to leave room for "Show more" on the 3rd line
-      const maxCharsForThreeLines = 180; // Approximate chars for ~2.8 lines
+      const maxCharsForThreeLines = 165; // Approximate chars for ~2.7 lines to leave room for "Show more"
       const truncatedPreviewText = collapsedPreviewText?.length > maxCharsForThreeLines
         ? collapsedPreviewText.substring(0, maxCharsForThreeLines).trim() + '...'
         : collapsedPreviewText;
