@@ -2,7 +2,7 @@ import { collection, deleteDoc, doc, increment, onSnapshot, orderBy, query, serv
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '../api/firebaseClient';
 
-const MAX_ALBUM_ITEMS = 10;
+const MAX_ALBUM_ITEMS = 12;
 const buildPhotoId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const albumCollection = (userId) => collection(db, 'users', userId, 'album');
 

@@ -67,6 +67,8 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [albumLoading, setAlbumLoading] = useState(true);
   const [albumColumns, setAlbumColumns] = useState(3);
   const [albumShape, setAlbumShape] = useState('square');
+  const [albumLayout, setAlbumLayout] = useState('masonry'); // 'grid' or 'masonry' - default to masonry
+  const [masonryColumns, setMasonryColumns] = useState(3); // Number of columns for masonry layout
   const [albumUploading, setAlbumUploading] = useState(false);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [photoPreviewSource, setPhotoPreviewSource] = useState(null);
@@ -239,7 +241,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   }, [isOwnProfile, user?.uid]);
 
   const handleChangeAlbumColumns = useCallback((columns) => {
-    if (![2, 3].includes(columns)) {
+    if (![2, 3, 4].includes(columns)) {
       return;
     }
     setAlbumColumns(columns);
@@ -247,6 +249,13 @@ export default function PublicProfileScreen({ navigation, route }) {
       updateAlbumPreferences(userId, { columns });
     }
   }, [isOwnProfile, userId]);
+
+  const handleChangeMasonryColumns = useCallback((columns) => {
+    if (![2, 3, 4].includes(columns)) {
+      return;
+    }
+    setMasonryColumns(columns);
+  }, []);
 
   const handleChangeAlbumShape = useCallback((shape) => {
     if (!['square', 'portrait'].includes(shape)) {
@@ -316,105 +325,200 @@ export default function PublicProfileScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
             {showAlbumSettings && (
-              <View style={[styles.albumSettingsContainer, { backgroundColor: withAlpha(primaryColor, 0.06), borderColor: withAlpha(primaryColor, 0.15) }]}>
-                <View style={styles.albumSettingsRow}>
-                  <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Grid</Text>
-                  {[2, 3].map((columns) => (
-                    <TouchableOpacity
-                      key={`columns-${columns}`}
-                      style={[
-                        styles.albumOption,
-                        {
-                          borderColor: themeColors.divider,
-                          backgroundColor: themeColors.card
-                        },
-                        albumColumns === columns && [
-                          styles.albumOptionActive,
-                          {
-                            borderColor: primaryColor,
-                            backgroundColor: withAlpha(primaryColor, 0.12)
-                          }
-                        ]
-                      ]}
-                      onPress={() => handleChangeAlbumColumns(columns)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
+              <View style={[styles.albumSettingsContainer, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
+                {/* Layout Type */}
+                <View style={styles.settingsSection}>
+                  <Text style={[styles.settingsSectionTitle, { color: themeColors.textPrimary }]}>Layout</Text>
+                  <View style={styles.layoutOptionsRow}>
+                    {[
+                      { key: 'grid', label: 'Grid', icon: 'grid-outline' },
+                      { key: 'masonry', label: 'Masonry', icon: 'albums-outline' }
+                    ].map((layoutOption) => (
+                      <TouchableOpacity
+                        key={`layout-${layoutOption.key}`}
                         style={[
-                          styles.albumOptionText,
-                          { color: themeColors.textSecondary },
-                          albumColumns === columns && [
-                            styles.albumOptionTextActive,
-                            { color: primaryColor }
-                          ]
-                        ]}
-                      >
-                        {columns} columns
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.albumSettingsRow}>
-                  <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Shape</Text>
-                  {['square', 'portrait'].map((shapeKey) => (
-                    <TouchableOpacity
-                      key={`shape-${shapeKey}`}
-                      style={[
-                        styles.albumOption,
-                        {
-                          borderColor: themeColors.divider,
-                          backgroundColor: themeColors.card
-                        },
-                        albumShape === shapeKey && [
-                          styles.albumOptionActive,
+                          styles.layoutOptionCard,
                           {
+                            borderColor: themeColors.divider,
+                            backgroundColor: themeColors.background
+                          },
+                          albumLayout === layoutOption.key && {
                             borderColor: primaryColor,
-                            backgroundColor: withAlpha(primaryColor, 0.12)
+                            borderWidth: 2,
+                            backgroundColor: withAlpha(primaryColor, 0.08)
                           }
-                        ]
-                      ]}
-                      onPress={() => handleChangeAlbumShape(shapeKey)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.albumOptionText,
-                          { color: themeColors.textSecondary },
-                          albumShape === shapeKey && [
-                            styles.albumOptionTextActive,
-                            { color: primaryColor }
-                          ]
                         ]}
+                        onPress={() => setAlbumLayout(layoutOption.key)}
+                        activeOpacity={0.7}
                       >
-                        {shapeKey === 'square' ? 'Square' : 'Portrait'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Ionicons
+                          name={layoutOption.icon}
+                          size={24}
+                          color={albumLayout === layoutOption.key ? primaryColor : themeColors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.layoutOptionLabel,
+                            { color: themeColors.textSecondary },
+                            albumLayout === layoutOption.key && { color: primaryColor, fontWeight: '700' }
+                          ]}
+                        >
+                          {layoutOption.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
+
+                {/* Number of Columns (Grid only) */}
+                {albumLayout === 'grid' && (
+                  <View style={styles.settingsSection}>
+                    <Text style={[styles.settingsSectionTitle, { color: themeColors.textPrimary }]}>Number of columns</Text>
+                    <View style={styles.columnsGrid}>
+                      {[2, 3, 4].map((cols) => (
+                        <TouchableOpacity
+                          key={`cols-${cols}`}
+                          style={[
+                            styles.columnVisualOption,
+                            {
+                              borderColor: themeColors.divider,
+                              backgroundColor: themeColors.background
+                            },
+                            albumColumns === cols && {
+                              borderColor: primaryColor,
+                              borderWidth: 3
+                            }
+                          ]}
+                          onPress={() => handleChangeAlbumColumns(cols)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.columnVisual}>
+                            {Array.from({ length: cols }).map((_, i) => (
+                              <View
+                                key={i}
+                                style={[
+                                  styles.columnBar,
+                                  {
+                                    backgroundColor: albumColumns === cols ? primaryColor : themeColors.textSecondary,
+                                    opacity: albumColumns === cols ? 1 : 0.3
+                                  }
+                                ]}
+                              />
+                            ))}
+                          </View>
+                          <Text style={[styles.columnNumber, { color: albumColumns === cols ? primaryColor : themeColors.textSecondary }]}>
+                            {cols}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Number of Columns (Masonry only) */}
+                {albumLayout === 'masonry' && (
+                  <View style={styles.settingsSection}>
+                    <Text style={[styles.settingsSectionTitle, { color: themeColors.textPrimary }]}>Number of columns</Text>
+                    <View style={styles.columnsGrid}>
+                      {[2, 3, 4].map((cols) => (
+                        <TouchableOpacity
+                          key={`masonry-cols-${cols}`}
+                          style={[
+                            styles.columnVisualOption,
+                            {
+                              borderColor: themeColors.divider,
+                              backgroundColor: themeColors.background
+                            },
+                            masonryColumns === cols && {
+                              borderColor: primaryColor,
+                              borderWidth: 3
+                            }
+                          ]}
+                          onPress={() => handleChangeMasonryColumns(cols)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.columnVisual}>
+                            {Array.from({ length: cols }).map((_, i) => (
+                              <View
+                                key={i}
+                                style={[
+                                  styles.columnBar,
+                                  {
+                                    backgroundColor: masonryColumns === cols ? primaryColor : themeColors.textSecondary,
+                                    opacity: masonryColumns === cols ? 1 : 0.3
+                                  }
+                                ]}
+                              />
+                            ))}
+                          </View>
+                          <Text style={[styles.columnNumber, { color: masonryColumns === cols ? primaryColor : themeColors.textSecondary }]}>
+                            {cols}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             )}
           </View>
         )}
 
         {hasPhotos ? (
-          <View style={styles.albumGrid}>
-            {photoItems.map((photo) => (
-              <TouchableOpacity
-                key={photo.id}
-                style={[styles.albumItem, { width: `${100 / albumColumns}%` }]}
-                activeOpacity={0.8}
-                onPress={() => handlePreviewPhoto(photo.downloadUrl)}
-                onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
-                delayLongPress={250}
-              >
-                <Image
-                  source={{ uri: photo.downloadUrl }}
-                  style={[styles.albumImage, { aspectRatio }]}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+          albumLayout === 'masonry' ? (
+            // Masonry layout - dynamic columns with varying heights
+            <View style={styles.masonryContainer}>
+              {Array.from({ length: masonryColumns }).map((_, columnIndex) => (
+                <View key={`column-${columnIndex}`} style={styles.masonryColumn}>
+                  {photoItems
+                    .filter((_, index) => index % masonryColumns === columnIndex)
+                    .map((photo, indexInColumn) => {
+                      // Varied aspect ratios for Pinterest-style masonry
+                      // Pattern: tall, medium, short, medium, tall...
+                      const aspectRatios = [0.65, 0.85, 1.1, 0.75, 0.95];
+                      const aspectRatio = aspectRatios[indexInColumn % aspectRatios.length];
+
+                      return (
+                        <TouchableOpacity
+                          key={photo.id}
+                          style={styles.masonryItem}
+                          activeOpacity={0.8}
+                          onPress={() => handlePreviewPhoto(photo.downloadUrl)}
+                          onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
+                          delayLongPress={250}
+                        >
+                          <Image
+                            source={{ uri: photo.downloadUrl }}
+                            style={[styles.masonryImage, { aspectRatio }]}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+              ))}
+            </View>
+          ) : (
+            // Grid layout - uniform size
+            <View style={styles.albumGrid}>
+              {photoItems.map((photo) => (
+                <TouchableOpacity
+                  key={photo.id}
+                  style={[styles.albumItem, { width: `${100 / albumColumns}%` }]}
+                  activeOpacity={0.8}
+                  onPress={() => handlePreviewPhoto(photo.downloadUrl)}
+                  onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
+                  delayLongPress={250}
+                >
+                  <Image
+                    source={{ uri: photo.downloadUrl }}
+                    style={[styles.albumImage, { aspectRatio }]}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="images-outline" size={64} color={themeColors.textSecondary} />
@@ -435,11 +539,14 @@ export default function PublicProfileScreen({ navigation, route }) {
     albumLoading,
     albumPhotos,
     albumShape,
+    albumLayout,
     albumUploading,
     showAlbumSettings,
+    masonryColumns,
     handleAddAlbumPhotos,
     handleDeleteAlbumPhoto,
     handleChangeAlbumColumns,
+    handleChangeMasonryColumns,
     handleChangeAlbumShape,
     handlePreviewPhoto,
     isOwnProfile,
@@ -1070,13 +1177,14 @@ const styles = StyleSheet.create({
   },
   albumContainer: {
     gap: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   albumControls: {
     gap: 12,
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    marginHorizontal: 20,
     borderWidth: 1,
     borderColor: 'transparent',
     backgroundColor: 'transparent',
@@ -1111,6 +1219,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   albumOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
@@ -1141,11 +1251,67 @@ const styles = StyleSheet.create({
     marginRight: -8,
   },
   albumSettingsContainer: {
-    borderRadius: 14,
-    padding: 14,
-    gap: 12,
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1,
-    marginBottom: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  settingsSection: {
+    marginBottom: 20,
+  },
+  settingsSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  layoutOptionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  layoutOptionCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  layoutOptionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  columnsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-start',
+  },
+  columnVisualOption: {
+    width: 90,
+    height: 80,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  columnVisual: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'flex-end',
+  },
+  columnBar: {
+    width: 8,
+    height: 24,
+    borderRadius: 2,
+  },
+  columnNumber: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   albumGrid: {
     flexDirection: 'row',
@@ -1159,9 +1325,25 @@ const styles = StyleSheet.create({
   },
   albumImage: {
     width: '100%',
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: '#ccc',
-    borderWidth: StyleSheet.hairlineWidth,
+  },
+  masonryContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 0,
+  },
+  masonryColumn: {
+    flex: 1,
+    gap: 4,
+  },
+  masonryItem: {
+    width: '100%',
+  },
+  masonryImage: {
+    width: '100%',
+    borderRadius: 12,
+    backgroundColor: '#ccc',
   },
   photoModalBackdrop: {
     flex: 1,
