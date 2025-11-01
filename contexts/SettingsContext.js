@@ -853,38 +853,39 @@ export function SettingsProvider({ children }) {
     setPremiumAccentShade(0);
   }, [hasActivePremium, baseAccentKey, isDevBuild]);
 
+  // [PUBLIC-MODE] Load user profile from Firebase
+  const loadProfileFromFirebase = useCallback(async () => {
+    if (!user?.uid) return;
+
+    try {
+      const profile = await getUserProfile(user.uid);
+      if (profile && profile.isPublicProfile) {
+        setUserProfile(prev => ({
+          ...prev,
+          username: profile.username || '',
+          displayName: profile.displayName || '',
+          bio: profile.bio || '',
+          profilePhoto: profile.profilePhoto || '',
+          isPublicProfile: true,
+          currentMode: profile.currentMode || 'anonymous',
+          defaultMode: profile.defaultMode || 'anonymous',
+          followersCount: profile.followersCount || 0,
+          followingCount: profile.followingCount || 0,
+          publicPostsCount: profile.publicPostsCount || 0,
+          allowFollows: profile.allowFollows !== false,
+          showFollowers: profile.showFollowers !== false,
+          showFollowing: profile.showFollowing !== false,
+        }));
+      }
+    } catch (error) {
+      console.warn('[SettingsContext] Error loading profile:', error);
+    }
+  }, [user?.uid]);
+
   // [PUBLIC-MODE] Load user profile from Firebase when user signs in
   useEffect(() => {
-    const loadProfile = async () => {
-      if (!user?.uid) return;
-
-      try {
-        const profile = await getUserProfile(user.uid);
-        if (profile && profile.isPublicProfile) {
-          setUserProfile(prev => ({
-            ...prev,
-            username: profile.username || '',
-            displayName: profile.displayName || '',
-            bio: profile.bio || '',
-            profilePhoto: profile.profilePhoto || '',
-            isPublicProfile: true,
-            currentMode: profile.currentMode || 'anonymous',
-            defaultMode: profile.defaultMode || 'anonymous',
-            followersCount: profile.followersCount || 0,
-            followingCount: profile.followingCount || 0,
-            publicPostsCount: profile.publicPostsCount || 0,
-            allowFollows: profile.allowFollows !== false,
-            showFollowers: profile.showFollowers !== false,
-            showFollowing: profile.showFollowing !== false,
-          }));
-        }
-      } catch (error) {
-        console.warn('[SettingsContext] Error loading profile:', error);
-      }
-    };
-
-    loadProfile();
-  }, [user?.uid]);
+    loadProfileFromFirebase();
+  }, [loadProfileFromFirebase]);
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
@@ -1078,6 +1079,7 @@ export function SettingsProvider({ children }) {
       setPremiumAccentShade: updatePremiumAccentShade,
       userProfile,
       updateUserProfile,
+      reloadProfile: loadProfileFromFirebase,
       locationPermissionStatus,
       setLocationPermissionStatus,
       isDarkMode,
@@ -1118,6 +1120,7 @@ export function SettingsProvider({ children }) {
       updatePremiumAccentShade,
       userProfile,
       updateUserProfile,
+      loadProfileFromFirebase,
       locationPermissionStatus,
       setLocationPermissionStatus,
       isDarkMode,

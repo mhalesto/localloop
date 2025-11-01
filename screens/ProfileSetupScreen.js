@@ -23,7 +23,7 @@ import {
 import { updateUserProfile } from '../services/userProfileService';
 
 export default function ProfileSetupScreen({ navigation, route }) {
-  const { themeColors, accentPreset, userProfile, updateUserProfile: updateLocalProfile } = useSettings();
+  const { themeColors, accentPreset, userProfile, updateUserProfile: updateLocalProfile, reloadProfile } = useSettings();
   const { user } = useAuth();
   const isEditing = route.params?.isEditing ?? false;
 
@@ -155,11 +155,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
 
       await updateUserProfile(user.uid, profileData);
 
-      // Update local profile
-      updateLocalProfile({
-        ...profileData,
-        defaultMode: 'public', // Set default to public once profile is set up
-      });
+      // Reload profile from Firebase to ensure all screens get the latest data
+      await reloadProfile();
 
       Alert.alert(
         'Profile Updated! 🎉',

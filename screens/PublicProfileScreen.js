@@ -52,6 +52,14 @@ export default function PublicProfileScreen({ navigation, route }) {
     loadProfile();
   }, [loadProfile]);
 
+  // Reload profile when screen comes into focus (after editing)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfile();
+    });
+    return unsubscribe;
+  }, [navigation, loadProfile]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadProfile();
