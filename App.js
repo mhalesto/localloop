@@ -15,6 +15,7 @@ import ProvinceScreen from './screens/ProvinceScreen';
 import CityScreen from './screens/CityScreen';
 import RoomScreen from './screens/RoomScreen';
 import PostThreadScreen from './screens/PostThreadScreen';
+import ThreadSummaryScreen from './screens/ThreadSummaryScreen';
 import MyCommentsScreen from './screens/MyCommentsScreen';
 import MyPostsScreen from './screens/MyPostsScreen';
 import SettingsScreen from './screens/SettingsScreen';
@@ -43,6 +44,7 @@ function RootNavigator() {
       <Stack.Screen name="City" component={CityScreen} />
       <Stack.Screen name="Room" component={RoomScreen} />
       <Stack.Screen name="PostThread" component={PostThreadScreen} />
+      <Stack.Screen name="ThreadSummary" component={ThreadSummaryScreen} />
       <Stack.Screen name="MyComments" component={MyCommentsScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />

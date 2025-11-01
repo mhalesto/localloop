@@ -1,4 +1,4 @@
-// screens/PostThreadScreen.js - AI Features Enabled
+// screens/PostThreadScreen.js - AI Features with Loading States
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -477,6 +477,7 @@ export default function PostThreadScreen({ route, navigation }) {
   // [AI-FEATURES] Thread summarization, comment suggestions, translation
   const [threadSummary, setThreadSummary] = useState(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const isSummarizingRef = useRef(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
   const [translatedPost, setTranslatedPost] = useState(null);
@@ -1634,22 +1635,41 @@ export default function PostThreadScreen({ route, navigation }) {
   };
 
   // [AI-FEATURES] Thread Summarization
-  const handleSummarizeThread = async () => {
+  const handleSummarizeThread = useCallback(async () => {
+    if (isSummarizingRef.current) {
+      console.log('[ThreadSummary] Already summarizing, ignoring click');
+      return;
+    }
+
     if (comments.length < 10) {
       Alert.alert('Too few comments', 'Threads need at least 10 comments to summarize');
       return;
     }
 
+    console.log('[ThreadSummary] Starting summarization...');
+
+    // Update both ref and state
+    isSummarizingRef.current = true;
     setIsSummarizing(true);
+    console.log('[ThreadSummary] Set isSummarizingRef and state to true');
+
     try {
       const result = await summarizeThread(comments, post);
-      setThreadSummary(result.summary);
-    } catch (error) {
-      Alert.alert('Summary failed', error.message);
-    } finally {
+      console.log('[ThreadSummary] Summarization complete');
+      isSummarizingRef.current = false;
       setIsSummarizing(false);
+      // Navigate to dedicated summary screen
+      navigation.navigate('ThreadSummary', {
+        postTitle: post.title,
+        summary: result.summary,
+      });
+    } catch (error) {
+      console.log('[ThreadSummary] Summarization failed:', error.message);
+      isSummarizingRef.current = false;
+      setIsSummarizing(false);
+      Alert.alert('Summary failed', error.message);
     }
-  };
+  }, [comments, post, navigation]);
 
   // [AI-FEATURES] Comment Suggestions
   const handleGetSuggestion = async (type = SUGGESTION_TYPES.THOUGHTFUL) => {
@@ -2301,34 +2321,27 @@ export default function PostThreadScreen({ route, navigation }) {
             </Text>
 
             {/* Thread Summarization Button */}
-            {comments.length >= 10 && (
-              <TouchableOpacity
-                style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15` }]}
-                onPress={handleSummarizeThread}
-                disabled={isSummarizing}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="bulb-outline" size={14} color={linkColor} />
-                <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
-                  {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Thread Summary Display */}
-          {threadSummary && (
-            <View style={[styles.summaryCard, { backgroundColor: themeColors.card, borderColor: linkColor }]}>
-              <View style={styles.summaryHeader}>
-                <Ionicons name="bulb" size={18} color={linkColor} />
-                <Text style={[styles.summaryTitle, { color: themeColors.textPrimary }]}>Thread Summary</Text>
-                <TouchableOpacity onPress={() => setThreadSummary(null)} style={styles.summaryClose}>
-                  <Ionicons name="close-circle" size={20} color={themeColors.textSecondary} />
+            {comments.length >= 10 && (() => {
+              console.log('[ThreadSummary] Rendering button, isSummarizing:', isSummarizing);
+              return (
+                <TouchableOpacity
+                  style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
+                  onPress={handleSummarizeThread}
+                  disabled={isSummarizing}
+                  activeOpacity={0.7}
+                >
+                  {isSummarizing ? (
+                    <ActivityIndicator size="small" color={linkColor} />
+                  ) : (
+                    <Ionicons name="bulb-outline" size={14} color={linkColor} />
+                  )}
+                  <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                    {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-              <Text style={[styles.summaryText, { color: themeColors.textSecondary }]}>{threadSummary}</Text>
-            </View>
-          )}
+              );
+            })()}
+          </View>
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
             <View style={styles.actionsFooterRow}>
@@ -3762,6 +3775,9 @@ const createStyles = (
     summaryText: {
       fontSize: 13,
       lineHeight: 19,
+    },
+    summaryScrollView: {
+      maxHeight: 200,
     },
   });
 };
