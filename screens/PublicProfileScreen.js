@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
+  Modal,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
@@ -17,6 +19,38 @@ import { getUserProfile } from '../services/userProfileService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
 import { getUserPosts } from '../services/publicPostsService';
 import { ENGAGEMENT_POINT_RULES } from '../constants/authConfig';
+import * as ImagePicker from 'expo-image-picker';
+import * as ScreenCapture from 'expo-screen-capture';
+import {
+  ALBUM_MAX_ITEMS,
+  listenToAlbum,
+  uploadAlbumPhoto,
+  deleteAlbumPhoto,
+  updateAlbumPreferences
+} from '../services/albumService';
+
+const withAlpha = (color, alpha) => {
+  const clamped = Math.min(Math.max(alpha, 0), 1);
+  if (typeof color === 'string' && color.startsWith('#')) {
+    let hex = color.slice(1);
+    if (hex.length === 3) {
+      hex = hex
+        .split('')
+        .map((char) => `${char}${char}`)
+        .join('');
+    }
+    if (hex.length === 6) {
+      const value = parseInt(hex, 16);
+      if (!Number.isNaN(value)) {
+        const r = (value >> 16) & 255;
+        const g = (value >> 8) & 255;
+        const b = value & 255;
+        return `rgba(${r},${g},${b},${clamped})`;
+      }
+    }
+  }
+  return `rgba(108,77,244,${clamped})`;
+};
 
 export default function PublicProfileScreen({ navigation, route }) {
   const { userId, username } = route.params;
@@ -28,7 +62,14 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('posts'); // 'posts', 'statuses'
+  const [activeTab, setActiveTab] = useState('album'); // 'album', 'posts', 'statuses'
+  const [albumPhotos, setAlbumPhotos] = useState([]);
+  const [albumLoading, setAlbumLoading] = useState(true);
+  const [albumColumns, setAlbumColumns] = useState(3);
+  const [albumShape, setAlbumShape] = useState('square');
+  const [albumUploading, setAlbumUploading] = useState(false);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [photoPreviewSource, setPhotoPreviewSource] = useState(null);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
@@ -71,6 +112,379 @@ export default function PublicProfileScreen({ navigation, route }) {
     setRefreshing(true);
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    const unsubscribe = listenToAlbum(userId, (items) => {
+      setAlbumPhotos(items);
+      setAlbumLoading(false);
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (profile) {
+      const preferredColumns = Number(profile.albumLayout);
+      const preferredShape = typeof profile.albumShape === 'string' ? profile.albumShape : null;
+      setAlbumColumns([2, 3].includes(preferredColumns) ? preferredColumns : 3);
+      setAlbumShape(['square', 'portrait'].includes(preferredShape) ? preferredShape : 'square');
+    }
+  }, [profile]);
+
+  useEffect(() => () => {
+    ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!photoModalVisible) {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+    }
+  }, [photoModalVisible]);
+
+  const handlePreviewPhoto = useCallback(async (uri) => {
+    if (!uri) return;
+    try {
+      await ScreenCapture.preventScreenCaptureAsync();
+    } catch (error) {
+      console.warn('[PublicProfile] prevent screen capture failed', error);
+    }
+    setPhotoPreviewSource({ uri });
+    setPhotoModalVisible(true);
+  }, []);
+
+  const closePhotoPreview = useCallback(async () => {
+    setPhotoModalVisible(false);
+    setPhotoPreviewSource(null);
+    try {
+      await ScreenCapture.allowScreenCaptureAsync();
+    } catch {}
+  }, []);
+
+  const handleOpenInbox = useCallback(() => {
+    if (!user?.uid) {
+      navigation.navigate('Settings');
+      return;
+    }
+    navigation.navigate('DirectMessage', {
+      userId,
+      username: profile?.username,
+      displayName: profile?.displayName || profile?.username,
+      profilePhoto: profile?.profilePhoto || null
+    });
+  }, [navigation, profile, user?.uid, userId]);
+
+  const handleAddAlbumPhotos = useCallback(async () => {
+    if (!isOwnProfile || albumUploading) {
+      return;
+    }
+    if (!user?.uid) {
+      navigation.navigate('Settings');
+      return;
+    }
+    const remaining = Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0);
+    if (remaining <= 0) {
+      Alert.alert('Album is full', 'You can upload up to 10 photos. Remove a photo to add a new one.');
+      return;
+    }
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      allowsMultipleSelection: true,
+      selectionLimit: Math.min(remaining, 10),
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8
+    });
+
+    if (pickerResult.canceled) {
+      return;
+    }
+
+    const assets = pickerResult.assets ?? [];
+    if (!assets.length) {
+      return;
+    }
+
+    setAlbumUploading(true);
+    try {
+      const allowedAssets = assets.slice(0, remaining);
+      for (const asset of allowedAssets) {
+        if (asset?.uri) {
+          await uploadAlbumPhoto(user.uid, asset.uri);
+        }
+      }
+    } catch (error) {
+      console.error('[PublicProfile] album upload failed', error);
+      Alert.alert('Upload failed', 'We could not upload the selected photos. Please try again.');
+    } finally {
+      setAlbumUploading(false);
+    }
+  }, [albumPhotos.length, albumUploading, isOwnProfile, navigation, user?.uid]);
+
+  const handleDeleteAlbumPhoto = useCallback((photo) => {
+    if (!isOwnProfile || !user?.uid || !photo?.id) {
+      return;
+    }
+    Alert.alert('Remove photo', 'Do you want to remove this photo from your album?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          deleteAlbumPhoto(user.uid, photo).catch((error) => {
+            console.warn('[PublicProfile] delete album photo failed', error);
+          });
+        }
+      }
+    ]);
+  }, [isOwnProfile, user?.uid]);
+
+  const handleChangeAlbumColumns = useCallback((columns) => {
+    if (![2, 3].includes(columns)) {
+      return;
+    }
+    setAlbumColumns(columns);
+    if (isOwnProfile) {
+      updateAlbumPreferences(userId, { columns });
+    }
+  }, [isOwnProfile, userId]);
+
+  const handleChangeAlbumShape = useCallback((shape) => {
+    if (!['square', 'portrait'].includes(shape)) {
+      return;
+    }
+    setAlbumShape(shape);
+    if (isOwnProfile) {
+      updateAlbumPreferences(userId, { shape });
+    }
+  }, [isOwnProfile, userId]);
+
+  const renderAlbumTab = useCallback(() => {
+    if (albumLoading) {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color={primaryColor} />
+        </View>
+      );
+    }
+
+    const photoItems = albumPhotos.filter((item) => item?.downloadUrl);
+    const hasPhotos = photoItems.length > 0;
+    const aspectRatio = albumShape === 'portrait' ? 0.75 : 1;
+
+    return (
+      <View style={styles.albumContainer}>
+        {isOwnProfile && (
+          <View
+            style={[
+              styles.albumControls,
+              {
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.divider,
+                shadowColor: '#00000022'
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.albumActionButton, { backgroundColor: primaryColor }]}
+              onPress={handleAddAlbumPhotos}
+              activeOpacity={0.75}
+              disabled={albumUploading}
+            >
+              {albumUploading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={18} color="#fff" />
+                  <Text style={styles.albumActionText}>Upload photos</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <View style={styles.albumSettingsRow}>
+              <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Grid</Text>
+              {[2, 3].map((columns) => (
+                <TouchableOpacity
+                  key={`columns-${columns}`}
+                  style={[
+                    styles.albumOption,
+                    {
+                      borderColor: themeColors.divider,
+                      backgroundColor: themeColors.card
+                    },
+                    albumColumns === columns && [
+                      styles.albumOptionActive,
+                      {
+                        borderColor: primaryColor,
+                        backgroundColor: withAlpha(primaryColor, 0.12)
+                      }
+                    ]
+                  ]}
+                  onPress={() => handleChangeAlbumColumns(columns)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.albumOptionText,
+                      { color: themeColors.textSecondary },
+                      albumColumns === columns && [
+                        styles.albumOptionTextActive,
+                        { color: primaryColor }
+                      ]
+                    ]}
+                  >
+                    {columns} columns
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.albumSettingsRow}>
+              <Text style={[styles.albumSettingsLabel, { color: themeColors.textSecondary }]}>Shape</Text>
+              {['square', 'portrait'].map((shapeKey) => (
+                <TouchableOpacity
+                  key={`shape-${shapeKey}`}
+                  style={[
+                    styles.albumOption,
+                    {
+                      borderColor: themeColors.divider,
+                      backgroundColor: themeColors.card
+                    },
+                    albumShape === shapeKey && [
+                      styles.albumOptionActive,
+                      {
+                        borderColor: primaryColor,
+                        backgroundColor: withAlpha(primaryColor, 0.12)
+                      }
+                    ]
+                  ]}
+                  onPress={() => handleChangeAlbumShape(shapeKey)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.albumOptionText,
+                      { color: themeColors.textSecondary },
+                      albumShape === shapeKey && [
+                        styles.albumOptionTextActive,
+                        { color: primaryColor }
+                      ]
+                    ]}
+                  >
+                    {shapeKey === 'square' ? 'Square' : 'Portrait'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.albumHint, { color: themeColors.textSecondary }]}>
+              {`You can add up to ${ALBUM_MAX_ITEMS} photos (${Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0)} slots left).`}
+            </Text>
+          </View>
+        )}
+
+        {hasPhotos ? (
+          <View style={styles.albumGrid}>
+            {photoItems.map((photo) => (
+              <TouchableOpacity
+                key={photo.id}
+                style={[styles.albumItem, { width: `${100 / albumColumns}%` }]}
+                activeOpacity={0.8}
+                onPress={() => handlePreviewPhoto(photo.downloadUrl)}
+                onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
+                delayLongPress={250}
+              >
+                <Image
+                  source={{ uri: photo.downloadUrl }}
+                  style={[styles.albumImage, { aspectRatio }]}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="images-outline" size={64} color={themeColors.textSecondary} />
+            <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+              {isOwnProfile ? 'Build your album' : 'No album photos yet'}
+            </Text>
+            {isOwnProfile && (
+              <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }] }>
+                Add up to 10 photos that showcase your vibe. Touch and hold any photo to remove it later.
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }, [
+    albumColumns,
+    albumLoading,
+    albumPhotos,
+    albumShape,
+    albumUploading,
+    handleAddAlbumPhotos,
+    handleDeleteAlbumPhoto,
+    handleChangeAlbumColumns,
+    handleChangeAlbumShape,
+    handlePreviewPhoto,
+    isOwnProfile,
+    primaryColor,
+    themeColors
+  ]);
+
+  const renderPostsTab = useCallback(() => {
+    return posts.length > 0 ? (
+      <View style={styles.postsGrid}>
+        {posts.map((post) => (
+          <TouchableOpacity
+            key={post.id}
+            style={[styles.postCard, { backgroundColor: themeColors.card }]}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.postTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
+              {post.title}
+            </Text>
+            {post.message && (
+              <Text style={[styles.postMessage, { color: themeColors.textSecondary }]} numberOfLines={3}>
+                {post.message}
+              </Text>
+            )}
+            <View style={styles.postStats}>
+              <View style={styles.postStat}>
+                <Ionicons name="heart-outline" size={14} color={themeColors.textSecondary} />
+                <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
+                  {post.likesCount || 0}
+                </Text>
+              </View>
+              <View style={styles.postStat}>
+                <Ionicons name="chatbubble-outline" size={14} color={themeColors.textSecondary} />
+                <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
+                  {post.commentsCount || 0}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ) : (
+      <View style={styles.emptyState}>
+        <Ionicons name="document-text-outline" size={64} color={themeColors.textSecondary} />
+        <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+          {isOwnProfile ? 'No public posts yet' : 'No posts to show'}
+        </Text>
+        <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }] }>
+          {isOwnProfile
+            ? 'Posts you create in public mode will appear here.'
+            : 'This user hasn\'t posted publicly yet.'}
+        </Text>
+      </View>
+    );
+  }, [isOwnProfile, posts, themeColors.card, themeColors.textPrimary, themeColors.textSecondary]);
+
+  const renderStatusesTab = useCallback(() => (
+    <View style={styles.emptyState}>
+      <Ionicons name="flash-outline" size={64} color={themeColors.textSecondary} />
+      <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+        {isOwnProfile ? 'No statuses yet' : 'No statuses to show'}
+      </Text>
+    </View>
+  ), [isOwnProfile, themeColors.textSecondary]);
 
   const handleFollow = async () => {
     if (!user?.uid) {
@@ -155,6 +569,33 @@ export default function PublicProfileScreen({ navigation, route }) {
       onBack={() => navigation.goBack()}
       showFooter={false}
     >
+      <Modal
+        visible={photoModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={closePhotoPreview}
+        onDismiss={closePhotoPreview}
+      >
+        <View style={styles.photoModalBackdrop}>
+          <TouchableOpacity
+            style={styles.photoModalBackdropTouchable}
+            activeOpacity={1}
+            onPress={closePhotoPreview}
+          />
+          <View style={[styles.photoModalContent, { backgroundColor: themeColors.card }]}>
+            <TouchableOpacity
+              style={styles.photoModalClose}
+              onPress={closePhotoPreview}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color={themeColors.textPrimary} />
+            </TouchableOpacity>
+            {photoPreviewSource ? (
+              <Image source={photoPreviewSource} style={styles.photoModalImage} resizeMode="contain" />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -170,9 +611,15 @@ export default function PublicProfileScreen({ navigation, route }) {
           {/* Profile Photo */}
           <View style={[styles.photoContainer, { borderColor: primaryColor }]}>
             {profile.profilePhoto ? (
-              <Image source={{ uri: profile.profilePhoto }} style={styles.photo} />
+              <TouchableOpacity
+                style={styles.photoTouchable}
+                activeOpacity={0.85}
+                onPress={() => handlePreviewPhoto(profile.profilePhoto)}
+              >
+                <Image source={{ uri: profile.profilePhoto }} style={styles.photo} />
+              </TouchableOpacity>
             ) : (
-              <View style={[styles.photoPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
+              <View style={[styles.photoPlaceholder, { backgroundColor: withAlpha(primaryColor, 0.12) }]}>
                 <Ionicons name="person" size={50} color={primaryColor} />
               </View>
             )}
@@ -229,12 +676,29 @@ export default function PublicProfileScreen({ navigation, route }) {
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.stat}>
+            <TouchableOpacity
+              style={styles.stat}
+              onPress={() => setActiveTab('album')}
+              activeOpacity={0.7}
+            >
               <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
-                {profile.publicPostsCount || 0}
+                {profile.albumCount ?? albumPhotos.length}
+              </Text>
+              <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>
+                Album
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.stat}
+              onPress={() => setActiveTab('posts')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
+                {profile.publicPostsCount || posts.length}
               </Text>
               <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Posts</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Action Buttons */}
@@ -292,6 +756,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={[styles.messageButton, { borderColor: primaryColor }]}
                   activeOpacity={0.7}
+                  onPress={handleOpenInbox}
                 >
                   <Ionicons name="mail-outline" size={20} color={primaryColor} />
                 </TouchableOpacity>
@@ -302,122 +767,49 @@ export default function PublicProfileScreen({ navigation, route }) {
 
         {/* Tabs */}
         <View style={[styles.tabsContainer, { borderBottomColor: themeColors.divider }]}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'posts' && {
-                borderBottomColor: primaryColor,
-                borderBottomWidth: 2,
-              },
-            ]}
-            onPress={() => setActiveTab('posts')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="grid-outline"
-              size={20}
-              color={activeTab === 'posts' ? primaryColor : themeColors.textSecondary}
-            />
-            <Text
+          {[
+            { key: 'album', label: 'Album', icon: 'images-outline' },
+            { key: 'posts', label: 'Posts', icon: 'grid-outline' },
+            { key: 'statuses', label: 'Statuses', icon: 'flash-outline' }
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
               style={[
-                styles.tabText,
-                {
-                  color: activeTab === 'posts' ? primaryColor : themeColors.textSecondary,
+                styles.tab,
+                activeTab === tab.key && {
+                  borderBottomColor: primaryColor,
+                  borderBottomWidth: 2,
                 },
               ]}
+              onPress={() => setActiveTab(tab.key)}
+              activeOpacity={0.7}
             >
-              Posts
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'statuses' && {
-                borderBottomColor: primaryColor,
-                borderBottomWidth: 2,
-              },
-            ]}
-            onPress={() => setActiveTab('statuses')}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="flash-outline"
-              size={20}
-              color={activeTab === 'statuses' ? primaryColor : themeColors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                {
-                  color: activeTab === 'statuses' ? primaryColor : themeColors.textSecondary,
-                },
-              ]}
-            >
-              Statuses
-            </Text>
-          </TouchableOpacity>
+              <Ionicons
+                name={tab.icon}
+                size={20}
+                color={activeTab === tab.key ? primaryColor : themeColors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.tabText,
+                  {
+                    color: activeTab === tab.key ? primaryColor : themeColors.textSecondary,
+                  },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-
         {/* Tab Content */}
         <View style={styles.contentContainer}>
-          {activeTab === 'posts' ? (
-            posts.length > 0 ? (
-              <View style={styles.postsGrid}>
-                {posts.map(post => (
-                  <TouchableOpacity
-                    key={post.id}
-                    style={[styles.postCard, { backgroundColor: themeColors.card }]}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.postTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-                      {post.title}
-                    </Text>
-                    {post.message && (
-                      <Text style={[styles.postMessage, { color: themeColors.textSecondary }]} numberOfLines={3}>
-                        {post.message}
-                      </Text>
-                    )}
-                    <View style={styles.postStats}>
-                      <View style={styles.postStat}>
-                        <Ionicons name="heart-outline" size={14} color={themeColors.textSecondary} />
-                        <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
-                          {post.likesCount || 0}
-                        </Text>
-                      </View>
-                      <View style={styles.postStat}>
-                        <Ionicons name="chatbubble-outline" size={14} color={themeColors.textSecondary} />
-                        <Text style={[styles.postStatText, { color: themeColors.textSecondary }]}>
-                          {post.commentsCount || 0}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="document-text-outline" size={64} color={themeColors.textSecondary} />
-                <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                  {isOwnProfile ? 'No public posts yet' : 'No posts to show'}
-                </Text>
-                <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
-                  {isOwnProfile
-                    ? 'Posts you create in public mode will appear here'
-                    : 'This user hasn\'t posted publicly yet'}
-                </Text>
-              </View>
-            )
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="flash-outline" size={64} color={themeColors.textSecondary} />
-              <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                {isOwnProfile ? 'No statuses yet' : 'No statuses to show'}
-              </Text>
-            </View>
-          )}
+          {activeTab === 'album'
+            ? renderAlbumTab()
+            : activeTab === 'posts'
+            ? renderPostsTab()
+            : renderStatusesTab()}
         </View>
-
         {/* Account Overview Section - Only show for own profile */}
         {isOwnProfile && (
           <>
@@ -558,6 +950,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
+  photoTouchable: {
+    flex: 1,
+  },
   photo: {
     width: '100%',
     height: '100%',
@@ -651,6 +1046,109 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  albumContainer: {
+    gap: 16,
+    paddingHorizontal: 20,
+  },
+  albumControls: {
+    gap: 12,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  albumActionButton: {
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 18,
+  },
+  albumActionText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  albumSettingsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  albumSettingsLabel: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  albumOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  albumOptionActive: {},
+  albumOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#444',
+  },
+  albumOptionTextActive: {},
+  albumHint: {
+    fontSize: 12,
+    color: 'rgba(0,0,0,0.45)',
+  },
+  albumGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  albumItem: {
+    paddingHorizontal: 6,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  albumImage: {
+    width: '100%',
+    borderRadius: 18,
+    backgroundColor: '#ccc',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  photoModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  photoModalBackdropTouchable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  photoModalContent: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 24,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  photoModalClose: {
+    alignSelf: 'flex-end',
+    padding: 4,
+  },
+  photoModalImage: {
+    width: '100%',
+    height: 340,
+    borderRadius: 20,
   },
   tabsContainer: {
     flexDirection: 'row',

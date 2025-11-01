@@ -1,0 +1,174 @@
+rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+    function listHasCurrentUid(listValue) {
+      return listValue is list && listValue.hasAny([request.auth.uid]);
+    }
+
+    function areParticipantsValid(listValue) {
+      return listValue is list
+        && listValue.size() == 2
+        && listValue[0] is string
+        && listValue[1] is string;
+    }
+
+      function isConversationParticipant() {
+        return isSignedIn() && (
+          (request.resource.data != null && listHasCurrentUid(request.resource.data.participants)) ||
+          (resource.data != null && listHasCurrentUid(resource.data.participants))
+        );
+      }
+
+      function messageSentByRequester() {
+        return isSignedIn()
+          && resource.data != null
+          && resource.data.senderId == request.auth.uid;
+      }
+
+      match /posts/{postId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+          && request.resource.data.author.uid == request.auth.uid;
+
+        allow update: if isSignedIn()
+          && (
+            resource.data.author.uid == request.auth.uid ||
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['author', 'createdAt', 'clientId'])
+          );
+
+        allow delete: if isSignedIn()
+          && resource.data.author.uid == request.auth.uid;
+
+        match /comments/{commentId} {
+          allow read: if true;
+          allow create: if isSignedIn();
+          allow update, delete: if isSignedIn()
+            && resource.data.authorId == request.auth.uid;
+        }
+
+        match /presence/{clientId} {
+          allow read: if true;
+          allow write: if isSignedIn();
+        }
+      }
+
+      match /statuses/{statusId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid;
+
+        allow update: if isSignedIn()
+          && (
+            resource.data.authorId == request.auth.uid ||
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['authorId', 'createdAt'])
+          );
+
+        allow delete: if isSignedIn();
+
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if isSignedIn();
+          allow update, delete: if isSignedIn()
+            && resource.data.authorId == request.auth.uid;
+        }
+      }
+
+      match /users/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+
+        match /album/{photoId} {
+          allow read: if true;
+          allow create: if isOwner(userId)
+            && request.resource.data.ownerId == request.auth.uid
+            && request.resource.data.downloadUrl is string
+            && request.resource.data.storagePath is string;
+          allow update, delete: if isOwner(userId);
+        }
+      }
+
+      match /usernames/{username} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if isSignedIn()
+          && resource.data.uid == request.auth.uid;
+      }
+
+      match /following/{userId}/following/{followedId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /followers/{userId}/followers/{followerId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() && request.auth.uid == followerId;
+      }
+
+      match /publicPosts/{postId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isSignedIn()
+          && resource.data.authorId == request.auth.uid;
+      }
+
+      match /directMessages/{conversationId} {
+        allow read: if isConversationParticipant();
+        allow create: if isSignedIn()
+          && areParticipantsValid(request.resource.data.participants)
+          && request.resource.data.participants.hasAny([request.auth.uid]);
+        allow update: if isConversationParticipant()
+          && request.resource.data.participants == resource.data.participants;
+        allow delete: if isConversationParticipant();
+
+        match /messages/{messageId} {
+          allow read: if isConversationParticipant();
+          allow create: if isConversationParticipant()
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.recipientId != null
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000;
+          allow update, delete: if messageSentByRequester();
+        }
+      }
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+  }
+
+  ### Storage (storage.rules)
+
+  rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      match /albums/{userId}/{photoId} {
+        allow read: if true;
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /{allPaths=**} {
+        allow read: if false;
+        allow write: if false;
+      }
+    }
+  }

@@ -25,6 +25,7 @@ import StatusComposerScreen from './screens/StatusComposerScreen';
 import ModerationScreen from './screens/ModerationScreen';
 import TopStatusesScreen from './screens/TopStatusesScreen';
 import StatusStoryViewerScreen from './screens/StatusStoryViewerScreen';
+import DirectMessageScreen from './screens/DirectMessageScreen';
 import SubscriptionScreen from './screens/SubscriptionScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import ProfileSetupScreen from './screens/ProfileSetupScreen';
@@ -62,6 +63,7 @@ function RootNavigator() {
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="TopStatuses" component={TopStatusesScreen} />
       <Stack.Screen name="StatusStoryViewer" component={StatusStoryViewerScreen} />
+      <Stack.Screen name="DirectMessage" component={DirectMessageScreen} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
