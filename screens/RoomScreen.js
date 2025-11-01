@@ -182,15 +182,15 @@ export default function RoomScreen({ navigation, route }) {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValueBold}>{totalPosts}</Text>
-            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Posts</Text>
+            <Text style={styles.statLabelCompact}>Posts</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValueBold}>{totalComments}</Text>
-            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Comments</Text>
+            <Text style={styles.statLabelCompact}>Comments</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValueBold}>{averageReplies}</Text>
-            <Text style={[styles.statLabelCompact, { color: statLabelColor }]}>Avg Replies</Text>
+            <Text style={styles.statLabelCompact}>Avg Replies</Text>
           </View>
         </View>
       </View>
@@ -381,15 +381,15 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     stickyHeaderWrapper: {
       backgroundColor: 'transparent',
-      paddingBottom: 24
+      paddingBottom: 12
     },
     headerCard: {
       backgroundColor: palette.card,
       borderBottomLeftRadius: 0,
       borderBottomRightRadius: 0,
       paddingHorizontal: 20,
-      paddingTop: 8,
-      paddingBottom: 12,
+      paddingTop: 4,
+      paddingBottom: 8,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.25 : 0.12,
       shadowRadius: 12,
@@ -412,7 +412,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       flexDirection: 'row',
       justifyContent: 'space-around',
       alignItems: 'center',
-      paddingVertical: 16
+      paddingVertical: 12
     },
     statItem: {
       alignItems: 'center',
@@ -423,12 +423,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '800',
       color: '#fff',
       letterSpacing: 0.5,
-      marginBottom: 4
+      marginBottom: 2
     },
     statLabelCompact: {
       fontSize: 11,
-      fontWeight: '500',
-      opacity: 0.85
+      fontWeight: '600',
+      color: 'rgba(255,255,255,0.7)',
+      letterSpacing: 0.3
     },
     statCardBase: {
       borderRadius: 14,
