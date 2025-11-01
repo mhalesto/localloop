@@ -142,7 +142,7 @@ export async function translateText(text, targetLang, sourceLang = null, options
           { role: 'user', content: text },
         ],
         temperature: 0.3, // Lower for more accurate translations
-        max_tokens: Math.ceil(text.length * 1.5), // Allow for language expansion
+        max_tokens: Math.min(Math.ceil(text.length * 1.5), 4000), // Cap at 4000 tokens (GPT-3.5-turbo limit is 4096)
       }),
       signal: controller.signal,
     });
@@ -193,8 +193,8 @@ export async function translateText(text, targetLang, sourceLang = null, options
 export async function translatePost(post, targetLang) {
   try {
     const [titleResult, messageResult] = await Promise.all([
-      translateText(post.title || '', targetLang),
-      post.message ? translateText(post.message, targetLang) : Promise.resolve(null),
+      translateText(post.title || '', targetLang, null, { timeout: 30000 }),
+      post.message ? translateText(post.message, targetLang, null, { timeout: 30000 }) : Promise.resolve(null),
     ]);
 
     return {

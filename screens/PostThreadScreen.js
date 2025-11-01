@@ -480,7 +480,6 @@ export default function PostThreadScreen({ route, navigation }) {
   const isSummarizingRef = useRef(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
-  const [translatedPost, setTranslatedPost] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslationPicker, setShowTranslationPicker] = useState(false);
 
@@ -1690,11 +1689,19 @@ export default function PostThreadScreen({ route, navigation }) {
     setShowTranslationPicker(false);
     try {
       const result = await translatePost(post, targetLang);
-      setTranslatedPost({ ...result, targetLang });
-    } catch (error) {
-      Alert.alert('Translation failed', error.message);
-    } finally {
       setIsTranslating(false);
+
+      // Navigate to ThreadSummary screen with translation
+      const languageName = Object.values(LANGUAGES).find(l => l.code === targetLang)?.name || targetLang;
+      navigation.navigate('ThreadSummary', {
+        postTitle: `${post.title} (${languageName})`,
+        summary: `${result.title}\n\n${result.message}`,
+        isTranslation: true,
+        targetLanguage: languageName,
+      });
+    } catch (error) {
+      setIsTranslating(false);
+      Alert.alert('Translation failed', error.message);
     }
   };
 
@@ -2315,32 +2322,52 @@ export default function PostThreadScreen({ route, navigation }) {
               )}
             </View>
           ) : null}
+
           <View style={styles.commentHeaderRow}>
             <Text style={[styles.postMeta, { color: headerMetaColor }]}>
               {comments.length === 1 ? '1 comment' : `${comments.length} comments`}
             </Text>
 
-            {/* Thread Summarization Button */}
-            {comments.length >= 10 && (() => {
-              console.log('[ThreadSummary] Rendering button, isSummarizing:', isSummarizing);
-              return (
-                <TouchableOpacity
-                  style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
-                  onPress={handleSummarizeThread}
-                  disabled={isSummarizing}
-                  activeOpacity={0.7}
-                >
-                  {isSummarizing ? (
-                    <ActivityIndicator size="small" color={linkColor} />
-                  ) : (
-                    <Ionicons name="bulb-outline" size={14} color={linkColor} />
-                  )}
-                  <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
-                    {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })()}
+            <View style={styles.aiButtonsRow}>
+              {/* Translate Button */}
+              <TouchableOpacity
+                style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isTranslating ? 0.6 : 1 }]}
+                onPress={() => setShowTranslationPicker(true)}
+                disabled={isTranslating}
+                activeOpacity={0.7}
+              >
+                {isTranslating ? (
+                  <ActivityIndicator size="small" color={linkColor} />
+                ) : (
+                  <Ionicons name="language-outline" size={14} color={linkColor} />
+                )}
+                <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                  {isTranslating ? 'Translating...' : 'Translate'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Thread Summarization Button */}
+              {comments.length >= 10 && (() => {
+                console.log('[ThreadSummary] Rendering button, isSummarizing:', isSummarizing);
+                return (
+                  <TouchableOpacity
+                    style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
+                    onPress={handleSummarizeThread}
+                    disabled={isSummarizing}
+                    activeOpacity={0.7}
+                  >
+                    {isSummarizing ? (
+                      <ActivityIndicator size="small" color={linkColor} />
+                    ) : (
+                      <Ionicons name="bulb-outline" size={14} color={linkColor} />
+                    )}
+                    <Text style={[styles.aiFeatureButtonText, { color: linkColor }]}>
+                      {isSummarizing ? 'Summarizing...' : 'Summarize Thread'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
+            </View>
           </View>
 
           <View style={[styles.actionsFooter, { borderTopColor: dividerColor }]}>
@@ -3037,6 +3064,47 @@ export default function PostThreadScreen({ route, navigation }) {
           </Modal>
         );
       })() : null}
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={showTranslationPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTranslationPicker(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowTranslationPicker(false)}>
+          <View style={styles.languagePickerBackdrop}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.languagePickerContainer, { backgroundColor: themeColors.card }]}>
+                <View style={styles.languagePickerHeader}>
+                  <Text style={[styles.languagePickerTitle, { color: themeColors.textPrimary }]}>
+                    Translate to
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowTranslationPicker(false)}>
+                    <Ionicons name="close" size={24} color={themeColors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.languageList}>
+                  {Object.values(LANGUAGES).map((lang) => (
+                    <TouchableOpacity
+                      key={lang.code}
+                      style={[styles.languageItem, { borderBottomColor: themeColors.divider }]}
+                      onPress={() => handleTranslate(lang.code)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.languageFlag}>{lang.flag}</Text>
+                      <Text style={[styles.languageName, { color: themeColors.textPrimary }]}>
+                        {lang.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </ScreenLayout>
   );
 }
@@ -3739,6 +3807,11 @@ const createStyles = (
       marginTop: 16,
       marginBottom: 8,
     },
+    aiButtonsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     aiFeatureButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -3778,6 +3851,46 @@ const createStyles = (
     },
     summaryScrollView: {
       maxHeight: 200,
+    },
+    // Language Picker Styles
+    languagePickerBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    languagePickerContainer: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingBottom: 20,
+      maxHeight: '70%',
+    },
+    languagePickerHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      paddingBottom: 16,
+    },
+    languagePickerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    languageList: {
+      paddingHorizontal: 20,
+    },
+    languageItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+    },
+    languageFlag: {
+      fontSize: 24,
+      marginRight: 16,
+    },
+    languageName: {
+      fontSize: 16,
+      fontWeight: '500',
     },
   });
 };
