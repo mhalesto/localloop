@@ -12,7 +12,8 @@ import {
   Modal,
   Alert,
   Image,
-  Keyboard
+  Keyboard,
+  Pressable
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,17 +24,19 @@ import { buildConversationId, sendDirectMessage, subscribeToMessages, addReactio
 import VoiceRecorder from '../components/VoiceRecorder';
 import VoiceNotePlayer from '../components/VoiceNotePlayer';
 import MessageReactions from '../components/MessageReactions';
+import MessageActionSheet from '../components/MessageActionSheet';
 import StickerPicker from '../components/StickerPicker';
 import GifPicker from '../components/GifPicker';
 import AttachmentMenu from '../components/AttachmentMenu';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../api/firebaseClient';
+import * as Clipboard from 'expo-clipboard';
 
 export default function DirectMessageScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, profile: currentProfile } = useAuth();
-  const { themeColors } = useSettings();
+  const { themeColors, isDarkMode } = useSettings();
   const { userId: recipientId, username, displayName, profilePhoto } = route.params ?? {};
 
   const [messages, setMessages] = useState([]);
@@ -44,6 +47,7 @@ export default function DirectMessageScreen() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [actionSheetMessage, setActionSheetMessage] = useState(null);
   const listRef = useRef(null);
 
   const conversationId = useMemo(() => {
@@ -226,6 +230,51 @@ export default function DirectMessageScreen() {
     }
   }, [conversationId, messageText, navigation, recipientId, sending, user?.uid]);
 
+  const handleLongPressMessage = useCallback((message) => {
+    Keyboard.dismiss();
+    setShowAttachmentMenu(false);
+    setActionSheetMessage(message);
+  }, []);
+
+  const handleSelectReactionFromSheet = useCallback((emoji) => {
+    setActionSheetMessage((current) => {
+      if (!current) return null;
+      const existing = current.reactions?.[user?.uid];
+      const remove = existing === emoji;
+      handleReact(current.id, emoji, remove);
+      return null;
+    });
+  }, [handleReact, user?.uid]);
+
+  const handleSelectActionFromSheet = useCallback((actionId) => {
+    setActionSheetMessage((current) => {
+      if (!current) return null;
+      switch (actionId) {
+        case 'copy':
+          if (current.text) {
+            Clipboard.setStringAsync(current.text);
+            Alert.alert('Copied', 'Message copied to clipboard.');
+          } else {
+            Alert.alert('Nothing to copy', 'This message has no text to copy.');
+          }
+          break;
+        case 'delete':
+        case 'reply':
+        case 'forward':
+        case 'edit':
+        case 'info':
+        case 'star':
+        case 'more':
+        default:
+          Alert.alert('Coming soon', 'This action will be available in a future update.');
+          break;
+      }
+      return null;
+    });
+  }, []);
+
+  const closeActionSheet = useCallback(() => setActionSheetMessage(null), []);
+
   const renderMessage = ({ item }) => {
     const isMine = item.senderId === user?.uid;
     return (
@@ -236,41 +285,47 @@ export default function DirectMessageScreen() {
         ]}
       >
         <View style={styles.messageContainer}>
-          <View
-            style={[
-              styles.messageBubble,
-              {
-                backgroundColor: isMine ? themeColors.primary : themeColors.card,
-                borderTopLeftRadius: isMine ? 16 : 4,
-                borderTopRightRadius: isMine ? 4 : 16
-              }
-            ]}
+          <Pressable
+            onLongPress={() => handleLongPressMessage(item)}
+            delayLongPress={280}
+            style={styles.messagePressable}
           >
-            {item.voiceNote ? (
-              <VoiceNotePlayer
-                uri={item.voiceNote.url}
-                duration={item.voiceNote.duration}
-                themeColors={themeColors}
-                accentColor={themeColors.primary}
-                isSent={isMine}
-              />
-            ) : item.gif ? (
-              <Image
-                source={{ uri: item.gif.url }}
-                style={[styles.gifImage, { width: Math.min(item.gif.width || 200, 250), height: Math.min(item.gif.height || 200, 250) }]}
-                resizeMode="cover"
-              />
-            ) : item.isSticker ? (
-              <Text style={styles.stickerText}>{item.text}</Text>
-            ) : (
-              <Text style={[styles.messageText, { color: isMine ? '#fff' : themeColors.textPrimary }]}>
-                {item.text}
+            <View
+              style={[
+                styles.messageBubble,
+                {
+                  backgroundColor: isMine ? themeColors.primary : themeColors.card,
+                  borderTopLeftRadius: isMine ? 16 : 4,
+                  borderTopRightRadius: isMine ? 4 : 16
+                }
+              ]}
+            >
+              {item.voiceNote ? (
+                <VoiceNotePlayer
+                  uri={item.voiceNote.url}
+                  duration={item.voiceNote.duration}
+                  themeColors={themeColors}
+                  accentColor={themeColors.primary}
+                  isSent={isMine}
+                />
+              ) : item.gif ? (
+                <Image
+                  source={{ uri: item.gif.url }}
+                  style={[styles.gifImage, { width: Math.min(item.gif.width || 200, 250), height: Math.min(item.gif.height || 200, 250) }]}
+                  resizeMode="cover"
+                />
+              ) : item.isSticker ? (
+                <Text style={styles.stickerText}>{item.text}</Text>
+              ) : (
+                <Text style={[styles.messageText, { color: isMine ? '#fff' : themeColors.textPrimary }]}>
+                  {item.text}
+                </Text>
+              )}
+              <Text style={[styles.messageTime, { color: isMine ? 'rgba(255,255,255,0.7)' : themeColors.textSecondary }]}>
+                {formatTimestamp(item.createdAt)}
               </Text>
-            )}
-            <Text style={[styles.messageTime, { color: isMine ? 'rgba(255,255,255,0.7)' : themeColors.textSecondary }]}>
-              {formatTimestamp(item.createdAt)}
-            </Text>
-          </View>
+            </View>
+          </Pressable>
           <MessageReactions
             messageId={item.id}
             reactions={item.reactions}
@@ -413,6 +468,16 @@ export default function DirectMessageScreen() {
         onSelectGif={handleSendGif}
         themeColors={themeColors}
       />
+      <MessageActionSheet
+        visible={!!actionSheetMessage}
+        onClose={closeActionSheet}
+        message={actionSheetMessage}
+        currentUserId={user?.uid}
+        themeColors={themeColors}
+        onSelectReaction={handleSelectReactionFromSheet}
+        onSelectAction={handleSelectActionFromSheet}
+        isDarkMode={isDarkMode}
+      />
     </ScreenLayout>
   );
 }
@@ -461,6 +526,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16
+  },
+  messagePressable: {
+    alignSelf: 'flex-start'
   },
   messageText: {
     fontSize: 15,
