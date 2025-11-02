@@ -27,6 +27,19 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       }
     },
     {
+      label: 'Neighborhood Explorer',
+      icon: 'location-outline',
+      key: 'neighborhoodExplorer',
+      onPress: () => {
+        if (onSelectShortcut) {
+          onSelectShortcut('neighborhoodExplorer');
+        } else if (navigation) {
+          navigation.closeDrawer?.();
+          navigation.navigate('NeighborhoodExplorer');
+        }
+      }
+    },
+    {
       label: 'Top Statuses',
       icon: 'megaphone-outline',
       key: 'topStatuses',

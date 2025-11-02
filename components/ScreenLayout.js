@@ -344,6 +344,7 @@ export default function ScreenLayout({
     setDrawerVisible(false);
     if (!navigation) return;
     if (key === 'home') navigation.navigate('Country');
+    else if (key === 'neighborhoodExplorer') navigation.navigate('NeighborhoodExplorer');
     else if (key === 'myComments') navigation.navigate('MyComments');
     else if (key === 'myPosts') navigation.navigate('MyPosts');
     else if (key === 'topStatuses') navigation.navigate('TopStatuses');

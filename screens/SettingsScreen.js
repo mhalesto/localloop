@@ -35,6 +35,7 @@ import PremiumBadge from '../components/PremiumBadge';
 import PremiumSuccessModal from '../components/PremiumSuccessModal';
 import LoadingOverlay from '../components/LoadingOverlay';
 import AIFeaturesSettings from '../components/AIFeaturesSettings';
+import { useSensors } from '../contexts/SensorsContext';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -100,6 +101,21 @@ export default function SettingsScreen({ navigation }) {
     setPremiumSummaryLength,
     premiumSummaryLengthOptions
   } = useSettings();
+
+  const {
+    stepCounterEnabled,
+    toggleStepCounter,
+    motionDetectionEnabled,
+    toggleMotionDetection,
+    shakeEnabled,
+    toggleShake,
+    barometerEnabled,
+    toggleBarometer,
+    compassEnabled,
+    toggleCompass,
+    ambientLightEnabled,
+    toggleAmbientLight
+  } = useSensors();
 
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
@@ -958,6 +974,122 @@ export default function SettingsScreen({ navigation }) {
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Neighborhood Discovery</Text>
+          <Text style={styles.sectionHint}>
+            Use device sensors to enhance your local exploration experience.
+          </Text>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Step counter</Text>
+              <Text style={styles.itemSubtitle}>
+                Track daily steps and distance traveled in your neighborhood.
+              </Text>
+            </View>
+            <Switch
+              value={stepCounterEnabled}
+              onValueChange={toggleStepCounter}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={stepCounterEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Activity detection</Text>
+              <Text style={styles.itemSubtitle}>
+                Adjust discovery radius based on movement (walking, running, driving).
+              </Text>
+            </View>
+            <Switch
+              value={motionDetectionEnabled}
+              onValueChange={toggleMotionDetection}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={motionDetectionEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Shake to discover</Text>
+              <Text style={styles.itemSubtitle}>
+                Shake your phone to find random nearby posts.
+              </Text>
+            </View>
+            <Switch
+              value={shakeEnabled}
+              onValueChange={toggleShake}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={shakeEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Weather awareness</Text>
+              <Text style={styles.itemSubtitle}>
+                Detect atmospheric pressure for weather-based features.
+              </Text>
+            </View>
+            <Switch
+              value={barometerEnabled}
+              onValueChange={toggleBarometer}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={barometerEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Compass navigation</Text>
+              <Text style={styles.itemSubtitle}>
+                Show directional information for nearby posts.
+              </Text>
+            </View>
+            <Switch
+              value={compassEnabled}
+              onValueChange={toggleCompass}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={compassEnabled ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          {Platform.OS === 'android' && (
+            <View style={styles.itemLast}>
+              <View>
+                <Text style={styles.itemTitle}>Ambient light adaptation</Text>
+                <Text style={styles.itemSubtitle}>
+                  Auto-adjust UI brightness based on surroundings (Android only).
+                </Text>
+              </View>
+              <Switch
+                value={ambientLightEnabled}
+                onValueChange={toggleAmbientLight}
+                trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+                thumbColor={ambientLightEnabled ? activeThumbColor : inactiveThumbColor}
+                ios_backgroundColor={inactiveTrackColor}
+              />
+            </View>
+          )}
+          {Platform.OS !== 'android' && (
+            <View style={styles.itemLast}>
+              <View>
+                <Text style={styles.itemTitle}>Compass navigation</Text>
+                <Text style={styles.itemSubtitle}>
+                  Show directional information for nearby posts.
+                </Text>
+              </View>
+              <Switch
+                value={compassEnabled}
+                onValueChange={toggleCompass}
+                trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+                thumbColor={compassEnabled ? activeThumbColor : inactiveThumbColor}
+                ios_backgroundColor={inactiveTrackColor}
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>

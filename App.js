@@ -34,11 +34,13 @@ import FollowersScreen from './screens/FollowersScreen';
 import FollowingScreen from './screens/FollowingScreen';
 import FeedScreen from './screens/FeedScreen';
 import DiscoverScreen from './screens/DiscoverScreen';
+import NeighborhoodExplorerScreen from './screens/NeighborhoodExplorerScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StatusesProvider } from './contexts/StatusesContext';
+import { SensorsProvider } from './contexts/SensorsContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -72,6 +74,7 @@ function RootNavigator() {
       <Stack.Screen name="Following" component={FollowingScreen} />
       <Stack.Screen name="Feed" component={FeedScreen} />
       <Stack.Screen name="Discover" component={DiscoverScreen} />
+      <Stack.Screen name="NeighborhoodExplorer" component={NeighborhoodExplorerScreen} />
     </Stack.Navigator>
   );
 }
@@ -118,16 +121,18 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <SettingsProvider>
-          <PostsProvider>
-            <StatusesProvider>
-              <SafeAreaProvider>
-                <NavigationContainer>
-                  <StatusBar style="light" />
-                  <AuthGate />
-                </NavigationContainer>
-              </SafeAreaProvider>
-            </StatusesProvider>
-          </PostsProvider>
+          <SensorsProvider>
+            <PostsProvider>
+              <StatusesProvider>
+                <SafeAreaProvider>
+                  <NavigationContainer>
+                    <StatusBar style="light" />
+                    <AuthGate />
+                  </NavigationContainer>
+                </SafeAreaProvider>
+              </StatusesProvider>
+            </PostsProvider>
+          </SensorsProvider>
         </SettingsProvider>
       </AuthProvider>
     </GestureHandlerRootView>
