@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -9,14 +9,116 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(duration || 0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
+  const waveformRef = useRef(null);
+  const waveformWidth = useRef(0);
+  const seekTimeout = useRef(null);
+  const wasPlayingBeforeSeek = useRef(false);
 
   useEffect(() => {
     return () => {
       if (sound) {
         sound.unloadAsync();
       }
+      if (seekTimeout.current) {
+        clearTimeout(seekTimeout.current);
+      }
     };
   }, [sound]);
+
+  const performSeek = async (position) => {
+    if (!sound || playbackDuration === 0) {
+      console.log('[VoiceNotePlayer] Cannot seek - no sound or duration:', { hasSound: !!sound, playbackDuration });
+      return sound;
+    }
+
+    try {
+      // Check if sound is loaded
+      const checkStatus = await sound.getStatusAsync();
+      if (!checkStatus.isLoaded) {
+        console.log('[VoiceNotePlayer] Sound not loaded, skipping seek');
+        return sound;
+      }
+
+      const newPosition = Math.max(0, Math.min(position, playbackDuration));
+      console.log('[VoiceNotePlayer] Seeking to position:', newPosition, 'ms');
+
+      await sound.setPositionAsync(newPosition);
+
+      const verifyStatus = await sound.getStatusAsync();
+      console.log('[VoiceNotePlayer] Seek complete. New position:', verifyStatus.positionMillis, 'ms');
+
+      return sound;
+    } catch (error) {
+      console.error('[VoiceNotePlayer] Error seeking:', error);
+      return sound;
+    }
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !!sound, // Only allow seeking if sound is loaded
+      onMoveShouldSetPanResponder: () => !!sound,
+      onPanResponderGrant: async (evt) => {
+        if (!sound) return;
+
+        setIsSeeking(true);
+        wasPlayingBeforeSeek.current = isPlaying;
+
+        // Pause if playing
+        if (isPlaying) {
+          await sound.pauseAsync();
+        }
+
+        const touchX = Math.max(0, evt.nativeEvent.locationX);
+        const seekRatio = touchX / waveformWidth.current;
+        const newSeekPosition = seekRatio * playbackDuration;
+        setSeekPosition(newSeekPosition);
+        setPlaybackPosition(newSeekPosition);
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      },
+      onPanResponderMove: (evt) => {
+        if (!sound) return;
+
+        const touchX = Math.max(0, evt.nativeEvent.locationX);
+        const seekRatio = Math.max(0, Math.min(1, touchX / waveformWidth.current));
+        const newSeekPosition = seekRatio * playbackDuration;
+        setSeekPosition(newSeekPosition);
+        setPlaybackPosition(newSeekPosition);
+      },
+      onPanResponderRelease: async () => {
+        if (!sound) {
+          setIsSeeking(false);
+          return;
+        }
+
+        try {
+          // Perform the actual seek
+          await performSeek(seekPosition);
+
+          // Update position after seek
+          const status = await sound.getStatusAsync();
+          if (status.isLoaded) {
+            setPlaybackPosition(status.positionMillis || seekPosition);
+          }
+
+          setIsSeeking(false);
+
+          // Resume playing if it was playing before
+          if (wasPlayingBeforeSeek.current) {
+            await sound.playAsync();
+          }
+
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch (error) {
+          console.error('[VoiceNotePlayer] Error in release:', error);
+          setIsSeeking(false);
+        }
+      },
+    })
+  ).current;
 
   const playSound = async () => {
     try {
@@ -59,8 +161,11 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
   const onPlaybackStatusUpdate = (status) => {
     if (!status.isLoaded) return;
 
-    // Update playback position and duration in real-time
-    setPlaybackPosition(status.positionMillis || 0);
+    // Don't update position while seeking to prevent jumpy behavior
+    if (!isSeeking) {
+      setPlaybackPosition(status.positionMillis || 0);
+    }
+
     if (status.durationMillis) {
       setPlaybackDuration(status.durationMillis);
     }
@@ -99,7 +204,14 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
       </TouchableOpacity>
 
       <View style={styles.waveformContainer}>
-        <View style={styles.waveform}>
+        <View
+          ref={waveformRef}
+          style={styles.waveform}
+          onLayout={(event) => {
+            waveformWidth.current = event.nativeEvent.layout.width;
+          }}
+          {...panResponder.panHandlers}
+        >
           {[...Array(20)].map((_, i) => {
             const barProgress = (i / 20) * 100;
             const isActive = barProgress <= progress;
