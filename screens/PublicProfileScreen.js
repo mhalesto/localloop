@@ -838,14 +838,13 @@ export default function PublicProfileScreen({ navigation, route }) {
             style={styles.photoModalBackdropTouchable}
             activeOpacity={1}
             onPress={closePhotoPreview}
-          />
-          <View style={[styles.photoModalContent, { backgroundColor: themeColors.card }]}>
+          >
             <TouchableOpacity
               style={styles.photoModalClose}
               onPress={closePhotoPreview}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color={themeColors.textPrimary} />
+              <Ionicons name="close-circle" size={40} color="#fff" />
             </TouchableOpacity>
             {photoPreviewSource ? (
               <ProgressiveImage
@@ -856,7 +855,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                 priority="high"
               />
             ) : null}
-          </View>
+          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -1533,13 +1532,14 @@ const styles = StyleSheet.create({
   },
   photoModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
   },
   photoModalBackdropTouchable: {
     ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   photoModalContent: {
     width: '100%',
@@ -1549,13 +1549,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   photoModalClose: {
-    alignSelf: 'flex-end',
-    padding: 4,
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 30,
   },
   photoModalImage: {
     width: '100%',
-    height: 340,
-    borderRadius: 20,
+    height: '100%',
   },
   tabsContainer: {
     flexDirection: 'row',
