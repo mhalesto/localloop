@@ -1023,7 +1023,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 15,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: 8
   },
