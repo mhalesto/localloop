@@ -2,8 +2,8 @@
   "expo": {
     "name": "LocalLoop",
     "owner": "halalisani",
-    "slug": "localloop",
-    "version": "1.0.0",
+    "slug": "toilet",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,9 +14,15 @@
       "backgroundColor": "#6C4DF4"
     },
     "scheme": "localloop",
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hlalisani.localloop"
+      "bundleIdentifier": "com.hlalisani.localloop",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +30,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.hlalisani.localloop"
+      "package": "com.hlalisani.localloop",
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
