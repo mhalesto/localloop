@@ -6,7 +6,8 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import PostItem from '../components/PostItem';
@@ -18,6 +19,8 @@ import ShareLocationModal from '../components/ShareLocationModal';
 import { useAuth } from '../contexts/AuthContext';
 import AccentBackground from '../components/AccentBackground';
 import { analyzePostContent } from '../services/moderationService';
+import PollComposer from '../components/PollComposer';
+import PollDisplay from '../components/PollDisplay';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
@@ -34,6 +37,8 @@ export default function RoomScreen({ navigation, route }) {
   const [postToShare, setPostToShare] = useState(null);
   const [shareToast, setShareToast] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [pollModalVisible, setPollModalVisible] = useState(false);
+  const [pollData, setPollData] = useState(null);
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColorKey) ?? accentPresets[0],
     [selectedColorKey]
@@ -147,7 +152,8 @@ export default function RoomScreen({ navigation, route }) {
           uid: firebaseUser.uid
         },
         false,
-        moderation ?? null
+        moderation ?? null,
+        pollData // Include poll data if exists
       );
       if (!created) {
         Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
@@ -155,6 +161,7 @@ export default function RoomScreen({ navigation, route }) {
       }
       setTitle('');
       setMessage('');
+      setPollData(null); // Clear poll data
       navigation.navigate('MyPosts', { focusPostId: created.id, pendingPost: { ...created, city } });
     } finally {
       setIsPublishing(false);
@@ -168,7 +175,8 @@ export default function RoomScreen({ navigation, route }) {
     message,
     selectedColorKey,
     title,
-    userProfile
+    userProfile,
+    pollData
   ]);
 
   const handleOpenPost = (postId) => {
@@ -282,6 +290,39 @@ export default function RoomScreen({ navigation, route }) {
             style={[styles.previewInput, { color: previewPrimary }]}
             placeholderTextColor={previewMeta}
           />
+          {pollData && (
+            <View style={styles.pollPreview}>
+              <Text style={[styles.pollPreviewTitle, { color: previewPrimary }]}>
+                Poll: {pollData.question}
+              </Text>
+              <Text style={[styles.pollPreviewOptions, { color: previewMeta }]}>
+                {pollData.options.length} options
+              </Text>
+              <TouchableOpacity
+                onPress={() => setPollData(null)}
+                style={styles.removePollButton}
+              >
+                <Ionicons name="close-circle" size={20} color={previewMeta} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        <View style={styles.composerActions}>
+          <TouchableOpacity
+            onPress={() => setPollModalVisible(true)}
+            style={[styles.actionButton, pollData && { backgroundColor: themeColors.primary + '20' }]}
+          >
+            <Ionicons
+              name="stats-chart"
+              size={20}
+              color={pollData ? themeColors.primary : themeColors.textSecondary}
+            />
+            <Text style={[styles.actionButtonText, {
+              color: pollData ? themeColors.primary : themeColors.textSecondary
+            }]}>
+              {pollData ? 'Edit Poll' : 'Add Poll'}
+            </Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity
           style={[
@@ -352,6 +393,33 @@ export default function RoomScreen({ navigation, route }) {
         initialCountry={userProfile.country || undefined}
         initialProvince={userProfile.province || undefined}
       />
+      <Modal
+        visible={pollModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPollModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+            <PollComposer
+              onPollCreate={(poll) => {
+                setPollData(poll);
+                setPollModalVisible(false);
+              }}
+              themeColors={themeColors}
+              accentColor={accentPreset.linkColor || themeColors.primary}
+            />
+            <TouchableOpacity
+              onPress={() => setPollModalVisible(false)}
+              style={[styles.cancelButton, { borderColor: themeColors.border }]}
+            >
+              <Text style={[styles.cancelButtonText, { color: themeColors.textSecondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {shareToast ? (
         <View style={styles.toast}>
           <Text style={styles.toastText}>{shareToast}</Text>
@@ -589,5 +657,64 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     toastText: {
       color: '#fff',
       fontSize: 12
+    },
+    pollPreview: {
+      marginTop: 12,
+      padding: 12,
+      backgroundColor: 'rgba(0,0,0,0.1)',
+      borderRadius: 8,
+      position: 'relative'
+    },
+    pollPreviewTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 4
+    },
+    pollPreviewOptions: {
+      fontSize: 12
+    },
+    removePollButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8
+    },
+    composerActions: {
+      flexDirection: 'row',
+      marginBottom: 12,
+      gap: 8
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      gap: 6
+    },
+    actionButtonText: {
+      fontSize: 13,
+      fontWeight: '500'
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end'
+    },
+    modalContent: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      maxHeight: '90%'
+    },
+    cancelButton: {
+      marginTop: 12,
+      paddingVertical: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center'
+    },
+    cancelButtonText: {
+      fontSize: 15,
+      fontWeight: '500'
     }
   });

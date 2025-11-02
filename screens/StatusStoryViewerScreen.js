@@ -25,6 +25,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useScreenshotDetection } from '../services/screenshotDetection';
 
 const STORY_DURATION_MS = 6000;
 
@@ -92,6 +93,17 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   useEffect(() => { setCurrentIndex(derivedInitialIndex); }, [derivedInitialIndex]);
 
   const currentStatus = storyItems[currentIndex] ?? null;
+
+  // Enable screenshot detection for the current status
+  useScreenshotDetection({
+    contentId: currentStatus?.id,
+    contentType: 'status',
+    contentOwnerId: currentStatus?.authorId,
+    currentUserId: user?.uid,
+    onScreenshot: () => {
+      console.log('[StatusViewer] Screenshot detected for status:', currentStatus?.id);
+    }
+  });
 
   useEffect(() => {
     if (storyItems.length === 0) navigation.goBack?.();

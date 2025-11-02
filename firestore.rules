@@ -42,9 +42,13 @@ service cloud.firestore {
 
       allow update: if isSignedIn()
         && (
+          // Owner can update anything
           resource.data.author.uid == request.auth.uid ||
-          !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['author', 'createdAt', 'clientId'])
+          // Non-owners can update reactions and poll votes
+          (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['author', 'createdAt', 'clientId', 'title', 'message'])
+          )
         );
 
       allow delete: if isSignedIn()
@@ -173,6 +177,33 @@ service cloud.firestore {
 
         allow update, delete: if messageSentByRequester();
       }
+    }
+
+    match /screenshotEvents/{eventId} {
+      // Content owners can read their screenshot events
+      allow read: if isSignedIn()
+        && request.auth.uid == resource.data.contentOwnerId;
+
+      // Anyone can create screenshot events
+      allow create: if isSignedIn()
+        && request.resource.data.screenshotterId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
+
+      // Anyone can create notifications
+      allow create: if isSignedIn();
+
+      // Users can update their own notifications (mark as read)
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
+
+      // Users can delete their own notifications
+      allow delete: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
     }
 
     match /{document=**} {

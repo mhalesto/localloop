@@ -965,6 +965,7 @@ export function PostsProvider({ children }) {
       authorProfile = null,
       highlightDescription = false,
       moderation = null,
+      pollData = null, // Poll data if post has a poll
       postingMode = 'anonymous', // [PUBLIC-MODE] New parameter
       publicProfile = null // [PUBLIC-MODE] User's public profile data
     ) => {
@@ -1010,6 +1011,8 @@ export function PostsProvider({ children }) {
         highlightDescription: !!highlightDescription,
         moderation: moderation ?? null,
         moderationStatus,
+        // Add poll if provided
+        ...(pollData ? { poll: pollData } : {}),
         // [PUBLIC-MODE] Add mode and public profile fields
         postingMode, // 'anonymous' or 'public'
         isPublic: postingMode === 'public',

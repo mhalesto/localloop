@@ -48,8 +48,8 @@ export async function ensureConversation(conversationId, participants) {
   }
 }
 
-export async function sendDirectMessage({ conversationId, senderId, recipientId, text }) {
-  console.log('[Messages] sendDirectMessage called:', { conversationId, senderId, recipientId, textLength: text?.length });
+export async function sendDirectMessage({ conversationId, senderId, recipientId, text, voiceNote }) {
+  console.log('[Messages] sendDirectMessage called:', { conversationId, senderId, recipientId, textLength: text?.length, hasVoiceNote: !!voiceNote });
 
   if (!conversationId || !senderId || !recipientId || !text?.trim()) {
     throw new Error('Incomplete message payload');
@@ -74,7 +74,8 @@ export async function sendDirectMessage({ conversationId, senderId, recipientId,
       senderId,
       recipientId,
       text: text.trim(),
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      ...(voiceNote ? { voiceNote } : {})
     };
     console.log('[Messages] Message data:', messageData);
 
@@ -83,8 +84,9 @@ export async function sendDirectMessage({ conversationId, senderId, recipientId,
 
     // Update last message preview
     console.log('[Messages] Step 4: Updating conversation preview...');
+    const previewText = voiceNote ? '🎤 Voice Note' : text.trim().slice(0, 120);
     await updateDoc(conversationDoc(conversationId), {
-      lastMessagePreview: text.trim().slice(0, 120),
+      lastMessagePreview: previewText,
       updatedAt: serverTimestamp()
     }).catch((err) => {
       console.warn('[Messages] Failed to update last message preview:', err.code, err.message);

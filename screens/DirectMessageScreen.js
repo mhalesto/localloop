@@ -8,13 +8,20 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal,
+  Alert
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { buildConversationId, sendDirectMessage, subscribeToMessages } from '../services/messagesService';
+import VoiceRecorder from '../components/VoiceRecorder';
+import VoiceNotePlayer from '../components/VoiceNotePlayer';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../api/firebaseClient';
 
 export default function DirectMessageScreen() {
   const navigation = useNavigation();
@@ -26,6 +33,8 @@ export default function DirectMessageScreen() {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
   const listRef = useRef(null);
 
   const conversationId = useMemo(() => {
@@ -49,6 +58,45 @@ export default function DirectMessageScreen() {
     });
     return unsubscribe;
   }, [conversationId]);
+
+  const handleSendVoiceNote = useCallback(async ({ uri, duration }) => {
+    if (!conversationId || !user?.uid || !recipientId) {
+      Alert.alert('Error', 'Unable to send voice note');
+      return;
+    }
+
+    setUploadingVoice(true);
+    try {
+      // Upload to Firebase Storage
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const filename = `voice_${Date.now()}.m4a`;
+      const storageRef = ref(storage, `voiceNotes/${conversationId}/${filename}`);
+
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Send message with voice note
+      await sendDirectMessage({
+        conversationId,
+        senderId: user.uid,
+        recipientId,
+        text: '[Voice Note]',
+        voiceNote: {
+          url: downloadURL,
+          duration: duration
+        }
+      });
+
+      setIsRecordingVoice(false);
+    } catch (error) {
+      console.error('[DirectMessage] Failed to send voice note:', error);
+      Alert.alert('Error', 'Failed to send voice note');
+    } finally {
+      setUploadingVoice(false);
+    }
+  }, [conversationId, user?.uid, recipientId]);
 
   const handleSend = useCallback(async () => {
     console.log('[DirectMessageScreen] handleSend called');
@@ -104,9 +152,19 @@ export default function DirectMessageScreen() {
             }
           ]}
         >
-          <Text style={[styles.messageText, { color: isMine ? '#fff' : themeColors.textPrimary }]}>
-            {item.text}
-          </Text>
+          {item.voiceNote ? (
+            <VoiceNotePlayer
+              uri={item.voiceNote.url}
+              duration={item.voiceNote.duration}
+              themeColors={themeColors}
+              accentColor={themeColors.primary}
+              isSent={isMine}
+            />
+          ) : (
+            <Text style={[styles.messageText, { color: isMine ? '#fff' : themeColors.textPrimary }]}>
+              {item.text}
+            </Text>
+          )}
           <Text style={[styles.messageTime, { color: isMine ? 'rgba(255,255,255,0.7)' : themeColors.textSecondary }]}>
             {formatTimestamp(item.createdAt)}
           </Text>
@@ -157,6 +215,17 @@ export default function DirectMessageScreen() {
         />
         <View style={[styles.inputRow, { borderTopColor: themeColors.divider, backgroundColor: themeColors.card }]}
         >
+          <TouchableOpacity
+            style={styles.micButton}
+            onPress={() => setIsRecordingVoice(true)}
+            disabled={uploadingVoice}
+          >
+            {uploadingVoice ? (
+              <ActivityIndicator size="small" color={themeColors.primary} />
+            ) : (
+              <Ionicons name="mic" size={24} color={themeColors.primary} />
+            )}
+          </TouchableOpacity>
           <TextInput
             style={[styles.input, { color: themeColors.textPrimary }]}
             placeholder="Send a message"
@@ -180,6 +249,23 @@ export default function DirectMessageScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <Modal
+        visible={isRecordingVoice}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsRecordingVoice(false)}
+      >
+        <View style={styles.voiceModalOverlay}>
+          <View style={[styles.voiceModalContent, { backgroundColor: themeColors.surface }]}>
+            <VoiceRecorder
+              onRecordingComplete={handleSendVoiceNote}
+              onCancel={() => setIsRecordingVoice(false)}
+              themeColors={themeColors}
+              accentColor={themeColors.primary}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenLayout>
   );
 }
@@ -268,5 +354,21 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 16,
     textAlign: 'center'
+  },
+  micButton: {
+    padding: 8
+  },
+  voiceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  voiceModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 20
   }
 });

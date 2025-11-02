@@ -10,6 +10,12 @@ service firebase.storage {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // Voice notes for direct messages
+    match /voiceNotes/{conversationId}/{filename} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     match /{allPaths=**} {
       allow read: if false;
       allow write: if false;
