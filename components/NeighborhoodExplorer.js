@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSensors } from '../contexts/SensorsContext';
 import { useSettings } from '../contexts/SettingsContext';
 import WeatherDetailModal from './WeatherDetailModal';
+import FullScreenWeatherModal from './FullScreenWeatherModal';
 import CompassDetailModal from './CompassDetailModal';
 import { StepsDetailModal, ActivityDetailModal, ExplorationDetailModal } from './SensorDetailModals';
 
@@ -31,6 +32,7 @@ export default function NeighborhoodExplorer() {
   const [stepsModalVisible, setStepsModalVisible] = useState(false);
   const [activityModalVisible, setActivityModalVisible] = useState(false);
   const [weatherModalVisible, setWeatherModalVisible] = useState(false);
+  const [fullScreenWeatherVisible, setFullScreenWeatherVisible] = useState(false);
   const [compassModalVisible, setCompassModalVisible] = useState(false);
   const [explorationModalVisible, setExplorationModalVisible] = useState(false);
 
@@ -256,6 +258,14 @@ export default function NeighborhoodExplorer() {
       <WeatherDetailModal
         visible={weatherModalVisible}
         onClose={() => setWeatherModalVisible(false)}
+        onOpenFullScreen={() => {
+          setWeatherModalVisible(false);
+          setFullScreenWeatherVisible(true);
+        }}
+      />
+      <FullScreenWeatherModal
+        visible={fullScreenWeatherVisible}
+        onClose={() => setFullScreenWeatherVisible(false)}
       />
       <CompassDetailModal
         visible={compassModalVisible}

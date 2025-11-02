@@ -14,7 +14,7 @@ import { useSettings } from '../contexts/SettingsContext';
 
 const { width } = Dimensions.get('window');
 
-export default function WeatherDetailModal({ visible, onClose }) {
+export default function WeatherDetailModal({ visible, onClose, onOpenFullScreen }) {
   const { atmosphericPressure, weatherCondition, barometerEnabled } = useSensors();
   const { themeColors, isDarkMode } = useSettings();
   const [pressureHistory, setPressureHistory] = useState([]);
@@ -126,7 +126,11 @@ export default function WeatherDetailModal({ visible, onClose }) {
             </View>
 
             {/* Hourly Forecast Card */}
-            <View style={styles.hourlyCard}>
+            <TouchableOpacity
+              style={styles.hourlyCard}
+              activeOpacity={0.7}
+              onPress={onOpenFullScreen}
+            >
               <View style={styles.hourlyHeader}>
                 <View>
                   <Text style={styles.currentTemp}>{atmosphericPressure ? `${(atmosphericPressure / 33.86).toFixed(0)}°` : '--'}</Text>
@@ -181,7 +185,7 @@ export default function WeatherDetailModal({ visible, onClose }) {
                   </View>
                 ))}
               </ScrollView>
-            </View>
+            </TouchableOpacity>
 
             {/* Forecast */}
             <View style={styles.forecastCard}>
