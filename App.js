@@ -41,6 +41,7 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StatusesProvider } from './contexts/StatusesContext';
 import { SensorsProvider } from './contexts/SensorsContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -124,12 +125,14 @@ export default function App() {
           <SensorsProvider>
             <PostsProvider>
               <StatusesProvider>
-                <SafeAreaProvider>
-                  <NavigationContainer>
-                    <StatusBar style="light" />
-                    <AuthGate />
-                  </NavigationContainer>
-                </SafeAreaProvider>
+                <NotificationsProvider>
+                  <SafeAreaProvider>
+                    <NavigationContainer>
+                      <StatusBar style="light" />
+                      <AuthGate />
+                    </NavigationContainer>
+                  </SafeAreaProvider>
+                </NotificationsProvider>
               </StatusesProvider>
             </PostsProvider>
           </SensorsProvider>

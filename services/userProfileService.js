@@ -16,7 +16,10 @@ import {
   orderBy,
   limit,
   getDocs,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
+import { Platform } from 'react-native';
 import { db } from '../api/firebaseClient';
 
 /**
@@ -238,6 +241,97 @@ export async function getUsersByLocation(country, province = null, city = null, 
     }));
   } catch (error) {
     console.error('[UserProfile] Error getting users by location:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save push notification token for a user
+ * Supports multiple devices by storing tokens in an array
+ */
+export async function savePushToken(userId, token) {
+  if (!userId || !token) {
+    console.warn('[UserProfile] Cannot save push token - missing userId or token');
+    return false;
+  }
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    const tokenData = {
+      token,
+      platform: Platform.OS,
+      updatedAt: Date.now(),
+    };
+
+    // Use arrayUnion to add token without duplicates
+    await updateDoc(userRef, {
+      pushTokens: arrayUnion(tokenData),
+      lastPushTokenUpdate: serverTimestamp(),
+    });
+
+    console.log('[UserProfile] Push token saved successfully');
+    return true;
+  } catch (error) {
+    console.error('[UserProfile] Error saving push token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove push notification token for a user
+ */
+export async function removePushToken(userId, token) {
+  if (!userId || !token) {
+    console.warn('[UserProfile] Cannot remove push token - missing userId or token');
+    return false;
+  }
+
+  try {
+    const userRef = doc(db, 'users', userId);
+
+    // Get current tokens to find matching one
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const userData = snap.data();
+    const pushTokens = userData.pushTokens || [];
+
+    // Find and remove the matching token
+    const tokenToRemove = pushTokens.find(t => t.token === token);
+    if (tokenToRemove) {
+      await updateDoc(userRef, {
+        pushTokens: arrayRemove(tokenToRemove),
+        lastPushTokenUpdate: serverTimestamp(),
+      });
+      console.log('[UserProfile] Push token removed successfully');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[UserProfile] Error removing push token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all push tokens for a user
+ * Used by backend to send push notifications
+ */
+export async function getUserPushTokens(userId) {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) {
+      return [];
+    }
+
+    const userData = snap.data();
+    return userData.pushTokens || [];
+  } catch (error) {
+    console.error('[UserProfile] Error getting push tokens:', error);
     throw error;
   }
 }

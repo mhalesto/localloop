@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
 import ScreenLayout from '../components/ScreenLayout';
+import CameraCapture from '../components/CameraCapture';
 import { useSettings } from '../contexts/SettingsContext';
 import { useStatuses } from '../contexts/StatusesContext';
 
@@ -31,6 +32,7 @@ export default function StatusComposerScreen({ navigation }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState('');
+  const [showCamera, setShowCamera] = useState(false);
 
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
@@ -84,6 +86,19 @@ export default function StatusComposerScreen({ navigation }) {
         setImageMimeType(null);
         setError(e.message || 'Selected image is too large.');
       }
+    }
+  }, [ensureUnderLimit]);
+
+  const handleCameraCapture = useCallback(async (photo) => {
+    try {
+      const safe = await ensureUnderLimit(photo.uri);
+      setImageUri(safe.uri);
+      setImageMimeType(safe.mimeType);
+      setError('');
+    } catch (e) {
+      setImageUri(null);
+      setImageMimeType(null);
+      setError(e.message || 'Captured photo is too large.');
     }
   }, [ensureUnderLimit]);
 
@@ -155,10 +170,17 @@ export default function StatusComposerScreen({ navigation }) {
               </View>
             ) : null}
 
-            <TouchableOpacity style={styles.attachButton} onPress={launchImagePicker} activeOpacity={0.85}>
-              <Ionicons name="image-outline" size={18} color={themeColors.primaryDark} />
-              <Text style={styles.attachLabel}>Add photo</Text>
-            </TouchableOpacity>
+            <View style={styles.attachButtons}>
+              <TouchableOpacity style={styles.attachButton} onPress={() => setShowCamera(true)} activeOpacity={0.85}>
+                <Ionicons name="camera-outline" size={18} color={themeColors.primaryDark} />
+                <Text style={styles.attachLabel}>Take photo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachButton} onPress={launchImagePicker} activeOpacity={0.85}>
+                <Ionicons name="image-outline" size={18} color={themeColors.primaryDark} />
+                <Text style={styles.attachLabel}>Add photo</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.card}>
@@ -184,6 +206,13 @@ export default function StatusComposerScreen({ navigation }) {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CameraCapture
+        visible={showCamera}
+        onClose={() => setShowCamera(false)}
+        onCapture={handleCameraCapture}
+        mode="photo"
+      />
     </ScreenLayout>
   );
 }
@@ -212,7 +241,8 @@ const createStyles = (palette) =>
       padding: 16,
     },
     counter: { textAlign: 'right', marginTop: 8, fontSize: 12, color: palette.textSecondary },
-    attachButton: { flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+    attachButtons: { flexDirection: 'row', gap: 16, marginTop: 16 },
+    attachButton: { flexDirection: 'row', alignItems: 'center', flex: 1 },
     attachLabel: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: palette.primaryDark },
     previewBlock: { marginTop: 16, borderRadius: 16, overflow: 'hidden', position: 'relative' },
     previewImage: { width: '100%', height: 220 },
