@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import StatusStoryCard from '../components/StatusStoryCard';
+import Skeleton from '../components/Skeleton';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
@@ -429,8 +430,14 @@ export default function CountryScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
                 {statusesLoading ? (
-                  <View style={styles.carouselLoader}>
-                    <ActivityIndicator size="small" color={themeColors.primaryDark} />
+                  <View style={styles.skeletonContainer}>
+                    {[0, 1, 2].map((index) => (
+                      <View key={index} style={styles.skeletonCard}>
+                        <Skeleton variant="circle" size={38} />
+                        <Skeleton variant="rounded" width="100%" height={16} borderRadius={8} />
+                        <Skeleton variant="rounded" width="70%" height={14} borderRadius={7} />
+                      </View>
+                    ))}
                   </View>
                 ) : (
                   <FlatList
@@ -569,14 +576,25 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       color: palette.primaryDark,
       marginRight: 4
     },
-    carouselLoader: {
+    skeletonContainer: {
+      flexDirection: 'row',
+      gap: 16,
+      paddingLeft: 4
+    },
+    skeletonCard: {
+      width: 140,
       height: 200,
       borderRadius: 28,
       backgroundColor: palette.card,
       borderWidth: 1,
       borderColor: palette.divider,
-      alignItems: 'center',
-      justifyContent: 'center'
+      padding: 18,
+      justifyContent: 'space-between',
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.2 : 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3
     },
     carouselListContent: {
       paddingBottom: 4,
