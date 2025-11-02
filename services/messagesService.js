@@ -99,6 +99,29 @@ export async function sendDirectMessage({ conversationId, senderId, recipientId,
   }
 }
 
+export async function addReaction(conversationId, messageId, userId, emoji, remove = false) {
+  try {
+    const messageRef = doc(db, 'directMessages', conversationId, 'messages', messageId);
+
+    if (remove) {
+      // Remove reaction
+      await updateDoc(messageRef, {
+        [`reactions.${userId}`]: null
+      });
+      console.log('[Messages] Reaction removed:', { messageId, userId, emoji });
+    } else {
+      // Add reaction
+      await updateDoc(messageRef, {
+        [`reactions.${userId}`]: emoji
+      });
+      console.log('[Messages] Reaction added:', { messageId, userId, emoji });
+    }
+  } catch (error) {
+    console.error('[Messages] Error updating reaction:', error);
+    throw error;
+  }
+}
+
 export function subscribeToMessages(conversationId, callback) {
   if (!conversationId) {
     callback([]);
