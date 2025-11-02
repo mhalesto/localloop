@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import ProgressiveImage from '../components/ProgressiveImage';
+import ProfileSkeleton from '../components/ProfileSkeleton';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile } from '../services/userProfileService';
@@ -792,9 +793,7 @@ export default function PublicProfileScreen({ navigation, route }) {
         onBack={() => navigation.goBack()}
         showFooter={false}
       >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={primaryColor} />
-        </View>
+        <ProfileSkeleton />
       </ScreenLayout>
     );
   }

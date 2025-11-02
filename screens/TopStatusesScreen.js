@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import ScreenLayout from '../components/ScreenLayout';
 import StatusCard from '../components/StatusCard';
+import FeedSkeleton from '../components/FeedSkeleton';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -62,9 +63,7 @@ export default function TopStatusesScreen({ navigation }) {
       activeTab="home"
     >
       {isLoading ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={themeColors.primaryDark} />
-        </View>
+        <FeedSkeleton count={3} />
       ) : (
         <FlatList
           data={statusList}

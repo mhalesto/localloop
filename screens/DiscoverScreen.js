@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import ProgressiveImage from '../components/ProgressiveImage';
+import DiscoverSkeleton from '../components/DiscoverSkeleton';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getThumbnailUrl } from '../utils/imageUtils';
@@ -270,9 +271,7 @@ export default function DiscoverScreen({ navigation }) {
 
         {/* Content */}
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={primaryColor} />
-          </View>
+          <DiscoverSkeleton count={5} />
         ) : (
           <FlatList
             data={searchQuery ? searchResults : activeTab === 'trending' ? trendingUsers : localUsers}

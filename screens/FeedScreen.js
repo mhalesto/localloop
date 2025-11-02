@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import FeedSkeleton from '../components/FeedSkeleton';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getFeedPosts } from '../services/publicPostsService';
@@ -167,9 +168,7 @@ export default function FeedScreen({ navigation }) {
   return (
     <ScreenLayout title="Feed" navigation={navigation} showFooter={true} activeTab="feed">
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={primaryColor} />
-        </View>
+        <FeedSkeleton count={3} />
       ) : posts.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="newspaper-outline" size={80} color={themeColors.textSecondary} />
