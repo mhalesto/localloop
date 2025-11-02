@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSensors } from '../contexts/SensorsContext';
 import { useSettings } from '../contexts/SettingsContext';
+import WeatherDetailModal from './WeatherDetailModal';
+import CompassDetailModal from './CompassDetailModal';
+import { StepsDetailModal, ActivityDetailModal, ExplorationDetailModal } from './SensorDetailModals';
 
 export default function NeighborhoodExplorer() {
   const {
@@ -23,6 +26,13 @@ export default function NeighborhoodExplorer() {
   } = useSensors();
 
   const { themeColors, isDarkMode } = useSettings();
+
+  // Modal states
+  const [stepsModalVisible, setStepsModalVisible] = useState(false);
+  const [activityModalVisible, setActivityModalVisible] = useState(false);
+  const [weatherModalVisible, setWeatherModalVisible] = useState(false);
+  const [compassModalVisible, setCompassModalVisible] = useState(false);
+  const [explorationModalVisible, setExplorationModalVisible] = useState(false);
 
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
@@ -101,108 +111,161 @@ export default function NeighborhoodExplorer() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="location" size={24} color={themeColors.primary} />
-        <Text style={styles.title}>Neighborhood Explorer</Text>
-      </View>
-
-      <View style={styles.statsGrid}>
-        {/* Step Counter */}
-        {stepCounterEnabled && (
-          <View style={styles.statCard}>
-            <Ionicons name="footsteps" size={32} color="#10b981" />
-            <Text style={styles.statValue}>{dailySteps.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Steps Today</Text>
-            <Text style={styles.statSubtext}>{distanceInKm} km traveled</Text>
-          </View>
-        )}
-
-        {/* Activity Detection */}
-        {motionDetectionEnabled && (
-          <View style={styles.statCard}>
-            <Ionicons name={activityIcon} size={32} color={activityColor} />
-            <Text style={[styles.statValue, { color: activityColor }]}>
-              {currentActivity}
-            </Text>
-            <Text style={styles.statLabel}>Current Activity</Text>
-            <Text style={styles.statSubtext}>
-              {proximityRadius}m discovery radius
-            </Text>
-          </View>
-        )}
-
-        {/* Weather Condition */}
-        {barometerEnabled && atmosphericPressure && (
-          <View style={styles.statCard}>
-            <Text style={styles.weatherEmoji}>{weatherEmoji}</Text>
-            <Text style={styles.statValue}>
-              {atmosphericPressure.toFixed(0)} hPa
-            </Text>
-            <Text style={styles.statLabel}>Atmospheric Pressure</Text>
-            <Text style={styles.statSubtext}>
-              Condition: {weatherCondition}
-            </Text>
-          </View>
-        )}
-
-        {/* Compass Direction */}
-        {compassEnabled && (
-          <View style={styles.statCard}>
-            <Ionicons name="compass" size={32} color="#3b82f6" />
-            <Text style={styles.statValue}>{getCompassDirection()}</Text>
-            <Text style={styles.statLabel}>Heading</Text>
-            <Text style={styles.statSubtext}>
-              {Math.round(compassHeading)}°
-            </Text>
-          </View>
-        )}
-
-        {/* Ambient Light */}
-        {ambientLightEnabled && ambientLight !== null && (
-          <View style={styles.statCard}>
-            <Ionicons name="sunny" size={32} color="#f59e0b" />
-            <Text style={styles.statValue}>{Math.round(ambientLight)} lux</Text>
-            <Text style={styles.statLabel}>Ambient Light</Text>
-            <Text style={styles.statSubtext}>{lightCondition}</Text>
-          </View>
-        )}
-
-        {/* Exploration Progress */}
-        {stepCounterEnabled && (
-          <View style={styles.statCard}>
-            <Ionicons name="trophy" size={32} color="#a855f7" />
-            <Text style={styles.statValue}>
-              {explorationProgress.neighborhoodCoverage.toFixed(0)}%
-            </Text>
-            <Text style={styles.statLabel}>Explored</Text>
-            <Text style={styles.statSubtext}>
-              {explorationProgress.locationsVisited.length} locations
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Activity-based Discovery Hint */}
-      {motionDetectionEnabled && (
-        <View style={styles.hintCard}>
-          <Ionicons
-            name="information-circle-outline"
-            size={18}
-            color={themeColors.textSecondary}
-          />
-          <Text style={styles.hintText}>
-            {currentActivity === 'STATIONARY'
-              ? 'Showing hyper-local posts within 100m'
-              : currentActivity === 'WALKING'
-              ? 'Walking mode: discovering posts within 500m'
-              : currentActivity === 'RUNNING'
-              ? 'Running mode: expanding to 1km radius'
-              : 'Moving fast: showing neighborhood-wide posts (5km)'}
-          </Text>
+    <>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Ionicons name="location" size={24} color={themeColors.primary} />
+          <Text style={styles.title}>Neighborhood Explorer</Text>
         </View>
-      )}
-    </View>
+
+        <View style={styles.statsGrid}>
+          {/* Step Counter */}
+          {stepCounterEnabled && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => setStepsModalVisible(true)}
+            >
+              <Ionicons name="footsteps" size={32} color="#10b981" />
+              <Text style={styles.statValue}>{dailySteps.toLocaleString()}</Text>
+              <Text style={styles.statLabel}>Steps Today</Text>
+              <Text style={styles.statSubtext}>{distanceInKm} km traveled</Text>
+              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
+            </TouchableOpacity>
+          )}
+
+          {/* Activity Detection */}
+          {motionDetectionEnabled && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => setActivityModalVisible(true)}
+            >
+              <Ionicons name={activityIcon} size={32} color={activityColor} />
+              <Text style={[styles.statValue, { color: activityColor }]}>
+                {currentActivity}
+              </Text>
+              <Text style={styles.statLabel}>Current Activity</Text>
+              <Text style={styles.statSubtext}>
+                {proximityRadius}m discovery radius
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
+            </TouchableOpacity>
+          )}
+
+          {/* Weather Condition */}
+          {barometerEnabled && atmosphericPressure && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => setWeatherModalVisible(true)}
+            >
+              <Text style={styles.weatherEmoji}>{weatherEmoji}</Text>
+              <Text style={styles.statValue}>
+                {atmosphericPressure.toFixed(0)} hPa
+              </Text>
+              <Text style={styles.statLabel}>Atmospheric Pressure</Text>
+              <Text style={styles.statSubtext}>
+                Condition: {weatherCondition}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
+            </TouchableOpacity>
+          )}
+
+          {/* Compass Direction */}
+          {compassEnabled && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => setCompassModalVisible(true)}
+            >
+              <Ionicons name="compass" size={32} color="#3b82f6" />
+              <Text style={styles.statValue}>{getCompassDirection()}</Text>
+              <Text style={styles.statLabel}>Heading</Text>
+              <Text style={styles.statSubtext}>
+                {Math.round(compassHeading)}°
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
+            </TouchableOpacity>
+          )}
+
+          {/* Ambient Light */}
+          {ambientLightEnabled && ambientLight !== null && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => {/* Could add light detail modal if needed */}}
+            >
+              <Ionicons name="sunny" size={32} color="#f59e0b" />
+              <Text style={styles.statValue}>{Math.round(ambientLight)} lux</Text>
+              <Text style={styles.statLabel}>Ambient Light</Text>
+              <Text style={styles.statSubtext}>{lightCondition}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Exploration Progress */}
+          {stepCounterEnabled && (
+            <TouchableOpacity
+              style={styles.statCard}
+              activeOpacity={0.7}
+              onPress={() => setExplorationModalVisible(true)}
+            >
+              <Ionicons name="trophy" size={32} color="#a855f7" />
+              <Text style={styles.statValue}>
+                {explorationProgress.neighborhoodCoverage.toFixed(0)}%
+              </Text>
+              <Text style={styles.statLabel}>Explored</Text>
+              <Text style={styles.statSubtext}>
+                {explorationProgress.locationsVisited.length} locations
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Activity-based Discovery Hint */}
+        {motionDetectionEnabled && (
+          <View style={styles.hintCard}>
+            <Ionicons
+              name="information-circle-outline"
+              size={18}
+              color={themeColors.textSecondary}
+            />
+            <Text style={styles.hintText}>
+              {currentActivity === 'STATIONARY'
+                ? 'Showing hyper-local posts within 100m'
+                : currentActivity === 'WALKING'
+                ? 'Walking mode: discovering posts within 500m'
+                : currentActivity === 'RUNNING'
+                ? 'Running mode: expanding to 1km radius'
+                : 'Moving fast: showing neighborhood-wide posts (5km)'}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Modals */}
+      <StepsDetailModal
+        visible={stepsModalVisible}
+        onClose={() => setStepsModalVisible(false)}
+      />
+      <ActivityDetailModal
+        visible={activityModalVisible}
+        onClose={() => setActivityModalVisible(false)}
+      />
+      <WeatherDetailModal
+        visible={weatherModalVisible}
+        onClose={() => setWeatherModalVisible(false)}
+      />
+      <CompassDetailModal
+        visible={compassModalVisible}
+        onClose={() => setCompassModalVisible(false)}
+      />
+      <ExplorationDetailModal
+        visible={explorationModalVisible}
+        onClose={() => setExplorationModalVisible(false)}
+      />
+    </>
   );
 }
 
@@ -244,7 +307,8 @@ const createStyles = (palette, { isDarkMode }) =>
       padding: 16,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: palette.divider
+      borderColor: palette.divider,
+      position: 'relative'
     },
     weatherEmoji: {
       fontSize: 32,
@@ -267,6 +331,11 @@ const createStyles = (palette, { isDarkMode }) =>
       fontSize: 11,
       color: palette.textSecondary,
       textAlign: 'center'
+    },
+    chevron: {
+      position: 'absolute',
+      top: 8,
+      right: 8
     },
     hintCard: {
       flexDirection: 'row',
