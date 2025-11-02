@@ -9,15 +9,11 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(duration || 0);
-  const updateInterval = useRef(null);
 
   useEffect(() => {
     return () => {
       if (sound) {
         sound.unloadAsync();
-      }
-      if (updateInterval.current) {
-        clearInterval(updateInterval.current);
       }
     };
   }, [sound]);
@@ -31,10 +27,11 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
             // Restart from beginning
             await sound.setPositionAsync(0);
           }
+          // Set status update callback for existing sound
+          sound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
           await sound.playAsync();
           setIsPlaying(true);
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          startProgressUpdate(sound);
         }
       } else {
         // Load and play
@@ -46,7 +43,6 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
         setSound(newSound);
         setIsPlaying(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        startProgressUpdate(newSound);
       }
     } catch (error) {
       console.error('[VoiceNotePlayer] Error playing sound:', error);
@@ -57,41 +53,24 @@ export default function VoiceNotePlayer({ uri, duration, themeColors, accentColo
     if (sound) {
       await sound.pauseAsync();
       setIsPlaying(false);
-      if (updateInterval.current) {
-        clearInterval(updateInterval.current);
-      }
     }
-  };
-
-  const startProgressUpdate = (soundInstance) => {
-    if (updateInterval.current) {
-      clearInterval(updateInterval.current);
-    }
-    updateInterval.current = setInterval(async () => {
-      if (soundInstance) {
-        const status = await soundInstance.getStatusAsync();
-        if (status.isLoaded) {
-          setPlaybackPosition(status.positionMillis);
-          setPlaybackDuration(status.durationMillis || duration || 0);
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPlaybackPosition(0);
-            clearInterval(updateInterval.current);
-          }
-        }
-      }
-    }, 100);
   };
 
   const onPlaybackStatusUpdate = (status) => {
     if (!status.isLoaded) return;
 
+    // Update playback position and duration in real-time
+    setPlaybackPosition(status.positionMillis || 0);
+    if (status.durationMillis) {
+      setPlaybackDuration(status.durationMillis);
+    }
+
+    // Update playing state
+    setIsPlaying(status.isPlaying || false);
+
     if (status.didJustFinish) {
       setIsPlaying(false);
       setPlaybackPosition(0);
-      if (updateInterval.current) {
-        clearInterval(updateInterval.current);
-      }
     }
   };
 
