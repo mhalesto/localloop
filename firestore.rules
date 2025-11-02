@@ -88,7 +88,22 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if true;
-      allow write: if isOwner(userId);
+      allow create: if isOwner(userId);
+
+      // Allow users to update their own profile
+      allow update: if isOwner(userId);
+
+      // Allow updating follower/following counts when following/unfollowing
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'followingCount', 'lastPushTokenUpdate'])
+        && (
+          request.resource.data.followersCount == resource.data.followersCount + 1
+          || request.resource.data.followersCount == resource.data.followersCount - 1
+          || request.resource.data.followingCount == resource.data.followingCount + 1
+          || request.resource.data.followingCount == resource.data.followingCount - 1
+        );
+
+      allow delete: if isOwner(userId);
 
       match /album/{photoId} {
         allow read: if true;
@@ -128,29 +143,34 @@ service cloud.firestore {
 
     match /directMessages/{conversationId} {
       allow read: if isConversationParticipant(resource.data);
+
+      // Allow creating conversation if user is one of the participants
       allow create: if isSignedIn()
         && areParticipantsValid(request.resource.data.participants);
-      allow update: if isConversationParticipant(resource.data)
-        && request.resource.data.participants == resource.data.participants;
+
+      // Allow updating conversation metadata if user is a participant
+      allow update: if isSignedIn()
+        && (
+          // User is trying to create/update with themselves as participant
+          areParticipantsValid(request.resource.data.participants)
+          // OR user is already a participant (for updating lastMessagePreview, etc.)
+          || isConversationParticipant(resource.data)
+        );
+
       allow delete: if isConversationParticipant(resource.data);
 
       match /messages/{messageId} {
-        allow read: if isSignedIn()
-          && exists(/databases/$(database)/documents/directMessages/$(conversationId))
-          && isConversationParticipant(
-            get(/databases/$(database)/documents/directMessages/$(conversationId)).data
-          );
+        allow read: if isSignedIn();
+
+        // Allow creating message if sender is current user
         allow create: if isSignedIn()
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.recipientId != null
           && request.resource.data.recipientId is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000
-          && exists(/databases/$(database)/documents/directMessages/$(conversationId))
-          && isConversationParticipant(
-            get(/databases/$(database)/documents/directMessages/$(conversationId)).data
-          );
+          && request.resource.data.text.size() <= 2000;
+
         allow update, delete: if messageSentByRequester();
       }
     }
