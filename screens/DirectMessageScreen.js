@@ -801,6 +801,7 @@ export default function DirectMessageScreen() {
       onBack={() => navigation.goBack()}
       showFooter={false}
       contentStyle={{ paddingHorizontal: 0, paddingBottom: insets.bottom }}
+      profilePhoto={profilePhoto}
     >
       <KeyboardAvoidingView
         style={styles.wrapper}

@@ -39,6 +39,7 @@ export default function ScreenLayout({
   headerStyle,
   headerBackgroundStyle,
   enableHeaderOverlap = false,
+  profilePhoto,
 }) {
   const {
     showAddShortcut,
@@ -415,6 +416,7 @@ export default function ScreenLayout({
           onSearchChange={onSearchChange}
           wrapperStyle={headerStyle}
           accent={accentPreset}
+          profilePhoto={profilePhoto}
         />
 
         <View style={[styles.content, contentStyle]}>{children}</View>

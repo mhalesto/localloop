@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AccentBackground from './AccentBackground';
@@ -31,6 +31,7 @@ export default function AppHeader({
   wrapperStyle,
   accent = defaultAccent,
   rightBadgeCount = 0,
+  profilePhoto,              // NEW: profile photo URL
 
   // NEW: square filler that extends below the rounded header
   bottomFillColor,           // set this to your top post card color (e.g. themeColors.card)
@@ -98,8 +99,16 @@ export default function AppHeader({
         </TouchableOpacity>
 
         <View style={styles.titleBlock}>
-          {subtitle ? <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text> : null}
-          {title ? <Text style={[styles.title, { color: onPrimary }]}>{title}</Text> : null}
+          {profilePhoto && (
+            <Image
+              source={{ uri: profilePhoto }}
+              style={styles.profilePhoto}
+            />
+          )}
+          <View style={styles.titleTextBlock}>
+            {subtitle ? <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text> : null}
+            {title ? <Text style={[styles.title, { color: onPrimary }]}>{title}</Text> : null}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -199,7 +208,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  titleBlock: { flex: 1, marginHorizontal: 12 },
+  titleBlock: { flex: 1, marginHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  profilePhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  titleTextBlock: { flex: 1 },
   subtitle: { fontSize: 13, marginBottom: 2 },
   title: { fontSize: 20, fontWeight: '600' },
   searchWrapper: {
