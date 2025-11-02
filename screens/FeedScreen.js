@@ -16,10 +16,12 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getFeedPosts } from '../services/publicPostsService';
 import { getFollowing } from '../services/followService';
+import useHaptics from '../hooks/useHaptics';
 
 export default function FeedScreen({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
+  const haptics = useHaptics();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,20 +62,24 @@ export default function FeedScreen({ navigation }) {
   }, [loadFeed]);
 
   const handleRefresh = useCallback(() => {
+    haptics.light();
     setRefreshing(true);
     loadFeed();
-  }, [loadFeed]);
+  }, [loadFeed, haptics]);
 
   const navigateToPost = (post) => {
+    haptics.light();
     // Navigate to post detail (you can create a PostDetailScreen later)
     console.log('Navigate to post:', post.id);
   };
 
   const navigateToProfile = (userId) => {
+    haptics.light();
     navigation.push('PublicProfile', { userId });
   };
 
   const navigateToDiscover = () => {
+    haptics.light();
     navigation.navigate('Discover');
   };
 

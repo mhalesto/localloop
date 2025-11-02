@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import StatusStoryCard from '../components/StatusStoryCard';
 import Skeleton from '../components/Skeleton';
+import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
@@ -41,6 +42,7 @@ export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts } = usePosts();
+  const haptics = useHaptics();
   const {
     statuses,
     isLoading: statusesLoading,
@@ -166,6 +168,7 @@ export default function CountryScreen({ navigation }) {
   }, [userProfile?.country, userProfile?.province]);
 
   const handleRefresh = useCallback(async () => {
+    haptics.light();
     setRefreshing(true);
     try {
       const postsRefreshPromise = refreshPosts ? refreshPosts() : Promise.resolve();
@@ -175,7 +178,7 @@ export default function CountryScreen({ navigation }) {
         setRefreshing(false);
       }
     }
-  }, [loadCountries, loadPersonalCities, refreshPosts]);
+  }, [loadCountries, loadPersonalCities, refreshPosts, haptics]);
 
   const statusList = useMemo(
     () =>
@@ -201,12 +204,14 @@ export default function CountryScreen({ navigation }) {
   }, [statusCarouselItems]);
 
   const handleAddStatusPress = useCallback(() => {
+    haptics.light();
     navigation.navigate('StatusComposer');
-  }, [navigation]);
+  }, [navigation, haptics]);
 
   const handleOpenStatus = useCallback(
     (status, index = 0) => {
       if (!status) return;
+      haptics.light();
       const ids = statusCarouselItems.map((item) => item.id);
       navigation.navigate('StatusStoryViewer', {
         statusIds: ids,
@@ -214,12 +219,13 @@ export default function CountryScreen({ navigation }) {
         initialIndex: index,
       });
     },
-    [navigation, statusCarouselItems]
+    [navigation, statusCarouselItems, haptics]
   );
 
   const handleSeeAllStatuses = useCallback(() => {
+    haptics.light();
     navigation.navigate('TopStatuses');
-  }, [navigation]);
+  }, [navigation, haptics]);
 
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 

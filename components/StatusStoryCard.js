@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProgressiveImage from './ProgressiveImage';
 import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
+import useHaptics from '../hooks/useHaptics';
 
 const FALLBACK_COLORS = ['#705CF6', '#4B8BFF', '#9B5BFF', '#FF6FA9'];
 
@@ -35,6 +36,7 @@ const formatRelativeTime = (timestamp) => {
 };
 
 export default function StatusStoryCard({ status, onPress }) {
+  const haptics = useHaptics();
 
   const authorName = status?.author?.nickname || status?.author?.displayName || 'Anonymous';
   const fallbackColor = useMemo(() => {
@@ -72,7 +74,10 @@ export default function StatusStoryCard({ status, onPress }) {
       <TouchableOpacity
         style={styles.container}
         activeOpacity={0.88}
-        onPress={() => onPress?.(status)}
+        onPress={() => {
+          haptics.light();
+          onPress?.(status);
+        }}
       >
         {imageUrl ? (
           <View style={styles.imageBackground}>
