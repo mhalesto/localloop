@@ -20,7 +20,7 @@ export default function AttachmentMenu({ visible, onClose, onSelectOption, theme
   if (!visible) return null;
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.card, paddingBottom: 100 + insets.bottom, marginBottom: -insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: themeColors.card, paddingBottom: insets.bottom, marginBottom: -70 }]}>
       <View style={styles.rowContainer}>
         <View style={styles.row}>
           {options.slice(0, 4).map((option) => (
@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
   },
   rowContainer: {
     gap: 20,
+    paddingBottom: 105,
   },
   row: {
     flexDirection: 'row',

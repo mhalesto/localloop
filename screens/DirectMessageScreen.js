@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Modal,
   Alert,
   Image,
   Keyboard,
@@ -17,11 +16,12 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import ScreenLayout from '../components/ScreenLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { buildConversationId, sendDirectMessage, subscribeToMessages, addReaction } from '../services/messagesService';
-import VoiceRecorder from '../components/VoiceRecorder';
 import VoiceNotePlayer from '../components/VoiceNotePlayer';
 import MessageReactions from '../components/MessageReactions';
 import MessageActionSheet from '../components/MessageActionSheet';
@@ -31,6 +31,11 @@ import AttachmentMenu from '../components/AttachmentMenu';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../api/firebaseClient';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const MAX_RECORDING_DURATION_MS = 60000;
+const CANCEL_SWIPE_THRESHOLD = -90;
+const LOCK_SWIPE_THRESHOLD = -80;
 
 export default function DirectMessageScreen() {
   const navigation = useNavigation();
@@ -38,17 +43,32 @@ export default function DirectMessageScreen() {
   const { user, profile: currentProfile } = useAuth();
   const { themeColors, isDarkMode } = useSettings();
   const { userId: recipientId, username, displayName, profilePhoto } = route.params ?? {};
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
-  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [uploadingVoice, setUploadingVoice] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingLocked, setRecordingLocked] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [slideOffset, setSlideOffset] = useState(0);
+  const [willCancelRecording, setWillCancelRecording] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [actionSheetMessage, setActionSheetMessage] = useState(null);
   const listRef = useRef(null);
+  const recordingRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const recordingStartRef = useRef(null);
+  const recordingAccumulatedRef = useRef(0);
+  const micGestureOriginRef = useRef({ x: 0, y: 0 });
+  const hasMicPermissionRef = useRef(false);
+  const isFinalizingRecordingRef = useRef(false);
+  // const keyboardOffset = Platform.OS === 'ios' ? insets.bottom + 12 : 0;
+  const keyboardOffset = Platform.OS === 'ios' ? 90 + insets.bottom : 0;
 
   const conversationId = useMemo(() => {
     if (!user?.uid || !recipientId) {
@@ -60,6 +80,35 @@ export default function DirectMessageScreen() {
   useEffect(() => {
     navigation.setOptions?.({ headerShown: false });
   }, [navigation]);
+
+  useEffect(() => {
+    let mounted = true;
+    Audio.requestPermissionsAsync()
+      .then(({ status }) => {
+        if (mounted && status === 'granted') {
+          hasMicPermissionRef.current = true;
+        }
+      })
+      .catch((error) => {
+        console.warn('[DirectMessage] microphone permission request failed:', error);
+      });
+
+    return () => {
+      mounted = false;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (recordingRef.current) {
+        try {
+          recordingRef.current.stopAndUnloadAsync();
+        } catch (error) {
+          console.warn('[DirectMessage] cleanup stop failed:', error);
+        }
+      }
+      Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => { });
+    };
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return undefined;
@@ -102,7 +151,6 @@ export default function DirectMessageScreen() {
         }
       });
 
-      setIsRecordingVoice(false);
     } catch (error) {
       console.error('[DirectMessage] Failed to send voice note:', error);
       Alert.alert('Error', 'Failed to send voice note');
@@ -160,11 +208,14 @@ export default function DirectMessageScreen() {
   }, [conversationId, user?.uid, recipientId]);
 
   const handleAttachmentMenuToggle = useCallback(() => {
+    if (isRecording || uploadingVoice) {
+      return;
+    }
     if (!showAttachmentMenu) {
       Keyboard.dismiss();
     }
     setShowAttachmentMenu(!showAttachmentMenu);
-  }, [showAttachmentMenu]);
+  }, [isRecording, showAttachmentMenu, uploadingVoice]);
 
   const handleAttachmentSelect = useCallback((optionId) => {
     switch (optionId) {
@@ -229,6 +280,393 @@ export default function DirectMessageScreen() {
       setSending(false);
     }
   }, [conversationId, messageText, navigation, recipientId, sending, user?.uid]);
+
+  const clearRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const resetRecordingVisualState = useCallback(() => {
+    setIsRecording(false);
+    setRecordingLocked(false);
+    setRecordingPaused(false);
+    setRecordingDuration(0);
+    setSlideOffset(0);
+    setWillCancelRecording(false);
+    recordingAccumulatedRef.current = 0;
+  }, []);
+
+  const releaseAudioResources = useCallback(async () => {
+    try {
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+    } catch (error) {
+      console.warn('[DirectMessage] Failed to reset audio mode:', error);
+    }
+  }, []);
+
+  const cancelVoiceRecording = useCallback(async (withFeedback = true) => {
+    const activeRecording = recordingRef.current;
+    recordingRef.current = null;
+    micGestureOriginRef.current = { x: 0, y: 0 };
+    clearRecordingTimer();
+    resetRecordingVisualState();
+    if (withFeedback) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => { });
+    }
+    if (activeRecording) {
+      try {
+        await activeRecording.stopAndUnloadAsync();
+      } catch (error) {
+        console.warn('[DirectMessage] Failed to cancel recording:', error);
+      }
+    }
+    await releaseAudioResources();
+  }, [clearRecordingTimer, releaseAudioResources, resetRecordingVisualState]);
+
+  const finalizeVoiceRecording = useCallback(async () => {
+    if (isFinalizingRecordingRef.current) {
+      return;
+    }
+    const activeRecording = recordingRef.current;
+    if (!activeRecording) {
+      resetRecordingVisualState();
+      return;
+    }
+    isFinalizingRecordingRef.current = true;
+    clearRecordingTimer();
+    micGestureOriginRef.current = { x: 0, y: 0 };
+    try {
+      await activeRecording.stopAndUnloadAsync();
+      if (recordingStartRef.current) {
+        recordingAccumulatedRef.current += Date.now() - recordingStartRef.current;
+      }
+      const duration = recordingAccumulatedRef.current;
+      recordingStartRef.current = null;
+      recordingAccumulatedRef.current = 0;
+      const uri = activeRecording.getURI();
+      await releaseAudioResources();
+      resetRecordingVisualState();
+      if (!uri || duration < 600) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+        Alert.alert('Recording too short', 'Hold the microphone a little longer to capture a voice note.');
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+      await handleSendVoiceNote({ uri, duration });
+    } catch (error) {
+      console.error('[DirectMessage] Failed to finalize recording:', error);
+      Alert.alert('Error', 'Failed to save voice note');
+      resetRecordingVisualState();
+    } finally {
+      recordingRef.current = null;
+      isFinalizingRecordingRef.current = false;
+    }
+  }, [clearRecordingTimer, handleSendVoiceNote, releaseAudioResources, resetRecordingVisualState]);
+
+  const restartRecordingTimer = useCallback(() => {
+    clearRecordingTimer();
+    recordingTimerRef.current = setInterval(() => {
+      const elapsed =
+        recordingAccumulatedRef.current +
+        (recordingStartRef.current ? Date.now() - recordingStartRef.current : 0);
+      setRecordingDuration(elapsed);
+      if (elapsed >= MAX_RECORDING_DURATION_MS) {
+        finalizeVoiceRecording();
+      }
+    }, 100);
+  }, [clearRecordingTimer, finalizeVoiceRecording]);
+
+  const startVoiceRecording = useCallback(async () => {
+    if (uploadingVoice || recordingRef.current || isFinalizingRecordingRef.current) {
+      return false;
+    }
+    if (!conversationId || !user?.uid || !recipientId) {
+      Alert.alert('Sign in required', 'Sign in to send voice notes.');
+      return false;
+    }
+    try {
+      if (!hasMicPermissionRef.current) {
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission required', 'Microphone permission is required to record voice notes.');
+          return false;
+        }
+        hasMicPermissionRef.current = true;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        staysActiveInBackground: false
+      });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      recordingStartRef.current = Date.now();
+      recordingAccumulatedRef.current = 0;
+      setIsRecording(true);
+      setRecordingLocked(false);
+      setRecordingPaused(false);
+      setRecordingDuration(0);
+      setSlideOffset(0);
+      setWillCancelRecording(false);
+      setShowAttachmentMenu(false);
+      Keyboard.dismiss();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+      restartRecordingTimer();
+      return true;
+    } catch (error) {
+      console.error('[DirectMessage] Failed to start recording:', error);
+      Alert.alert('Error', 'Failed to start recording');
+      recordingRef.current = null;
+      recordingStartRef.current = null;
+      resetRecordingVisualState();
+      await releaseAudioResources();
+      return false;
+    }
+  }, [
+    conversationId,
+    finalizeVoiceRecording,
+    restartRecordingTimer,
+    releaseAudioResources,
+    resetRecordingVisualState,
+    setShowAttachmentMenu,
+    uploadingVoice,
+    user?.uid,
+    recipientId
+  ]);
+
+  const handleMicResponderGrant = useCallback(
+    async (event) => {
+      if (uploadingVoice || recordingLocked || messageText.trim()) {
+        return;
+      }
+      if (!conversationId || !user?.uid || !recipientId) {
+        Alert.alert('Sign in required', 'Sign in to send voice notes.');
+        return;
+      }
+      micGestureOriginRef.current = {
+        x: event.nativeEvent.pageX,
+        y: event.nativeEvent.pageY
+      };
+      const started = await startVoiceRecording();
+      if (!started) {
+        micGestureOriginRef.current = { x: 0, y: 0 };
+      }
+    },
+    [conversationId, messageText, recipientId, recordingLocked, startVoiceRecording, uploadingVoice, user?.uid]
+  );
+
+  const handleMicResponderMove = useCallback(
+    (event) => {
+      if (!isRecording || recordingLocked || !recordingRef.current) {
+        return;
+      }
+      const { pageX, pageY } = event.nativeEvent;
+      const dx = pageX - micGestureOriginRef.current.x;
+      const dy = pageY - micGestureOriginRef.current.y;
+      const clampedDx = Math.max(-160, Math.min(0, dx));
+      setSlideOffset(clampedDx);
+      const shouldCancel = dx <= CANCEL_SWIPE_THRESHOLD;
+      setWillCancelRecording(shouldCancel);
+      if (!recordingLocked && dy <= LOCK_SWIPE_THRESHOLD) {
+        setRecordingLocked(true);
+        setRecordingPaused(false);
+        setSlideOffset(0);
+        setWillCancelRecording(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      }
+    },
+    [isRecording, recordingLocked]
+  );
+
+  const handleMicResponderEnd = useCallback(() => {
+    if (!isRecording) {
+      return;
+    }
+    if (recordingLocked) {
+      return;
+    }
+    if (willCancelRecording) {
+      cancelVoiceRecording();
+    } else {
+      finalizeVoiceRecording();
+    }
+  }, [cancelVoiceRecording, finalizeVoiceRecording, isRecording, recordingLocked, willCancelRecording]);
+
+  const handleMicResponderTerminate = useCallback(() => {
+    handleMicResponderEnd();
+  }, [handleMicResponderEnd]);
+
+  const toggleRecordingPause = useCallback(async () => {
+    const activeRecording = recordingRef.current;
+    if (!activeRecording || !recordingLocked) {
+      return;
+    }
+    try {
+      if (recordingPaused) {
+        await activeRecording.startAsync();
+        recordingStartRef.current = Date.now();
+        setRecordingPaused(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+        restartRecordingTimer();
+      } else {
+        await activeRecording.pauseAsync();
+        if (recordingStartRef.current) {
+          recordingAccumulatedRef.current += Date.now() - recordingStartRef.current;
+        }
+        recordingStartRef.current = null;
+        setRecordingPaused(true);
+        clearRecordingTimer();
+        setRecordingDuration(recordingAccumulatedRef.current);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+      }
+    } catch (error) {
+      console.error('[DirectMessage] Failed to toggle recording pause:', error);
+    }
+  }, [clearRecordingTimer, recordingLocked, recordingPaused, restartRecordingTimer]);
+
+  const renderRecordingHud = () => {
+    if (!isRecording) {
+      return null;
+    }
+    const formattedDuration = formatDurationLabel(recordingDuration);
+    const progress = Math.min(recordingDuration / MAX_RECORDING_DURATION_MS, 1);
+    const rawPercent = Math.min(Math.max(progress, 0), 1) * 100;
+    const clampedPercent = Math.min(Math.max(rawPercent, 0), 100);
+    const fillPercent = Math.max(clampedPercent, 2);
+
+    if (recordingLocked) {
+      return (
+        <View
+          style={[
+            styles.lockedRecordingContainer,
+            {
+              backgroundColor: themeColors.surface,
+              borderColor: themeColors.border
+            }
+          ]}
+        >
+          <View style={styles.lockedProgressHeader}>
+            <Text style={[styles.lockedTimer, { color: themeColors.textSecondary }]}>
+              {formattedDuration}
+            </Text>
+            <View style={[styles.lockedProgressBar, { backgroundColor: themeColors.border }]}>
+              <View
+                style={[
+                  styles.lockedProgressFill,
+                  { width: `${fillPercent}%`, backgroundColor: themeColors.primary }
+                ]}
+              />
+              <View
+                style={[
+                  styles.lockedProgressThumb,
+                  {
+                    left: `${clampedPercent}%`,
+                    borderColor: themeColors.primary,
+                    backgroundColor: themeColors.card
+                  }
+                ]}
+              />
+            </View>
+          </View>
+          <View style={styles.lockedControls}>
+            <TouchableOpacity
+              style={[
+                styles.lockedTrashButton,
+                {
+                  borderColor: themeColors.border,
+                  backgroundColor: themeColors.surface
+                }
+              ]}
+              onPress={() => cancelVoiceRecording()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash" size={20} color="#ff4d4f" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.lockedPauseButton,
+                {
+                  borderColor: recordingPaused ? themeColors.primary : themeColors.border,
+                  backgroundColor: recordingPaused ? themeColors.primary : themeColors.card
+                }
+              ]}
+              onPress={toggleRecordingPause}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={recordingPaused ? 'play' : 'pause'}
+                size={20}
+                color={recordingPaused ? '#fff' : themeColors.textPrimary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.lockedSendButton, { backgroundColor: themeColors.primary }]}
+              onPress={finalizeVoiceRecording}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="send" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.recordingPromptWrapper}>
+        <Text style={styles.recordingTimerLabel}>{formattedDuration}</Text>
+        <View
+          style={[
+            styles.slideToCancelBubble,
+            {
+              borderColor: willCancelRecording ? '#ff4d4f' : themeColors.border,
+              backgroundColor: willCancelRecording ? 'rgba(255,77,79,0.18)' : themeColors.surface,
+              transform: [{ translateX: Math.max(-140, Math.min(0, slideOffset)) }]
+            }
+          ]}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={16}
+            color={willCancelRecording ? '#ff4d4f' : themeColors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.slideToCancelText,
+              { color: willCancelRecording ? '#ff4d4f' : themeColors.textSecondary }
+            ]}
+          >
+            Slide to cancel
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderLockHint = () => {
+    if (!isRecording || recordingLocked) {
+      return null;
+    }
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          styles.lockHintWrapper,
+          {
+            borderColor: themeColors.border,
+            backgroundColor: themeColors.surface
+          }
+        ]}
+      >
+        <Ionicons name="arrow-up" size={16} color={themeColors.textSecondary} />
+        <Ionicons name="lock-closed-outline" size={18} color={themeColors.textSecondary} />
+      </View>
+    );
+  };
 
   const handleLongPressMessage = useCallback((message) => {
     Keyboard.dismiss();
@@ -362,12 +800,12 @@ export default function DirectMessageScreen() {
       navigation={navigation}
       onBack={() => navigation.goBack()}
       showFooter={false}
-      contentStyle={{ paddingHorizontal: 0, paddingBottom: 0 }}
+      contentStyle={{ paddingHorizontal: 0, paddingBottom: insets.bottom }}
     >
       <KeyboardAvoidingView
         style={styles.wrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
+        keyboardVerticalOffset={keyboardOffset}
       >
         <FlatList
           ref={listRef}
@@ -381,23 +819,46 @@ export default function DirectMessageScreen() {
         />
         <View style={[styles.inputRow, { borderTopColor: themeColors.divider, backgroundColor: themeColors.card }]}>
           <TouchableOpacity
-            style={styles.attachButton}
+            style={[
+              styles.attachButton,
+              (isRecording || uploadingVoice) && styles.attachButtonDisabled,
+              isRecording && styles.attachButtonHidden
+            ]}
             onPress={handleAttachmentMenuToggle}
+            disabled={isRecording || uploadingVoice}
+            activeOpacity={0.8}
           >
-            <Ionicons name={showAttachmentMenu ? "close-circle" : "add-circle"} size={28} color={themeColors.primary} />
+            <Ionicons
+              name={showAttachmentMenu ? 'close-circle' : 'add-circle'}
+              size={28}
+              color={themeColors.primary}
+            />
           </TouchableOpacity>
 
-          <View style={[styles.inputContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.divider }]}>
-            <TextInput
-              style={[styles.input, { color: themeColors.textPrimary }]}
-              placeholder="Message"
-              placeholderTextColor={themeColors.textSecondary}
-              value={messageText}
-              onChangeText={setMessageText}
-              onFocus={() => setShowAttachmentMenu(false)}
-              multiline
-              maxLength={2000}
-            />
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: themeColors.surface,
+                borderColor: themeColors.divider
+              },
+              isRecording && styles.recordingContainerActive
+            ]}
+          >
+            {isRecording ? (
+              renderRecordingHud()
+            ) : (
+              <TextInput
+                style={[styles.input, { color: themeColors.textPrimary }]}
+                placeholder="Message"
+                placeholderTextColor={themeColors.textSecondary}
+                value={messageText}
+                onChangeText={setMessageText}
+                onFocus={() => setShowAttachmentMenu(false)}
+                multiline
+                maxLength={2000}
+              />
+            )}
           </View>
 
           {messageText.trim() ? (
@@ -413,21 +874,39 @@ export default function DirectMessageScreen() {
                 <Ionicons name="send" size={20} color="#fff" />
               )}
             </TouchableOpacity>
+          ) : recordingLocked ? (
+            <View style={styles.micButtonPlaceholder} />
           ) : (
-            <TouchableOpacity
-              style={styles.micButton}
-              onPress={() => setIsRecordingVoice(true)}
-              disabled={uploadingVoice}
+            <View
+              style={[
+                styles.micButton,
+                {
+                  borderColor: themeColors.divider,
+                  backgroundColor: themeColors.surface
+                },
+                isRecording && styles.micButtonActive,
+                uploadingVoice && styles.micButtonDisabled
+              ]}
+              onStartShouldSetResponder={() => !uploadingVoice && !recordingLocked}
+              onResponderGrant={handleMicResponderGrant}
+              onResponderMove={handleMicResponderMove}
+              onResponderRelease={handleMicResponderEnd}
+              onResponderTerminate={handleMicResponderTerminate}
             >
               {uploadingVoice ? (
                 <ActivityIndicator size="small" color={themeColors.primary} />
               ) : (
-                <Ionicons name="mic" size={28} color={themeColors.primary} />
+                <Ionicons
+                  name="mic"
+                  size={24}
+                  color={isRecording ? '#ff4d4f' : themeColors.primary}
+                />
               )}
-            </TouchableOpacity>
+            </View>
           )}
+          {renderLockHint()}
         </View>
-        {showAttachmentMenu && (
+        {showAttachmentMenu && !isRecording && (
           <AttachmentMenu
             visible={showAttachmentMenu}
             onClose={() => setShowAttachmentMenu(false)}
@@ -439,23 +918,6 @@ export default function DirectMessageScreen() {
           />
         )}
       </KeyboardAvoidingView>
-      <Modal
-        visible={isRecordingVoice}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsRecordingVoice(false)}
-      >
-        <View style={styles.voiceModalOverlay}>
-          <View style={[styles.voiceModalContent, { backgroundColor: themeColors.surface }]}>
-            <VoiceRecorder
-              onRecordingComplete={handleSendVoiceNote}
-              onCancel={() => setIsRecordingVoice(false)}
-              themeColors={themeColors}
-              accentColor={themeColors.primary}
-            />
-          </View>
-        </View>
-      </Modal>
       <StickerPicker
         visible={showStickerPicker}
         onClose={() => setShowStickerPicker(false)}
@@ -480,6 +942,14 @@ export default function DirectMessageScreen() {
       />
     </ScreenLayout>
   );
+}
+
+function formatDurationLabel(ms) {
+  const safeMs = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function formatTimestamp(value) {
@@ -514,6 +984,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingVertical: 24,
+    paddingBottom: 160,
     gap: 8
   },
   messageRow: {
@@ -549,25 +1020,34 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: 8
   },
   attachButton: {
-    padding: 4,
-    marginBottom: 4
+    padding: 4
+  },
+  attachButtonDisabled: {
+    opacity: 0.4
+  },
+  attachButtonHidden: {
+    opacity: 0
   },
   inputContainer: {
     flex: 1,
     borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 40,
+    paddingVertical: 6,
+    minHeight: 48,
     maxHeight: 120,
     justifyContent: 'center',
     borderWidth: 1
+  },
+  recordingContainerActive: {
+    paddingVertical: 10,
+    minHeight: 60
   },
   input: {
     fontSize: 15,
@@ -583,8 +1063,135 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   micButton: {
-    padding: 4,
-    marginBottom: 4
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1
+  },
+  micButtonPlaceholder: {
+    width: 44,
+    height: 44
+  },
+  micButtonActive: {
+    backgroundColor: 'rgba(255,77,79,0.12)',
+    borderColor: '#ff4d4f'
+  },
+  micButtonDisabled: {
+    opacity: 0.4
+  },
+  recordingPromptWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  recordingTimerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ff4d4f',
+    minWidth: 44
+  },
+  slideToCancelBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 24,
+    borderWidth: 1,
+    minWidth: 160
+  },
+  slideToCancelText: {
+    fontSize: 14,
+    fontWeight: '500'
+  },
+  lockedRecordingContainer: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 4
+  },
+  lockedProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  lockedTimer: {
+    fontSize: 15,
+    fontWeight: '600'
+  },
+  lockedProgressBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    position: 'relative'
+  },
+  lockedProgressFill: {
+    height: '100%',
+    borderRadius: 3
+  },
+  lockedProgressThumb: {
+    position: 'absolute',
+    top: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    marginLeft: -9
+  },
+  lockedControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    justifyContent: 'space-between'
+  },
+  lockedTrashButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  lockedPauseButton: {
+    width: 52,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  lockedSendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  lockHintWrapper: {
+    width: 44,
+    height: 64,
+    borderRadius: 22,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3
   },
   centered: {
     flex: 1,
@@ -595,18 +1202,5 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 16,
     textAlign: 'center'
-  },
-  voiceModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20
-  },
-  voiceModalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 20
   }
 });
