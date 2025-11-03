@@ -10,11 +10,12 @@
   },
   "dependencies": {
     "@xenova/transformers": "^2.16.1",
-    "cors": "^2.8.5",
     "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
     "express": "^4.21.1",
     "google-auth-library": "^9.14.1",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.14",
     "onnxruntime-node": "^1.23.0",
     "onnxruntime-web": "^1.18.0"
   }

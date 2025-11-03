@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 /** ---------- Tunables ---------- */
 const DEFAULT_PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -41,7 +42,17 @@ const {
   EXPO_PUBLIC_SCHEME,
   AUTH_ALLOWED_ORIGINS,
   AUTH_COOKIE_NAME,
-  SESSION_TOKEN_TTL
+  SESSION_TOKEN_TTL,
+  CONTACT_SMTP_URL,
+  CONTACT_SMTP_HOST,
+  CONTACT_SMTP_PORT,
+  CONTACT_SMTP_USER,
+  CONTACT_SMTP_PASS,
+  CONTACT_SMTP_SECURE,
+  CONTACT_EMAIL_FROM,
+  CONTACT_EMAIL_TO,
+  CONTACT_EMAIL_BYPASS,
+  SENDMAIL_PATH
 } = process.env;
 
 const RESOLVED_COOKIE_NAME = AUTH_COOKIE_NAME || 'localloop_session';
@@ -131,6 +142,11 @@ const parseBooleanEnv = (value) => {
   const s = String(value).trim().toLowerCase();
   return s === '1' || s === 'true' || s === 'yes' || s === 'on';
 };
+
+const RESOLVED_CONTACT_EMAIL_TO = (CONTACT_EMAIL_TO || 'currenttech.co.za@gmail.com').trim();
+const RESOLVED_CONTACT_EMAIL_FROM = (CONTACT_EMAIL_FROM || 'no-reply@localloop.app').trim();
+const RESOLVED_CONTACT_SMTP_SECURE = parseBooleanEnv(CONTACT_SMTP_SECURE);
+const CONTACT_EMAIL_DEV_BYPASS = parseBooleanEnv(CONTACT_EMAIL_BYPASS);
 
 /** ---------- Transformer state ---------- */
 const disabledModes = new Set(['extractive', 'fallback', 'disabled', 'disable', 'off', 'none']);
@@ -265,6 +281,76 @@ const truncateSentenceAtWordBoundary = (s, max) => {
   const clipped = s.slice(0, Math.max(0, max));
   const i = clipped.lastIndexOf(' ');
   return (i <= 0 ? clipped : clipped.slice(0, i)).trim();
+};
+
+let contactTransport = null;
+let contactTransportError = null;
+
+const buildContactTransport = () => {
+  if (contactTransport || contactTransportError) return contactTransport;
+
+  try {
+    if (CONTACT_SMTP_URL && CONTACT_SMTP_URL.trim()) {
+      contactTransport = nodemailer.createTransport(CONTACT_SMTP_URL.trim());
+      return contactTransport;
+    }
+
+    if (CONTACT_SMTP_HOST && CONTACT_SMTP_USER && CONTACT_SMTP_PASS) {
+      contactTransport = nodemailer.createTransport({
+        host: CONTACT_SMTP_HOST.trim(),
+        port: CONTACT_SMTP_PORT ? Number(CONTACT_SMTP_PORT) : 587,
+        secure: RESOLVED_CONTACT_SMTP_SECURE,
+        auth: {
+          user: CONTACT_SMTP_USER.trim(),
+          pass: CONTACT_SMTP_PASS
+        }
+      });
+      return contactTransport;
+    }
+
+    if (SENDMAIL_PATH && SENDMAIL_PATH.trim()) {
+      contactTransport = nodemailer.createTransport({
+        sendmail: true,
+        newline: 'unix',
+        path: SENDMAIL_PATH.trim()
+      });
+      return contactTransport;
+    }
+  } catch (error) {
+    contactTransportError = error;
+    console.error('[contact-email] Failed to configure mail transport', error);
+  }
+
+  return contactTransport;
+};
+
+const formatContactEmail = ({ name, email, role, tier, notes }) => {
+  const safe = (v, limit = 400) => sanitizeInputText(v || '').slice(0, limit);
+  const safeName = safe(name, 120) || 'Unknown contact';
+  const safeEmail = (email || '').trim();
+  const safeRole = safe(role, 120) || 'Unknown role';
+  const safeTier = safe(tier, 120) || 'Not specified';
+  const safeNotes = safe(notes, 2000) || 'No additional details provided.';
+
+  const lines = [
+    `Name: ${safeName}`,
+    `Email: ${safeEmail || 'n/a'}`,
+    `Role: ${safeRole}`,
+    `Interested tier: ${safeTier}`,
+    '',
+    safeNotes
+  ];
+
+  return {
+    subject: `New LocalLoop inquiry from ${safeName}`,
+    text: lines.join('\n'),
+    html: `<p><strong>Name:</strong> ${safeName}</p>
+<p><strong>Email:</strong> ${safeEmail || 'n/a'}</p>
+<p><strong>Role:</strong> ${safeRole}</p>
+<p><strong>Interested tier:</strong> ${safeTier}</p>
+<p><strong>Details:</strong></p>
+<p>${safeNotes.replace(/\n/g, '<br />')}</p>`
+  };
 };
 
 /** ---------- Extractive fallback ---------- */
@@ -843,6 +929,64 @@ app.post('/summaries', async (req, res) => {
     fallbackReason: last?.error ? 'transformer-unavailable' : 'transformer-disabled',
     quality: quality || 'fast',
   });
+});
+
+app.post('/contact/messages', async (req, res) => {
+  const { name, email, role, tier, notes } = req.body ?? {};
+  const safeName = sanitizeInputText(name || '');
+  const safeRole = sanitizeInputText(role || '');
+  const safeTier = sanitizeInputText(tier || '');
+  const safeNotes = sanitizeInputText(notes || '');
+  const rawEmail = typeof email === 'string' ? email.trim() : '';
+
+  const errors = [];
+  if (!safeName) errors.push('Name is required.');
+  if (!rawEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+    errors.push('A valid email address is required.');
+  }
+  if (safeNotes.length > 4000) {
+    errors.push('Message is too long. Please keep it under 4000 characters.');
+  }
+
+  if (errors.length) {
+    return res.status(400).json({ error: errors[0], errors });
+  }
+
+  if (!RESOLVED_CONTACT_EMAIL_TO) {
+    console.error('[contact-email] CONTACT_EMAIL_TO is not configured.');
+    return res.status(500).json({ error: 'Contact email is not configured.' });
+  }
+
+  const payload = { name: safeName, email: rawEmail, role: safeRole, tier: safeTier, notes: safeNotes };
+  const message = formatContactEmail(payload);
+
+  if (CONTACT_EMAIL_DEV_BYPASS) {
+    console.info('[contact-email] Bypassed sending email (CONTACT_EMAIL_BYPASS enabled). Payload:', payload);
+    return res.json({ ok: true, bypassed: true });
+  }
+
+  const transport = buildContactTransport();
+  if (!transport) {
+    console.error('[contact-email] Mail transport is not configured.');
+    return res.status(503).json({ error: 'Email service is not available. Please try again later.' });
+  }
+
+  try {
+    await transport.sendMail({
+      to: RESOLVED_CONTACT_EMAIL_TO,
+      from: RESOLVED_CONTACT_EMAIL_FROM,
+      replyTo: rawEmail || RESOLVED_CONTACT_EMAIL_FROM,
+      subject: message.subject,
+      text: message.text,
+      html: message.html
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    contactTransport = null;
+    contactTransportError = error;
+    console.error('[contact-email] Failed to send contact email', error);
+    return res.status(502).json({ error: 'Failed to send your message. Please try again later.' });
+  }
 });
 
 if (require.main === module) {
