@@ -103,6 +103,15 @@ const Header = () => (
   </header>
 );
 
+const resolveApiBaseUrl = () => {
+  const candidates = [
+    typeof window !== 'undefined' ? window.LOCALLOOP_API_BASE_URL : null,
+    typeof window !== 'undefined' && window.LOCALLOOP_SITE_CONFIG ? window.LOCALLOOP_SITE_CONFIG.apiBaseUrl : null
+  ].filter(Boolean);
+  const picked = candidates.length ? candidates[0] : '';
+  return picked ? picked.replace(/\/+$/, '') : '';
+};
+
 const ContactHero = () => (
   <section className="hero">
     <div className="hero-content">
@@ -189,75 +198,161 @@ const TierBreakdown = () => (
   </section>
 );
 
-const ContactPanel = () => (
-  <section>
-    <div className="section-header">
-      <span className="pill">Connect</span>
-      <h2>We respond within one business day.</h2>
-      <p>
-        Share a few details and our neighborhood success team will tailor a launch plan, data migration support, and
-        pricing estimate that fits your goals.
-      </p>
-    </div>
-    <div className="contact-grid">
-      <article className="contact-card">
-        <form>
-          <label>
-            Name
-            <input type="text" name="name" placeholder="Jordan Lee" required />
-          </label>
-          <label>
-            Email
-            <input type="email" name="email" placeholder="you@organization.org" required />
-          </label>
-          <label>
-            Role
-            <select name="role">
-              <option value="resident">Resident leader</option>
-              <option value="association">Neighborhood association</option>
-              <option value="civic">Civic / municipal partner</option>
-              <option value="business">Business district</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label>
-            Which tier are you exploring?
-            <select name="tier">
-              {tierDetails.map(tier => (
-                <option key={tier.name} value={tier.name}>
-                  {tier.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Tell us about your goals
-            <textarea name="notes" placeholder="Share member counts, goals, or timelines so we can tailor our response." />
-          </label>
-          <button type="submit" className="button primary">
-            Send message
-          </button>
-        </form>
-      </article>
-      <aside className="contact-insight">
-        <h3>Direct channels</h3>
-        <ul>
-          {contactChannels.map(channel => (
-            <li key={channel.value}>
-              <strong>{channel.label}:</strong> <a href={`mailto:${channel.value}`}>{channel.value}</a>
-            </li>
-          ))}
-        </ul>
-        <h3>What happens next</h3>
-        <ul>
-          <li>We book a discovery session to understand your neighborhood dynamics.</li>
-          <li>Our team shares a tailored rollout plan with success metrics.</li>
-          <li>You receive launch collateral and onboarding materials for members.</li>
-        </ul>
-      </aside>
-    </div>
-  </section>
-);
+const ContactPanel = () => {
+  const apiBaseUrl = React.useMemo(() => resolveApiBaseUrl(), []);
+  const [form, setForm] = React.useState({
+    name: '',
+    email: '',
+    role: 'Resident leader',
+    tier: tierDetails[0]?.name ?? 'Neighbors (Free)',
+    notes: ''
+  });
+  const [status, setStatus] = React.useState({ state: 'idle', message: '' });
+
+  const updateField = (field) => (event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const endpoint = React.useMemo(() => {
+    if (!apiBaseUrl) return '/contact/messages';
+    return `${apiBaseUrl}/contact/messages`;
+  }, [apiBaseUrl]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ state: 'pending', message: '' });
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = payload?.error || 'We could not send your message. Please try again.';
+        setStatus({ state: 'error', message });
+        return;
+      }
+
+      setStatus({ state: 'success', message: 'Thanks! Our neighborhood success team will reach out shortly.' });
+      setForm({
+        name: '',
+        email: '',
+        role: 'Resident leader',
+        tier: tierDetails[0]?.name ?? 'Neighbors (Free)',
+        notes: ''
+      });
+    } catch (error) {
+      setStatus({
+        state: 'error',
+        message:
+          'We hit a network snag while submitting your message. Double-check your connection or email us directly.'
+      });
+    }
+  };
+
+  return (
+    <section>
+      <div className="section-header">
+        <span className="pill">Connect</span>
+        <h2>We respond within one business day.</h2>
+        <p>
+          Share a few details and our neighborhood success team will tailor a launch plan, data migration support, and
+          pricing estimate that fits your goals.
+        </p>
+        {!apiBaseUrl && (
+          <p style={{ color: 'rgba(255, 204, 128, 0.85)', fontSize: 14 }}>
+            Hosting the marketing site separately? Expose your backend at the same origin or set{' '}
+            <code>window.LOCALLOOP_API_BASE_URL</code> before loading this page.
+          </p>
+        )}
+      </div>
+      <div className="contact-grid">
+        <article className="contact-card">
+          <form onSubmit={handleSubmit}>
+            <label>
+              Name
+              <input type="text" name="name" placeholder="Jordan Lee" value={form.name} onChange={updateField('name')} required />
+            </label>
+            <label>
+              Email
+              <input
+                type="email"
+                name="email"
+                placeholder="you@organization.org"
+                value={form.email}
+                onChange={updateField('email')}
+                required
+              />
+            </label>
+            <label>
+              Role
+              <select name="role" value={form.role} onChange={updateField('role')}>
+                <option value="Resident leader">Resident leader</option>
+                <option value="Neighborhood association">Neighborhood association</option>
+                <option value="Civic / municipal partner">Civic / municipal partner</option>
+                <option value="Business district">Business district</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>
+              Which tier are you exploring?
+              <select name="tier" value={form.tier} onChange={updateField('tier')}>
+                {tierDetails.map((tier) => (
+                  <option key={tier.name} value={tier.name}>
+                    {tier.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Tell us about your goals
+              <textarea
+                name="notes"
+                placeholder="Share member counts, goals, or timelines so we can tailor our response."
+                value={form.notes}
+                onChange={updateField('notes')}
+              />
+            </label>
+            <button type="submit" className="button primary" disabled={status.state === 'pending'}>
+              {status.state === 'pending' ? 'Sending…' : 'Send message'}
+            </button>
+            {status.state !== 'idle' && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  color: status.state === 'success' ? 'rgba(126, 255, 207, 0.9)' : 'rgba(255, 184, 184, 0.9)'
+                }}
+              >
+                {status.message}
+              </p>
+            )}
+          </form>
+        </article>
+        <aside className="contact-insight">
+          <h3>Direct channels</h3>
+          <ul>
+            {contactChannels.map((channel) => (
+              <li key={channel.value}>
+                <strong>{channel.label}:</strong> <a href={`mailto:${channel.value}`}>{channel.value}</a>
+              </li>
+            ))}
+          </ul>
+          <h3>What happens next</h3>
+          <ul>
+            <li>We book a discovery session to understand your neighborhood dynamics.</li>
+            <li>Our team shares a tailored rollout plan with success metrics.</li>
+            <li>You receive launch collateral and onboarding materials for members.</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+  );
+};
 
 const Footer = () => (
   <footer className="footer">

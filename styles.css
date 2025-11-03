@@ -239,10 +239,12 @@ main {
   padding: 28px 26px;
   display: grid;
   gap: 20px;
+  justify-items: center;
 }
 
 .hero-frame img {
-  width: 100%;
+  width: min(100%, 320px);
+  max-height: 320px;
   border-radius: 18px;
   box-shadow: 0 18px 40px rgba(58, 123, 255, 0.32);
 }
@@ -344,10 +346,11 @@ main {
 }
 
 .experience-card img {
-  width: 100%;
+  width: min(100%, 260px);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: 0 16px 40px rgba(14, 22, 42, 0.42);
+  margin: 0 auto;
 }
 
 .experience-card h3 {
