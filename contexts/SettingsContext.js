@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState
 } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkColors, lightColors } from '../constants/colors';
 import { useAuth } from './AuthContext';
 import { getUserProfile } from '../services/userProfileService'; // [PUBLIC-MODE]
@@ -775,6 +776,28 @@ export const premiumAccentPresets = [
 
 export const accentPresets = [...baseAccentPresets, ...premiumAccentPresets];
 
+// AsyncStorage keys
+const STORAGE_KEYS = {
+  ACCENT_KEY: '@settings_accent_key',
+  BASE_ACCENT_KEY: '@settings_base_accent_key',
+  PREMIUM_ACCENT_KEY: '@settings_premium_accent_key',
+  PREMIUM_ACCENT_ENABLED: '@settings_premium_accent_enabled',
+  PREMIUM_ACCENT_BRIGHTNESS: '@settings_premium_accent_brightness',
+  PREMIUM_ACCENT_SHADE: '@settings_premium_accent_shade',
+  IS_DARK_MODE: '@settings_is_dark_mode',
+  DREAMY_SCROLL_INDICATOR: '@settings_dreamy_scroll_indicator',
+  PREMIUM_TYPOGRAPHY_ENABLED: '@settings_premium_typography_enabled',
+  PREMIUM_TITLE_FONT_SIZE_ENABLED: '@settings_premium_title_font_size_enabled',
+  PREMIUM_DESCRIPTION_FONT_SIZE_ENABLED: '@settings_premium_description_font_size_enabled',
+  PREMIUM_TITLE_FONT_SIZE: '@settings_premium_title_font_size',
+  PREMIUM_DESCRIPTION_FONT_SIZE: '@settings_premium_description_font_size',
+  PREMIUM_SUMMARIES_ENABLED: '@settings_premium_summaries_enabled',
+  PREMIUM_SUMMARY_LENGTH: '@settings_premium_summary_length',
+  USER_PROFILE: '@settings_user_profile',
+  SHOW_ADD_SHORTCUT: '@settings_show_add_shortcut',
+  LOCATION_PERMISSION_STATUS: '@settings_location_permission_status',
+};
+
 const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
@@ -839,6 +862,182 @@ export function SettingsProvider({ children }) {
     premiumUnlocked: false,
   });
   const { hasActivePremium, user } = useAuth();
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  // Load settings from AsyncStorage on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const [
+          savedAccentKey,
+          savedBaseAccentKey,
+          savedPremiumAccentKey,
+          savedPremiumAccentEnabled,
+          savedPremiumAccentBrightness,
+          savedPremiumAccentShade,
+          savedIsDarkMode,
+          savedDreamyScrollIndicator,
+          savedPremiumTypography,
+          savedPremiumTitleFontSizeEnabled,
+          savedPremiumDescriptionFontSizeEnabled,
+          savedPremiumTitleFontSize,
+          savedPremiumDescriptionFontSize,
+          savedPremiumSummariesEnabled,
+          savedPremiumSummaryLength,
+          savedUserProfile,
+          savedShowAddShortcut,
+          savedLocationPermissionStatus,
+        ] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.ACCENT_KEY),
+          AsyncStorage.getItem(STORAGE_KEYS.BASE_ACCENT_KEY),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_ACCENT_KEY),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_ACCENT_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_ACCENT_BRIGHTNESS),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_ACCENT_SHADE),
+          AsyncStorage.getItem(STORAGE_KEYS.IS_DARK_MODE),
+          AsyncStorage.getItem(STORAGE_KEYS.DREAMY_SCROLL_INDICATOR),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_TYPOGRAPHY_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_TITLE_FONT_SIZE_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_DESCRIPTION_FONT_SIZE_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_TITLE_FONT_SIZE),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_DESCRIPTION_FONT_SIZE),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_SUMMARIES_ENABLED),
+          AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_SUMMARY_LENGTH),
+          AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
+          AsyncStorage.getItem(STORAGE_KEYS.SHOW_ADD_SHORTCUT),
+          AsyncStorage.getItem(STORAGE_KEYS.LOCATION_PERMISSION_STATUS),
+        ]);
+
+        if (savedAccentKey) setAccentKey(savedAccentKey);
+        if (savedBaseAccentKey) setBaseAccentKey(savedBaseAccentKey);
+        if (savedPremiumAccentKey) setPremiumAccentKey(savedPremiumAccentKey);
+        if (savedPremiumAccentEnabled !== null) setPremiumAccentEnabled(savedPremiumAccentEnabled === 'true');
+        if (savedPremiumAccentBrightness) setPremiumAccentBrightness(Number(savedPremiumAccentBrightness));
+        if (savedPremiumAccentShade) setPremiumAccentShade(Number(savedPremiumAccentShade));
+        if (savedIsDarkMode !== null) setIsDarkMode(savedIsDarkMode === 'true');
+        if (savedDreamyScrollIndicator !== null) setDreamyScrollIndicatorEnabled(savedDreamyScrollIndicator === 'true');
+        if (savedPremiumTypography !== null) setPremiumTypographyEnabled(savedPremiumTypography === 'true');
+        if (savedPremiumTitleFontSizeEnabled !== null) setPremiumTitleFontSizeEnabled(savedPremiumTitleFontSizeEnabled === 'true');
+        if (savedPremiumDescriptionFontSizeEnabled !== null) setPremiumDescriptionFontSizeEnabled(savedPremiumDescriptionFontSizeEnabled === 'true');
+        if (savedPremiumTitleFontSize) setPremiumTitleFontSize(Number(savedPremiumTitleFontSize));
+        if (savedPremiumDescriptionFontSize) setPremiumDescriptionFontSize(Number(savedPremiumDescriptionFontSize));
+        if (savedPremiumSummariesEnabled !== null) setPremiumSummariesEnabled(savedPremiumSummariesEnabled === 'true');
+        if (savedPremiumSummaryLength) setPremiumSummaryLength(savedPremiumSummaryLength);
+        if (savedUserProfile) {
+          const profile = JSON.parse(savedUserProfile);
+          setUserProfile(prev => ({ ...prev, ...profile }));
+        }
+        if (savedShowAddShortcut !== null) setShowAddShortcut(savedShowAddShortcut === 'true');
+        if (savedLocationPermissionStatus) {
+          setLocationPermissionStatus(savedLocationPermissionStatus);
+        } else if (savedUserProfile) {
+          // If user has location data but no permission status saved, set it to granted
+          // This handles migration for existing users
+          const profile = JSON.parse(savedUserProfile);
+          if (profile?.city) {
+            setLocationPermissionStatus('granted');
+          }
+        }
+      } catch (error) {
+        console.warn('[SettingsContext] Error loading settings:', error);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  // Save settings to AsyncStorage whenever they change
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.ACCENT_KEY, accentKey);
+  }, [accentKey, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.BASE_ACCENT_KEY, baseAccentKey);
+  }, [baseAccentKey, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_ACCENT_KEY, premiumAccentKey);
+  }, [premiumAccentKey, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_ACCENT_ENABLED, String(premiumAccentEnabled));
+  }, [premiumAccentEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_ACCENT_BRIGHTNESS, String(premiumAccentBrightness));
+  }, [premiumAccentBrightness, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_ACCENT_SHADE, String(premiumAccentShade));
+  }, [premiumAccentShade, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.IS_DARK_MODE, String(isDarkMode));
+  }, [isDarkMode, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.DREAMY_SCROLL_INDICATOR, String(dreamyScrollIndicatorEnabled));
+  }, [dreamyScrollIndicatorEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_TYPOGRAPHY_ENABLED, String(premiumTypographyEnabled));
+  }, [premiumTypographyEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_TITLE_FONT_SIZE_ENABLED, String(premiumTitleFontSizeEnabled));
+  }, [premiumTitleFontSizeEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_DESCRIPTION_FONT_SIZE_ENABLED, String(premiumDescriptionFontSizeEnabled));
+  }, [premiumDescriptionFontSizeEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_TITLE_FONT_SIZE, String(premiumTitleFontSize));
+  }, [premiumTitleFontSize, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_DESCRIPTION_FONT_SIZE, String(premiumDescriptionFontSize));
+  }, [premiumDescriptionFontSize, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_SUMMARIES_ENABLED, String(premiumSummariesEnabled));
+  }, [premiumSummariesEnabled, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.PREMIUM_SUMMARY_LENGTH, premiumSummaryLength);
+  }, [premiumSummaryLength, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(userProfile));
+  }, [userProfile, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.SHOW_ADD_SHORTCUT, String(showAddShortcut));
+  }, [showAddShortcut, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
+    AsyncStorage.setItem(STORAGE_KEYS.LOCATION_PERMISSION_STATUS, locationPermissionStatus);
+  }, [locationPermissionStatus, isLoadingSettings]);
 
   useEffect(() => {
     if (hasActivePremium || isDevBuild) {
