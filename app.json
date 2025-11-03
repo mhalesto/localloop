@@ -22,7 +22,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.halalisani.localloop",
-      "buildNumber": "2"
+      "buildNumber": "3",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMotionUsageDescription": "LocalLoop uses motion sensors to detect your activity and enhance your neighborhood exploration experience.",
+        "NSLocationWhenInUseUsageDescription": "LocalLoop needs your location to show you posts and content from your neighborhood."
+      }
     },
     "android": {
       "adaptiveIcon": {
