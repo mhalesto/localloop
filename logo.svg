@@ -1,0 +1,18 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="loop-gradient" x1="16%" y1="88%" x2="84%" y2="12%">
+      <stop offset="0%" stop-color="#2F80ED" />
+      <stop offset="100%" stop-color="#56CCF2" />
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <circle cx="60" cy="60" r="56" stroke="url(#loop-gradient)" stroke-width="8" />
+    <path
+      d="M60 84c-12.15 0-22-10.07-22-22.5S47.85 39 60 39c7.45 0 14.08 3.78 18.08 9.59"
+      stroke="url(#loop-gradient)"
+      stroke-width="12"
+      stroke-linecap="round"
+    />
+    <circle cx="84" cy="60" r="12" fill="url(#loop-gradient)" />
+  </g>
+</svg>
