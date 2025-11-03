@@ -128,8 +128,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <SettingsProvider>
-          {/* Temporarily disabled SensorsProvider for debugging */}
-          {/* <SensorsProvider> */}
+          <SensorsProvider>
             <PostsProvider>
               <StatusesProvider>
                 <NotificationsProvider>
@@ -142,7 +141,7 @@ export default function App() {
                 </NotificationsProvider>
               </StatusesProvider>
             </PostsProvider>
-          {/* </SensorsProvider> */}
+          </SensorsProvider>
         </SettingsProvider>
       </AuthProvider>
     </GestureHandlerRootView>
