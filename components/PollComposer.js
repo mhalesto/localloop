@@ -1,11 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function PollComposer({ onPollCreate, themeColors, accentColor }) {
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '']);
-  const [durationHours, setDurationHours] = useState(24);
+export default function PollComposer({ onPollCreate, themeColors, accentColor, initialPoll = null }) {
+  const [question, setQuestion] = useState(initialPoll?.question || '');
+  const [options, setOptions] = useState(
+    initialPoll?.options?.map(opt => typeof opt === 'string' ? opt : opt.text) || ['', '']
+  );
+  const [durationHours, setDurationHours] = useState(() => {
+    if (initialPoll?.endsAt) {
+      const remaining = initialPoll.endsAt - Date.now();
+      const hours = Math.max(1, Math.round(remaining / (60 * 60 * 1000)));
+      return hours <= 72 ? hours : 24;
+    }
+    return 24;
+  });
+
+  // Update form when initialPoll changes
+  useEffect(() => {
+    if (initialPoll) {
+      setQuestion(initialPoll.question || '');
+      setOptions(initialPoll.options?.map(opt => typeof opt === 'string' ? opt : opt.text) || ['', '']);
+      if (initialPoll.endsAt) {
+        const remaining = initialPoll.endsAt - Date.now();
+        const hours = Math.max(1, Math.round(remaining / (60 * 60 * 1000)));
+        setDurationHours(hours <= 72 ? hours : 24);
+      }
+    } else {
+      setQuestion('');
+      setOptions(['', '']);
+      setDurationHours(24);
+    }
+  }, [initialPoll]);
 
   const addOption = () => {
     if (options.length >= 6) {

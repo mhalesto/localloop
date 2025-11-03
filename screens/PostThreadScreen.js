@@ -1933,7 +1933,7 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [city, markNotificationsForThreadRead, postId, togglePostSubscription]);
 
   const handleSubmitEdit = useCallback(
-    ({ title: nextTitle, message: nextMessage, colorKey, highlightDescription }) => {
+    ({ title: nextTitle, message: nextMessage, colorKey, highlightDescription, poll }) => {
       const trimmedTitle = nextTitle?.trim?.() ?? '';
       const trimmedMessage = nextMessage?.trim?.() ?? '';
       const updates = {};
@@ -1957,6 +1957,14 @@ export default function PostThreadScreen({ route, navigation }) {
         updates.colorKey = colorKey;
       }
 
+      // Handle poll updates
+      if (poll !== undefined) {
+        const pollChanged = JSON.stringify(poll) !== JSON.stringify(post?.poll ?? null);
+        if (pollChanged) {
+          updates.poll = poll;
+        }
+      }
+
       if (Object.keys(updates).length === 0) {
         setEditModalVisible(false);
         return;
@@ -1970,7 +1978,7 @@ export default function PostThreadScreen({ route, navigation }) {
         setFeedbackMessage('Unable to update post');
       }
     },
-    [city, post?.colorKey, post?.highlightDescription, post?.message, post?.title, postId, updatePost]
+    [city, post?.colorKey, post?.highlightDescription, post?.message, post?.title, post?.poll, postId, updatePost]
   );
 
   const confirmDeletePost = useCallback(() => {
@@ -2835,6 +2843,7 @@ export default function PostThreadScreen({ route, navigation }) {
         initialMessage={post?.message ?? ''}
         initialTitle={post?.title ?? ''}
         initialHighlightDescription={!!post?.highlightDescription}
+        initialPoll={post?.poll ?? null}
         authorProfile={post?.author ?? {}}
         allowLocationChange={false}
         onSubmit={handleSubmitEdit}

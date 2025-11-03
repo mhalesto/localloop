@@ -11,7 +11,8 @@ import {
   Platform,
   ScrollView,
   Switch,
-  Alert
+  Alert,
+  TouchableWithoutFeedback
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard'; // [AI-SUMMARY]
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 import LoadingOverlay from './LoadingOverlay';
+import PollComposer from './PollComposer';
 import {
   EMAIL_ADDRESS_REGEX,
   EMAIL_LABEL_PLACEHOLDER,
@@ -53,6 +55,7 @@ export default function CreatePostModal({
   initialMessage = '',
   initialTitle = '',
   initialHighlightDescription = false,
+  initialPoll = null,
   mode = 'create',
   titleText,
   submitLabel,
@@ -105,6 +108,10 @@ export default function CreatePostModal({
   // [PUBLIC-MODE] Posting mode state
   const [postingMode, setPostingMode] = useState(userProfile?.currentMode || 'anonymous');
 
+  // Poll state
+  const [pollData, setPollData] = useState(null);
+  const [pollModalVisible, setPollModalVisible] = useState(false);
+
   useEffect(() => {
     if (visible) {
       const nextTitle = initialTitle ?? '';
@@ -125,6 +132,10 @@ export default function CreatePostModal({
 
       // [PUBLIC-MODE] Reset to user's preferred mode
       setPostingMode(userProfile?.currentMode || 'anonymous');
+
+      // Set poll data from initial value
+      setPollData(initialPoll);
+      setPollModalVisible(false);
 
       // [AI-SUMMARY] reset summary UI each open
       setSummaryError('');
@@ -212,6 +223,10 @@ export default function CreatePostModal({
     setAdvancedEnabled(false);
     setHighlightDescription(false);
     setMessageSelection({ start: 0, end: 0 });
+
+    // Reset poll data
+    setPollData(null);
+    setPollModalVisible(false);
 
     // [AI-SUMMARY]
     setIsSummarizing(false);
@@ -502,6 +517,11 @@ export default function CreatePostModal({
     }
   };
 
+  const handlePollCreate = (poll) => {
+    setPollData(poll);
+    setPollModalVisible(false);
+  };
+
   const handleSubmit = async () => {
     if (submitDisabled) return;
 
@@ -535,7 +555,8 @@ export default function CreatePostModal({
         description: trimmedMessage,
         highlightDescription,
         postingMode, // [PUBLIC-MODE] Include posting mode
-        isPublic: postingMode === 'public' // Helper flag
+        isPublic: postingMode === 'public', // Helper flag
+        poll: pollData // Include poll data
       });
     } catch (error) {
       console.warn('[CreatePostModal] submit failed', error);
@@ -556,6 +577,7 @@ export default function CreatePostModal({
       setMessageSelection({ start: 0, end: 0 });
       setSummaryVisible(false);
       setSummaryText('');
+      setPollData(null);
     }
     setLocationModalVisible(false);
 
@@ -796,7 +818,48 @@ export default function CreatePostModal({
                 onSelectionChange={(e) => updateSelection(e?.nativeEvent?.selection)}
                 selection={messageSelection}
               />
+              {pollData && pollData.question && pollData.options && (
+                <View style={[styles.pollPreview, { backgroundColor: previewHighlightFill }]}>
+                  <View style={styles.pollPreviewHeader}>
+                    <Ionicons name="stats-chart" size={16} color={previewPrimary} />
+                    <Text style={[styles.pollPreviewTitle, { color: previewPrimary }]}>
+                      Poll: {pollData.question}
+                    </Text>
+                  </View>
+                  <Text style={[styles.pollPreviewOptions, { color: previewMuted }]}>
+                    {pollData.options.length} options
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setPollData(null)}
+                    style={styles.removePollButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close-circle" size={20} color={previewMuted} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
+
+            <TouchableOpacity
+              onPress={() => setPollModalVisible(true)}
+              style={[
+                styles.pollButton,
+                { backgroundColor: pollData ? `${summaryAccentColor}20` : themeColors.surface },
+                { borderColor: pollData ? summaryAccentColor : themeColors.divider }
+              ]}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="stats-chart"
+                size={20}
+                color={pollData ? summaryAccentColor : themeColors.textSecondary}
+              />
+              <Text style={[styles.pollButtonText, {
+                color: pollData ? summaryAccentColor : themeColors.textSecondary
+              }]}>
+                {pollData ? 'Edit Poll' : 'Add Poll'}
+              </Text>
+            </TouchableOpacity>
 
             {premiumSummariesEnabled ? (
               <>
@@ -985,6 +1048,44 @@ export default function CreatePostModal({
         title="Choose a room"
       />
 
+      <Modal
+        visible={pollModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setPollModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback onPress={() => setPollModalVisible(false)}>
+              <View style={{ flex: 1 }} />
+            </TouchableWithoutFeedback>
+            <View style={[styles.card, { maxHeight: '85%' }]}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Create Poll</Text>
+                <TouchableOpacity onPress={() => setPollModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name="close" size={24} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <PollComposer
+                  key={pollData ? JSON.stringify(pollData) : 'new-poll'}
+                  onPollCreate={handlePollCreate}
+                  themeColors={themeColors}
+                  accentColor={selectedPreset.buttonBackground ?? themeColors.primaryDark}
+                  initialPoll={pollData}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </Modal>
   );
 }
@@ -1152,5 +1253,45 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     modeToggleText: {
       fontSize: 14,
       fontWeight: '600',
+    },
+
+    // Poll styles
+    pollButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      marginTop: 12,
+    },
+    pollButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pollPreview: {
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 10,
+      position: 'relative',
+    },
+    pollPreviewHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    pollPreviewTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pollPreviewOptions: {
+      fontSize: 12,
+    },
+    removePollButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
     },
   });

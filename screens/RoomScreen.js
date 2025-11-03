@@ -210,10 +210,77 @@ export default function RoomScreen({ navigation, route }) {
 
   const [showComposer, setShowComposer] = useState(false);
 
+  const handleNavigateToComposer = useCallback(() => {
+    navigation.navigate('PostComposer', {
+      initialLocation: {
+        city,
+        province: userProfile?.province ?? '',
+        country: userProfile?.country ?? ''
+      },
+      initialAccentKey: selectedColorKey,
+      onSubmit: async ({ title: postTitle, message: postMessage, colorKey, poll }) => {
+        if (!firebaseUser?.uid) {
+          Alert.alert('Sign in required', 'Sign in to publish posts to this room.');
+          return;
+        }
+
+        try {
+          let moderation = null;
+          try {
+            moderation = await analyzePostContent({ title: postTitle, message: postMessage });
+          } catch (error) {
+            console.warn('[RoomScreen] moderation analyze failed', error);
+          }
+
+          if (moderation?.action === 'block') {
+            const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
+            Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
+            return false;
+          }
+          if (moderation?.action === 'review') {
+            const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
+            Alert.alert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`);
+          }
+
+          const created = addPost(
+            city,
+            postTitle,
+            postMessage,
+            colorKey,
+            {
+              ...userProfile,
+              nickname: userProfile?.nickname ?? '',
+              city,
+              province: userProfile?.province ?? '',
+              country: userProfile?.country ?? '',
+              avatarKey: userProfile?.avatarKey ?? 'default',
+              uid: firebaseUser.uid
+            },
+            false,
+            moderation ?? null,
+            poll
+          );
+
+          if (!created) {
+            Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+            return false;
+          }
+
+          navigation.navigate('MyPosts', { focusPostId: created.id, pendingPost: { ...created, city } });
+          return true;
+        } catch (error) {
+          console.error('[RoomScreen] Error creating post:', error);
+          Alert.alert('Error', 'Failed to create post. Please try again.');
+          return false;
+        }
+      }
+    });
+  }, [navigation, city, userProfile, selectedColorKey, firebaseUser?.uid, addPost]);
+
   const renderComposerButton = () => (
     <TouchableOpacity
       style={[styles.dropPostButton, { backgroundColor: accentPreset.buttonBackground }]}
-      onPress={() => setShowComposer(true)}
+      onPress={handleNavigateToComposer}
       activeOpacity={0.85}
     >
       <Ionicons name="add-circle" size={24} color={accentPreset.buttonForeground || '#fff'} />

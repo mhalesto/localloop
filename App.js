@@ -35,6 +35,7 @@ import FollowingScreen from './screens/FollowingScreen';
 import FeedScreen from './screens/FeedScreen';
 import DiscoverScreen from './screens/DiscoverScreen';
 import NeighborhoodExplorerScreen from './screens/NeighborhoodExplorerScreen';
+import PostComposerScreen from './screens/PostComposerScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -76,6 +77,7 @@ function RootNavigator() {
       <Stack.Screen name="Feed" component={FeedScreen} />
       <Stack.Screen name="Discover" component={DiscoverScreen} />
       <Stack.Screen name="NeighborhoodExplorer" component={NeighborhoodExplorerScreen} />
+      <Stack.Screen name="PostComposer" component={PostComposerScreen} />
     </Stack.Navigator>
   );
 }
