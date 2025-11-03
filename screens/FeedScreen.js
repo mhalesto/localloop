@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
@@ -16,13 +17,24 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getFeedPosts } from '../services/publicPostsService';
 import { getFollowing } from '../services/followService';
+import { fetchMarketListingsForCity } from '../services/marketplaceService';
 import useHaptics from '../hooks/useHaptics';
+
+const categoryVisuals = {
+  Essentials: { icon: 'leaf-outline', color: '#3ab370' },
+  'Home & DIY': { icon: 'construct-outline', color: '#7b46ff' },
+  Services: { icon: 'people-outline', color: '#ff8a5c' },
+  Events: { icon: 'sparkles-outline', color: '#2f80ed' },
+  'Free Finds': { icon: 'gift-outline', color: '#56ccf2' },
+  Neighbors: { icon: 'hand-left-outline', color: '#f59e0b' }
+};
 
 export default function FeedScreen({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
-  const [posts, setPosts] = useState([]);
+  const [feedItems, setFeedItems] = useState([]);
+  const [rawFeedPosts, setRawFeedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -31,31 +43,48 @@ export default function FeedScreen({ navigation }) {
   const loadFeed = useCallback(async () => {
     if (!user?.uid) {
       setLoading(false);
+      setRefreshing(false);
+      setFeedItems([]);
+      setRawFeedPosts([]);
       return;
     }
 
     try {
-      // Get list of users being followed
       const following = await getFollowing(user.uid);
       const followingIds = following.map(u => u.id);
 
-      if (followingIds.length === 0) {
-        setPosts([]);
-        setLoading(false);
-        setRefreshing(false);
-        return;
+      let feedPosts = [];
+      if (followingIds.length > 0) {
+        feedPosts = await getFeedPosts(followingIds);
+      }
+      setRawFeedPosts(feedPosts);
+
+      let combinedItems = feedPosts.map((post) => ({
+        kind: 'post',
+        id: `post-${post.id}`,
+        data: post
+      }));
+
+      if (userProfile?.city) {
+        const marketListings = await fetchMarketListingsForCity(userProfile.city, { limit: 6 });
+        const marketItems = marketListings.map((listing) => ({
+          kind: 'market',
+          id: `market-${listing.id}`,
+          data: listing
+        }));
+        combinedItems = injectMarketplaceItems(combinedItems, marketItems);
       }
 
-      // Get posts from followed users
-      const feedPosts = await getFeedPosts(followingIds);
-      setPosts(feedPosts);
+      setFeedItems(combinedItems);
     } catch (error) {
       console.error('[Feed] Error loading feed:', error);
+      setFeedItems([]);
+      setRawFeedPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.uid]);
+  }, [user?.uid, userProfile?.city]);
 
   useEffect(() => {
     loadFeed();
@@ -83,7 +112,19 @@ export default function FeedScreen({ navigation }) {
     navigation.navigate('Discover');
   };
 
-  const renderPost = ({ item }) => (
+  const handleMarketPress = (listing) => {
+    haptics.light();
+    const details = listing.marketListing?.details || listing.message || 'Message the neighbor in the room to coordinate.';
+    Alert.alert(listing.title, details, [
+      { text: 'Close', style: 'cancel' },
+      {
+        text: 'Browse Markets',
+        onPress: () => navigation.navigate('LocalLoopMarkets')
+      }
+    ]);
+  };
+
+  const renderPostCard = (item) => (
     <TouchableOpacity
       style={[styles.postCard, { backgroundColor: themeColors.card }]}
       onPress={() => navigateToPost(item)}
@@ -148,6 +189,61 @@ export default function FeedScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  const renderMarketPlacement = (listing) => {
+    const meta = listing.marketListing || {};
+    const visuals = categoryVisuals[meta.category] || { icon: 'bag-handle-outline', color: primaryColor };
+    const isBoosted = (meta.boostedUntil ?? 0) > Date.now();
+
+    return (
+      <TouchableOpacity
+        style={[styles.marketCard, { backgroundColor: themeColors.card }]}
+        onPress={() => handleMarketPress(listing)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.marketHeader}>
+          <View style={[styles.marketIcon, { backgroundColor: `${visuals.color}22` }] }>
+            <Ionicons name={visuals.icon} size={18} color={visuals.color} />
+          </View>
+          <Text style={[styles.marketTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
+            {listing.title}
+          </Text>
+        </View>
+        <Text style={[styles.marketPrice, { color: themeColors.textPrimary }]}>{meta.price || 'Negotiable'}</Text>
+        <Text style={[styles.marketLocation, { color: themeColors.textSecondary }]}>
+          {meta.location || listing.city}
+        </Text>
+        <View style={styles.marketFooter}>
+          <View style={[styles.marketBadge, { backgroundColor: `${visuals.color}1f` }] }>
+            <Text style={[styles.marketBadgeText, { color: visuals.color }] }>
+              {meta.intent === 'request' ? 'Request' : 'Marketplace'}
+            </Text>
+          </View>
+          <View style={styles.marketMetaRow}>
+            {isBoosted ? (
+              <View style={styles.marketMetaItem}>
+                <Ionicons name="rocket-outline" size={14} color="#facc15" />
+                <Text style={[styles.marketMetaText, { color: '#facc15' }]}>Boosted</Text>
+              </View>
+            ) : null}
+            <View style={styles.marketMetaItem}>
+              <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
+              <Text style={[styles.marketMetaText, { color: themeColors.textSecondary }]}>
+                {formatTimeAgo(listing.createdAt)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFeedItem = ({ item }) => {
+    if (item.kind === 'market') {
+      return renderMarketPlacement(item.data);
+    }
+    return renderPostCard(item.data);
+  };
+
   if (!user?.uid || !userProfile?.isPublicProfile) {
     return (
       <ScreenLayout title="Feed" navigation={navigation} showFooter={true} activeTab="feed">
@@ -175,7 +271,7 @@ export default function FeedScreen({ navigation }) {
     <ScreenLayout title="Feed" navigation={navigation} showFooter={true} activeTab="feed">
       {loading ? (
         <FeedSkeleton count={3} />
-      ) : posts.length === 0 ? (
+      ) : rawFeedPosts.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="newspaper-outline" size={80} color={themeColors.textSecondary} />
           <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
@@ -195,8 +291,8 @@ export default function FeedScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={posts}
-          renderItem={renderPost}
+          data={feedItems}
+          renderItem={renderFeedItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -212,11 +308,49 @@ export default function FeedScreen({ navigation }) {
   );
 }
 
+function injectMarketplaceItems(postItems, marketItems) {
+  if (!marketItems.length) return postItems;
+  const queue = [...marketItems];
+  const result = [];
+
+  postItems.forEach((item, index) => {
+    result.push(item);
+    if (!queue.length) {
+      return;
+    }
+    const shouldInsert = Math.random() < 0.25 && ((index + 1) % 3 === 0);
+    if (shouldInsert) {
+      result.push(queue.shift());
+    }
+  });
+
+  if (queue.length) {
+    const insertIndex = Math.min(2, result.length);
+    result.splice(insertIndex, 0, queue.shift());
+  }
+
+  if (queue.length) {
+    result.push(queue.shift());
+  }
+
+  return result;
+}
+
 function formatTimeAgo(timestamp) {
-  if (!timestamp?.toMillis) return 'Just now';
+  if (timestamp == null) return 'Just now';
+
+  let time;
+  if (typeof timestamp === 'number') {
+    time = timestamp;
+  } else if (timestamp.toMillis) {
+    time = timestamp.toMillis();
+  } else if (typeof timestamp === 'object' && typeof timestamp.seconds === 'number') {
+    time = timestamp.seconds * 1000;
+  } else {
+    return 'Just now';
+  }
 
   const now = Date.now();
-  const time = timestamp.toMillis();
   const diff = now - time;
 
   const minutes = Math.floor(diff / 60000);
@@ -355,5 +489,63 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
+  },
+  marketCard: {
+    borderRadius: 14,
+    padding: 16,
+    gap: 12,
+  },
+  marketHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  marketIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  marketTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  marketPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  marketLocation: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  marketFooter: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  marketBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  marketBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  marketMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  marketMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  marketMetaText: {
+    fontSize: 12,
   },
 });

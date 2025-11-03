@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePosts } from '../contexts/PostsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const listingCategories = [
   'Essentials',
@@ -26,6 +28,8 @@ const listingConditions = ['New', 'Like new', 'Good', 'Used', 'Needs TLC'];
 export default function CreateMarketListingScreen({ navigation, route }) {
   const intent = route?.params?.intent ?? 'offer';
   const { themeColors, isDarkMode, accentPreset, userProfile } = useSettings();
+  const { addPost } = usePosts();
+  const { user } = useAuth();
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode, accent: accentPreset }),
     [themeColors, isDarkMode, accentPreset]
@@ -48,6 +52,26 @@ export default function CreateMarketListingScreen({ navigation, route }) {
       return;
     }
 
+    if (!user?.uid) {
+      Alert.alert('Sign in required', 'Sign in to publish listings to your neighborhood.');
+      return;
+    }
+
+    if (!userProfile?.isPublicProfile || !userProfile?.username || !userProfile?.displayName) {
+      Alert.alert(
+        'Public profile required',
+        'LocalLoop Markets uses real neighbor identities. Set up your public profile with a display name and username before listing.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open settings',
+            onPress: () => navigation.navigate('Settings')
+          }
+        ]
+      );
+      return;
+    }
+
     const summaryLines = [
       `Listing type: ${intent === 'request' ? 'Neighbor request' : 'Offer / for sale'}`,
       `Category: ${category}`,
@@ -59,11 +83,67 @@ export default function CreateMarketListingScreen({ navigation, route }) {
       description || 'Describe what you are offering or looking for. Include timing, pick-up details, or how neighbors can help.'
     ];
 
-    navigation.navigate('PostComposer', {
-      mode: 'market',
-      presetTitle: trimmedTitle,
-      presetMessage: summaryLines.join('\n')
-    });
+    const [cityFromInput = ''] = (location || '').split(',').map((part) => part.trim());
+    const resolvedCity = cityFromInput || userProfile?.city;
+
+    if (!resolvedCity) {
+      Alert.alert(
+        'Add your city',
+        'Listings need a neighborhood. Update your location in settings first so neighbors see the right posts.'
+      );
+      return;
+    }
+
+    const listingMessage = summaryLines.join('\n');
+    const marketMeta = {
+      intent,
+      category,
+      condition: intent === 'request' ? 'n/a' : condition,
+      price: price || 'Negotiable',
+      location: location || userProfile?.city || '',
+      contact: contact || 'Reply in comments / DMs',
+      details: description.trim(),
+      createdAt: Date.now(),
+      boostedUntil: 0,
+      boostCount: 0,
+      boostWeight: 0
+    };
+
+    const created = addPost(
+      resolvedCity,
+      trimmedTitle,
+      listingMessage,
+      accentPreset?.key ?? 'sunset',
+      userProfile,
+      false,
+      null,
+      null,
+      'public',
+      userProfile,
+      marketMeta
+    );
+
+    if (!created) {
+      Alert.alert(
+        'Unable to list right now',
+        'We could not publish your listing. Check your connection and try again.'
+      );
+      return;
+    }
+
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setCategory(listingCategories[0]);
+    setCondition(listingConditions[0]);
+    setContact(userProfile?.contactMethod ?? '');
+
+    Alert.alert('Listing published', 'Your neighbors can now see this in LocalLoop Markets.', [
+      {
+        text: 'Great',
+        onPress: () => navigation.navigate('LocalLoopMarkets')
+      }
+    ]);
   };
 
   const renderPillRow = (items, value, onChange) => (

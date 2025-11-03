@@ -967,7 +967,8 @@ export function PostsProvider({ children }) {
       moderation = null,
       pollData = null, // Poll data if post has a poll
       postingMode = 'anonymous', // [PUBLIC-MODE] New parameter
-      publicProfile = null // [PUBLIC-MODE] User's public profile data
+      publicProfile = null, // [PUBLIC-MODE] User's public profile data
+      marketMeta = null // Marketplace listing metadata
     ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
@@ -989,6 +990,16 @@ export function PostsProvider({ children }) {
       const moderationStatus = deriveModerationStatus(moderation);
 
       // [PUBLIC-MODE] Build post object with mode-specific fields
+      const isMarketListing = Boolean(marketMeta);
+      const nextMarketMeta = marketMeta
+        ? {
+            boostedUntil: 0,
+            boostCount: 0,
+            boostWeight: 0,
+            ...marketMeta,
+          }
+        : null;
+
       const newPost = {
         id: newPostId,
         city,
@@ -1021,7 +1032,13 @@ export function PostsProvider({ children }) {
           authorUsername: publicProfile.username,
           authorDisplayName: publicProfile.displayName,
           authorAvatar: publicProfile.profilePhoto,
-        } : {})
+        } : {}),
+        ...(isMarketListing
+          ? {
+              isMarketListing: true,
+              marketListing: nextMarketMeta,
+            }
+          : { isMarketListing: false })
       };
 
       setPostsWithPersist((prev) => {
@@ -1847,6 +1864,42 @@ export function PostsProvider({ children }) {
     ]
   );
 
+  const boostMarketListing = useCallback(
+    (city, postId, durationHours = 12) => {
+      if (!city || !postId) {
+        return false;
+      }
+
+      const post = getPostById(city, postId);
+      if (!post || !post.isMarketListing) {
+        return false;
+      }
+
+      const now = Date.now();
+      const currentMeta = post.marketListing ?? {};
+      const currentUntil = Number(currentMeta.boostedUntil ?? 0);
+      const baseTime = currentUntil > now ? currentUntil : now;
+      const boostMillis = durationHours * 60 * 60 * 1000;
+      const boostedUntil = baseTime + boostMillis;
+      const boostCount = (currentMeta.boostCount ?? 0) + 1;
+      const boostWeight = boostedUntil + boostCount * 60000;
+
+      const nextMeta = {
+        ...currentMeta,
+        boostedUntil,
+        boostCount,
+        boostWeight,
+        boostedAt: now,
+      };
+
+      return updatePost(city, postId, {
+        marketListing: nextMeta,
+        marketBoostedAt: now,
+      });
+    },
+    [getPostById, updatePost]
+  );
+
   const value = useMemo(
     () => ({
       addComment,
@@ -1870,6 +1923,7 @@ export function PostsProvider({ children }) {
       toggleVote,
       toggleCommentReaction,
       updatePost,
+      boostMarketListing,
       refreshPosts: refreshFromRemote,
       watchThread,
       setTypingStatus,
@@ -1900,6 +1954,7 @@ export function PostsProvider({ children }) {
       toggleVote,
       toggleCommentReaction,
       updatePost,
+      boostMarketListing,
       refreshFromRemote,
       watchThread,
       setTypingStatus,

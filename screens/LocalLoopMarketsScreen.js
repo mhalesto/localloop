@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePosts } from '../contexts/PostsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const categories = [
   'All',
@@ -22,68 +24,14 @@ const categories = [
   'Neighbors'
 ];
 
-const listings = [
-  {
-    id: '1',
-    title: 'Community Garden Veg Boxes',
-    price: 'R120',
-    category: 'Essentials',
-    distance: '1.2 km • Woodstock',
-    badge: 'Fresh Today',
-    icon: 'leaf-outline',
-    color: '#3ab370'
-  },
-  {
-    id: '2',
-    title: 'Neighborhood Tool Library',
-    price: 'R40/day',
-    category: 'Home & DIY',
-    distance: '2.4 km • Observatory',
-    badge: 'Reserve',
-    icon: 'construct-outline',
-    color: '#7b46ff'
-  },
-  {
-    id: '3',
-    title: 'Weekend Babysitting Collective',
-    price: 'From R90',
-    category: 'Services',
-    distance: '0.9 km • Salt River',
-    badge: 'Trusted',
-    icon: 'people-outline',
-    color: '#ff8a5c'
-  },
-  {
-    id: '4',
-    title: 'Street Swap Pop-up',
-    price: 'Free entry',
-    category: 'Events',
-    distance: '3.1 km • Gardens',
-    badge: 'Saturday',
-    icon: 'swap-horizontal-outline',
-    color: '#2f80ed'
-  },
-  {
-    id: '5',
-    title: 'LocalLoop Micro Grants',
-    price: 'Apply now',
-    category: 'Neighbors',
-    distance: 'City-wide • Cape Town',
-    badge: 'New',
-    icon: 'sparkles-outline',
-    color: '#f2c94c'
-  },
-  {
-    id: '6',
-    title: 'Community Cleanup Gear',
-    price: 'Free borrow',
-    category: 'Free Finds',
-    distance: '1.5 km • Vredehoek',
-    badge: 'Pick up',
-    icon: 'trash-outline',
-    color: '#56ccf2'
-  }
-];
+const categoryVisuals = {
+  Essentials: { icon: 'leaf-outline', color: '#3ab370' },
+  'Home & DIY': { icon: 'construct-outline', color: '#7b46ff' },
+  Services: { icon: 'people-outline', color: '#ff8a5c' },
+  Events: { icon: 'sparkles-outline', color: '#2f80ed' },
+  'Free Finds': { icon: 'gift-outline', color: '#56ccf2' },
+  Neighbors: { icon: 'hand-left-outline', color: '#f59e0b' }
+};
 
 const servicePrompts = [
   {
@@ -109,13 +57,62 @@ const servicePrompts = [
 ];
 
 export default function LocalLoopMarketsScreen({ navigation }) {
-  const { themeColors, isDarkMode, accentPreset } = useSettings();
+  const { themeColors, isDarkMode, accentPreset, userProfile } = useSettings();
+  const { getPostsForCity, boostMarketListing } = usePosts();
+  const { user } = useAuth();
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
   );
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchValue, setSearchValue] = useState('');
+
+  const cityPosts = userProfile?.city ? getPostsForCity(userProfile.city) ?? [] : [];
+
+  const listings = useMemo(() => {
+    if (!cityPosts?.length) return [];
+    const now = Date.now();
+    return cityPosts
+      .filter((post) => post.isMarketListing)
+      .map((post) => {
+        const meta = post.marketListing || {};
+        const visuals = categoryVisuals[meta.category] || { icon: 'storefront-outline', color: '#6366f1' };
+        const boostedUntil = Number(meta.boostedUntil ?? 0);
+        const isBoosted = boostedUntil > now;
+        const badge = isBoosted
+          ? 'Boosted'
+          : meta.intent === 'request'
+          ? 'Request'
+          : 'Offer';
+
+        return {
+          id: post.id,
+          post,
+          title: post.title,
+          price: meta.price || 'Negotiable',
+          category: meta.category || 'Neighbors',
+          distance: meta.location || post.city,
+          badge,
+          icon: visuals.icon,
+          color: visuals.color,
+          isBoosted,
+          boostedUntil,
+          isOwner: post.author?.uid === user?.uid || post.authorId === user?.uid,
+          createdAt: post.createdAt ?? 0,
+          boostCount: meta.boostCount ?? 0,
+          city: post.city,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isBoosted !== b.isBoosted) {
+          return a.isBoosted ? -1 : 1;
+        }
+        if ((b.boostedUntil ?? 0) !== (a.boostedUntil ?? 0)) {
+          return (b.boostedUntil ?? 0) - (a.boostedUntil ?? 0);
+        }
+        return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+      });
+  }, [cityPosts, user?.uid]);
 
   const filteredListings = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -125,15 +122,46 @@ export default function LocalLoopMarketsScreen({ navigation }) {
       const matchesQuery =
         !query ||
         listing.title.toLowerCase().includes(query) ||
-        listing.distance.toLowerCase().includes(query);
+        (listing.distance || '').toLowerCase().includes(query);
       return matchesCategory && matchesQuery;
     });
-  }, [selectedCategory, searchValue]);
+  }, [listings, selectedCategory, searchValue]);
 
-  const handleListingPress = (item) => {
+  const handleListingPress = (listing) => {
     Alert.alert(
-      item.title,
-      'Marketplace chats and payments are coming soon. For now, DM this neighbor in the room to coordinate.'
+      listing.title,
+      listing.post?.message ||
+        'Marketplace chats and payments are coming soon. For now, DM this neighbor in the room to coordinate.'
+    );
+  };
+
+  const handleBoostPress = (listing) => {
+    if (!listing.isOwner) {
+      return;
+    }
+    if (listing.isBoosted) {
+      const expires = new Date(listing.boostedUntil).toLocaleString();
+      Alert.alert('Already boosted', `This listing is boosted until ${expires}.`);
+      return;
+    }
+    Alert.alert(
+      'Boost listing',
+      'Give this listing priority placement for the next 12 hours so more neighbors in your city see it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Boost now',
+          style: 'default',
+          onPress: () => {
+            const ok = boostMarketListing(listing.city, listing.id, 12);
+            if (!ok) {
+              Alert.alert('Unable to boost', 'We could not boost this listing right now. Try again soon.');
+            } else {
+              Alert.alert('Boost activated', 'Your listing will be highlighted to neighbors for the next 12 hours.');
+            }
+          }
+        }
+      ]
     );
   };
 
@@ -173,8 +201,8 @@ export default function LocalLoopMarketsScreen({ navigation }) {
       activeOpacity={0.9}
       onPress={() => handleListingPress(item)}
     >
-      <View style={[styles.listingIconWrapper, { backgroundColor: item.color }]}>
-        <Ionicons name={item.icon} size={28} color="#0f172a" />
+      <View style={[styles.listingIconWrapper, { backgroundColor: `${item.color}33` }]}>
+        <Ionicons name={item.icon} size={28} color={item.color} />
       </View>
       <View style={styles.listingMeta}>
         <Text style={styles.listingTitle} numberOfLines={2}>
@@ -186,6 +214,23 @@ export default function LocalLoopMarketsScreen({ navigation }) {
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{item.badge}</Text>
       </View>
+      {item.isOwner ? (
+        <TouchableOpacity style={styles.boostButton} onPress={() => handleBoostPress(item)}>
+          <Ionicons
+            name={item.isBoosted ? 'rocket-outline' : 'flash-outline'}
+            size={18}
+            color={item.isBoosted ? '#facc15' : themeColors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.boostButtonText,
+              { color: item.isBoosted ? '#facc15' : themeColors.textSecondary }
+            ]}
+          >
+            {item.isBoosted ? 'Boosted' : 'Boost listing'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -230,53 +275,71 @@ export default function LocalLoopMarketsScreen({ navigation }) {
       activeTab="markets"
       showFooter={false}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Browse by vibe</Text>
-        </View>
-        <FlatList
-          data={categories}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesList}
-          contentContainerStyle={styles.categoriesContent}
-        />
-
-        <View style={styles.promptsSection}>
-          {servicePrompts.map(renderPromptCard)}
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Neighbor highlights</Text>
-          <Text style={styles.sectionSubtitle}>
-            {selectedCategory === 'All' ? 'Curated for your Loop' : selectedCategory}
+      {!userProfile?.city ? (
+        <View style={[styles.emptyState, { paddingHorizontal: 24 }] }>
+          <Ionicons name="navigate-outline" size={64} color={themeColors.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>Add your neighborhood</Text>
+          <Text style={[styles.emptyDescription, { color: themeColors.textSecondary }]}>
+            Set your city in Settings so we can surface listings from neighbors nearby.
           </Text>
+          <TouchableOpacity
+            style={[styles.discoverButton, { backgroundColor: accentPreset?.iconTint || themeColors.primary }]}
+            onPress={() => navigation.navigate('Settings')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="settings-outline" size={18} color="#fff" />
+            <Text style={styles.discoverButtonText}>Open Settings</Text>
+          </TouchableOpacity>
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Browse by vibe</Text>
+          </View>
+          <FlatList
+            data={categories}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesList}
+            contentContainerStyle={styles.categoriesContent}
+          />
 
-        <FlatList
-          data={filteredListings}
-          renderItem={renderListing}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 16 }}
-          contentContainerStyle={styles.listingsContent}
-          scrollEnabled={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="planet-outline" size={44} color={themeColors.textSecondary} />
-              <Text style={styles.emptyTitle}>Nothing here yet</Text>
-              <Text style={styles.emptyDescription}>
-                Be the first to create a listing or ask for what you need in your neighborhood.
-              </Text>
-            </View>
-          }
-        />
-      </ScrollView>
+          <View style={styles.promptsSection}>
+            {servicePrompts.map(renderPromptCard)}
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Neighbor highlights</Text>
+            <Text style={styles.sectionSubtitle}>
+              {selectedCategory === 'All' ? 'Curated for your Loop' : selectedCategory}
+            </Text>
+          </View>
+
+          <FlatList
+            data={filteredListings}
+            renderItem={renderListing}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={{ gap: 16 }}
+            contentContainerStyle={styles.listingsContent}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="planet-outline" size={44} color={themeColors.textSecondary} />
+                <Text style={styles.emptyTitle}>Nothing here yet</Text>
+                <Text style={styles.emptyDescription}>
+                  Be the first to create a listing or ask for what you need in your neighborhood.
+                </Text>
+              </View>
+            }
+          />
+        </ScrollView>
+      )}
     </ScreenLayout>
   );
 }
@@ -380,7 +443,8 @@ const createStyles = (palette, { isDarkMode }) =>
       shadowOpacity: isDarkMode ? 0.35 : 0.08,
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 12 },
-      elevation: 5
+      elevation: 5,
+      paddingBottom: 62
     },
     listingIconWrapper: {
       width: 52,
@@ -422,6 +486,22 @@ const createStyles = (palette, { isDarkMode }) =>
       fontWeight: '600',
       color: isDarkMode ? '#fff' : palette.primary
     },
+    boostButton: {
+      position: 'absolute',
+      bottom: 16,
+      right: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 18,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)'
+    },
+    boostButtonText: {
+      fontSize: 12,
+      fontWeight: '600'
+    },
     emptyState: {
       alignItems: 'center',
       paddingVertical: 36,
@@ -437,5 +517,19 @@ const createStyles = (palette, { isDarkMode }) =>
       fontSize: 14,
       color: palette.textSecondary,
       paddingHorizontal: 24
+    },
+    discoverButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 999,
+      marginTop: 12
+    },
+    discoverButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600'
     }
   });
