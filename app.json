@@ -21,7 +21,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.hlalisani.localloop",
+      "bundleIdentifier": "com.halalisani.localloop",
       "buildNumber": "2"
     },
     "android": {
@@ -30,7 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.hlalisani.localloop",
+      "package": "com.halalisani.localloop",
       "versionCode": 2
     },
     "web": {
