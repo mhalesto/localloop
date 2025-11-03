@@ -349,6 +349,7 @@ export default function ScreenLayout({
     else if (key === 'myComments') navigation.navigate('MyComments');
     else if (key === 'myPosts') navigation.navigate('MyPosts');
     else if (key === 'topStatuses') navigation.navigate('TopStatuses');
+    else if (key === 'markets') navigation.navigate('LocalLoopMarkets');
     else if (key === 'settings') navigation.navigate('Settings');
   };
 

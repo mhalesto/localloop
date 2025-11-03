@@ -40,6 +40,19 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       }
     },
     {
+      label: 'LocalLoop Markets',
+      icon: 'storefront-outline',
+      key: 'markets',
+      onPress: () => {
+        if (onSelectShortcut) {
+          onSelectShortcut('markets');
+        } else if (navigation) {
+          navigation.closeDrawer?.();
+          navigation.navigate('LocalLoopMarkets');
+        }
+      }
+    },
+    {
       label: 'Top Statuses',
       icon: 'megaphone-outline',
       key: 'topStatuses',

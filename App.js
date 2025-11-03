@@ -36,6 +36,7 @@ import FeedScreen from './screens/FeedScreen';
 import DiscoverScreen from './screens/DiscoverScreen';
 import NeighborhoodExplorerScreen from './screens/NeighborhoodExplorerScreen';
 import PostComposerScreen from './screens/PostComposerScreen';
+import LocalLoopMarketsScreen from './screens/LocalLoopMarketsScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -78,6 +79,7 @@ function RootNavigator() {
       <Stack.Screen name="Discover" component={DiscoverScreen} />
       <Stack.Screen name="NeighborhoodExplorer" component={NeighborhoodExplorerScreen} />
       <Stack.Screen name="PostComposer" component={PostComposerScreen} />
+      <Stack.Screen name="LocalLoopMarkets" component={LocalLoopMarketsScreen} />
     </Stack.Navigator>
   );
 }
