@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 5.2.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -35,7 +35,7 @@
         "track": "internal"
       },
       "ios": {
-        "appleId": "halalisani.mbanjwa@example.com",
+        "appleId": "currenttech.co.za@gmail.com",
         "ascAppId": "6754855740",
         "appleTeamId": "B98QD8MH9U"
       }
