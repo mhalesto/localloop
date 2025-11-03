@@ -89,16 +89,22 @@ const servicePrompts = [
   {
     id: 'offer',
     title: 'List something to share or sell',
-    icon: 'add-circle-outline',
+    icon: 'cart-outline',
+    iconColor: '#f59e0b',
+    iconBackground: 'rgba(245, 158, 11, 0.22)',
     description: 'Got a side hustle, spare veggies, or skills to share? Publish a post in seconds.',
-    cta: 'Create listing'
+    cta: 'Create listing',
+    intent: 'offer'
   },
   {
     id: 'request',
     title: 'Ask the Loop for what you need',
-    icon: 'chatbubbles-outline',
+    icon: 'people-circle-outline',
+    iconColor: '#38bdf8',
+    iconBackground: 'rgba(56, 189, 248, 0.2)',
     description: 'Need help moving, lending a ladder, or planning an event? Let neighbors jump in.',
-    cta: 'Post a request'
+    cta: 'Post a request',
+    intent: 'request'
   }
 ];
 
@@ -131,13 +137,8 @@ export default function LocalLoopMarketsScreen({ navigation }) {
     );
   };
 
-  const handleCreateListing = () => {
-    navigation.navigate('PostComposer', {
-      mode: 'market',
-      presetTitle: '',
-      presetMessage:
-        'Listing name:\nWhat you are offering or looking for:\nPick-up / delivery:\nPrice or barter details:\nBest way to reach you:'
-    });
+  const handleCreateListing = (intent = 'offer') => {
+    navigation.navigate('CreateMarketListing', { intent });
   };
 
   const renderCategory = ({ item }) => {
@@ -192,11 +193,20 @@ export default function LocalLoopMarketsScreen({ navigation }) {
     <TouchableOpacity
       key={prompt.id}
       style={styles.promptCard}
-      onPress={prompt.id === 'offer' ? handleCreateListing : () => navigation.navigate('PostComposer')}
+      onPress={() => handleCreateListing(prompt.intent)}
       activeOpacity={0.85}
     >
-      <View style={[styles.promptIcon, { backgroundColor: accentPreset?.iconTint ?? themeColors.primary }]}>
-        <Ionicons name={prompt.icon} size={22} color="#fff" />
+      <View
+        style={[
+          styles.promptIcon,
+          { backgroundColor: prompt.iconBackground || accentPreset?.iconTint || themeColors.primary }
+        ]}
+      >
+        <Ionicons
+          name={prompt.icon}
+          size={22}
+          color={prompt.iconColor || '#0f172a'}
+        />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.promptTitle}>{prompt.title}</Text>

@@ -15,8 +15,10 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
   const shortcuts = [
     {
       label: 'Explore',
-      icon: 'compass-outline',
+      icon: 'earth-outline',
       key: 'home',
+      iconBackground: 'rgba(56, 189, 248, 0.25)',
+      iconColor: '#38bdf8',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('home');
@@ -30,6 +32,8 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'Neighborhood Explorer',
       icon: 'location-outline',
       key: 'neighborhoodExplorer',
+      iconBackground: 'rgba(99, 102, 241, 0.25)',
+      iconColor: '#6366f1',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('neighborhoodExplorer');
@@ -41,8 +45,10 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
     },
     {
       label: 'LocalLoop Markets',
-      icon: 'storefront-outline',
+      icon: 'bag-handle-outline',
       key: 'markets',
+      iconBackground: 'rgba(245, 158, 11, 0.25)',
+      iconColor: '#f59e0b',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('markets');
@@ -56,6 +62,8 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'Top Statuses',
       icon: 'megaphone-outline',
       key: 'topStatuses',
+      iconBackground: 'rgba(244, 114, 182, 0.25)',
+      iconColor: '#f472b6',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('topStatuses');
@@ -69,6 +77,8 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'My Replies',
       icon: 'chatbubble-ellipses-outline',
       key: 'myComments',
+      iconBackground: 'rgba(45, 212, 191, 0.25)',
+      iconColor: '#2dd4bf',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('myComments');
@@ -82,6 +92,8 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'My Posts',
       icon: 'document-text-outline',
       key: 'myPosts',
+      iconBackground: 'rgba(251, 191, 36, 0.25)',
+      iconColor: '#fbbf24',
       onPress: () => {
         if (onSelectShortcut) {
           onSelectShortcut('myPosts');
@@ -148,8 +160,10 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
               activeOpacity={0.7}
               onPress={item.onPress}
             >
-              <View style={[styles.iconCircle, { backgroundColor: preset.iconTint || themeColors.primary }]}>
-                <Ionicons name={item.icon} size={22} color="#ffffff" />
+              <View
+                style={[styles.iconCircle, { backgroundColor: item.iconBackground || preset.iconTint || themeColors.primary }]}
+              >
+                <Ionicons name={item.icon} size={22} color={item.iconColor || '#0f172a'} />
               </View>
               <Text style={[styles.shortcutLabel, { color: themeColors.textPrimary }]}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
