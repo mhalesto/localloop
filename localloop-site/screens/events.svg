@@ -1,0 +1,29 @@
+<svg width="360" height="320" viewBox="0 0 360 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="frame" x1="10%" y1="92%" x2="90%" y2="8%">
+      <stop offset="0%" stop-color="#101424" />
+      <stop offset="100%" stop-color="#192449" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#7C46FF" />
+      <stop offset="100%" stop-color="#3A7BFF" />
+    </linearGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <rect x="70" y="20" width="220" height="280" rx="32" fill="url(#frame)" />
+    <rect x="90" y="44" width="180" height="16" rx="8" fill="#212B4B" />
+    <rect x="90" y="70" width="180" height="210" rx="22" fill="#0D1428" />
+    <rect x="106" y="94" width="148" height="16" rx="8" fill="#1F2947" />
+    <rect x="106" y="120" width="148" height="40" rx="14" fill="#111932" />
+    <rect x="118" y="132" width="48" height="12" rx="6" fill="#27335C" />
+    <rect x="176" y="132" width="64" height="12" rx="6" fill="#27335C" opacity="0.75" />
+    <rect x="106" y="172" width="148" height="66" rx="18" fill="#111932" />
+    <rect x="122" y="188" width="84" height="12" rx="6" fill="#28345E" />
+    <rect x="122" y="208" width="92" height="10" rx="5" fill="#2F3D6E" />
+    <rect x="218" y="188" width="24" height="32" rx="10" fill="url(#accent)" />
+    <rect x="106" y="244" width="148" height="26" rx="12" fill="#1C2544" />
+    <rect x="122" y="252" width="84" height="10" rx="5" fill="#2E3B69" />
+    <rect x="210" y="252" width="24" height="10" rx="5" fill="#2E3B69" opacity="0.7" />
+    <circle cx="180" cy="36" r="6" fill="#7C46FF" />
+  </g>
+</svg>
