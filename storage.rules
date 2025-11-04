@@ -16,6 +16,12 @@ service firebase.storage {
       allow write: if isSignedIn();
     }
 
+    // Status images
+    match /statuses/{userId}/{filename} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
     match /{allPaths=**} {
       allow read: if false;
       allow write: if false;

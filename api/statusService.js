@@ -200,6 +200,7 @@ export async function createStatus({
   const now = Date.now();
   const payload = {
     id: statusId,
+    authorId: author.uid,
     message: trimmed,
     ...imagePayload,
     createdAt: now,
