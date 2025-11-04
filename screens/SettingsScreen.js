@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenLayout from '../components/ScreenLayout';
 import Slider from '@react-native-community/slider';
 import {
@@ -425,6 +426,20 @@ export default function SettingsScreen({ navigation }) {
       setSigningOut(false);
     }
   }, [signOutAccount]);
+
+  const handleViewOnboarding = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('@onboarding_completed');
+      Alert.alert(
+        'Restart Required',
+        'Please restart the app to view the onboarding experience again.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error resetting onboarding:', error);
+      Alert.alert('Error', 'Unable to reset onboarding. Please try again.');
+    }
+  }, []);
 
   const handleRedeemPremium = useCallback(async () => {
     const result = await redeemPremiumDay();
@@ -1004,7 +1019,7 @@ export default function SettingsScreen({ navigation }) {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick actions</Text>
-          <View style={styles.itemLast}>
+          <View style={styles.item}>
             <View>
               <Text style={styles.itemTitle}>Show add post shortcut</Text>
               <Text style={styles.itemSubtitle}>
@@ -1019,6 +1034,22 @@ export default function SettingsScreen({ navigation }) {
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>
+          <TouchableOpacity
+            style={styles.onboardingButton}
+            onPress={handleViewOnboarding}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.onboardingIcon, { backgroundColor: `${themeColors.primary}20` }]}>
+              <Ionicons name="book-outline" size={20} color={themeColors.primary} />
+            </View>
+            <View style={styles.onboardingTextBlock}>
+              <Text style={styles.itemTitle}>View onboarding</Text>
+              <Text style={styles.itemSubtitle}>
+                Revisit the app tour and learn how to use LocalLoop.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -2445,5 +2476,31 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 12,
       fontWeight: '700',
       color: '#ffffff'
+    },
+    onboardingButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 16,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      shadowColor: '#000',
+      shadowOpacity: isDarkMode ? 0.15 : 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2
+    },
+    onboardingIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14
+    },
+    onboardingTextBlock: {
+      flex: 1
     }
   });

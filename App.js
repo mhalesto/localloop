@@ -7,6 +7,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoadingOverlay from './components/LoadingOverlay';
 import CustomSplashScreen from './components/SplashScreen';
 
@@ -38,6 +39,7 @@ import NeighborhoodExplorerScreen from './screens/NeighborhoodExplorerScreen';
 import PostComposerScreen from './screens/PostComposerScreen';
 import LocalLoopMarketsScreen from './screens/LocalLoopMarketsScreen';
 import CreateMarketListingScreen from './screens/CreateMarketListingScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -93,16 +95,40 @@ function RootNavigator() {
 function AuthGate() {
   const { isInitializing } = useAuth();
   const [showLoader, setShowLoader] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   useEffect(() => {
     if (!isInitializing) {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => setShowLoader(false), 100);
-      return () => clearTimeout(timer);
+      // Check if onboarding has been completed
+      checkOnboardingStatus();
     }
   }, [isInitializing]);
 
-  if (isInitializing || showLoader) {
+  const checkOnboardingStatus = async () => {
+    try {
+      const completed = await AsyncStorage.getItem('@onboarding_completed');
+      setShowOnboarding(completed !== 'true');
+
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setShowLoader(false);
+        setCheckingOnboarding(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      setShowOnboarding(false);
+      setShowLoader(false);
+      setCheckingOnboarding(false);
+    }
+  };
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
+
+  if (isInitializing || showLoader || checkingOnboarding) {
     return (
       <View style={{ flex: 1 }}>
         <LoadingOverlay
@@ -112,6 +138,10 @@ function AuthGate() {
         />
       </View>
     );
+  }
+
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
   return <RootNavigator />;
