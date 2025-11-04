@@ -1,5 +1,22 @@
 # toilet
 
+## Brand assets
+
+The LocalLoop icon set lives in `assets/`:
+
+- `icon.png`: iOS / general app icon (1024×1024)
+- `adaptive-icon.png`: Android adaptive icon foreground (1024×1024)
+- `favicon.png`: marketing/landing page usage (96×96)
+- `logo.svg`: master vector mark
+
+Regenerate them with:
+
+```bash
+npm run generate:icons
+```
+
+---
+
 ## Premium summarization backend
 
 The premium composer now supports AI-assisted summaries backed by a lightweight Express service that wraps the `facebook/bart-large-cnn` model.
