@@ -18,7 +18,7 @@ import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { useAuth } from '../contexts/AuthContext';
 import AccentBackground from '../components/AccentBackground';
-import { analyzePostContent } from '../services/moderationService';
+import { analyzePostContent } from '../services/openai/moderationService';
 import PollComposer from '../components/PollComposer';
 import PollDisplay from '../components/PollDisplay';
 

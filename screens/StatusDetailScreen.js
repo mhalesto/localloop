@@ -18,6 +18,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { analyzePostContent } from '../services/openai/moderationService';
 
 const MAX_CONTENT_WIDTH = 680;
 // This should match the horizontal padding that ScreenLayout gives its content.
@@ -77,6 +78,17 @@ export default function StatusDetailScreen({ route, navigation }) {
     }
     setSubmittingReply(true);
     try {
+      // Moderation check
+      console.log('[StatusDetail] Running moderation on reply...');
+      const moderation = await analyzePostContent({ message: trimmed });
+      console.log('[StatusDetail] Moderation result:', moderation.action);
+
+      if (moderation.action === 'block') {
+        setError('Your reply contains inappropriate content. Please revise and try again.');
+        setSubmittingReply(false);
+        return;
+      }
+
       await addReply(statusId, trimmed);
       setReply('');
       setError('');

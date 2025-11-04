@@ -19,6 +19,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import CameraCapture from '../components/CameraCapture';
 import { useSettings } from '../contexts/SettingsContext';
 import { useStatuses } from '../contexts/StatusesContext';
+import { analyzePostContent } from '../services/openai/moderationService';
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -108,12 +109,25 @@ export default function StatusComposerScreen({ navigation }) {
     setSubmitting(true);
     setUploadPct(0);
     try {
+      // Moderation check
+      console.log('[StatusComposer] Running moderation...');
+      const moderation = await analyzePostContent({ message: trimmed });
+      console.log('[StatusComposer] Moderation result:', moderation.action);
+
+      if (moderation.action === 'block') {
+        setError('Your status contains inappropriate content and cannot be posted. Please revise and try again.');
+        setSubmitting(false);
+        setUploadPct(0);
+        return;
+      }
+
       const image = imageUri ? { uri: imageUri, mimeType: imageMimeType } : null;
       console.log('[composer] submit with image?', Boolean(image));
       await createStatus({
         message: trimmed,
         image,
         onUploadProgress: (pct) => setUploadPct(pct),
+        moderation,
       });
       setMessage('');
       setImageUri(null);

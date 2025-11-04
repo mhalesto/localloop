@@ -46,6 +46,7 @@ import { ContentWarningList, SentimentBadge } from '../components/ContentWarning
 import { summarizeThread } from '../services/openai/threadSummarizationService';
 import { suggestComment, SUGGESTION_TYPES } from '../services/openai/commentSuggestionService';
 import { translatePost, LANGUAGES, COMMON_LANGUAGES } from '../services/openai/translationService';
+import { analyzePostContent } from '../services/openai/moderationService';
 import { isFeatureEnabled } from '../config/aiFeatures';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
@@ -1663,14 +1664,38 @@ export default function PostThreadScreen({ route, navigation }) {
   }, [insets.bottom]);
 
   // Add comment
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     const t = reply.trim();
     if (!t) return;
-    addComment(city, postId, t, userProfile, replyingToComment?.id ?? null);
-    setReply('');
-    setReplyingToComment(null);
-    closeReactionPicker();
-    sendTypingUpdate(false);
+
+    try {
+      // Moderation check
+      console.log('[PostThread] Running moderation on comment...');
+      const moderation = await analyzePostContent({ message: t });
+      console.log('[PostThread] Moderation result:', moderation.action);
+
+      if (moderation.action === 'block') {
+        Alert.alert(
+          'Content Blocked',
+          'Your comment contains inappropriate content and cannot be posted. Please revise and try again.'
+        );
+        return;
+      }
+
+      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null);
+      setReply('');
+      setReplyingToComment(null);
+      closeReactionPicker();
+      sendTypingUpdate(false);
+    } catch (error) {
+      console.warn('[PostThread] Moderation failed:', error);
+      // On moderation error, allow the comment (don't block legitimate content)
+      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null);
+      setReply('');
+      setReplyingToComment(null);
+      closeReactionPicker();
+      sendTypingUpdate(false);
+    }
   };
 
   // [AI-FEATURES] Thread Summarization
