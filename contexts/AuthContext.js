@@ -95,6 +95,22 @@ const normalizeProfile = (raw = {}) => ({
 export function AuthProvider({ children }) {
   const auth = useMemo(() => sharedAuth ?? null, []);
   const googleConfigured = useMemo(() => isGoogleAuthConfigured(), []);
+  const requiresIosClientId = Platform.OS === 'ios';
+  const iosClientIdForRequest = useMemo(() => {
+    if (requiresIosClientId) {
+      return (
+        googleAuthConfig.iosClientId ||
+        googleAuthConfig.expoClientId ||
+        googleAuthConfig.webClientId ||
+        'disabled-ios-client-id'
+      );
+    }
+    return googleAuthConfig.iosClientId || undefined;
+  }, [requiresIosClientId]);
+  const googleReadyOnThisPlatform = useMemo(
+    () => googleConfigured && (!requiresIosClientId || Boolean(googleAuthConfig.iosClientId)),
+    [googleConfigured, requiresIosClientId]
+  );
 
   // We **force** the Expo proxy redirect for Expo Go
   // const redirectUri = useMemo(() => {
@@ -123,7 +139,7 @@ export function AuthProvider({ children }) {
     expoClientId:
       googleAuthConfig.expoClientId || googleAuthConfig.webClientId || undefined,
     webClientId: googleAuthConfig.webClientId || undefined,
-    iosClientId: googleAuthConfig.iosClientId || undefined,
+    iosClientId: iosClientIdForRequest,
     androidClientId: googleAuthConfig.androidClientId || undefined,
     scopes: ['openid', 'profile', 'email'],
     redirectUri, // force proxy URL
@@ -299,6 +315,12 @@ export function AuthProvider({ children }) {
       setAuthError('Google Sign-In is not configured yet. Check .env values.');
       return;
     }
+    if (!googleReadyOnThisPlatform) {
+      setAuthError(
+        'Google Sign-In is temporarily disabled on this platform until EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is defined.'
+      );
+      return;
+    }
     if (!request) {
       setAuthError('Google Sign-In is still initializing. Please try again.');
       return;
@@ -350,7 +372,7 @@ export function AuthProvider({ children }) {
         } catch { }
       }
     }
-  }, [googleConfigured, request, promptAsync, redirectUri]);
+  }, [googleConfigured, googleReadyOnThisPlatform, request, promptAsync, redirectUri]);
 
   const signInWithEmail = useCallback(
     async ({ email, password }) => {
@@ -574,7 +596,7 @@ export function AuthProvider({ children }) {
       pointsToNextPremium,
       premiumDayCost: PREMIUM_DAY_COST,
       premiumAccessDurationMs: PREMIUM_ACCESS_DURATION_MS,
-      canUseGoogleSignIn: googleConfigured && Boolean(request),
+      canUseGoogleSignIn: googleReadyOnThisPlatform && Boolean(request),
       startGoogleSignIn,
       signInWithEmail,
       signUpWithEmail,
@@ -585,6 +607,7 @@ export function AuthProvider({ children }) {
       signOut,
       redeemPremiumDay,
       clearAuthError,
+      googleReadyOnThisPlatform,
     }),
     [
       firebaseUser,
@@ -597,6 +620,7 @@ export function AuthProvider({ children }) {
       hasActivePremium,
       pointsToNextPremium,
       googleConfigured,
+      googleReadyOnThisPlatform,
       request,
       startGoogleSignIn,
       signInWithEmail,

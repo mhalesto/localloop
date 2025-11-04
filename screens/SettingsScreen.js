@@ -58,7 +58,8 @@ export default function SettingsScreen({ navigation }) {
     sendPasswordReset,
     redeemPremiumDay,
     clearAuthError,
-    isAdmin
+    isAdmin,
+    googleReadyOnThisPlatform
   } = useAuth();
   const {
     showAddShortcut,
@@ -228,6 +229,12 @@ export default function SettingsScreen({ navigation }) {
   }, [authProfile?.premiumExpiresAt]);
   const redeemDisabled = !user || pointsBalance < premiumDayCost || isRedeeming;
   const googleButtonDisabled = isSigningIn; // let startGoogleSignIn() surface config/init errors
+  const googleDisabledMessage = useMemo(() => {
+    if (Platform.OS === 'ios' && !googleReadyOnThisPlatform) {
+      return 'Google Sign-In is temporarily disabled on iOS until EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is set.';
+    }
+    return 'Add your Google OAuth client IDs in constants/authConfig.js.';
+  }, [googleReadyOnThisPlatform]);
   const hoursOfPremium = useMemo(
     () => Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1),
     [premiumAccessDurationMs]
@@ -914,9 +921,7 @@ export default function SettingsScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
               {!canUseGoogleSignIn ? (
-                <Text style={styles.configNotice}>
-                  Add your Google OAuth client IDs in constants/authConfig.js.
-                </Text>
+                <Text style={styles.configNotice}>{googleDisabledMessage}</Text>
               ) : null}
             </>
           )}
