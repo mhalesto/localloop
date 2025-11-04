@@ -946,37 +946,23 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.sectionHint}>
                 Sign in to stash your nickname and start with {SIGNUP_BONUS_POINTS} reward points.
               </Text>
-              <TouchableOpacity
-                style={[
-                  styles.googleButton,
-                  googleButtonDisabled && styles.googleButtonDisabled
-                ]}
-                onPress={handleGoogleSignInPress}
-                activeOpacity={0.85}
-                disabled={googleButtonDisabled}
-              >
-                <Ionicons name="logo-google" size={20} style={styles.googleIcon} />
-                <Text style={styles.googleButtonLabel}>
-                  {isSigningIn ? 'Connecting...' : 'Continue with Google'}
-                </Text>
-              </TouchableOpacity>
               <View style={styles.emailCtaRow}>
                 <TouchableOpacity
+                  style={styles.emailPrimaryButton}
                   onPress={() => openEmailAuth('signIn')}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.emailCtaLink}>Use email instead</Text>
+                  <Ionicons name="mail-outline" size={20} color="#fff" style={styles.emailButtonIcon} />
+                  <Text style={styles.emailPrimaryButtonText}>Sign in with Email</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={styles.emailSecondaryButton}
                   onPress={() => openEmailAuth('signUp')}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.emailCtaLink}>Create an account</Text>
+                  <Text style={styles.emailSecondaryButtonText}>Create an account</Text>
                 </TouchableOpacity>
               </View>
-              {!canUseGoogleSignIn ? (
-                <Text style={styles.configNotice}>{googleDisabledMessage}</Text>
-              ) : null}
             </>
           )}
           {authError ? <Text style={styles.authErrorText}>{authError}</Text> : null}
@@ -1877,18 +1863,51 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600'
     },
     emailCtaRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: 'column',
       marginTop: 16,
-      flexWrap: 'wrap',
-      rowGap: 12,
-      columnGap: 12
+      gap: 12
     },
     emailCtaLink: {
       fontSize: 13,
       fontWeight: '600',
       color: palette.primary
+    },
+    emailPrimaryButton: {
+      borderRadius: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.primary,
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3
+    },
+    emailButtonIcon: {
+      marginRight: 10
+    },
+    emailPrimaryButtonText: {
+      color: '#ffffff',
+      fontSize: 15,
+      fontWeight: '600'
+    },
+    emailSecondaryButton: {
+      borderRadius: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: palette.primary
+    },
+    emailSecondaryButtonText: {
+      color: palette.primary,
+      fontSize: 15,
+      fontWeight: '600'
     },
     configNotice: {
       marginTop: 12,
