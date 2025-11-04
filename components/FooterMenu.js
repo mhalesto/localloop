@@ -1,5 +1,5 @@
 // FooterMenu.js
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,12 +14,14 @@ import { useSettings } from '../contexts/SettingsContext';
  *  themeColors.textSecondary -> inactive tab color
  */
 
-const tabs = [
+const getTabsConfig = (isLoggedIn) => [
   { key: 'home', label: 'Explore', icon: 'home-outline' },
   { key: 'feed', label: 'Feed', icon: 'people-outline' },
   { key: 'discover', label: 'Discover', icon: 'compass-outline' },
   { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' },
-  { key: 'profile', label: 'Profile', icon: 'person-outline' },
+  isLoggedIn
+    ? { key: 'profile', label: 'Profile', icon: 'person-outline' }
+    : { key: 'settings', label: 'Settings', icon: 'settings-outline' },
 ];
 
 // ===== TUNABLES =====
@@ -42,7 +44,8 @@ export default function FooterMenu({
   onAddPostShortcut,
   showShortcut = true,
   accent,
-  myRepliesBadge = 0
+  myRepliesBadge = 0,
+  isLoggedIn = false
 }) {
   const { themeColors, isDarkMode } = useSettings();
   const insets = useSafeAreaInsets();
@@ -51,6 +54,8 @@ export default function FooterMenu({
   const [barW, setBarW] = useState(0);
   const [anchorX, setAnchorX] = useState(null); // center of gap (between Explore & My Replies)
   const maskId = useRef(`mask_${Math.random().toString(36).slice(2)}`).current;
+
+  const tabs = useMemo(() => getTabsConfig(isLoggedIn), [isLoggedIn]);
 
   // Notch / FAB x-position
   const notchCx = anchorX != null ? anchorX + FAB_NUDGE_X : null;

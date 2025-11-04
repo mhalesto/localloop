@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, Modal, Pressable, Animated, Alert } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Animated, Alert, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -336,6 +336,11 @@ export default function ScreenLayout({
           username: userProfile.username
         });
       }
+    } else if (tab === 'settings') {
+      // Navigate to Settings when not logged in
+      if (navigation.getCurrentRoute?.()?.name !== 'Settings') {
+        navigation.navigate('Settings');
+      }
     }
   };
 
@@ -430,6 +435,7 @@ export default function ScreenLayout({
             showShortcut={showAddShortcut}
             accent={accentPreset}
             myRepliesBadge={myRepliesBadge}
+            isLoggedIn={!!firebaseUser}
           />
         ) : null}
 
@@ -455,15 +461,21 @@ export default function ScreenLayout({
           {/* Keep the status bar translucent in the drawer as well */}
           <StatusBar translucent backgroundColor="transparent" style={statusStyle} />
           <View style={styles.drawerContainer}>
-            <BlurView
-              intensity={isDarkMode ? 30 : 20}
-              tint={isDarkMode ? 'dark' : 'light'}
-              style={styles.drawerSheet}
-            >
-              <View style={{ paddingTop: insets.top + 12, flex: 1 }}>
+{Platform.OS === 'android' ? (
+              <View style={[styles.drawerSheet, { backgroundColor: isDarkMode ? '#000000' : '#f5f5f5', paddingTop: 0 }]}>
                 <MainDrawerContent accent={accentPreset} onSelectShortcut={handleShortcutSelect} />
               </View>
-            </BlurView>
+            ) : (
+              <BlurView
+                intensity={isDarkMode ? 30 : 20}
+                tint={isDarkMode ? 'dark' : 'light'}
+                style={styles.drawerSheet}
+              >
+                <View style={{ paddingTop: insets.top + 12, flex: 1 }}>
+                  <MainDrawerContent accent={accentPreset} onSelectShortcut={handleShortcutSelect} />
+                </View>
+              </BlurView>
+            )}
             <Pressable style={styles.drawerOverlay} onPress={() => setDrawerVisible(false)}>
               <BlurView
                 intensity={50}

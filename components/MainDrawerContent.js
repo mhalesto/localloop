@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSettings } from '../contexts/SettingsContext';
@@ -17,7 +17,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'Explore',
       icon: 'earth-outline',
       key: 'home',
-      iconBackground: 'rgba(56, 189, 248, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(56, 189, 248, 0.25)',
       iconColor: '#38bdf8',
       onPress: () => {
         if (onSelectShortcut) {
@@ -32,7 +32,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'Neighborhood Explorer',
       icon: 'location-outline',
       key: 'neighborhoodExplorer',
-      iconBackground: 'rgba(99, 102, 241, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(99, 102, 241, 0.35)' : 'rgba(99, 102, 241, 0.25)',
       iconColor: '#6366f1',
       onPress: () => {
         if (onSelectShortcut) {
@@ -47,7 +47,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'LocalLoop Markets',
       icon: 'bag-handle-outline',
       key: 'markets',
-      iconBackground: 'rgba(245, 158, 11, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(245, 158, 11, 0.25)',
       iconColor: '#f59e0b',
       onPress: () => {
         if (onSelectShortcut) {
@@ -62,7 +62,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'Top Statuses',
       icon: 'megaphone-outline',
       key: 'topStatuses',
-      iconBackground: 'rgba(244, 114, 182, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(244, 114, 182, 0.35)' : 'rgba(244, 114, 182, 0.25)',
       iconColor: '#f472b6',
       onPress: () => {
         if (onSelectShortcut) {
@@ -77,7 +77,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'My Replies',
       icon: 'chatbubble-ellipses-outline',
       key: 'myComments',
-      iconBackground: 'rgba(45, 212, 191, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(45, 212, 191, 0.35)' : 'rgba(45, 212, 191, 0.25)',
       iconColor: '#2dd4bf',
       onPress: () => {
         if (onSelectShortcut) {
@@ -92,7 +92,7 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
       label: 'My Posts',
       icon: 'document-text-outline',
       key: 'myPosts',
-      iconBackground: 'rgba(251, 191, 36, 0.25)',
+      iconBackground: Platform.OS === 'android' ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.25)',
       iconColor: '#fbbf24',
       onPress: () => {
         if (onSelectShortcut) {
@@ -140,36 +140,45 @@ export default function MainDrawerContent({ navigation, onSelectShortcut, accent
         contentContainerStyle={styles.menuContainer}
         showsVerticalScrollIndicator={false}
       >
-        {shortcuts.map((item, index) => (
-          <BlurView
-            key={item.key}
-            intensity={isDarkMode ? 60 : 40}
-            tint={isDarkMode ? 'dark' : 'light'}
-            style={[
-              styles.glassCard,
-              {
-                marginTop: index === 0 ? 24 : 12,
-                backgroundColor: isDarkMode
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(255,255,255,0.6)'
-              }
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.shortcut}
-              activeOpacity={0.7}
-              onPress={item.onPress}
+        {shortcuts.map((item, index) => {
+          const CardWrapper = Platform.OS === 'android' ? View : BlurView;
+          const cardProps = Platform.OS === 'android'
+            ? {}
+            : {
+              intensity: isDarkMode ? 60 : 40,
+              tint: isDarkMode ? 'dark' : 'light'
+            };
+
+          return (
+            <CardWrapper
+              key={item.key}
+              {...cardProps}
+              style={[
+                styles.glassCard,
+                {
+                  marginTop: index === 0 ? 24 : (Platform.OS === 'android' ? 14 : 12),
+                  backgroundColor: Platform.OS === 'android'
+                    ? (isDarkMode ? '#1e1e2e' : '#ffffff')
+                    : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)')
+                }
+              ]}
             >
-              <View
-                style={[styles.iconCircle, { backgroundColor: item.iconBackground || preset.iconTint || themeColors.primary }]}
+              <TouchableOpacity
+                style={styles.shortcut}
+                activeOpacity={0.7}
+                onPress={item.onPress}
               >
-                <Ionicons name={item.icon} size={22} color={item.iconColor || '#0f172a'} />
-              </View>
-              <Text style={[styles.shortcutLabel, { color: themeColors.textPrimary }]}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
-            </TouchableOpacity>
-          </BlurView>
-        ))}
+                <View
+                  style={[styles.iconCircle, { backgroundColor: item.iconBackground || preset.iconTint || themeColors.primary }]}
+                >
+                  <Ionicons name={item.icon} size={22} color={item.iconColor || '#0f172a'} />
+                </View>
+                <Text style={[styles.shortcutLabel, { color: themeColors.textPrimary }]}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </CardWrapper>
+          );
+        })}
 
         {/* Decorative gradient */}
         <View style={styles.decorativeGradient} />
@@ -182,20 +191,27 @@ const createStyles = (palette, { isDarkMode } = {}) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: palette.background
+      backgroundColor: palette.background,
+      ...(Platform.OS === 'android' && {
+        marginTop: 0,
+        paddingTop: 0
+      })
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 24,
       paddingVertical: 32,
+      paddingTop: Platform.OS === 'android' ? 60 : 32,
+      paddingBottom: 32,
       backgroundColor: palette.card,
       shadowColor: '#000',
       shadowOpacity: isDarkMode ? 0.3 : 0.12,
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
-      elevation: 6,
-      overflow: 'hidden'
+      elevation: Platform.OS === 'android' ? 10 : 6,
+      overflow: 'hidden',
+      zIndex: 10
     },
     headerBackground: {
       ...StyleSheet.absoluteFillObject
@@ -232,25 +248,29 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       backgroundColor: palette.background
     },
     menuContainer: {
-      paddingHorizontal: 16,
+      paddingHorizontal: Platform.OS === 'android' ? 18 : 16,
       paddingBottom: 32
     },
     glassCard: {
-      borderRadius: 20,
-      overflow: 'hidden',
-      borderWidth: 1,
+      borderRadius: Platform.OS === 'android' ? 28 : 20,
+      overflow: Platform.OS === 'android' ? 'visible' : 'hidden',
+      borderWidth: Platform.OS === 'android' ? 0 : 1,
       borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.3)',
       shadowColor: '#000',
-      shadowOpacity: isDarkMode ? 0.3 : 0.08,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3
+      shadowOpacity: Platform.OS === 'android' ? (isDarkMode ? 0.4 : 0.12) : (isDarkMode ? 0.3 : 0.08),
+      shadowRadius: Platform.OS === 'android' ? 8 : 12,
+      shadowOffset: { width: 0, height: Platform.OS === 'android' ? 3 : 4 },
+      elevation: Platform.OS === 'android' ? 4 : 3,
+      ...(Platform.OS === 'android' && {
+        backgroundColor: isDarkMode ? '#1e1e2e' : '#ffffff',
+        marginHorizontal: 2,
+      })
     },
     shortcut: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 18,
+      paddingHorizontal: Platform.OS === 'android' ? 20 : 20,
+      paddingVertical: Platform.OS === 'android' ? 18 : 18,
       gap: 14
     },
     iconCircle: {
@@ -259,11 +279,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOpacity: 0.15,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 2
+      shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+      shadowOpacity: Platform.OS === 'android' ? 0 : 0.15,
+      shadowRadius: Platform.OS === 'android' ? 0 : 6,
+      shadowOffset: { width: 0, height: Platform.OS === 'android' ? 0 : 2 },
+      elevation: Platform.OS === 'android' ? 0 : 2,
     },
     shortcutLabel: {
       fontSize: 16,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar, Image, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AccentBackground from './AccentBackground';
@@ -106,8 +106,8 @@ export default function AppHeader({
             />
           )}
           <View style={styles.titleTextBlock}>
-            {subtitle ? <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text> : null}
-            {title ? <Text style={[styles.title, { color: onPrimary }]}>{title}</Text> : null}
+            {subtitle ? <Text style={[styles.subtitle, { color: subtitleColor }]} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text> : null}
+            {title ? <Text style={[styles.title, { color: onPrimary }]} numberOfLines={1} ellipsizeMode="tail">{title}</Text> : null}
           </View>
         </View>
 
@@ -173,7 +173,8 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    minHeight: Platform.OS === 'android' ? 56 : 44
   },
   iconButton: {
     width: 44,
@@ -208,7 +209,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  titleBlock: { flex: 1, marginHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  titleBlock: {
+    flex: 1,
+    marginHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: Platform.OS === 'android' ? 56 : 44
+  },
   profilePhoto: {
     width: 50,
     height: 50,
@@ -216,9 +224,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  titleTextBlock: { flex: 1 },
-  subtitle: { fontSize: 13, marginBottom: 2 },
-  title: { fontSize: 20, fontWeight: '600' },
+  titleTextBlock: { flex: 1, justifyContent: 'center' },
+  subtitle: {
+    fontSize: 13,
+    marginBottom: Platform.OS === 'android' ? 8 : 4,
+    lineHeight: Platform.OS === 'android' ? 18 : 16
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: Platform.OS === 'android' ? 26 : 24,
+    marginTop: Platform.OS === 'android' ? 2 : 0
+  },
   searchWrapper: {
     marginTop: 18,
     flexDirection: 'row',
