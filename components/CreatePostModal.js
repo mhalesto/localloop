@@ -782,6 +782,9 @@ export default function CreatePostModal({
                   onChangeText={setTitle}
                   autoCapitalize="sentences"
                   returnKeyType="next"
+                  multiline={true}
+                  numberOfLines={2}
+                  maxLength={100}
                 />
                 {isFeatureEnabled('titleGeneration', userProfile?.isPremium || false, userProfile?.aiPreferences || {}) && message.length >= 20 && (
                   <TouchableOpacity
@@ -1117,7 +1120,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     previewAvatarEmoji: { fontSize: 18 },
     previewTitle: { fontSize: 16, fontWeight: '700' },
     previewMeta: { fontSize: 12, marginTop: 4 },
-    previewTitleInput: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+    previewTitleInput: { fontSize: 18, fontWeight: '700', marginBottom: 10, lineHeight: 26, maxHeight: 54 },
     previewBodyInput: { minHeight: 80, fontSize: 16, fontWeight: '500', textAlignVertical: 'top' },
     previewBodyInputHighlighted: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
 

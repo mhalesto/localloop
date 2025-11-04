@@ -31,15 +31,15 @@ export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, o
   // Define system prompts for different styles
   const systemPrompts = {
     catchy:
-      'You are a creative title writer. Generate an attention-grabbing, engaging title (max 60 characters) for this post. Make it interesting and clickable.',
+      'You are a creative title writer. Generate an attention-grabbing, engaging title (max 70 characters) for this post. Make it interesting and clickable.',
     descriptive:
-      'You are a clear communicator. Generate a descriptive, informative title (max 60 characters) that clearly explains what the post is about.',
+      'You are a clear communicator. Generate a descriptive, informative title (max 70 characters) that clearly explains what the post is about.',
     question:
-      'You are a curious questioner. Turn the main idea of this post into a compelling question (max 60 characters) that would make people want to read it.',
+      'You are a curious questioner. Turn the main idea of this post into a compelling question (max 70 characters) that would make people want to read it.',
     emotional:
-      'You are an empathetic writer. Generate an emotionally resonant title (max 60 characters) that captures the feeling or tone of this post.',
+      'You are an empathetic writer. Generate an emotionally resonant title (max 70 characters) that captures the feeling or tone of this post.',
     direct:
-      'You are a direct communicator. Generate a straight-to-the-point title (max 60 characters) that summarizes the post in the simplest way.',
+      'You are a direct communicator. Generate a straight-to-the-point title (max 70 characters) that summarizes the post in the simplest way.',
   };
 
   const systemPrompt = systemPrompts[style] || systemPrompts.descriptive;
@@ -87,9 +87,9 @@ export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, o
     // Remove quotes if present
     title = title.replace(/^["']|["']$/g, '');
 
-    // Ensure it's not too long
-    if (title.length > 80) {
-      title = title.substring(0, 77) + '...';
+    // Ensure it's not too long (fits in 2 lines nicely)
+    if (title.length > 70) {
+      title = title.substring(0, 67) + '...';
     }
 
     return {
@@ -181,11 +181,11 @@ export function generateFallbackTitle(message) {
   // Try to get first sentence
   const firstSentence = message.split(/[.!?]/)[0].trim();
 
-  if (firstSentence.length > 0 && firstSentence.length <= 60) {
+  if (firstSentence.length > 0 && firstSentence.length <= 70) {
     return firstSentence;
   }
 
-  // Otherwise take first 50 chars
-  const truncated = message.substring(0, 50).trim();
-  return truncated + (message.length > 50 ? '...' : '');
+  // Otherwise take first 67 chars (fits nicely in 2 lines)
+  const truncated = message.substring(0, 67).trim();
+  return truncated + (message.length > 67 ? '...' : '');
 }
