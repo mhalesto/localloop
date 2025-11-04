@@ -10,12 +10,14 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import NeighborhoodExplorer from '../components/NeighborhoodExplorer';
 import StatusStoryCard from '../components/StatusStoryCard';
 import Skeleton from '../components/Skeleton';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
+import { useSensors } from '../contexts/SensorsContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
 
 const INITIAL_VISIBLE = 40;
@@ -40,7 +42,7 @@ const FALLBACK_COUNTRIES = [
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
-  const { showAddShortcut, userProfile, themeColors, isDarkMode } = useSettings();
+  const { showAddShortcut, showDiscoveryOnExplore, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts } = usePosts();
   const haptics = useHaptics();
   const {
@@ -48,6 +50,20 @@ export default function CountryScreen({ navigation }) {
     isLoading: statusesLoading,
     statusesError,
   } = useStatuses();
+  const {
+    stepCounterEnabled,
+    motionDetectionEnabled,
+    barometerEnabled,
+    compassEnabled,
+    ambientLightEnabled,
+  } = useSensors();
+  const discoveryEnabled =
+    stepCounterEnabled ||
+    motionDetectionEnabled ||
+    barometerEnabled ||
+    compassEnabled ||
+    ambientLightEnabled;
+  const showDiscoveryCard = showDiscoveryOnExplore && discoveryEnabled;
 
   const [countries, setCountries] = useState([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -416,6 +432,24 @@ export default function CountryScreen({ navigation }) {
           }
           ListHeaderComponent={
             <View>
+              {showDiscoveryCard ? (
+                <View style={styles.discoverySection}>
+                  <NeighborhoodExplorer />
+                  <View style={styles.discoveryFooter}>
+                    <Text style={styles.discoveryHintText}>
+                      Sensors personalize your discovery radius in real time.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.discoveryLinkButton}
+                      onPress={() => navigation.navigate('NeighborhoodExplorer')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.discoveryLinkText}>Open full explorer</Text>
+                      <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
               <View style={styles.carouselSection}>
                 <View style={styles.carouselHeader}>
                   <View>
@@ -546,6 +580,41 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontWeight: '600',
       color: palette.textPrimary,
       marginBottom: 16
+    },
+    discoverySection: {
+      marginBottom: 28
+    },
+    discoveryFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 12,
+      flexWrap: 'wrap'
+    },
+    discoveryHintText: {
+      flex: 1,
+      marginRight: 12,
+      marginBottom: 8,
+      fontSize: 12,
+      color: palette.textSecondary,
+      minWidth: 180
+    },
+    discoveryLinkButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 14,
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      marginTop: 4
+    },
+    discoveryLinkText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primaryDark,
+      marginRight: 4
     },
     carouselSection: {
       marginBottom: 24

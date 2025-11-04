@@ -156,7 +156,7 @@ export default function NeighborhoodExplorer() {
           )}
 
           {/* Weather Condition */}
-          {barometerEnabled && atmosphericPressure && (
+          {barometerEnabled && (
             <TouchableOpacity
               style={styles.statCard}
               activeOpacity={0.7}
@@ -164,11 +164,13 @@ export default function NeighborhoodExplorer() {
             >
               <Text style={styles.weatherEmoji}>{weatherEmoji}</Text>
               <Text style={styles.statValue}>
-                {atmosphericPressure.toFixed(0)} hPa
+                {atmosphericPressure ? atmosphericPressure.toFixed(0) + ' hPa' : 'Calibrating'}
               </Text>
               <Text style={styles.statLabel}>Atmospheric Pressure</Text>
               <Text style={styles.statSubtext}>
-                Condition: {weatherCondition}
+                {atmosphericPressure
+                  ? `Condition: ${weatherCondition}`
+                  : 'Waiting for sensor data'}
               </Text>
               <Ionicons name="chevron-forward" size={16} color={themeColors.textSecondary} style={styles.chevron} />
             </TouchableOpacity>
