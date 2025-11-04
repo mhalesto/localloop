@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, Modal, Pressable, Animated, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -302,10 +302,10 @@ export default function ScreenLayout({
     setLoadingVisible(true);
   };
 
-  const handleLoadingComplete = () => {
+  const handleLoadingComplete = useCallback(() => {
     setLoadingVisible(false);
     setComposerVisible(true);
-  };
+  }, []);
 
   const handleTabPress = (tab) => {
     if (!navigation) return;
