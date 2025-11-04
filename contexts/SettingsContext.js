@@ -795,6 +795,7 @@ const STORAGE_KEYS = {
   PREMIUM_SUMMARY_LENGTH: '@settings_premium_summary_length',
   USER_PROFILE: '@settings_user_profile',
   SHOW_ADD_SHORTCUT: '@settings_show_add_shortcut',
+  SHOW_DISCOVERY_ON_EXPLORE: '@settings_show_discovery_on_explore',
   LOCATION_PERMISSION_STATUS: '@settings_location_permission_status',
 };
 
@@ -804,6 +805,7 @@ export function SettingsProvider({ children }) {
   const isDevBuild = __DEV__ === true;
   const defaultPremiumAccentKey = premiumAccentPresets[0]?.key ?? baseAccentPresets[0].key;
   const [showAddShortcut, setShowAddShortcut] = useState(true);
+  const [showDiscoveryOnExplore, setShowDiscoveryOnExplore] = useState(true);
   const [accentKey, setAccentKey] = useState(
     isDevBuild ? defaultPremiumAccentKey : baseAccentPresets[0].key
   );
@@ -886,6 +888,7 @@ export function SettingsProvider({ children }) {
           savedPremiumSummaryLength,
           savedUserProfile,
           savedShowAddShortcut,
+          savedShowDiscoveryOnExplore,
           savedLocationPermissionStatus,
         ] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.ACCENT_KEY),
@@ -905,6 +908,7 @@ export function SettingsProvider({ children }) {
           AsyncStorage.getItem(STORAGE_KEYS.PREMIUM_SUMMARY_LENGTH),
           AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE),
           AsyncStorage.getItem(STORAGE_KEYS.SHOW_ADD_SHORTCUT),
+          AsyncStorage.getItem(STORAGE_KEYS.SHOW_DISCOVERY_ON_EXPLORE),
           AsyncStorage.getItem(STORAGE_KEYS.LOCATION_PERMISSION_STATUS),
         ]);
 
@@ -928,6 +932,9 @@ export function SettingsProvider({ children }) {
           setUserProfile(prev => ({ ...prev, ...profile }));
         }
         if (savedShowAddShortcut !== null) setShowAddShortcut(savedShowAddShortcut === 'true');
+        if (savedShowDiscoveryOnExplore !== null) {
+          setShowDiscoveryOnExplore(savedShowDiscoveryOnExplore === 'true');
+        }
         if (savedLocationPermissionStatus) {
           setLocationPermissionStatus(savedLocationPermissionStatus);
         } else if (savedUserProfile) {
@@ -1036,6 +1043,14 @@ export function SettingsProvider({ children }) {
 
   useEffect(() => {
     if (isLoadingSettings) return;
+    AsyncStorage.setItem(
+      STORAGE_KEYS.SHOW_DISCOVERY_ON_EXPLORE,
+      String(showDiscoveryOnExplore)
+    );
+  }, [showDiscoveryOnExplore, isLoadingSettings]);
+
+  useEffect(() => {
+    if (isLoadingSettings) return;
     AsyncStorage.setItem(STORAGE_KEYS.LOCATION_PERMISSION_STATUS, locationPermissionStatus);
   }, [locationPermissionStatus, isLoadingSettings]);
 
@@ -1088,6 +1103,10 @@ export function SettingsProvider({ children }) {
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
+    []
+  );
+  const updateShowDiscoveryOnExplore = useCallback(
+    (enabled) => setShowDiscoveryOnExplore(enabled),
     []
   );
   const updateAccentKey = useCallback(
@@ -1263,6 +1282,8 @@ export function SettingsProvider({ children }) {
     () => ({
       showAddShortcut,
       setShowAddShortcut: updateShowAddShortcut,
+      showDiscoveryOnExplore,
+      setShowDiscoveryOnExplore: updateShowDiscoveryOnExplore,
       accentKey,
       setAccentKey: updateAccentKey,
       accentPreset,
@@ -1306,6 +1327,8 @@ export function SettingsProvider({ children }) {
     [
       showAddShortcut,
       updateShowAddShortcut,
+      showDiscoveryOnExplore,
+      updateShowDiscoveryOnExplore,
       accentKey,
       updateAccentKey,
       accentPreset,

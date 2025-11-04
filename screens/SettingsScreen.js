@@ -64,6 +64,8 @@ export default function SettingsScreen({ navigation }) {
   const {
     showAddShortcut,
     setShowAddShortcut,
+    showDiscoveryOnExplore,
+    setShowDiscoveryOnExplore,
     accentOptions,
     accentKey,
     setAccentKey,
@@ -137,6 +139,7 @@ export default function SettingsScreen({ navigation }) {
   const [emailStatusMessage, setEmailStatusMessage] = useState('');
   const [premiumSuccessVisible, setPremiumSuccessVisible] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [enablingDiscovery, setEnablingDiscovery] = useState(false);
 
   const isEmailBusy = isSigningIn || isResettingPassword;
 
@@ -240,6 +243,57 @@ export default function SettingsScreen({ navigation }) {
     [premiumAccessDurationMs]
   );
   const pointsGap = Math.max(pointsToNextPremium, 0);
+  const discoveryPresetActive = useMemo(
+    () =>
+      stepCounterEnabled &&
+      motionDetectionEnabled &&
+      compassEnabled &&
+      barometerEnabled,
+    [stepCounterEnabled, motionDetectionEnabled, compassEnabled, barometerEnabled]
+  );
+
+  const enableDiscoveryPreset = useCallback(async () => {
+    if (discoveryPresetActive || enablingDiscovery) return;
+    setEnablingDiscovery(true);
+    try {
+      if (!showDiscoveryOnExplore) {
+        setShowDiscoveryOnExplore(true);
+      }
+      await Promise.all([
+        stepCounterEnabled ? Promise.resolve() : toggleStepCounter(true),
+        motionDetectionEnabled ? Promise.resolve() : toggleMotionDetection(true),
+        compassEnabled ? Promise.resolve() : toggleCompass(true),
+        barometerEnabled ? Promise.resolve() : toggleBarometer(true),
+        Platform.OS === 'android' && !ambientLightEnabled
+          ? toggleAmbientLight(true)
+          : Promise.resolve(),
+      ]);
+      if (!shakeEnabled) {
+        await toggleShake(true);
+      }
+    } catch (error) {
+      console.warn('[Settings] Failed to enable discovery preset', error);
+    } finally {
+      setEnablingDiscovery(false);
+    }
+  }, [
+    discoveryPresetActive,
+    enablingDiscovery,
+    showDiscoveryOnExplore,
+    setShowDiscoveryOnExplore,
+    stepCounterEnabled,
+    motionDetectionEnabled,
+    compassEnabled,
+    barometerEnabled,
+    ambientLightEnabled,
+    shakeEnabled,
+    toggleStepCounter,
+    toggleMotionDetection,
+    toggleCompass,
+    toggleBarometer,
+    toggleAmbientLight,
+    toggleShake
+  ]);
 
   useEffect(() => {
     setNicknameDraft(userProfile.nickname ?? '');
@@ -986,6 +1040,71 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.sectionHint}>
             Use device sensors to enhance your local exploration experience.
           </Text>
+          <TouchableOpacity
+            style={[
+              styles.discoveryPresetCard,
+              discoveryPresetActive && styles.discoveryPresetCardActive
+            ]}
+            activeOpacity={0.85}
+            onPress={enableDiscoveryPreset}
+            disabled={discoveryPresetActive || enablingDiscovery}
+          >
+            <View
+              style={[
+                styles.discoveryPresetIcon,
+                discoveryPresetActive && styles.discoveryPresetIconActive
+              ]}
+            >
+              <Ionicons
+                name="flash-outline"
+                size={20}
+                color={discoveryPresetActive ? '#fff' : themeColors.primary}
+              />
+            </View>
+            <View style={styles.discoveryPresetCopy}>
+              <Text style={[
+                styles.discoveryPresetTitle,
+                discoveryPresetActive && styles.discoveryPresetTitleActive
+              ]}>
+                {discoveryPresetActive ? 'Discovery enabled on Explore' : 'Enable for Explore tab'}
+              </Text>
+              <Text
+                style={[
+                  styles.discoveryPresetSubtitle,
+                  discoveryPresetActive && styles.discoveryPresetSubtitleActive
+                ]}
+              >
+                Turn on core sensors so the Explore screen shows live neighborhood stats.
+              </Text>
+            </View>
+            {enablingDiscovery ? (
+              <ActivityIndicator
+                size="small"
+                color={discoveryPresetActive ? '#fff' : themeColors.textSecondary}
+              />
+            ) : (
+              <Ionicons
+                name={discoveryPresetActive ? 'checkmark-circle' : 'chevron-forward'}
+                size={20}
+                color={discoveryPresetActive ? themeColors.primary : themeColors.textSecondary}
+              />
+            )}
+          </TouchableOpacity>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Show on Explore tab</Text>
+              <Text style={styles.itemSubtitle}>
+                Keep the Neighborhood Explorer card visible on the Country screen.
+              </Text>
+            </View>
+            <Switch
+              value={showDiscoveryOnExplore}
+              onValueChange={setShowDiscoveryOnExplore}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={showDiscoveryOnExplore ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
           <View style={styles.item}>
             <View>
               <Text style={styles.itemTitle}>Step counter</Text>
@@ -1668,6 +1787,53 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 13,
       color: palette.textSecondary,
       marginBottom: 16
+    },
+    discoveryPresetCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.background,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: -4,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.divider,
+      gap: 16
+    },
+    discoveryPresetCardActive: {
+      backgroundColor: palette.primaryDark,
+      borderColor: palette.primaryDark
+    },
+    discoveryPresetIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(99,102,241,0.12)'
+    },
+    discoveryPresetIconActive: {
+      backgroundColor: 'rgba(255,255,255,0.14)'
+    },
+    discoveryPresetCopy: {
+      flex: 1
+    },
+    discoveryPresetTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: palette.textPrimary,
+      marginBottom: 4
+    },
+    discoveryPresetTitleActive: {
+      color: '#fff'
+    },
+    discoveryPresetSubtitle: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      lineHeight: 16
+    },
+    discoveryPresetSubtitleActive: {
+      color: 'rgba(255,255,255,0.8)'
     },
     authButton: {
       borderRadius: 12,
