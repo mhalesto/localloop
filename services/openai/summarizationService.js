@@ -4,7 +4,7 @@
  * Much faster and more reliable than Hugging Face
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Quality levels for summarization
@@ -47,12 +47,6 @@ export async function summarizeText(text, options = {}) {
     };
   }
 
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const settings = QUALITY_SETTINGS[quality] || QUALITY_SETTINGS.balanced;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -61,12 +55,9 @@ export async function summarizeText(text, options = {}) {
     // Truncate very long texts to stay within token limits
     const truncatedText = text.length > 3000 ? text.substring(0, 3000) + '...' : text;
 
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

@@ -3,7 +3,7 @@
  * Helps users write thoughtful, relevant comments using OpenAI GPT-3.5-turbo
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Suggestion types
@@ -24,12 +24,6 @@ export const SUGGESTION_TYPES = {
  * @returns {Promise<Object>} Suggestion result
  */
 export async function suggestComment(post, suggestionType = SUGGESTION_TYPES.THOUGHTFUL, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const postText = `Title: ${post.title || ''}\n\n${post.message || post.description || ''}`;
 
   // Define system prompts for different suggestion types
@@ -47,12 +41,9 @@ export async function suggestComment(post, suggestionType = SUGGESTION_TYPES.THO
   const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
 
   try {
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

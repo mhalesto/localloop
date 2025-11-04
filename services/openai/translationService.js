@@ -3,7 +3,7 @@
  * Translates content between South African languages using OpenAI GPT-3.5-turbo
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Supported South African languages
@@ -33,22 +33,13 @@ export const COMMON_LANGUAGES = ['en', 'af', 'zu', 'xh'];
  * @returns {Promise<Object>} Detected language info
  */
 export async function detectLanguage(text) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
@@ -108,12 +99,6 @@ export async function detectLanguage(text) {
  * @returns {Promise<Object>} Translation result
  */
 export async function translateText(text, targetLang, sourceLang = null, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const targetLanguage = Object.values(LANGUAGES).find(l => l.code === targetLang);
   if (!targetLanguage) {
     throw new Error(`Unsupported target language: ${targetLang}`);
@@ -129,12 +114,9 @@ export async function translateText(text, targetLang, sourceLang = null, options
 
     const systemPrompt = `You are a professional translator specializing in South African languages. Translate the text to ${targetLanguage.name} ${sourceText}. Maintain the tone, style, and cultural context. Only return the translation, no explanations.`;
 
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

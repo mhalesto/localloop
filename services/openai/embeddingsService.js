@@ -4,7 +4,7 @@
  * Very cost-effective: $0.00002 per 1000 tokens (~$0.00002 per post)
  */
 
-const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Generate embedding vector for text
@@ -13,12 +13,6 @@ const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
  * @returns {Promise<Object>} Embedding result with vector
  */
 export async function generateEmbedding(text, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   if (!text || text.trim().length === 0) {
     throw new Error('Text is required for embedding');
   }
@@ -30,12 +24,9 @@ export async function generateEmbedding(text, options = {}) {
     // Truncate to avoid token limits
     const truncatedText = text.length > 8000 ? text.substring(0, 8000) : text;
 
-    const response = await fetch(OPENAI_EMBEDDINGS_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.EMBEDDINGS, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'text-embedding-3-small', // Fast, cheap, good quality
         input: truncatedText,

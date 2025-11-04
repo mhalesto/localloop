@@ -4,7 +4,7 @@
  * Much more reliable than Hugging Face with better accuracy
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 // Same comprehensive category taxonomy
 const CATEGORIES = {
@@ -115,12 +115,6 @@ function keywordBasedClassification(text) {
  * Call OpenAI GPT-3.5-turbo for classification
  */
 async function classifyWithOpenAI(text, maxTags = 4) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
@@ -135,12 +129,9 @@ Be accurate and selective. Only choose categories that truly fit the content.`;
 
     const userPrompt = `Categorize this post:\n\n${text}`;
 
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

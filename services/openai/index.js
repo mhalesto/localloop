@@ -3,6 +3,9 @@
  * Central export for all OpenAI-powered features
  */
 
+// Configuration
+export * from './config';
+
 // Core services (already integrated)
 export * from './moderationService';
 export * from './autoTaggingService';

@@ -3,7 +3,7 @@
  * Auto-generates catchy, relevant titles from post content using OpenAI GPT-3.5-turbo
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Title styles
@@ -24,12 +24,6 @@ export const TITLE_STYLES = {
  * @returns {Promise<Object>} Generated title result
  */
 export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   if (!message || message.trim().length < 10) {
     throw new Error('Message too short to generate title');
   }
@@ -57,12 +51,9 @@ export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, o
     // Truncate long messages
     const truncatedMessage = message.length > 1000 ? message.substring(0, 1000) + '...' : message;
 
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

@@ -4,7 +4,7 @@
  * Helps boost quality content in feeds
  */
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Quality dimensions
@@ -49,12 +49,6 @@ export const QUALITY_TIERS = {
  * @returns {Promise<Object>} Quality score result
  */
 export async function scorePostQuality(post, options = {}) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const postText = `Title: ${post.title || 'No title'}\n\n${post.message || ''}`;
 
   const controller = new AbortController();
@@ -70,12 +64,9 @@ export async function scorePostQuality(post, options = {}) {
 
 Return ONLY a JSON object with scores. Example: {"clarity": 8, "completeness": 7, "helpfulness": 9, "engagement": 8}`;
 
-    const response = await fetch(OPENAI_CHAT_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [

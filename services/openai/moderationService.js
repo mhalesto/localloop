@@ -4,7 +4,7 @@
  * Much faster and more reliable than Hugging Face
  */
 
-const OPENAI_MODERATION_URL = 'https://api.openai.com/v1/moderations';
+import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Moderation categories and thresholds
@@ -30,22 +30,13 @@ const MODERATION_THRESHOLDS = {
  * Call OpenAI Moderation API (FREE)
  */
 async function callModerationAPI(text) {
-  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
   try {
-    const response = await fetch(OPENAI_MODERATION_URL, {
+    const response = await fetch(OPENAI_ENDPOINTS.MODERATION, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getOpenAIHeaders(),
       body: JSON.stringify({
         input: text,
       }),
