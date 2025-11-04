@@ -45,7 +45,7 @@ const PROXIMITY_RADIUS = {
 };
 
 export function SensorsProvider({ children }) {
-  // Feature toggles
+  // Feature toggles - start all disabled by default for safety
   const [stepCounterEnabled, setStepCounterEnabled] = useState(false);
   const [motionDetectionEnabled, setMotionDetectionEnabled] = useState(false);
   const [shakeEnabled, setShakeEnabled] = useState(false);
@@ -146,32 +146,36 @@ export function SensorsProvider({ children }) {
     }
 
     const checkAvailability = async () => {
-      const available = await Pedometer.isAvailableAsync();
-      if (!available) {
-        console.log('Pedometer not available on this device');
-        return;
-      }
+      try {
+        const available = await Pedometer.isAvailableAsync();
+        if (!available) {
+          console.log('Pedometer not available on this device');
+          return;
+        }
 
-      // Get today's steps
-      const end = new Date();
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
+        // Get today's steps
+        const end = new Date();
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
 
-      const result = await Pedometer.getStepCountAsync(start, end);
-      if (result) {
-        setDailySteps(result.steps);
-        await AsyncStorage.setItem(STORAGE_KEYS.DAILY_STEPS, String(result.steps));
-      }
+        const result = await Pedometer.getStepCountAsync(start, end);
+        if (result) {
+          setDailySteps(result.steps);
+          await AsyncStorage.setItem(STORAGE_KEYS.DAILY_STEPS, String(result.steps));
+        }
 
-      // Subscribe to real-time updates
-      pedometerSubscription.current = Pedometer.watchStepCount((result) => {
-        setStepCount(result.steps);
-        setDailySteps(prev => {
-          const newSteps = prev + 1;
-          AsyncStorage.setItem(STORAGE_KEYS.DAILY_STEPS, String(newSteps));
-          return newSteps;
+        // Subscribe to real-time updates
+        pedometerSubscription.current = Pedometer.watchStepCount((result) => {
+          setStepCount(result.steps);
+          setDailySteps(prev => {
+            const newSteps = prev + 1;
+            AsyncStorage.setItem(STORAGE_KEYS.DAILY_STEPS, String(newSteps));
+            return newSteps;
+          });
         });
-      });
+      } catch (error) {
+        console.log('Error initializing pedometer:', error);
+      }
     };
 
     checkAvailability();
@@ -193,26 +197,40 @@ export function SensorsProvider({ children }) {
       return;
     }
 
-    DeviceMotion.setUpdateInterval(1000); // Update every second
+    const initMotion = async () => {
+      try {
+        const available = await DeviceMotion.isAvailableAsync();
+        if (!available) {
+          console.log('DeviceMotion not available on this device');
+          return;
+        }
 
-    motionSubscription.current = DeviceMotion.addListener((data) => {
-      if (!data.acceleration) return;
+        DeviceMotion.setUpdateInterval(1000); // Update every second
 
-      const { x, y, z } = data.acceleration;
-      const magnitude = Math.sqrt(x * x + y * y + z * z);
+        motionSubscription.current = DeviceMotion.addListener((data) => {
+          if (!data.acceleration) return;
 
-      let activity = 'STATIONARY';
-      if (magnitude > ACTIVITY_THRESHOLDS.DRIVING) {
-        activity = 'DRIVING';
-      } else if (magnitude > ACTIVITY_THRESHOLDS.RUNNING) {
-        activity = 'RUNNING';
-      } else if (magnitude > ACTIVITY_THRESHOLDS.WALKING) {
-        activity = 'WALKING';
+          const { x, y, z } = data.acceleration;
+          const magnitude = Math.sqrt(x * x + y * y + z * z);
+
+          let activity = 'STATIONARY';
+          if (magnitude > ACTIVITY_THRESHOLDS.DRIVING) {
+            activity = 'DRIVING';
+          } else if (magnitude > ACTIVITY_THRESHOLDS.RUNNING) {
+            activity = 'RUNNING';
+          } else if (magnitude > ACTIVITY_THRESHOLDS.WALKING) {
+            activity = 'WALKING';
+          }
+
+          setCurrentActivity(activity);
+          setProximityRadius(PROXIMITY_RADIUS[activity]);
+        });
+      } catch (error) {
+        console.log('Error initializing DeviceMotion:', error);
       }
+    };
 
-      setCurrentActivity(activity);
-      setProximityRadius(PROXIMITY_RADIUS[activity]);
-    });
+    initMotion();
 
     return () => {
       if (motionSubscription.current) {
@@ -231,23 +249,37 @@ export function SensorsProvider({ children }) {
       return;
     }
 
-    Accelerometer.setUpdateInterval(100); // Check every 100ms
-
-    accelerometerSubscription.current = Accelerometer.addListener((data) => {
-      const { x, y, z } = data;
-      const acceleration = Math.sqrt(x * x + y * y + z * z);
-
-      if (acceleration > SHAKE_THRESHOLD) {
-        const now = Date.now();
-        // Debounce: only trigger once per second
-        if (now - lastShakeTime.current > 1000) {
-          lastShakeTime.current = now;
-          if (onShake) {
-            onShake();
-          }
+    const initAccelerometer = async () => {
+      try {
+        const available = await Accelerometer.isAvailableAsync();
+        if (!available) {
+          console.log('Accelerometer not available on this device');
+          return;
         }
+
+        Accelerometer.setUpdateInterval(100); // Check every 100ms
+
+        accelerometerSubscription.current = Accelerometer.addListener((data) => {
+          const { x, y, z } = data;
+          const acceleration = Math.sqrt(x * x + y * y + z * z);
+
+          if (acceleration > SHAKE_THRESHOLD) {
+            const now = Date.now();
+            // Debounce: only trigger once per second
+            if (now - lastShakeTime.current > 1000) {
+              lastShakeTime.current = now;
+              if (onShake) {
+                onShake();
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.log('Error initializing Accelerometer:', error);
       }
-    });
+    };
+
+    initAccelerometer();
 
     return () => {
       if (accelerometerSubscription.current) {
@@ -484,7 +516,44 @@ export function SensorsProvider({ children }) {
 export function useSensors() {
   const context = useContext(SensorsContext);
   if (!context) {
-    throw new Error('useSensors must be used within a SensorsProvider');
+    // Return default values to prevent crashes when SensorsProvider is not available
+    console.warn('useSensors: SensorsProvider not found, returning default values');
+    return {
+      // Feature toggles
+      stepCounterEnabled: false,
+      motionDetectionEnabled: false,
+      shakeEnabled: false,
+      barometerEnabled: false,
+      compassEnabled: false,
+      ambientLightEnabled: false,
+      toggleStepCounter: () => {},
+      toggleMotionDetection: () => {},
+      toggleShake: () => {},
+      toggleBarometer: () => {},
+      toggleCompass: () => {},
+      toggleAmbientLight: () => {},
+
+      // Data
+      stepCount: 0,
+      dailySteps: 0,
+      currentActivity: 'STATIONARY',
+      proximityRadius: 100,
+      atmosphericPressure: null,
+      weatherCondition: 'normal',
+      compassHeading: 0,
+      getCompassDirection: () => 'N',
+      ambientLight: null,
+      autoAdaptUI: false,
+      setAutoAdaptUI: () => {},
+      explorationProgress: {
+        locationsVisited: [],
+        totalDistance: 0,
+        neighborhoodCoverage: 0
+      },
+      updateExplorationData: () => {},
+      setOnShake: () => {},
+      pressureHistory: []
+    };
   }
   return context;
 }
