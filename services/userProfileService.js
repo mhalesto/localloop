@@ -257,19 +257,45 @@ export async function savePushToken(userId, token) {
 
   try {
     const userRef = doc(db, 'users', userId);
-    const tokenData = {
-      token,
-      platform: Platform.OS,
-      updatedAt: Date.now(),
-    };
 
-    // Use arrayUnion to add token without duplicates
-    await updateDoc(userRef, {
-      pushTokens: arrayUnion(tokenData),
-      lastPushTokenUpdate: serverTimestamp(),
-    });
+    // Get current tokens to check if this token already exists
+    const snap = await getDoc(userRef);
+    const userData = snap.exists() ? snap.data() : {};
+    const existingTokens = userData.pushTokens || [];
 
-    console.log('[UserProfile] Push token saved successfully');
+    // Check if token already exists (by token string, not full object)
+    const tokenExists = existingTokens.some(t => t.token === token);
+
+    if (tokenExists) {
+      // Update the existing token's timestamp and platform
+      const updatedTokens = existingTokens.map(t =>
+        t.token === token
+          ? { token, platform: Platform.OS, updatedAt: Date.now() }
+          : t
+      );
+
+      await updateDoc(userRef, {
+        pushTokens: updatedTokens,
+        lastPushTokenUpdate: serverTimestamp(),
+      });
+
+      console.log('[UserProfile] Push token updated successfully');
+    } else {
+      // Add new token
+      const tokenData = {
+        token,
+        platform: Platform.OS,
+        updatedAt: Date.now(),
+      };
+
+      await updateDoc(userRef, {
+        pushTokens: arrayUnion(tokenData),
+        lastPushTokenUpdate: serverTimestamp(),
+      });
+
+      console.log('[UserProfile] Push token saved successfully');
+    }
+
     return true;
   } catch (error) {
     console.error('[UserProfile] Error saving push token:', error);

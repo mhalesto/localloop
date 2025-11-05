@@ -68,7 +68,20 @@ async function sendNotificationToUser(userId, notification) {
       return {success: true, sent: 0, message: "No push tokens available"};
     }
 
-    const messages = tokenData.map((td) => ({
+    // Deduplicate tokens by token string to prevent duplicate notifications
+    const uniqueTokens = [];
+    const seenTokens = new Set();
+
+    for (const td of tokenData) {
+      if (!seenTokens.has(td.token)) {
+        seenTokens.add(td.token);
+        uniqueTokens.push(td);
+      }
+    }
+
+    console.log(`[Notifications] Tokens for user ${userId}: ${tokenData.length} total, ${uniqueTokens.length} unique`);
+
+    const messages = uniqueTokens.map((td) => ({
       to: td.token,
       sound: "default",
       title,
