@@ -160,8 +160,8 @@ export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeU
     };
   }
 
-  // Check monthly limit
-  if (limits.monthly !== null && currentMonthUsage >= limits.monthly) {
+  // Check monthly limit (only for premium users with monthly > 0)
+  if (limits.monthly !== null && limits.monthly > 0 && currentMonthUsage >= limits.monthly) {
     return {
       canGenerate: false,
       reason: `You've used all ${limits.monthly} cartoon generations this month. Your limit resets next month.`,
