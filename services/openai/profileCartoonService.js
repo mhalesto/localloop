@@ -157,48 +157,77 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
     // Step 1: Analyze the profile picture to get a description
     const personDescription = await analyzeProfilePicture(imageUrl, apiKey);
+    console.log('[profileCartoonService] Person description:', personDescription);
 
     // Step 2: Generate cartoon based on the description
     const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-    const prompt = `Create a ${genderHint}portrait ${style.prompt} of this person: ${personDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+    const prompt = `Create a ${genderHint}portrait ${style.prompt} of this person: ${personDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture.`;
 
-    console.log('[profileCartoonService] Generating cartoon with DALL-E 3');
+    console.log('[profileCartoonService] Full prompt:', prompt);
+    console.log('[profileCartoonService] Prompt length:', prompt.length);
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'standard', // Use 'standard' for cost efficiency, 'hd' for better quality
-        style: 'vivid', // 'vivid' for more dramatic, 'natural' for more realistic
-      }),
-    });
+    // Try up to 3 times with exponential backoff
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`[profileCartoonService] Attempt ${attempt}/3: Generating with DALL-E 3`);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('[profileCartoonService] OpenAI API error:', errorData);
-      throw new Error(errorData.error?.message || 'Failed to generate cartoon profile');
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3',
+            prompt: prompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'standard',
+            style: 'vivid',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`[profileCartoonService] Attempt ${attempt} failed:`, errorData);
+
+          // If it's a server error, retry
+          if (errorData.error?.type === 'server_error' && attempt < 3) {
+            const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
+            console.log(`[profileCartoonService] Server error, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            lastError = errorData;
+            continue;
+          }
+
+          throw new Error(errorData.error?.message || 'Failed to generate cartoon profile');
+        }
+
+        const data = await response.json();
+
+        if (!data.data || data.data.length === 0) {
+          throw new Error('No image generated');
+        }
+
+        console.log('[profileCartoonService] Successfully generated cartoon');
+
+        return {
+          imageUrl: data.data[0].url,
+          style: style.id,
+          revisedPrompt: data.data[0].revised_prompt,
+        };
+
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+        lastError = error;
+      }
     }
 
-    const data = await response.json();
+    throw lastError || new Error('Failed after 3 attempts');
 
-    if (!data.data || data.data.length === 0) {
-      throw new Error('No image generated');
-    }
-
-    console.log('[profileCartoonService] Successfully generated cartoon');
-
-    return {
-      imageUrl: data.data[0].url,
-      style: style.id,
-      revisedPrompt: data.data[0].revised_prompt,
-    };
   } catch (error) {
     console.error('[profileCartoonService] Error:', error);
     throw error;
