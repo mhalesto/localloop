@@ -831,6 +831,9 @@ export function SettingsProvider({ children }) {
     PREMIUM_SUMMARY_LENGTH_DEFAULT
   );
   const [userProfile, setUserProfile] = useState({
+    // User identity
+    uid: null,                 // Firebase Auth UID
+
     // Location data
     nickname: '',
     country: '',
@@ -1091,6 +1094,7 @@ export function SettingsProvider({ children }) {
       if (profile) {
         setUserProfile(prev => ({
           ...prev,
+          uid: user.uid,                                  // Set Firebase Auth UID
           username: profile.username || '',
           displayName: profile.displayName || '',
           bio: profile.bio || '',
@@ -1118,6 +1122,22 @@ export function SettingsProvider({ children }) {
   useEffect(() => {
     loadProfileFromFirebase();
   }, [loadProfileFromFirebase]);
+
+  // Ensure uid is always set when user is available
+  useEffect(() => {
+    if (user?.uid) {
+      setUserProfile(prev => ({
+        ...prev,
+        uid: user.uid
+      }));
+    } else {
+      // Clear uid when user logs out
+      setUserProfile(prev => ({
+        ...prev,
+        uid: null
+      }));
+    }
+  }, [user?.uid]);
 
   const updateShowAddShortcut = useCallback(
     (enabled) => setShowAddShortcut(enabled),
