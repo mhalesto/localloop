@@ -22,17 +22,24 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
    - Pixar, Anime, Comic Book, Watercolor
    - Disney Classic, Classic Cartoon, Studio Ghibli, Simple Cartoon
 
-2. **Usage Limits**
-   - Basic Plan: 1 lifetime generation
-   - Premium/Gold: 2 generations per month
+2. **Gold Exclusive: Custom Prompts**
+   - Gold users can describe their own custom cartoon style
+   - Text input field (300 characters max)
+   - Examples: "superhero in cyberpunk city", "watercolor princess in fantasy setting"
+   - Powered by DALL-E 3 with full creative control
+
+3. **Usage Limits**
+   - Basic Plan: 5 lifetime generations
+   - Premium: 10 generations per month
+   - Gold: 20 generations per month + custom prompts
    - Automatic monthly reset for premium users
 
-3. **History Management**
+4. **History Management**
    - Saves last 3 generated cartoons
    - View, delete, or set as profile picture
    - Automatic cleanup of old images
 
-4. **User Flow**
+5. **User Flow**
    - Settings � Profile � "AI Cartoon Avatar"
    - Tap "Generate" � Choose style � AI generates
    - View "History" to manage saved cartoons

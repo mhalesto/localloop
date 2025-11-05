@@ -235,8 +235,8 @@ export default function PaymentScreen({ route, navigation }) {
           )}
         </TouchableOpacity>
 
-        {/* Subscribe Button - Simulated Payment (for testing) */}
-        <TouchableOpacity
+        {/* Subscribe Button - Simulated Payment (for testing) - COMMENTED OUT FOR PRODUCTION */}
+        {/* <TouchableOpacity
           style={[styles.testButton, { backgroundColor: themeColors.textSecondary, opacity: 0.7 }]}
           onPress={handleSimulatedPayment}
           disabled={isProcessing}
@@ -252,7 +252,7 @@ export default function PaymentScreen({ route, navigation }) {
               </Text>
             </>
           )}
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* Security Info */}
         <View style={styles.securityInfo}>

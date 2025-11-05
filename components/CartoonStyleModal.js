@@ -12,6 +12,9 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
@@ -27,9 +30,13 @@ export default function CartoonStyleModal({
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [selectedStyle, setSelectedStyle] = useState(null);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
+  const isGoldUser = subscriptionPlan === 'gold';
+
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,
     usageData?.monthlyUsage || 0,
@@ -47,13 +54,30 @@ export default function CartoonStyleModal({
   const handleStyleSelect = (styleId) => {
     if (!canGenerate) return;
     setSelectedStyle(styleId);
+    setUseCustomPrompt(false); // Deselect custom prompt when selecting a style
+  };
+
+  const handleToggleCustomPrompt = () => {
+    if (!isGoldUser || !canGenerate) return;
+    setUseCustomPrompt(!useCustomPrompt);
+    if (!useCustomPrompt) {
+      setSelectedStyle(null); // Clear style selection when using custom prompt
+    }
   };
 
   const handleGenerate = () => {
-    if (selectedStyle && canGenerate) {
+    if (!canGenerate) return;
+
+    if (useCustomPrompt && customPrompt.trim()) {
+      // Send custom prompt for Gold users
+      onStyleSelect('custom', customPrompt.trim());
+    } else if (selectedStyle) {
+      // Send predefined style
       onStyleSelect(selectedStyle);
     }
   };
+
+  const canProceed = canGenerate && ((useCustomPrompt && customPrompt.trim().length > 0) || (!useCustomPrompt && selectedStyle));
 
   return (
     <Modal
@@ -67,41 +91,107 @@ export default function CartoonStyleModal({
         }
       }}
     >
-      <View style={localStyles.modalOverlay}>
-        <View style={[localStyles.modalContent, { backgroundColor: themeColors.card }]}>
-          {/* Header */}
-          <View style={localStyles.header}>
-            <View style={localStyles.headerTop}>
-              <Text style={[localStyles.title, { color: themeColors.textPrimary }]}>
-                Choose Cartoon Style
-              </Text>
-              <TouchableOpacity onPress={onClose} disabled={isGenerating}>
-                <Ionicons
-                  name="close"
-                  size={28}
-                  color={themeColors.textSecondary}
-                  style={{ opacity: isGenerating ? 0.5 : 1 }}
-                />
-              </TouchableOpacity>
-            </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={localStyles.modalOverlay}>
+          <View style={[localStyles.modalContent, { backgroundColor: themeColors.card }]}>
+            {/* Header */}
+            <View style={localStyles.header}>
+              <View style={localStyles.headerTop}>
+                <Text style={[localStyles.title, { color: themeColors.textPrimary }]}>
+                  Choose Cartoon Style
+                </Text>
+                <TouchableOpacity onPress={onClose} disabled={isGenerating}>
+                  <Ionicons
+                    name="close"
+                    size={28}
+                    color={themeColors.textSecondary}
+                    style={{ opacity: isGenerating ? 0.5 : 1 }}
+                  />
+                </TouchableOpacity>
+              </View>
 
-            {/* Usage Stats */}
-            <View style={[localStyles.usageBanner, { backgroundColor: `${primaryColor}15` }]}>
-              <Ionicons name="sparkles" size={16} color={primaryColor} />
-              <Text style={[localStyles.usageText, { color: themeColors.textSecondary }]}>
-                {usageText}
-              </Text>
-            </View>
-
-            {!canGenerate && (
-              <View style={[localStyles.warningBanner, { backgroundColor: '#FF950015' }]}>
-                <Ionicons name="information-circle" size={16} color="#FF9500" />
-                <Text style={[localStyles.warningText, { color: '#FF9500' }]}>
-                  {reason}
+              {/* Usage Stats */}
+              <View style={[localStyles.usageBanner, { backgroundColor: `${primaryColor}15` }]}>
+                <Ionicons name="sparkles" size={16} color={primaryColor} />
+                <Text style={[localStyles.usageText, { color: themeColors.textSecondary }]}>
+                  {usageText}
                 </Text>
               </View>
-            )}
-          </View>
+
+              {!canGenerate && (
+                <View style={[localStyles.warningBanner, { backgroundColor: '#FF950015' }]}>
+                  <Ionicons name="information-circle" size={16} color="#FF9500" />
+                  <Text style={[localStyles.warningText, { color: '#FF9500' }]}>
+                    {reason}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+          {/* Gold Custom Prompt Option */}
+          {isGoldUser && (
+            <View style={[localStyles.customPromptSection, { paddingHorizontal: 20, paddingBottom: 8 }]}>
+              <TouchableOpacity
+                style={[
+                  localStyles.customPromptToggle,
+                  {
+                    backgroundColor: useCustomPrompt ? `${primaryColor}15` : themeColors.background,
+                    borderColor: useCustomPrompt ? primaryColor : themeColors.divider,
+                    borderWidth: useCustomPrompt ? 2 : 1,
+                  },
+                ]}
+                onPress={handleToggleCustomPrompt}
+                disabled={!canGenerate || isGenerating}
+                activeOpacity={0.7}
+              >
+                <View style={localStyles.customPromptHeader}>
+                  <Ionicons name="create" size={20} color={primaryColor} />
+                  <Text style={[localStyles.customPromptTitle, { color: themeColors.textPrimary }]}>
+                    Custom Request (Gold Exclusive)
+                  </Text>
+                  {useCustomPrompt && (
+                    <View style={[localStyles.selectedBadge, { backgroundColor: primaryColor }]}>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[localStyles.customPromptDesc, { color: themeColors.textSecondary }]}>
+                  Describe your own cartoon style
+                </Text>
+              </TouchableOpacity>
+
+              {useCustomPrompt && (
+                <TextInput
+                  style={[
+                    localStyles.customPromptInput,
+                    {
+                      backgroundColor: themeColors.background,
+                      borderColor: themeColors.divider,
+                      color: themeColors.textPrimary,
+                    },
+                  ]}
+                  placeholder="E.g., 'Make me look like a superhero in a cyberpunk city, neon colors and futuristic style'"
+                  placeholderTextColor={themeColors.textSecondary}
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={300}
+                  editable={!isGenerating}
+                  textAlignVertical="top"
+                />
+              )}
+
+              {useCustomPrompt && (
+                <Text style={[localStyles.charCount, { color: themeColors.textSecondary }]}>
+                  {customPrompt.length}/300 characters
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Style Options */}
           <ScrollView
@@ -109,7 +199,7 @@ export default function CartoonStyleModal({
             contentContainerStyle={localStyles.stylesContainer}
             showsVerticalScrollIndicator={false}
           >
-            {styles.map((style) => {
+            {!useCustomPrompt && styles.map((style) => {
               const isSelected = selectedStyle === style.id;
               return (
                 <TouchableOpacity
@@ -142,6 +232,15 @@ export default function CartoonStyleModal({
                 </TouchableOpacity>
               );
             })}
+
+            {useCustomPrompt && (
+              <View style={[localStyles.customPromptPlaceholder, { backgroundColor: themeColors.background }]}>
+                <Ionicons name="brush" size={40} color={primaryColor} style={{ opacity: 0.3 }} />
+                <Text style={[localStyles.placeholderText, { color: themeColors.textSecondary }]}>
+                  Describe your custom cartoon style above
+                </Text>
+              </View>
+            )}
           </ScrollView>
 
           {/* Generate Button */}
@@ -150,11 +249,11 @@ export default function CartoonStyleModal({
               style={[
                 localStyles.generateButton,
                 {
-                  backgroundColor: selectedStyle && canGenerate ? primaryColor : themeColors.divider,
+                  backgroundColor: canProceed ? primaryColor : themeColors.divider,
                 },
               ]}
               onPress={handleGenerate}
-              disabled={!selectedStyle || !canGenerate || isGenerating}
+              disabled={!canProceed || isGenerating}
               activeOpacity={0.8}
             >
               {isGenerating ? (
@@ -165,7 +264,9 @@ export default function CartoonStyleModal({
               ) : (
                 <>
                   <Ionicons name="color-wand" size={20} color="#fff" />
-                  <Text style={localStyles.generateButtonText}>Generate Cartoon</Text>
+                  <Text style={localStyles.generateButtonText}>
+                    {useCustomPrompt ? 'Generate Custom Avatar' : 'Generate Cartoon'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -177,6 +278,7 @@ export default function CartoonStyleModal({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -287,6 +389,56 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 12,
+    fontStyle: 'italic',
+  },
+  customPromptSection: {
+    marginBottom: 8,
+  },
+  customPromptToggle: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+  },
+  customPromptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  customPromptTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  customPromptDesc: {
+    fontSize: 13,
+    marginLeft: 28,
+  },
+  customPromptInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    fontSize: 15,
+    minHeight: 100,
+    marginTop: 8,
+  },
+  charCount: {
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  customPromptPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 60,
+    borderRadius: 12,
+    marginVertical: 20,
+  },
+  placeholderText: {
+    fontSize: 14,
+    marginTop: 12,
+    textAlign: 'center',
     fontStyle: 'italic',
   },
 });

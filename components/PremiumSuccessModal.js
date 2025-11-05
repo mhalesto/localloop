@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -57,13 +57,20 @@ export default function PremiumSuccessModal({ visible, onClose }) {
     if (visible) {
       setShowGiftAnimation(true);
       setShowSummary(false);
+    } else {
+      // Reset states when modal is hidden
+      setShowGiftAnimation(true);
+      setShowSummary(false);
     }
   }, [visible]);
 
-  const handleAnimationComplete = () => {
-    setShowGiftAnimation(false);
-    setShowSummary(true);
-  };
+  const handleAnimationComplete = useCallback(() => {
+    console.log('[PremiumSuccessModal] Animation complete, closing modal');
+    // Close the entire modal immediately after gift animation
+    if (onClose) {
+      onClose();
+    }
+  }, [onClose]);
 
   return (
     <>

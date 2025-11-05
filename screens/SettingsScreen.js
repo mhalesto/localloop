@@ -177,8 +177,8 @@ export default function SettingsScreen({ navigation }) {
     icon: 'star',
   });
 
-  // Reset subscription state (for testing)
-  const [resettingSubscription, setResettingSubscription] = useState(false);
+  // Reset subscription state (for testing) - COMMENTED OUT FOR PRODUCTION
+  // const [resettingSubscription, setResettingSubscription] = useState(false);
 
   const isEmailBusy = isSigningIn || isResettingPassword;
 
@@ -505,7 +505,8 @@ export default function SettingsScreen({ navigation }) {
     }
   }, [redeemPremiumDay]);
 
-  const handleResetSubscription = useCallback(async () => {
+  // COMMENTED OUT FOR PRODUCTION - Reset subscription handler
+  /* const handleResetSubscription = useCallback(async () => {
     showAlert(
       'Reset Subscription',
       'This will reset your subscription back to Basic. This is for testing only. Continue?',
@@ -549,7 +550,7 @@ export default function SettingsScreen({ navigation }) {
       ],
       { icon: 'refresh', iconColor: '#FF3B30' }
     );
-  }, [reloadProfile, showAlert]);
+  }, [reloadProfile, showAlert]); */
 
   const handleTogglePremiumAccent = (value) => {
     // Check if user has access to premium themes
@@ -836,9 +837,15 @@ export default function SettingsScreen({ navigation }) {
   };
 
   // Handle style selection and generation
-  const handleGenerateCartoon = async (styleId) => {
+  const handleGenerateCartoon = async (styleId, customPrompt = null) => {
     if (!user?.uid || !userProfile?.profilePhoto) {
       showAlert('Error', 'Please set a profile photo first before generating a cartoon.', [], { type: 'warning' });
+      return;
+    }
+
+    // Validate Gold users for custom prompts
+    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold') {
+      showAlert('Premium Feature', 'Custom cartoon prompts are exclusive to Gold members. Upgrade to Gold to unlock this feature!', [], { type: 'warning' });
       return;
     }
 
@@ -849,14 +856,15 @@ export default function SettingsScreen({ navigation }) {
       const result = await generateCartoonProfile(
         userProfile.profilePhoto,
         styleId,
-        userProfile.gender || 'neutral'
+        userProfile.gender || 'neutral',
+        customPrompt // Pass custom prompt for Gold users
       );
 
       // Upload to Firebase Storage
       const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
 
-      // Record generation and update history
-      await recordCartoonGeneration(user.uid, storageUrl, styleId);
+      // Record generation and update history (use 'custom' as style if custom prompt)
+      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId);
 
       // Reload data to update UI
       await loadCartoonData();
@@ -869,7 +877,10 @@ export default function SettingsScreen({ navigation }) {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Show success alert
-      showAlert('Success', 'Your cartoon avatar has been generated and saved!', [], { type: 'success' });
+      const message = styleId === 'custom'
+        ? 'Your custom cartoon avatar has been generated and saved!'
+        : 'Your cartoon avatar has been generated and saved!';
+      showAlert('Success', message, [], { type: 'success' });
     } catch (error) {
       console.error('[SettingsScreen] Error generating cartoon:', error);
       setIsGeneratingCartoon(false);
@@ -1215,8 +1226,8 @@ export default function SettingsScreen({ navigation }) {
                   <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
                 </TouchableOpacity>
 
-                {/* Reset Subscription Button (Testing Only) */}
-                <TouchableOpacity
+                {/* Reset Subscription Button (Testing Only) - COMMENTED OUT FOR PRODUCTION */}
+                {/* <TouchableOpacity
                   style={[styles.subscriptionButton, { backgroundColor: '#ff000010', marginTop: 12 }]}
                   onPress={handleResetSubscription}
                   activeOpacity={0.7}
@@ -1232,7 +1243,7 @@ export default function SettingsScreen({ navigation }) {
                       </Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             </>
           ) : (

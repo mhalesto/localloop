@@ -16,6 +16,7 @@ export const SUBSCRIPTION_PLANS = {
       '5 statuses per day',
       'Unlimited comments & replies',
       '5 basic accent themes',
+      { text: '5 AI cartoon avatars (lifetime)', badge: 'NEW', badgeColor: '#FF9500' },
       'Free AI features',
       'Standard support (48h)',
     ],
@@ -42,6 +43,9 @@ export const SUBSCRIPTION_PLANS = {
       marketListingImages: 3,
       avatarChoices: 10,
       profileAnalytics: false,
+      cartoonAvatarsMonthly: 0,
+      cartoonAvatarsLifetime: 5,
+      customCartoonPrompts: false,
     },
   },
   PREMIUM: {
@@ -56,6 +60,8 @@ export const SUBSCRIPTION_PLANS = {
       'Unlimited posts & statuses',
       '15+ premium gradient themes',
       'Custom typography controls',
+      { text: '10 AI cartoon avatars/month', badge: 'NEW', badgeColor: '#FF9500' },
+      { text: '8 cartoon styles (Pixar, Anime, etc.)', badge: 'NEW', badgeColor: '#FF9500' },
       'AI thread summaries',
       'Smart comment suggestions',
       'Translation (11 languages)',
@@ -86,6 +92,9 @@ export const SUBSCRIPTION_PLANS = {
       marketListingImages: 5,
       avatarChoices: 50,
       profileAnalytics: true,
+      cartoonAvatarsMonthly: 10,
+      cartoonAvatarsLifetime: null,
+      customCartoonPrompts: false,
     },
     savings: null,
   },
@@ -98,6 +107,9 @@ export const SUBSCRIPTION_PLANS = {
     description: 'Ultimate VIP experience',
     features: [
       'Everything in Premium',
+      { text: '20 AI cartoon avatars/month', badge: 'NEW', badgeColor: '#FF9500' },
+      { text: '✨ Custom avatar prompts (Gold exclusive)', badge: 'EARLY ACCESS', badgeColor: '#5E5CE6' },
+      'Describe your own cartoon style',
       'Gold Crown badge',
       '5 exclusive Gold themes',
       'Advanced color controls',
@@ -133,6 +145,9 @@ export const SUBSCRIPTION_PLANS = {
       profileAnalytics: true,
       verifiedCheckmark: true,
       advancedColorControls: true,
+      cartoonAvatarsMonthly: 20,
+      cartoonAvatarsLifetime: null,
+      customCartoonPrompts: true, // GOLD EXCLUSIVE
     },
     savings: 'Save R100/year',
   },
@@ -203,7 +218,7 @@ export function canUserPerformAction(planId, action) {
  */
 export function getRequiredPlan(featureName) {
   // Gold-exclusive features
-  const goldFeatures = ['goldThemes', 'goldBadge', 'earlyAccess', 'verifiedCheckmark', 'advancedColorControls'];
+  const goldFeatures = ['goldThemes', 'goldBadge', 'earlyAccess', 'verifiedCheckmark', 'advancedColorControls', 'customCartoonPrompts'];
   if (goldFeatures.includes(featureName)) {
     return 'gold';
   }

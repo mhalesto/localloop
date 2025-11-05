@@ -214,19 +214,35 @@ export default function SubscriptionScreen({ navigation }) {
 
               {/* Features */}
               <View style={styles.featuresContainer}>
-                {plan.features.map((feature, idx) => (
-                  <View key={idx} style={styles.featureRow}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={primaryColor}
-                      style={styles.featureIcon}
-                    />
-                    <Text style={[styles.featureText, { color: themeColors.textPrimary }]}>
-                      {feature}
-                    </Text>
-                  </View>
-                ))}
+                {plan.features.map((feature, idx) => {
+                  // Support both string features and object features with badges
+                  const featureText = typeof feature === 'string' ? feature : feature.text;
+                  const featureBadge = typeof feature === 'object' ? feature.badge : null;
+                  const badgeColor = typeof feature === 'object' ? feature.badgeColor : '#FF9500';
+
+                  return (
+                    <View key={idx} style={styles.featureRow}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={primaryColor}
+                        style={styles.featureIcon}
+                      />
+                      <View style={styles.featureTextContainer}>
+                        <Text style={[styles.featureText, { color: themeColors.textPrimary }]}>
+                          {featureText}
+                        </Text>
+                        {featureBadge && (
+                          <View style={[styles.featureBadge, { backgroundColor: `${badgeColor}15` }]}>
+                            <Text style={[styles.featureBadgeText, { color: badgeColor }]}>
+                              {featureBadge}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
 
               {/* Select Button */}
@@ -387,16 +403,35 @@ const styles = StyleSheet.create({
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
   },
   featureIcon: {
     marginTop: 2,
   },
+  featureTextContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   featureText: {
     fontSize: 15,
-    flex: 1,
     lineHeight: 22,
+    flexShrink: 1,
+  },
+  featureBadge: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  featureBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   selectButton: {
     height: 48,

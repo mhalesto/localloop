@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Modal, Dimensions } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useSettings } from '../contexts/SettingsContext';
@@ -7,16 +7,28 @@ const { width, height } = Dimensions.get('window');
 
 export default function LoadingOverlay({ visible, onComplete, animationSource, duration = 5000 }) {
   const { themeColors, isDarkMode } = useSettings();
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (visible) {
+      console.log('[LoadingOverlay] Starting timer for', duration, 'ms');
       // Auto-dismiss after specified duration
-      const timer = setTimeout(() => {
-        onComplete?.();
+      timerRef.current = setTimeout(() => {
+        console.log('[LoadingOverlay] Timer fired, calling onComplete');
+        if (onComplete) {
+          onComplete();
+        }
       }, duration);
-      return () => clearTimeout(timer);
+
+      return () => {
+        console.log('[LoadingOverlay] Cleaning up timer');
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+      };
     }
-  }, [visible, onComplete, duration]);
+  }, [visible, duration]); // Removed onComplete from dependencies to prevent timer reset
 
   const source = animationSource || require('../assets/sandy-loading.json');
 

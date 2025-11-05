@@ -62,14 +62,14 @@ export const CARTOON_STYLES = {
 export const USAGE_LIMITS = {
   basic: {
     monthly: 0,
-    lifetime: 100, // TESTING: Increased to 100 for development
+    lifetime: 5, // Free users get 5 lifetime generations
   },
   premium: {
-    monthly: 100, // TESTING: Increased to 100 for development
+    monthly: 10, // Premium users get 10 generations per month
     lifetime: null, // Unlimited lifetime
   },
   gold: {
-    monthly: 100, // TESTING: Increased to 100 for development
+    monthly: 20, // Gold users get 20 generations per month
     lifetime: null, // Unlimited lifetime
   },
 };
@@ -140,11 +140,12 @@ const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
 /**
  * Generate a cartoon version of a profile picture
  * @param {string} imageUrl - URL of the original profile picture
- * @param {string} styleId - ID of the cartoon style to apply
+ * @param {string} styleId - ID of the cartoon style to apply, or 'custom' for custom prompt
  * @param {string} gender - Optional gender hint (male/female/neutral)
+ * @param {string} customPrompt - Optional custom prompt for Gold users (only used if styleId is 'custom')
  * @returns {Promise<{imageUrl: string, style: string}>}
  */
-export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral') {
+export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null) {
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
@@ -163,16 +164,26 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     await new Promise(resolve => setTimeout(resolve, waitTime));
   }
 
-  const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
+  let prompt;
+  let styleName;
+
+  // Check if using custom prompt (Gold exclusive feature)
+  if (styleId === 'custom' && customPrompt) {
+    styleName = 'Custom';
+    // Enhance the custom prompt with some basic guidelines
+    prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
+    console.log('[profileCartoonService] Using CUSTOM prompt from Gold user');
+  } else {
+    // Use predefined style
+    const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
+    styleName = style.name;
+    const genderHint = gender !== 'neutral' ? `${gender} ` : '';
+    prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+  }
 
   try {
     lastRequestTime = Date.now(); // Update last request time
-    console.log('[profileCartoonService] Starting cartoon generation with style:', style.name);
-
-    // Generate cartoon based on style and gender hint (simple, works reliably)
-    const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-    const prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
-
+    console.log('[profileCartoonService] Starting cartoon generation with style:', styleName);
     console.log('[profileCartoonService] Full prompt:', prompt);
     console.log('[profileCartoonService] Prompt length:', prompt.length);
 
@@ -231,7 +242,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
         return {
           imageUrl: data.data[0].url,
-          style: style.id,
+          style: styleId === 'custom' ? 'custom' : styleId,
           revisedPrompt: data.data[0].revised_prompt,
         };
 
@@ -266,7 +277,7 @@ export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeU
   if (limits.lifetime !== null && lifetimeUsage >= limits.lifetime) {
     return {
       canGenerate: false,
-      reason: `Basic plan users can only generate ${limits.lifetime} cartoon profile. Upgrade to Premium for more!`,
+      reason: `Basic plan users can generate ${limits.lifetime} cartoon profiles. Upgrade to Premium for ${USAGE_LIMITS.premium.monthly}/month!`,
     };
   }
 
@@ -296,8 +307,8 @@ export function getUsageStatsText(subscriptionPlan = 'basic', currentMonthUsage 
 
   if (subscriptionPlan === 'basic') {
     return lifetimeUsage >= limits.lifetime
-      ? 'Used your one-time generation. Upgrade to Premium for 2/month!'
-      : 'One-time generation available';
+      ? `Used all ${limits.lifetime} generations. Upgrade to Premium for ${USAGE_LIMITS.premium.monthly}/month!`
+      : `${lifetimeUsage}/${limits.lifetime} lifetime generations used`;
   }
 
   return `${currentMonthUsage}/${limits.monthly} used this month`;

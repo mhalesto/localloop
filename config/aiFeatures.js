@@ -152,11 +152,12 @@ export const AI_FEATURES_CONFIG = {
    * Profile Cartoon Generator
    * Convert profile picture to cartoon/artistic styles
    * Cost: ~$0.04 per generation (DALL-E 3 Standard)
-   * Usage limits: Basic=1 lifetime, Premium/Gold=2/month
+   * Usage limits: Basic=5 lifetime, Premium=10/month, Gold=20/month
+   * Gold Exclusive: Custom text prompts to describe your own cartoon style
    */
   profileCartoon: {
     enabled: true, // ✅ ENABLED
-    requiresPremium: false, // Basic gets 1, Premium gets more
+    requiresPremium: false, // Basic gets 5, Premium gets 10/month, Gold gets 20/month + custom prompts
     userCanToggle: false, // Always available (usage limited by plan)
   },
 };

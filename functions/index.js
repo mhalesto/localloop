@@ -504,12 +504,15 @@ const crypto = require('crypto');
 // PayFast configuration
 const getPayFastConfig = () => {
   const config = functions.config().payfast || {};
+
+  // PRODUCTION MODE - Using live PayFast
+  // Credentials should be set via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY"
   return {
-    merchantId: config.merchant_id || '10043394', // Sandbox default
-    merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Sandbox default
+    merchantId: config.merchant_id || '10043394', // Fallback to sandbox if not configured
+    merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Fallback to sandbox if not configured
     passphrase: config.passphrase || '',
-    // Use sandbox for testing, change to https://www.payfast.co.za/eng/process for production
-    processUrl: 'https://sandbox.payfast.co.za/eng/process',
+    processUrl: 'https://www.payfast.co.za/eng/process', // PRODUCTION URL
+    // For testing, use: 'https://sandbox.payfast.co.za/eng/process'
   };
 };
 
