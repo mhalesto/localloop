@@ -13,6 +13,7 @@ export function AlertProvider({ children }) {
     buttons: [],
     icon: null,
     iconColor: null,
+    type: null,
   });
 
   const showAlert = useCallback((title, message, buttons = [], options = {}) => {
@@ -32,6 +33,7 @@ export function AlertProvider({ children }) {
       })),
       icon: options.icon || null,
       iconColor: options.iconColor || null,
+      type: options.type || null, // success, error, warning, info
     });
   }, []);
 
@@ -54,6 +56,7 @@ export function AlertProvider({ children }) {
         buttons={alertConfig.buttons}
         icon={alertConfig.icon}
         iconColor={alertConfig.iconColor}
+        type={alertConfig.type}
         themeColors={themeColors}
         accentColor={accentPreset?.buttonBackground}
       />

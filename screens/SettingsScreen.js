@@ -838,11 +838,12 @@ export default function SettingsScreen({ navigation }) {
   // Handle style selection and generation
   const handleGenerateCartoon = async (styleId) => {
     if (!user?.uid || !userProfile?.profilePhoto) {
-      showAlert('Error', 'Please set a profile photo first before generating a cartoon.');
+      showAlert('Error', 'Please set a profile photo first before generating a cartoon.', [], { type: 'warning' });
       return;
     }
 
     setIsGeneratingCartoon(true);
+
     try {
       // Generate cartoon using OpenAI
       const result = await generateCartoonProfile(
@@ -860,14 +861,24 @@ export default function SettingsScreen({ navigation }) {
       // Reload data to update UI
       await loadCartoonData();
 
-      // Close modal and show success
+      // Close modal immediately
       setCartoonStyleModalVisible(false);
-      showAlert('Success', 'Your cartoon avatar has been generated and saved!');
+      setIsGeneratingCartoon(false);
+
+      // Wait for modal to close completely
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Show success alert
+      showAlert('Success', 'Your cartoon avatar has been generated and saved!', [], { type: 'success' });
     } catch (error) {
       console.error('[SettingsScreen] Error generating cartoon:', error);
-      showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.');
-    } finally {
       setIsGeneratingCartoon(false);
+      setCartoonStyleModalVisible(false);
+
+      // Wait for modal to close
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.', [], { type: 'error' });
     }
   };
 
@@ -876,13 +887,22 @@ export default function SettingsScreen({ navigation }) {
     if (!user?.uid) return;
 
     setIsCartoonProcessing(true);
+
+    // Close modal immediately to prevent freezing
+    setCartoonHistoryModalVisible(false);
+
     try {
+      // Wait for modal to fully close
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       await setAsProfilePicture(user.uid, pictureUrl);
       await reloadProfile();
-      showAlert('Success', 'Your cartoon avatar is now your profile picture!');
+
+      // Show success alert after everything completes
+      showAlert('Success', 'Your cartoon avatar is now your profile picture!', [], { type: 'success' });
     } catch (error) {
       console.error('[SettingsScreen] Error setting profile:', error);
-      showAlert('Error', 'Failed to update profile picture. Please try again.');
+      showAlert('Error', 'Failed to update profile picture. Please try again.', [], { type: 'error' });
     } finally {
       setIsCartoonProcessing(false);
     }
@@ -892,16 +912,13 @@ export default function SettingsScreen({ navigation }) {
   const handleDeleteCartoonPicture = async (pictureId) => {
     if (!user?.uid) return;
 
-    setIsCartoonProcessing(true);
     try {
       await removePictureFromHistory(user.uid, pictureId);
       await loadCartoonData();
-      showAlert('Success', 'Cartoon picture deleted.');
+      // Success - no alert needed, user already confirmed
     } catch (error) {
       console.error('[SettingsScreen] Error deleting picture:', error);
-      showAlert('Error', 'Failed to delete picture. Please try again.');
-    } finally {
-      setIsCartoonProcessing(false);
+      showAlert('Error', 'Failed to delete picture. Please try again.', [], { type: 'error' });
     }
   };
 
@@ -910,14 +927,22 @@ export default function SettingsScreen({ navigation }) {
     if (!user?.uid) return;
 
     setIsCartoonProcessing(true);
+
+    // Close modal immediately
+    setCartoonHistoryModalVisible(false);
+
     try {
+      // Wait for modal to close
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       await clearCartoonHistory(user.uid);
       await loadCartoonData();
-      setCartoonHistoryModalVisible(false);
-      showAlert('Success', 'All cartoon pictures cleared.');
+
+      // Show success after completion
+      showAlert('Success', 'All cartoon pictures cleared.', [], { type: 'success' });
     } catch (error) {
       console.error('[SettingsScreen] Error clearing history:', error);
-      showAlert('Error', 'Failed to clear history. Please try again.');
+      showAlert('Error', 'Failed to clear history. Please try again.', [], { type: 'error' });
     } finally {
       setIsCartoonProcessing(false);
     }

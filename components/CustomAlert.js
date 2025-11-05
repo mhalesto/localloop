@@ -20,43 +20,46 @@ export default function CustomAlert({
   buttons = [],
   icon = null,
   iconColor = null,
+  type = null, // success, error, warning, info
   themeColors,
   accentColor,
 }) {
   // Default to single OK button if no buttons provided
   const alertButtons = buttons.length > 0 ? buttons : [{ text: 'OK', onPress: () => {} }];
 
-  const getIconForStyle = (style) => {
-    if (icon) return icon;
-    switch (style) {
-      case 'destructive':
-        return 'alert-circle';
-      case 'cancel':
-        return 'close-circle';
-      default:
-        return 'information-circle';
+  // Get icon and color based on alert type
+  const getIconAndColorForType = () => {
+    // If custom icon/color provided, use those
+    if (icon && iconColor) {
+      return { icon, color: iconColor };
     }
+
+    // Determine based on type or button styles
+    if (type === 'success') {
+      return { icon: 'checkmark-circle', color: '#34C759' };
+    } else if (type === 'error') {
+      return { icon: 'close-circle', color: '#FF3B30' };
+    } else if (type === 'warning') {
+      return { icon: 'warning', color: '#FF9500' };
+    } else if (type === 'info') {
+      return { icon: 'information-circle', color: accentColor || themeColors.primary };
+    }
+
+    // Fall back to button style detection
+    const destructiveButton = alertButtons.find((btn) => btn.style === 'destructive');
+    if (destructiveButton) {
+      return { icon: 'warning', color: '#FF9500' };
+    }
+
+    // Default
+    return { icon: icon || 'information-circle', color: iconColor || accentColor || themeColors.primary };
   };
 
-  const getColorForStyle = (style) => {
-    if (iconColor) return iconColor;
-    switch (style) {
-      case 'destructive':
-        return '#FF3B30';
-      case 'cancel':
-        return themeColors.textSecondary;
-      default:
-        return accentColor || themeColors.primary;
-    }
-  };
+  const { icon: iconToShow, color: iconColorToShow } = getIconAndColorForType();
 
   const primaryButton = alertButtons.find((btn) => btn.style !== 'cancel' && btn.style !== 'destructive');
   const cancelButton = alertButtons.find((btn) => btn.style === 'cancel');
   const destructiveButton = alertButtons.find((btn) => btn.style === 'destructive');
-
-  // Determine which icon to show (use primary button's style or destructive if exists)
-  const iconToShow = destructiveButton ? 'alert-circle' : getIconForStyle(primaryButton?.style);
-  const iconColorToShow = destructiveButton ? '#FF3B30' : getColorForStyle(primaryButton?.style);
 
   return (
     <Modal

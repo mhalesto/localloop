@@ -60,7 +60,12 @@ export default function CartoonStyleModal({
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        // Don't allow closing while generating
+        if (!isGenerating) {
+          onClose();
+        }
+      }}
     >
       <View style={localStyles.modalOverlay}>
         <View style={[localStyles.modalContent, { backgroundColor: themeColors.card }]}>
@@ -71,7 +76,12 @@ export default function CartoonStyleModal({
                 Choose Cartoon Style
               </Text>
               <TouchableOpacity onPress={onClose} disabled={isGenerating}>
-                <Ionicons name="close" size={28} color={themeColors.textSecondary} />
+                <Ionicons
+                  name="close"
+                  size={28}
+                  color={themeColors.textSecondary}
+                  style={{ opacity: isGenerating ? 0.5 : 1 }}
+                />
               </TouchableOpacity>
             </View>
 
@@ -148,7 +158,10 @@ export default function CartoonStyleModal({
               activeOpacity={0.8}
             >
               {isGenerating ? (
-                <ActivityIndicator color="#fff" />
+                <>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={[localStyles.generateButtonText, { marginLeft: 8 }]}>Generating...</Text>
+                </>
               ) : (
                 <>
                   <Ionicons name="color-wand" size={20} color="#fff" />
@@ -156,6 +169,11 @@ export default function CartoonStyleModal({
                 </>
               )}
             </TouchableOpacity>
+            {isGenerating && (
+              <Text style={[localStyles.generatingHint, { color: themeColors.textSecondary }]}>
+                This may take 10-20 seconds. Please wait...
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -264,5 +282,11 @@ const localStyles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '600',
+  },
+  generatingHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
   },
 });

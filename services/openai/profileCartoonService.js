@@ -133,6 +133,10 @@ async function analyzeProfilePicture(imageUrl, apiKey) {
   }
 }
 
+// Track last request time to prevent rate limiting
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
+
 /**
  * Generate a cartoon version of a profile picture
  * @param {string} imageUrl - URL of the original profile picture
@@ -150,9 +154,19 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     throw new Error('OpenAI API key not configured');
   }
 
+  // Rate limiting: ensure minimum time between requests
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    console.log(`[profileCartoonService] Rate limiting: waiting ${waitTime}ms before request`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+
   const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
 
   try {
+    lastRequestTime = Date.now(); // Update last request time
     console.log('[profileCartoonService] Starting cartoon generation with style:', style.name);
 
     // Generate cartoon based on style and gender hint (simple, works reliably)
@@ -162,11 +176,11 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     console.log('[profileCartoonService] Full prompt:', prompt);
     console.log('[profileCartoonService] Prompt length:', prompt.length);
 
-    // Try up to 3 times with exponential backoff
+    // Try up to 2 times with backoff (we already have rate limiting)
     let lastError = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        console.log(`[profileCartoonService] Attempt ${attempt}/3: Generating with DALL-E 3`);
+        console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
         const response = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
@@ -188,22 +202,29 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
           const errorData = await response.json();
           console.error(`[profileCartoonService] Attempt ${attempt} failed:`, errorData);
 
-          // If it's a server error, retry
-          if (errorData.error?.type === 'server_error' && attempt < 3) {
-            const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
+          // If it's a server error and we can retry, wait longer
+          if (errorData.error?.type === 'server_error' && attempt < 2) {
+            const delay = 5000; // Wait 5 seconds before retry
             console.log(`[profileCartoonService] Server error, retrying in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
-            lastError = errorData;
+            lastError = new Error('OpenAI servers are busy. Please try again in a moment.');
             continue;
           }
 
-          throw new Error(errorData.error?.message || 'Failed to generate cartoon profile');
+          // User-friendly error messages
+          if (errorData.error?.type === 'server_error') {
+            throw new Error('OpenAI servers are temporarily busy. Please try again in a few seconds.');
+          } else if (errorData.error?.code === 'rate_limit_exceeded') {
+            throw new Error('Too many requests. Please wait a moment and try again.');
+          } else {
+            throw new Error(errorData.error?.message || 'Failed to generate cartoon. Please try again.');
+          }
         }
 
         const data = await response.json();
 
         if (!data.data || data.data.length === 0) {
-          throw new Error('No image generated');
+          throw new Error('No image generated. Please try again.');
         }
 
         console.log('[profileCartoonService] Successfully generated cartoon');
@@ -215,14 +236,14 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         };
 
       } catch (error) {
-        if (attempt === 3) {
+        if (attempt === 2) {
           throw error;
         }
         lastError = error;
       }
     }
 
-    throw lastError || new Error('Failed after 3 attempts');
+    throw lastError || new Error('Failed after retries. Please try again later.');
 
   } catch (error) {
     console.error('[profileCartoonService] Error:', error);
