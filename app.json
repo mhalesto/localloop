@@ -23,7 +23,7 @@
       "icon": "./assets/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.halalisani.localloop",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMotionUsageDescription": "LocalLoop uses motion sensors to detect your activity and enhance your neighborhood exploration experience.",
