@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,18 +13,21 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { updateUserProfile } from '../services/userProfileService';
+import { useAlert } from '../contexts/AlertContext';
 
 export default function PaymentScreen({ route, navigation }) {
   const { planId, planName, price, currency, interval } = route.params;
   const { themeColors, accentPreset } = useSettings();
-  const { updateUserProfile, user } = useAuth();
+  const { user } = useAuth();
+  const { showAlert } = useAlert();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   const handlePayment = async () => {
     if (!user?.uid) {
-      Alert.alert('Sign In Required', 'Please sign in to subscribe.');
+      showAlert('Sign In Required', 'Please sign in to subscribe.', [{ text: 'OK' }]);
       return;
     }
 
@@ -58,7 +60,7 @@ export default function PaymentScreen({ route, navigation }) {
         await Linking.openURL(paymentUrl);
 
         // Show instructions
-        Alert.alert(
+        showAlert(
           'Complete Payment',
           'You will be redirected to PayFast to complete your payment. Once done, your subscription will be activated automatically.',
           [
@@ -70,7 +72,8 @@ export default function PaymentScreen({ route, navigation }) {
                 navigation.navigate('Subscription');
               },
             },
-          ]
+          ],
+          { icon: 'card', iconColor: primaryColor }
         );
       } else {
         throw new Error('Cannot open payment URL');
@@ -78,9 +81,11 @@ export default function PaymentScreen({ route, navigation }) {
     } catch (error) {
       setIsProcessing(false);
       console.error('[PaymentScreen] Payment error:', error);
-      Alert.alert(
+      showAlert(
         'Payment Error',
-        error.message || 'Unable to process payment. Please try again.'
+        error.message || 'Unable to process payment. Please try again.',
+        [{ text: 'OK' }],
+        { icon: 'alert-circle', iconColor: '#FF3B30' }
       );
     }
   };
@@ -92,7 +97,7 @@ export default function PaymentScreen({ route, navigation }) {
     try {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      await updateUserProfile({
+      await updateUserProfile(user.uid, {
         subscriptionPlan: planId,
         premiumUnlocked: true,
         subscriptionStartDate: Date.now(),
@@ -104,19 +109,26 @@ export default function PaymentScreen({ route, navigation }) {
 
       setIsProcessing(false);
 
-      Alert.alert(
-        'Payment Successful! 🎉',
+      showAlert(
+        'Payment Successful!',
         `You are now subscribed to ${planName}. Enjoy your premium features!`,
         [
           {
             text: 'Great!',
             onPress: () => navigation.navigate('Settings'),
           },
-        ]
+        ],
+        { icon: 'checkmark-circle', iconColor: '#34C759' }
       );
     } catch (error) {
       setIsProcessing(false);
-      Alert.alert('Payment Failed', 'Something went wrong. Please try again.');
+      console.error('[PaymentScreen] Test payment error:', error);
+      showAlert(
+        'Payment Failed',
+        error.message || 'Something went wrong. Please try again.',
+        [{ text: 'OK' }],
+        { icon: 'alert-circle', iconColor: '#FF3B30' }
+      );
     }
   };
 
@@ -223,10 +235,9 @@ export default function PaymentScreen({ route, navigation }) {
           )}
         </TouchableOpacity>
 
-        {/* Subscribe Button - Simulated Payment (disabled - using real PayFast now) */}
-        {/*
+        {/* Subscribe Button - Simulated Payment (for testing) */}
         <TouchableOpacity
-          style={[styles.subscribeButton, { backgroundColor: primaryColor }]}
+          style={[styles.testButton, { backgroundColor: themeColors.textSecondary, opacity: 0.7 }]}
           onPress={handleSimulatedPayment}
           disabled={isProcessing}
           activeOpacity={0.8}
@@ -235,14 +246,13 @@ export default function PaymentScreen({ route, navigation }) {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Ionicons name="lock-closed" size={20} color="#fff" />
+              <Ionicons name="flask" size={20} color="#fff" />
               <Text style={styles.subscribeButtonText}>
-                Subscribe for R{price.toFixed(2)} (Test Mode)
+                Test Mode - Instant Activation
               </Text>
             </>
           )}
         </TouchableOpacity>
-        */}
 
         {/* Security Info */}
         <View style={styles.securityInfo}>
@@ -353,6 +363,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 16,
+  },
+  testButton: {
+    height: 56,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   subscribeButtonText: {
     color: '#fff',

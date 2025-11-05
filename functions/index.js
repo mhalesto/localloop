@@ -626,8 +626,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Merchant details
       merchant_id: config.merchantId,
       merchant_key: config.merchantKey,
-      return_url: `https://localloop.app/payment-success`,
-      cancel_url: `https://localloop.app/payment-cancelled`,
+      return_url: `localloop://payment-success`,
+      cancel_url: `localloop://payment-cancelled`,
       notify_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
 
       // Buyer details
@@ -788,6 +788,41 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
   } catch (error) {
     console.error('[payFastWebhook] Error:', error);
     res.status(500).send('Webhook handler failed');
+  }
+});
+
+/**
+ * Reset User Subscription (for testing)
+ * Allows users to reset their subscription back to basic
+ */
+exports.resetMySubscription = functions.https.onCall(async (data, context) => {
+  // Verify user is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated',
+    );
+  }
+
+  try {
+    const userId = context.auth.uid;
+
+    await admin.firestore().collection('users').doc(userId).update({
+      subscriptionPlan: 'basic',
+      premiumUnlocked: false,
+      subscriptionStartDate: admin.firestore.FieldValue.delete(),
+      subscriptionEndDate: admin.firestore.FieldValue.delete(),
+      payFastPaymentId: admin.firestore.FieldValue.delete(),
+      payFastToken: admin.firestore.FieldValue.delete(),
+      lastPaymentDate: admin.firestore.FieldValue.delete(),
+    });
+
+    console.log(`[resetMySubscription] Reset subscription for user ${userId}`);
+
+    return {success: true, message: 'Subscription reset to basic'};
+  } catch (error) {
+    console.error('[resetMySubscription] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 

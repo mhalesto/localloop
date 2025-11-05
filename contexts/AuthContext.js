@@ -89,6 +89,13 @@ const normalizeProfile = (raw = {}) => ({
   signupBonusAwardedAt: ts(raw.signupBonusAwardedAt),
   lastLoginAt: ts(raw.lastLoginAt),
   lastPremiumRedeemedAt: ts(raw.lastPremiumRedeemedAt),
+  // PayFast subscription fields
+  subscriptionPlan: raw.subscriptionPlan ?? 'basic',
+  premiumUnlocked: raw.premiumUnlocked ?? false,
+  subscriptionStartDate: ts(raw.subscriptionStartDate),
+  subscriptionEndDate: ts(raw.subscriptionEndDate),
+  payFastPaymentId: raw.payFastPaymentId ?? null,
+  payFastToken: raw.payFastToken ?? null,
 });
 
 // ---------- provider ----------
@@ -572,10 +579,21 @@ export function AuthProvider({ children }) {
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
   // ---------- derived ----------
-  const hasActivePremium = useMemo(
-    () => Boolean(profile?.premiumExpiresAt && profile.premiumExpiresAt > Date.now()),
-    [profile?.premiumExpiresAt]
-  );
+  const hasActivePremium = useMemo(() => {
+    const now = Date.now();
+
+    // Check points-based premium (old system)
+    const pointsPremium = Boolean(profile?.premiumExpiresAt && profile.premiumExpiresAt > now);
+
+    // Check PayFast subscription (new system)
+    const payFastPremium = Boolean(
+      profile?.premiumUnlocked &&
+      profile?.subscriptionEndDate &&
+      profile.subscriptionEndDate > now
+    );
+
+    return pointsPremium || payFastPremium;
+  }, [profile?.premiumExpiresAt, profile?.premiumUnlocked, profile?.subscriptionEndDate]);
 
   const pointsToNextPremium = useMemo(() => {
     if (!profile) return PREMIUM_DAY_COST;

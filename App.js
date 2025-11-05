@@ -1,7 +1,7 @@
 // App.js
 import 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Alert, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -47,6 +47,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { StatusesProvider } from './contexts/StatusesContext';
 import { SensorsProvider } from './contexts/SensorsContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { AlertProvider } from './contexts/AlertContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -149,6 +150,73 @@ function AuthGate() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const navigationRef = React.useRef(null);
+
+  // Deep link configuration for PayFast redirects
+  const linking = {
+    prefixes: ['localloop://'],
+    config: {
+      screens: {
+        Subscription: 'subscription',
+      },
+    },
+  };
+
+  // Handle deep links from PayFast
+  useEffect(() => {
+    const handleDeepLink = (event) => {
+      const url = event.url;
+      console.log('[App] Deep link received:', url);
+
+      if (url.includes('payment-success')) {
+        // Payment successful - navigate to subscription screen
+        Alert.alert(
+          'Payment Processing',
+          'Your payment was successful! Your subscription will be activated shortly.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (navigationRef.current) {
+                  navigationRef.current.navigate('Subscription');
+                }
+              },
+            },
+          ]
+        );
+      } else if (url.includes('payment-cancelled')) {
+        // Payment cancelled
+        Alert.alert(
+          'Payment Cancelled',
+          'Your payment was cancelled. You can try again anytime.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (navigationRef.current) {
+                  navigationRef.current.navigate('Subscription');
+                }
+              },
+            },
+          ]
+        );
+      }
+    };
+
+    // Listen for deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   if (showSplash) {
     return <CustomSplashScreen onAnimationComplete={() => setShowSplash(false)} />;
@@ -158,20 +226,22 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <SettingsProvider>
-          <SensorsProvider>
-            <PostsProvider>
-              <StatusesProvider>
-                <NotificationsProvider>
-                  <SafeAreaProvider>
-                    <NavigationContainer>
-                      <StatusBar style="light" />
-                      <AuthGate />
-                    </NavigationContainer>
-                  </SafeAreaProvider>
-                </NotificationsProvider>
-              </StatusesProvider>
-            </PostsProvider>
-          </SensorsProvider>
+          <AlertProvider>
+            <SensorsProvider>
+              <PostsProvider>
+                <StatusesProvider>
+                  <NotificationsProvider>
+                    <SafeAreaProvider>
+                      <NavigationContainer ref={navigationRef} linking={linking}>
+                        <StatusBar style="light" />
+                        <AuthGate />
+                      </NavigationContainer>
+                    </SafeAreaProvider>
+                  </NotificationsProvider>
+                </StatusesProvider>
+              </PostsProvider>
+            </SensorsProvider>
+          </AlertProvider>
         </SettingsProvider>
       </AuthProvider>
     </GestureHandlerRootView>

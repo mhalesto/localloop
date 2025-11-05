@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,49 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS, formatPrice } from '../config/subscriptionPlans';
+import { getUserProfile, updateUserProfile } from '../services/userProfileService';
+import { useAlert } from '../contexts/AlertContext';
 
 export default function SubscriptionScreen({ navigation }) {
   const { themeColors, accentPreset } = useSettings();
-  const { userProfile, updateUserProfile } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState(userProfile?.subscriptionPlan || 'basic');
+  const { user } = useAuth();
+  const { showAlert } = useAlert();
+  const [userProfile, setUserProfile] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState('basic');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load user profile with subscription data
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.uid) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(user.uid);
+        setUserProfile(profile);
+        setSelectedPlan(profile?.subscriptionPlan || 'basic');
+      } catch (error) {
+        console.error('[SubscriptionScreen] Error loading profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [user]);
 
   const handleSelectPlan = async (planId) => {
     if (planId === userProfile?.subscriptionPlan) {
-      Alert.alert('Already Subscribed', 'You are already on this plan.');
+      showAlert('Already Subscribed', 'You are already on this plan.', [{ text: 'OK' }]);
       return;
     }
 
@@ -33,14 +59,29 @@ export default function SubscriptionScreen({ navigation }) {
       // Free plan - immediate activation
       try {
         setIsProcessing(true);
-        await updateUserProfile({
+        await updateUserProfile(user.uid, {
           subscriptionPlan: planId,
           premiumUnlocked: false,
         });
-        Alert.alert('Success', 'You are now on the Basic plan.');
-        navigation.goBack();
+
+        // Reload profile
+        const updatedProfile = await getUserProfile(user.uid);
+        setUserProfile(updatedProfile);
+
+        showAlert(
+          'Success',
+          'You are now on the Basic plan.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }],
+          { icon: 'checkmark-circle', iconColor: '#34C759' }
+        );
       } catch (error) {
-        Alert.alert('Error', 'Failed to update plan. Please try again.');
+        console.error('[SubscriptionScreen] Error updating plan:', error);
+        showAlert(
+          'Error',
+          'Failed to update plan. Please try again.',
+          [{ text: 'OK' }],
+          { icon: 'alert-circle', iconColor: '#FF3B30' }
+        );
       } finally {
         setIsProcessing(false);
       }
@@ -62,6 +103,11 @@ export default function SubscriptionScreen({ navigation }) {
     SUBSCRIPTION_PLANS.GOLD,
   ];
 
+  const currentPlanName = userProfile?.subscriptionPlan || 'basic';
+  const currentPlan = SUBSCRIPTION_PLANS[currentPlanName.toUpperCase()];
+  const isSubscribed = userProfile?.premiumUnlocked && (currentPlanName === 'premium' || currentPlanName === 'gold');
+  const subscriptionEndDate = userProfile?.subscriptionEndDate;
+
   return (
     <ScreenLayout
       title="Choose Your Plan"
@@ -75,7 +121,37 @@ export default function SubscriptionScreen({ navigation }) {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {plans.map((plan, index) => {
+        {/* Current Subscription Status */}
+        {!isLoading && isSubscribed && (
+          <View style={[styles.statusBanner, { backgroundColor: `${accentPreset?.buttonBackground || themeColors.primary}15` }]}>
+            <View style={styles.statusHeader}>
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={accentPreset?.buttonBackground || themeColors.primary}
+              />
+              <Text style={[styles.statusTitle, { color: themeColors.textPrimary }]}>
+                Active Subscription
+              </Text>
+            </View>
+            <Text style={[styles.statusText, { color: themeColors.textSecondary }]}>
+              You're on the <Text style={{ fontWeight: '700' }}>{currentPlan?.name}</Text> plan
+              {subscriptionEndDate && (
+                <Text> • Renews {new Date(subscriptionEndDate).toLocaleDateString()}</Text>
+              )}
+            </Text>
+          </View>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={accentPreset?.buttonBackground || themeColors.primary} />
+          </View>
+        )}
+
+        {/* Plan Cards */}
+        {!isLoading && plans.map((plan, index) => {
           const isCurrentPlan = userProfile?.subscriptionPlan === plan.id;
           const isSelected = selectedPlan === plan.id;
           const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
@@ -186,12 +262,14 @@ export default function SubscriptionScreen({ navigation }) {
         })}
 
         {/* Footer Info */}
+        {!isLoading && (
         <View style={styles.footerInfo}>
           <Ionicons name="information-circle-outline" size={16} color={themeColors.textSecondary} />
           <Text style={[styles.footerText, { color: themeColors.textSecondary }]}>
             You can upgrade, downgrade, or cancel your subscription at any time from your profile settings.
           </Text>
         </View>
+        )}
       </ScrollView>
     </ScreenLayout>
   );
@@ -204,6 +282,31 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
     paddingBottom: 40,
+  },
+  statusBanner: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statusText: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginLeft: 36,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   planCard: {
     borderRadius: 16,

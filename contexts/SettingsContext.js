@@ -1058,14 +1058,29 @@ export function SettingsProvider({ children }) {
     if (hasActivePremium || isDevBuild) {
       return;
     }
+
+    // Disable all premium features
     setPremiumAccentEnabled(false);
-    setAccentKey(baseAccentKey);
     setPremiumTypographyEnabled(false);
     setPremiumTitleFontSizeEnabled(false);
     setPremiumDescriptionFontSizeEnabled(false);
     setPremiumSummariesEnabled(false);
     setPremiumAccentShade(0);
-  }, [hasActivePremium, baseAccentKey, isDevBuild]);
+
+    // Check if current accent is premium, if so reset to first basic theme
+    const currentAccent = accentPresets.find((preset) => preset.key === accentKey);
+    const isPremium = premiumAccentPresets.some((preset) => preset.key === currentAccent?.key);
+
+    if (isPremium) {
+      // Reset to first basic theme (Royal Purple)
+      const firstBasicTheme = baseAccentPresets[0].key;
+      setBaseAccentKey(firstBasicTheme);
+      setAccentKey(firstBasicTheme);
+      // Save to AsyncStorage
+      AsyncStorage.setItem(STORAGE_KEYS.ACCENT_KEY, firstBasicTheme);
+      console.log('[SettingsContext] Premium downgraded: Reset theme from', accentKey, 'to', firstBasicTheme);
+    }
+  }, [hasActivePremium, isDevBuild, accentKey]);
 
   // [PUBLIC-MODE] Load user profile from Firebase
   const loadProfileFromFirebase = useCallback(async () => {
@@ -1073,14 +1088,14 @@ export function SettingsProvider({ children }) {
 
     try {
       const profile = await getUserProfile(user.uid);
-      if (profile && profile.isPublicProfile) {
+      if (profile) {
         setUserProfile(prev => ({
           ...prev,
           username: profile.username || '',
           displayName: profile.displayName || '',
           bio: profile.bio || '',
           profilePhoto: profile.profilePhoto || '',
-          isPublicProfile: true,
+          isPublicProfile: profile.isPublicProfile || false,
           currentMode: profile.currentMode || 'anonymous',
           defaultMode: profile.defaultMode || 'anonymous',
           followersCount: profile.followersCount || 0,
@@ -1089,6 +1104,9 @@ export function SettingsProvider({ children }) {
           allowFollows: profile.allowFollows !== false,
           showFollowers: profile.showFollowers !== false,
           showFollowing: profile.showFollowing !== false,
+          // Load subscription data
+          subscriptionPlan: profile.subscriptionPlan || 'basic',
+          premiumUnlocked: profile.premiumUnlocked || false,
         }));
       }
     } catch (error) {

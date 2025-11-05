@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   ScrollView,
   Switch,
   Text,
@@ -39,6 +38,8 @@ import AIFeaturesSettings from '../components/AIFeaturesSettings';
 import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useSensors } from '../contexts/SensorsContext';
 import { canUserPerformAction, getRequiredPlan, getPlanLimits } from '../config/subscriptionPlans';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { useAlert } from '../contexts/AlertContext';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -84,6 +85,7 @@ export default function SettingsScreen({ navigation }) {
     setPremiumAccentShade,
     userProfile,
     updateUserProfile,
+    reloadProfile,
     locationPermissionStatus,
     setLocationPermissionStatus,
     isDarkMode,
@@ -123,6 +125,8 @@ export default function SettingsScreen({ navigation }) {
     toggleAmbientLight
   } = useSensors();
 
+  const { showAlert } = useAlert();
+
   const [nicknameDraft, setNicknameDraft] = useState(userProfile.nickname ?? '');
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const avatarConfig = getAvatarConfig(userProfile.avatarKey);
@@ -152,6 +156,9 @@ export default function SettingsScreen({ navigation }) {
     requiredPlan: 'premium',
     icon: 'star',
   });
+
+  // Reset subscription state (for testing)
+  const [resettingSubscription, setResettingSubscription] = useState(false);
 
   const isEmailBusy = isSigningIn || isResettingPassword;
 
@@ -477,6 +484,52 @@ export default function SettingsScreen({ navigation }) {
       setPremiumSuccessVisible(true);
     }
   }, [redeemPremiumDay]);
+
+  const handleResetSubscription = useCallback(async () => {
+    showAlert(
+      'Reset Subscription',
+      'This will reset your subscription back to Basic. This is for testing only. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setResettingSubscription(true);
+              const functions = getFunctions();
+              const resetMySubscription = httpsCallable(functions, 'resetMySubscription');
+              const result = await resetMySubscription();
+
+              if (result.data.success) {
+                // Reload profile from Firestore to sync subscription status
+                await reloadProfile();
+
+                // Premium features will auto-disable due to useEffect in SettingsContext
+                showAlert(
+                  'Success',
+                  'Your subscription has been reset to Basic. Premium features have been disabled.',
+                  [{ text: 'OK' }],
+                  { icon: 'checkmark-circle', iconColor: '#34C759' }
+                );
+              }
+            } catch (error) {
+              console.error('[SettingsScreen] Reset error:', error);
+              showAlert(
+                'Error',
+                'Failed to reset subscription. Please try again.',
+                [{ text: 'OK' }],
+                { icon: 'alert-circle', iconColor: '#FF3B30' }
+              );
+            } finally {
+              setResettingSubscription(false);
+            }
+          },
+        },
+      ],
+      { icon: 'refresh', iconColor: '#FF3B30' }
+    );
+  }, [reloadProfile, showAlert]);
 
   const handleTogglePremiumAccent = (value) => {
     // Check if user has access to premium themes
@@ -995,6 +1048,25 @@ export default function SettingsScreen({ navigation }) {
                     {premiumUnlocked ? 'Manage Subscription' : 'View Subscription Plans'}
                   </Text>
                   <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+
+                {/* Reset Subscription Button (Testing Only) */}
+                <TouchableOpacity
+                  style={[styles.subscriptionButton, { backgroundColor: '#ff000010', marginTop: 12 }]}
+                  onPress={handleResetSubscription}
+                  activeOpacity={0.7}
+                  disabled={resettingSubscription}
+                >
+                  {resettingSubscription ? (
+                    <ActivityIndicator size="small" color="#ff0000" />
+                  ) : (
+                    <>
+                      <Ionicons name="refresh-outline" size={20} color="#ff0000" />
+                      <Text style={[styles.subscriptionButtonText, { color: '#ff0000', flex: 1 }]}>
+                        Reset Subscription (Testing)
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             </>
