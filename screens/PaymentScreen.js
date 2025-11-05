@@ -204,8 +204,7 @@ export default function PaymentScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Subscribe Button - Real PayFast (uncomment when functions deployed) */}
-        {/*
+        {/* Subscribe Button - Real PayFast */}
         <TouchableOpacity
           style={[styles.subscribeButton, { backgroundColor: primaryColor }]}
           onPress={handlePayment}
@@ -223,9 +222,9 @@ export default function PaymentScreen({ route, navigation }) {
             </>
           )}
         </TouchableOpacity>
-        */}
 
-        {/* Subscribe Button - Simulated Payment (remove when PayFast ready) */}
+        {/* Subscribe Button - Simulated Payment (disabled - using real PayFast now) */}
+        {/*
         <TouchableOpacity
           style={[styles.subscribeButton, { backgroundColor: primaryColor }]}
           onPress={handleSimulatedPayment}
@@ -243,6 +242,7 @@ export default function PaymentScreen({ route, navigation }) {
             </>
           )}
         </TouchableOpacity>
+        */}
 
         {/* Security Info */}
         <View style={styles.securityInfo}>
@@ -252,11 +252,11 @@ export default function PaymentScreen({ route, navigation }) {
           </Text>
         </View>
 
-        {/* Note about test mode */}
+        {/* Note about sandbox mode */}
         <View style={[styles.noteCard, { backgroundColor: `${primaryColor}10` }]}>
           <Ionicons name="information-circle" size={20} color={primaryColor} />
           <Text style={[styles.noteText, { color: primaryColor }]}>
-            Currently in test mode. Real payments will be enabled after PayFast Firebase Functions are deployed.
+            Currently using PayFast Sandbox for testing. Use test card: 5200 0000 0000 1096 to complete payment.
           </Text>
         </View>
       </ScrollView>
