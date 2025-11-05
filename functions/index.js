@@ -483,3 +483,419 @@ exports.onNewNearbyPost = functions.firestore
       }
     });
 */
+
+// ====================================
+// PAYFAST PAYMENT INTEGRATION
+// ====================================
+
+/**
+ * SETUP INSTRUCTIONS:
+ * 1. Set PayFast credentials:
+ *    firebase functions:config:set payfast.merchant_id="10043394"
+ *    firebase functions:config:set payfast.merchant_key="vxS0fu3o299dm"
+ *    firebase functions:config:set payfast.passphrase="LocalLoop2024Sandbox"
+ * 2. Deploy functions: firebase deploy --only functions
+ *
+ * PayFast Docs: https://developers.payfast.co.za/docs
+ */
+
+const crypto = require('crypto');
+
+// PayFast configuration
+const getPayFastConfig = () => {
+  const config = functions.config().payfast || {};
+  return {
+    merchantId: config.merchant_id || '10043394', // Sandbox default
+    merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Sandbox default
+    passphrase: config.passphrase || 'LocalLoop2024Sandbox', // Sandbox default
+    // Use sandbox for testing, change to https://www.payfast.co.za/eng/process for production
+    processUrl: 'https://sandbox.payfast.co.za/eng/process',
+  };
+};
+
+/**
+ * Generate MD5 signature for PayFast
+ */
+function generatePayFastSignature(data, passphrase = null) {
+  // Create parameter string
+  let pfOutput = '';
+  for (let key in data) {
+    if (data.hasOwnProperty(key)) {
+      if (data[key] !== '') {
+        pfOutput += `${key}=${encodeURIComponent(data[key].toString().trim()).replace(/%20/g, '+')}&`;
+      }
+    }
+  }
+
+  // Remove last ampersand
+  let getString = pfOutput.slice(0, -1);
+
+  if (passphrase !== null) {
+    getString += `&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}`;
+  }
+
+  return crypto.createHash('md5').update(getString).digest('hex');
+}
+
+/**
+ * Create PayFast payment URL with subscription
+ */
+exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
+  // Verify user is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated',
+    );
+  }
+
+  const {planId, planName, amount, interval, userId, userEmail} = data;
+
+  if (!planId || !amount || !interval) {
+    throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Missing required parameters',
+    );
+  }
+
+  try {
+    const config = getPayFastConfig();
+    const uid = context.auth.uid;
+
+    // PayFast subscription frequency
+    // 3 = Monthly, 6 = Annually
+    const frequency = interval === 'year' ? 6 : 3;
+
+    // Create PayFast payment data
+    const paymentData = {
+      // Merchant details
+      merchant_id: config.merchantId,
+      merchant_key: config.merchantKey,
+      return_url: `https://localloop.app/payment-success`,
+      cancel_url: `https://localloop.app/payment-cancelled`,
+      notify_url: `https://${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
+
+      // Buyer details
+      name_first: context.auth.token.name?.split(' ')[0] || 'User',
+      name_last: context.auth.token.name?.split(' ').slice(1).join(' ') || 'Name',
+      email_address: userEmail || context.auth.token.email,
+
+      // Transaction details
+      m_payment_id: `${uid}_${Date.now()}`,
+      amount: amount.toFixed(2),
+      item_name: `LocalLoop ${planName}`,
+      item_description: `${planName} subscription - ${interval}ly billing`,
+
+      // Subscription details
+      subscription_type: '1', // 1 = subscription
+      billing_date: new Date().toISOString().split('T')[0],
+      recurring_amount: amount.toFixed(2),
+      frequency: frequency.toString(),
+      cycles: '0', // 0 = forever
+
+      // Custom fields
+      custom_str1: uid, // User ID
+      custom_str2: planId, // Plan ID
+      custom_str3: interval, // Billing interval
+    };
+
+    // Generate signature
+    const signature = generatePayFastSignature(paymentData, config.passphrase);
+    paymentData.signature = signature;
+
+    // Build payment URL
+    const params = new URLSearchParams(paymentData).toString();
+    const paymentUrl = `${config.processUrl}?${params}`;
+
+    console.log(`[createPayFastPayment] Created for user ${uid}, plan ${planId}`);
+
+    return {
+      paymentUrl,
+      paymentId: paymentData.m_payment_id,
+    };
+  } catch (error) {
+    console.error('[createPayFastPayment] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * PayFast ITN (Instant Transaction Notification) Webhook
+ * Handles payment success and updates user subscription
+ */
+exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method Not Allowed');
+  }
+
+  try {
+    const pfData = req.body;
+    const config = getPayFastConfig();
+
+    console.log('[payFastWebhook] Received ITN:', pfData);
+
+    // Verify signature
+    const pfParamString = {};
+    for (let key in pfData) {
+      if (key !== 'signature') {
+        pfParamString[key] = pfData[key];
+      }
+    }
+
+    const signature = generatePayFastSignature(pfParamString, config.passphrase);
+
+    if (signature !== pfData.signature) {
+      console.error('[payFastWebhook] Invalid signature');
+      return res.status(400).send('Invalid signature');
+    }
+
+    // Check payment status
+    if (pfData.payment_status === 'COMPLETE') {
+      const userId = pfData.custom_str1;
+      const planId = pfData.custom_str2;
+      const interval = pfData.custom_str3;
+
+      // Calculate subscription end date
+      let subscriptionEndDate;
+      if (interval === 'year') {
+        subscriptionEndDate = Date.now() + 365 * 24 * 60 * 60 * 1000;
+      } else {
+        subscriptionEndDate = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      }
+
+      // Update user subscription
+      await admin.firestore().collection('users').doc(userId).update({
+        subscriptionPlan: planId,
+        premiumUnlocked: true,
+        subscriptionStartDate: Date.now(),
+        subscriptionEndDate: subscriptionEndDate,
+        payFastPaymentId: pfData.m_payment_id,
+        payFastToken: pfData.token || null,
+        lastPaymentDate: Date.now(),
+      });
+
+      console.log(`[payFastWebhook] Updated subscription for user ${userId} to ${planId}`);
+
+      // Send notification to user
+      await sendNotificationToUser(userId, {
+        title: 'Subscription Activated! 🎉',
+        body: `Your ${planId === 'gold' ? 'Gold' : 'Premium'} subscription is now active. Enjoy unlimited features!`,
+        data: {
+          type: 'subscription_activated',
+          planId: planId,
+          screen: 'Settings',
+        },
+        channelId: 'default',
+      });
+    } else if (pfData.payment_status === 'FAILED') {
+      const userId = pfData.custom_str1;
+
+      // Notify user of failed payment
+      await sendNotificationToUser(userId, {
+        title: 'Payment Failed',
+        body: 'Your subscription payment failed. Please try again or update your payment method.',
+        data: {
+          type: 'payment_failed',
+          screen: 'Subscription',
+        },
+        channelId: 'default',
+      });
+
+      console.log(`[payFastWebhook] Payment failed for user ${userId}`);
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('[payFastWebhook] Error:', error);
+    res.status(500).send('Webhook handler failed');
+  }
+});
+
+// ====================================
+// STRIPE PAYMENT INTEGRATION (OLD - KEPT FOR REFERENCE)
+// ====================================
+
+// Uncomment after setting up Stripe keys
+/*
+const stripe = require('stripe')(functions.config().stripe.secret_key);
+
+/**
+ * Create a Payment Intent for one-time subscription purchase
+ * Called from mobile app when user wants to subscribe
+ */
+exports.createPaymentIntent = functions.https.onCall(async (data, context) => {
+  // Verify user is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to create payment intent',
+    );
+  }
+
+  const {planId, amount, currency = 'zar'} = data;
+
+  if (!planId || !amount) {
+    throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Missing required parameters: planId, amount',
+    );
+  }
+
+  try {
+    const uid = context.auth.uid;
+
+    // Create or retrieve customer
+    let customer;
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    const userData = userDoc.data();
+
+    if (userData?.stripeCustomerId) {
+      customer = await stripe.customers.retrieve(userData.stripeCustomerId);
+    } else {
+      customer = await stripe.customers.create({
+        email: context.auth.token.email,
+        metadata: {
+          firebaseUID: uid,
+        },
+      });
+
+      // Save customer ID to user document
+      await admin.firestore().collection('users').doc(uid).update({
+        stripeCustomerId: customer.id,
+      });
+    }
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Convert to cents
+      currency: currency.toLowerCase(),
+      customer: customer.id,
+      metadata: {
+        firebaseUID: uid,
+        planId: planId,
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`[createPaymentIntent] Created for user ${uid}, plan ${planId}`);
+
+    return {
+      clientSecret: paymentIntent.client_secret,
+      customerId: customer.id,
+    };
+  } catch (error) {
+    console.error('[createPaymentIntent] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Stripe Webhook Handler
+ * Handles payment success and updates user subscription
+ *
+ * Setup: Add webhook endpoint in Stripe Dashboard
+ * URL: https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/stripeWebhook
+ * Events to listen: payment_intent.succeeded, invoice.payment_succeeded
+ */
+exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = functions.config().stripe?.webhook_secret;
+
+  if (!webhookSecret) {
+    console.error('[stripeWebhook] Webhook secret not configured');
+    return res.status(500).send('Webhook secret not configured');
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+  } catch (err) {
+    console.error('[stripeWebhook] Signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  try {
+    switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        const {firebaseUID, planId} = paymentIntent.metadata;
+
+        if (!firebaseUID || !planId) {
+          console.log('[stripeWebhook] Missing metadata in payment intent');
+          break;
+        }
+
+        // Calculate subscription end date
+        let subscriptionEndDate;
+        if (planId === 'gold') {
+          // Gold is yearly
+          subscriptionEndDate = Date.now() + 365 * 24 * 60 * 60 * 1000;
+        } else {
+          // Premium is monthly
+          subscriptionEndDate = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        }
+
+        // Update user subscription in Firestore
+        await admin.firestore().collection('users').doc(firebaseUID).update({
+          subscriptionPlan: planId,
+          premiumUnlocked: true,
+          subscriptionStartDate: Date.now(),
+          subscriptionEndDate: subscriptionEndDate,
+          stripePaymentIntentId: paymentIntent.id,
+          lastPaymentDate: Date.now(),
+        });
+
+        console.log(`[stripeWebhook] Updated subscription for user ${firebaseUID} to ${planId}`);
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+
+        // Find user by Stripe customer ID
+        const usersSnapshot = await admin.firestore()
+            .collection('users')
+            .where('stripeCustomerId', '==', customerId)
+            .limit(1)
+            .get();
+
+        if (!usersSnapshot.empty) {
+          const userDoc = usersSnapshot.docs[0];
+          // Optionally downgrade or flag account
+          await userDoc.ref.update({
+            paymentFailed: true,
+            lastPaymentFailedDate: Date.now(),
+          });
+
+          // Send notification to user
+          await sendNotificationToUser(userDoc.id, {
+            title: 'Payment Failed',
+            body: 'Your subscription payment failed. Please update your payment method.',
+            data: {
+              type: 'payment_failed',
+              screen: 'Subscription',
+            },
+            channelId: 'default',
+          });
+
+          console.log(`[stripeWebhook] Payment failed for user ${userDoc.id}`);
+        }
+        break;
+      }
+
+      default:
+        console.log(`[stripeWebhook] Unhandled event type: ${event.type}`);
+    }
+
+    res.json({received: true});
+  } catch (error) {
+    console.error('[stripeWebhook] Error handling event:', error);
+    res.status(500).send('Webhook handler failed');
+  }
+});
+*/

@@ -36,7 +36,9 @@ import PremiumBadge from '../components/PremiumBadge';
 import PremiumSuccessModal from '../components/PremiumSuccessModal';
 import LoadingOverlay from '../components/LoadingOverlay';
 import AIFeaturesSettings from '../components/AIFeaturesSettings';
+import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useSensors } from '../contexts/SensorsContext';
+import { canUserPerformAction, getRequiredPlan, getPlanLimits } from '../config/subscriptionPlans';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -142,7 +144,19 @@ export default function SettingsScreen({ navigation }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [enablingDiscovery, setEnablingDiscovery] = useState(false);
 
+  // Upgrade modal state
+  const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState({
+    name: 'Premium Feature',
+    description: 'This feature requires a Premium or Gold subscription',
+    requiredPlan: 'premium',
+    icon: 'star',
+  });
+
   const isEmailBusy = isSigningIn || isResettingPassword;
+
+  // Get user's current plan
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
 
   const emailModeTitle = useMemo(() => {
     switch (emailAuthMode) {
@@ -441,6 +455,22 @@ export default function SettingsScreen({ navigation }) {
     }
   }, []);
 
+  // Show upgrade prompt helper
+  const showUpgradePrompt = useCallback((featureName, featureDescription, requiredPlan, icon) => {
+    setUpgradeFeature({
+      name: featureName,
+      description: featureDescription,
+      requiredPlan,
+      icon,
+    });
+    setUpgradeModalVisible(true);
+  }, []);
+
+  const handleUpgradeNow = useCallback(() => {
+    setUpgradeModalVisible(false);
+    navigation.navigate('Subscription');
+  }, [navigation]);
+
   const handleRedeemPremium = useCallback(async () => {
     const result = await redeemPremiumDay();
     if (result?.ok) {
@@ -449,8 +479,14 @@ export default function SettingsScreen({ navigation }) {
   }, [redeemPremiumDay]);
 
   const handleTogglePremiumAccent = (value) => {
-    if (value && !premiumUnlocked && !isDevBuild) {
-      showPremiumRequiredAlert();
+    // Check if user has access to premium themes
+    if (value && !canUserPerformAction(userPlan, 'premiumThemes')) {
+      showUpgradePrompt(
+        'Premium Gradient Themes',
+        'Unlock 15+ stunning gradient accent themes with smooth animations and beautiful colors.',
+        'premium',
+        'color-palette'
+      );
       return;
     }
     setPremiumAccentEnabled(value);
@@ -519,8 +555,14 @@ export default function SettingsScreen({ navigation }) {
   const summaryLengthOptions = premiumSummaryLengthOptions ?? [];
 
   const handleTogglePremiumTypography = (value) => {
-    if (value && !premiumUnlocked) {
-      showPremiumRequiredAlert();
+    // Check if user has access to custom typography
+    if (value && !canUserPerformAction(userPlan, 'customTypography')) {
+      showUpgradePrompt(
+        'Custom Typography',
+        'Adjust title and description font sizes to match your reading preference.',
+        'premium',
+        'text'
+      );
       return;
     }
     setPremiumTypographyEnabled(value);
@@ -1752,6 +1794,16 @@ export default function SettingsScreen({ navigation }) {
         accentColor={accentSwitchColor}
         initialCountry={userProfile.country || undefined}
         initialProvince={userProfile.province || undefined}
+      />
+
+      <UpgradePromptModal
+        visible={upgradeModalVisible}
+        onClose={() => setUpgradeModalVisible(false)}
+        onUpgrade={handleUpgradeNow}
+        featureName={upgradeFeature.name}
+        featureDescription={upgradeFeature.description}
+        requiredPlan={upgradeFeature.requiredPlan}
+        icon={upgradeFeature.icon}
       />
 
       <PremiumSuccessModal

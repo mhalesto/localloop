@@ -17,9 +17,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import ScreenLayout from '../components/ScreenLayout';
 import CameraCapture from '../components/CameraCapture';
+import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { useStatuses } from '../contexts/StatusesContext';
 import { analyzePostContent } from '../services/openai/moderationService';
+import { canCreateStatus, recordStatusCreated } from '../utils/subscriptionUtils';
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -34,6 +36,10 @@ export default function StatusComposerScreen({ navigation }) {
   const [uploadPct, setUploadPct] = useState(0);
   const [error, setError] = useState('');
   const [showCamera, setShowCamera] = useState(false);
+  const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
+  const [statusLimitInfo, setStatusLimitInfo] = useState({ count: 0, limit: 5, remaining: 5 });
+
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
 
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
@@ -45,6 +51,11 @@ export default function StatusComposerScreen({ navigation }) {
     }
     return { uri, mimeType: blob.type || 'image/jpeg' };
   }, []);
+
+  const handleUpgradeNow = useCallback(() => {
+    setUpgradeModalVisible(false);
+    navigation.navigate('Subscription');
+  }, [navigation]);
 
   const launchImagePicker = useCallback(async () => {
     let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -106,6 +117,15 @@ export default function StatusComposerScreen({ navigation }) {
   const handleSubmit = useCallback(async () => {
     const trimmed = message.trim();
     if (!trimmed) { setError('Write something to share.'); return; }
+
+    // Check status limit
+    const limitCheck = await canCreateStatus(userPlan);
+    if (!limitCheck.allowed) {
+      setStatusLimitInfo(limitCheck);
+      setUpgradeModalVisible(true);
+      return;
+    }
+
     setSubmitting(true);
     setUploadPct(0);
     try {
@@ -129,6 +149,10 @@ export default function StatusComposerScreen({ navigation }) {
         onUploadProgress: (pct) => setUploadPct(pct),
         moderation,
       });
+
+      // Record status creation for limit tracking
+      await recordStatusCreated();
+
       setMessage('');
       setImageUri(null);
       setImageMimeType(null);
@@ -141,7 +165,7 @@ export default function StatusComposerScreen({ navigation }) {
       setSubmitting(false);
       setUploadPct(0);
     }
-  }, [createStatus, imageUri, imageMimeType, message, navigation]);
+  }, [createStatus, imageUri, imageMimeType, message, navigation, userPlan]);
 
   const locationSummary = useMemo(() => {
     const parts = [userProfile?.city, userProfile?.province];
@@ -226,6 +250,16 @@ export default function StatusComposerScreen({ navigation }) {
         onClose={() => setShowCamera(false)}
         onCapture={handleCameraCapture}
         mode="photo"
+      />
+
+      <UpgradePromptModal
+        visible={upgradeModalVisible}
+        onClose={() => setUpgradeModalVisible(false)}
+        onUpgrade={handleUpgradeNow}
+        featureName={`Status Limit Reached (${statusLimitInfo.count}/${statusLimitInfo.limit})`}
+        featureDescription={`You've reached your daily limit of ${statusLimitInfo.limit} statuses. Upgrade to Premium for unlimited statuses!`}
+        requiredPlan="premium"
+        icon="chatbubble-ellipses"
       />
     </ScreenLayout>
   );

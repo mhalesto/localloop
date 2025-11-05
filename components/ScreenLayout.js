@@ -20,6 +20,8 @@ import { analyzeContent } from '../services/openai/contentAnalysisService';
 import { scorePostQuality } from '../services/openai/qualityScoringService';
 import { isFeatureEnabled } from '../config/aiFeatures';
 import { createPublicPost } from '../services/publicPostsService'; // [PUBLIC-MODE]
+import { canCreatePost, recordPostCreated } from '../utils/subscriptionUtils';
+import UpgradePromptModal from './UpgradePromptModal';
 
 export default function ScreenLayout({
   children,
@@ -72,6 +74,11 @@ export default function ScreenLayout({
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [loadingVisible, setLoadingVisible] = useState(false);
+  const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
+  const [postLimitInfo, setPostLimitInfo] = useState({ count: 0, limit: 5, remaining: 5 });
+
+  // Get user's current plan
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
 
   const initialLocation = useMemo(
     () =>
@@ -98,6 +105,15 @@ export default function ScreenLayout({
     if (!firebaseUser?.uid) {
       Alert.alert('Sign in required', 'Sign in to publish posts to the community.');
       setComposerVisible(false);
+      return false;
+    }
+
+    // Check post limit
+    const limitCheck = await canCreatePost(userPlan);
+    if (!limitCheck.allowed) {
+      setPostLimitInfo(limitCheck);
+      setComposerVisible(false);
+      setUpgradeModalVisible(true);
       return false;
     }
 
@@ -133,6 +149,9 @@ export default function ScreenLayout({
       setComposerVisible(false);
       return false;
     }
+
+    // Record post creation for limit tracking
+    await recordPostCreated();
 
     if (!userProfile?.city) {
       updateUserProfile?.({
@@ -358,6 +377,13 @@ export default function ScreenLayout({
     else if (key === 'settings') navigation.navigate('Settings');
   };
 
+  const handleUpgradeNow = useCallback(() => {
+    setUpgradeModalVisible(false);
+    if (navigation) {
+      navigation.navigate('Subscription');
+    }
+  }, [navigation]);
+
   const headerNotificationCount = getNotificationCount ? getNotificationCount() : 0;
   const headerNotifications = useMemo(
     () => (getNotifications ? getNotifications() : []),
@@ -499,6 +525,16 @@ export default function ScreenLayout({
           visible={loadingVisible}
           onComplete={handleLoadingComplete}
           duration={1000}
+        />
+
+        <UpgradePromptModal
+          visible={upgradeModalVisible}
+          onClose={() => setUpgradeModalVisible(false)}
+          onUpgrade={handleUpgradeNow}
+          featureName={`Post Limit Reached (${postLimitInfo.count}/${postLimitInfo.limit})`}
+          featureDescription={`You've reached your daily limit of ${postLimitInfo.limit} posts. Upgrade to Premium for unlimited posts!`}
+          requiredPlan="premium"
+          icon="create"
         />
       </View>
     </SafeAreaView>

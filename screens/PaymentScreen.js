@@ -5,11 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,85 +18,105 @@ import { useAuth } from '../contexts/AuthContext';
 export default function PaymentScreen({ route, navigation }) {
   const { planId, planName, price, currency, interval } = route.params;
   const { themeColors, accentPreset } = useSettings();
-  const { updateUserProfile } = useAuth();
+  const { updateUserProfile, user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('card');
-
-  // Form states
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [cardName, setCardName] = useState('');
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   const handlePayment = async () => {
-    // Validation
-    if (paymentMethod === 'card') {
-      if (!cardNumber || !expiryDate || !cvv || !cardName) {
-        Alert.alert('Missing Information', 'Please fill in all payment details.');
-        return;
-      }
-
-      // Basic card number validation (simplified)
-      if (cardNumber.replace(/\s/g, '').length < 13) {
-        Alert.alert('Invalid Card', 'Please enter a valid card number.');
-        return;
-      }
+    if (!user?.uid) {
+      Alert.alert('Sign In Required', 'Please sign in to subscribe.');
+      return;
     }
 
     setIsProcessing(true);
 
-    // Simulate payment processing
-    setTimeout(async () => {
-      try {
-        // In a real app, this would:
-        // 1. Process payment via payment gateway (Stripe, PayPal, Yoco, etc.)
-        // 2. Create subscription in backend
-        // 3. Update user profile with subscription details
+    try {
+      // PAYFAST INTEGRATION METHOD
+      // Call Firebase Function to generate PayFast payment URL
+      const functions = getFunctions();
+      const createPayFastPayment = httpsCallable(functions, 'createPayFastPayment');
 
-        await updateUserProfile({
-          subscriptionPlan: planId,
-          premiumUnlocked: true,
-          subscriptionStartDate: Date.now(),
-          subscriptionEndDate: interval === 'year'
-            ? Date.now() + 365 * 24 * 60 * 60 * 1000
-            : Date.now() + 30 * 24 * 60 * 60 * 1000,
-        });
+      const { data } = await createPayFastPayment({
+        planId,
+        planName,
+        amount: price,
+        interval, // 'month' or 'year'
+        userId: user.uid,
+        userEmail: user.email,
+      });
 
-        setIsProcessing(false);
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
+      // Open PayFast payment page
+      const paymentUrl = data.paymentUrl;
+      const canOpen = await Linking.canOpenURL(paymentUrl);
+
+      if (canOpen) {
+        await Linking.openURL(paymentUrl);
+
+        // Show instructions
         Alert.alert(
-          'Payment Successful! 🎉',
-          `You are now subscribed to ${planName}. Enjoy your premium features!`,
+          'Complete Payment',
+          'You will be redirected to PayFast to complete your payment. Once done, your subscription will be activated automatically.',
           [
             {
-              text: 'Great!',
+              text: 'OK',
               onPress: () => {
-                navigation.navigate('Settings');
+                setIsProcessing(false);
+                // Optionally navigate back or to a pending screen
+                navigation.navigate('Subscription');
               },
             },
           ]
         );
-      } catch (error) {
-        setIsProcessing(false);
-        Alert.alert('Payment Failed', 'Something went wrong. Please try again.');
+      } else {
+        throw new Error('Cannot open payment URL');
       }
-    }, 2000);
+    } catch (error) {
+      setIsProcessing(false);
+      console.error('[PaymentScreen] Payment error:', error);
+      Alert.alert(
+        'Payment Error',
+        error.message || 'Unable to process payment. Please try again.'
+      );
+    }
   };
 
-  const formatCardNumber = (text) => {
-    const cleaned = text.replace(/\s/g, '');
-    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-    setCardNumber(formatted);
-  };
+  const handleSimulatedPayment = async () => {
+    // Simulated payment for testing (when PayFast Functions not deployed)
+    setIsProcessing(true);
 
-  const formatExpiryDate = (text) => {
-    const cleaned = text.replace(/\//g, '');
-    if (cleaned.length >= 2) {
-      setExpiryDate(cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4));
-    } else {
-      setExpiryDate(cleaned);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await updateUserProfile({
+        subscriptionPlan: planId,
+        premiumUnlocked: true,
+        subscriptionStartDate: Date.now(),
+        subscriptionEndDate:
+          interval === 'year'
+            ? Date.now() + 365 * 24 * 60 * 60 * 1000
+            : Date.now() + 30 * 24 * 60 * 60 * 1000,
+      });
+
+      setIsProcessing(false);
+
+      Alert.alert(
+        'Payment Successful! 🎉',
+        `You are now subscribed to ${planName}. Enjoy your premium features!`,
+        [
+          {
+            text: 'Great!',
+            onPress: () => navigation.navigate('Settings'),
+          },
+        ]
+      );
+    } catch (error) {
+      setIsProcessing(false);
+      Alert.alert('Payment Failed', 'Something went wrong. Please try again.');
     }
   };
 
@@ -142,155 +163,49 @@ export default function PaymentScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Payment Methods */}
+        {/* Payment Method */}
         <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
           Payment Method
         </Text>
 
-        <View style={styles.paymentMethods}>
-          <TouchableOpacity
-            style={[
-              styles.paymentMethodCard,
-              {
-                backgroundColor: themeColors.card,
-                borderColor: paymentMethod === 'card' ? primaryColor : themeColors.divider,
-                borderWidth: paymentMethod === 'card' ? 2 : 1,
-              },
-            ]}
-            onPress={() => setPaymentMethod('card')}
-          >
-            <Ionicons name="card-outline" size={24} color={primaryColor} />
-            <Text style={[styles.paymentMethodText, { color: themeColors.textPrimary }]}>
-              Credit/Debit Card
-            </Text>
-          </TouchableOpacity>
+        {/* PayFast Info Card */}
+        <View style={[styles.paymentMethodCard, { backgroundColor: themeColors.card }]}>
+          <View style={styles.paymentMethodHeader}>
+            <Ionicons name="card" size={32} color={primaryColor} />
+            <View style={styles.paymentMethodInfo}>
+              <Text style={[styles.paymentMethodTitle, { color: themeColors.textPrimary }]}>
+                PayFast Payment Gateway
+              </Text>
+              <Text style={[styles.paymentMethodDescription, { color: themeColors.textSecondary }]}>
+                Secure South African payment processing
+              </Text>
+            </View>
+          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.paymentMethodCard,
-              {
-                backgroundColor: themeColors.card,
-                borderColor: paymentMethod === 'paypal' ? primaryColor : themeColors.divider,
-                borderWidth: paymentMethod === 'paypal' ? 2 : 1,
-              },
-            ]}
-            onPress={() => setPaymentMethod('paypal')}
-          >
-            <Ionicons name="logo-paypal" size={24} color={primaryColor} />
-            <Text style={[styles.paymentMethodText, { color: themeColors.textPrimary }]}>
-              PayPal
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.paymentMethodFeatures}>
+            <View style={styles.featureRow}>
+              <Ionicons name="checkmark-circle" size={16} color={primaryColor} />
+              <Text style={[styles.featureText, { color: themeColors.textSecondary }]}>
+                Credit & Debit Cards
+              </Text>
+            </View>
+            <View style={styles.featureRow}>
+              <Ionicons name="checkmark-circle" size={16} color={primaryColor} />
+              <Text style={[styles.featureText, { color: themeColors.textSecondary }]}>
+                Instant EFT (Bank Transfer)
+              </Text>
+            </View>
+            <View style={styles.featureRow}>
+              <Ionicons name="checkmark-circle" size={16} color={primaryColor} />
+              <Text style={[styles.featureText, { color: themeColors.textSecondary }]}>
+                SnapScan, Zapper & more
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Card Details Form */}
-        {paymentMethod === 'card' && (
-          <View style={styles.formContainer}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-              Card Details
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>
-                Card Number
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: themeColors.background,
-                    color: themeColors.textPrimary,
-                    borderColor: themeColors.divider,
-                  },
-                ]}
-                placeholder="1234 5678 9012 3456"
-                placeholderTextColor={themeColors.textSecondary}
-                value={cardNumber}
-                onChangeText={formatCardNumber}
-                keyboardType="numeric"
-                maxLength={19}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>
-                  Expiry Date
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: themeColors.background,
-                      color: themeColors.textPrimary,
-                      borderColor: themeColors.divider,
-                    },
-                  ]}
-                  placeholder="MM/YY"
-                  placeholderTextColor={themeColors.textSecondary}
-                  value={expiryDate}
-                  onChangeText={formatExpiryDate}
-                  keyboardType="numeric"
-                  maxLength={5}
-                />
-              </View>
-
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>CVV</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: themeColors.background,
-                      color: themeColors.textPrimary,
-                      borderColor: themeColors.divider,
-                    },
-                  ]}
-                  placeholder="123"
-                  placeholderTextColor={themeColors.textSecondary}
-                  value={cvv}
-                  onChangeText={setCvv}
-                  keyboardType="numeric"
-                  maxLength={4}
-                  secureTextEntry
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>
-                Cardholder Name
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: themeColors.background,
-                    color: themeColors.textPrimary,
-                    borderColor: themeColors.divider,
-                  },
-                ]}
-                placeholder="John Doe"
-                placeholderTextColor={themeColors.textSecondary}
-                value={cardName}
-                onChangeText={setCardName}
-                autoCapitalize="words"
-              />
-            </View>
-          </View>
-        )}
-
-        {/* PayPal Message */}
-        {paymentMethod === 'paypal' && (
-          <View style={[styles.paypalMessage, { backgroundColor: `${primaryColor}10` }]}>
-            <Ionicons name="information-circle" size={20} color={primaryColor} />
-            <Text style={[styles.paypalMessageText, { color: primaryColor }]}>
-              You'll be redirected to PayPal to complete your purchase securely.
-            </Text>
-          </View>
-        )}
-
-        {/* Subscribe Button */}
+        {/* Subscribe Button - Real PayFast (uncomment when functions deployed) */}
+        {/*
         <TouchableOpacity
           style={[styles.subscribeButton, { backgroundColor: primaryColor }]}
           onPress={handlePayment}
@@ -303,7 +218,27 @@ export default function PaymentScreen({ route, navigation }) {
             <>
               <Ionicons name="lock-closed" size={20} color="#fff" />
               <Text style={styles.subscribeButtonText}>
-                Subscribe for R{price.toFixed(2)}
+                Pay with PayFast - R{price.toFixed(2)}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+        */}
+
+        {/* Subscribe Button - Simulated Payment (remove when PayFast ready) */}
+        <TouchableOpacity
+          style={[styles.subscribeButton, { backgroundColor: primaryColor }]}
+          onPress={handleSimulatedPayment}
+          disabled={isProcessing}
+          activeOpacity={0.8}
+        >
+          {isProcessing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="lock-closed" size={20} color="#fff" />
+              <Text style={styles.subscribeButtonText}>
+                Subscribe for R{price.toFixed(2)} (Test Mode)
               </Text>
             </>
           )}
@@ -313,7 +248,15 @@ export default function PaymentScreen({ route, navigation }) {
         <View style={styles.securityInfo}>
           <Ionicons name="shield-checkmark" size={16} color={themeColors.textSecondary} />
           <Text style={[styles.securityText, { color: themeColors.textSecondary }]}>
-            Your payment information is encrypted and secure. We never store your card details.
+            Payments processed securely by PayFast. Your payment information is encrypted and never stored on our servers.
+          </Text>
+        </View>
+
+        {/* Note about test mode */}
+        <View style={[styles.noteCard, { backgroundColor: `${primaryColor}10` }]}>
+          <Ionicons name="information-circle" size={20} color={primaryColor} />
+          <Text style={[styles.noteText, { color: primaryColor }]}>
+            Currently in test mode. Real payments will be enabled after PayFast Firebase Functions are deployed.
           </Text>
         </View>
       </ScrollView>
@@ -369,61 +312,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
   },
-  paymentMethods: {
-    flexDirection: 'row',
-    gap: 12,
+  paymentMethodCard: {
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 24,
   },
-  paymentMethodCard: {
-    flex: 1,
+  paymentMethodHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-  },
-  paymentMethodText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  formContainer: {
-    marginBottom: 24,
-  },
-  inputGroup: {
     marginBottom: 16,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    borderWidth: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
+  paymentMethodInfo: {
+    marginLeft: 12,
     flex: 1,
   },
-  paypalMessage: {
+  paymentMethodTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  paymentMethodDescription: {
+    fontSize: 13,
+  },
+  paymentMethodFeatures: {
+    gap: 10,
+  },
+  featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    gap: 8,
   },
-  paypalMessageText: {
+  featureText: {
     fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
   },
   subscribeButton: {
     height: 56,
@@ -444,10 +364,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     paddingHorizontal: 4,
+    marginBottom: 16,
   },
   securityText: {
     fontSize: 12,
     lineHeight: 18,
+    flex: 1,
+  },
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+  },
+  noteText: {
+    fontSize: 13,
+    lineHeight: 20,
     flex: 1,
   },
 });

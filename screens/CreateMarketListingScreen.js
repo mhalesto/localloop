@@ -10,9 +10,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
+import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { countUserActiveListings } from '../services/marketplaceService';
+import { getPlanLimits } from '../config/subscriptionPlans';
 
 const listingCategories = [
   'Essentials',
@@ -44,8 +47,17 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     userProfile?.city ? `${userProfile.city}, ${userProfile.province ?? ''}`.trim() : ''
   );
   const [contact, setContact] = useState(userProfile?.contactMethod ?? '');
+  const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
+  const [listingLimitInfo, setListingLimitInfo] = useState({ count: 0, limit: 3 });
 
-  const handleSubmit = () => {
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
+
+  const handleUpgradeNow = () => {
+    setUpgradeModalVisible(false);
+    navigation.navigate('Subscription');
+  };
+
+  const handleSubmit = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       Alert.alert('Add a title', 'Give your listing a clear title so neighbors know what it is.');
@@ -55,6 +67,21 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     if (!user?.uid) {
       Alert.alert('Sign in required', 'Sign in to publish listings to your neighborhood.');
       return;
+    }
+
+    // Check market listing limit
+    const limits = getPlanLimits(userPlan);
+    const maxListings = limits.marketListingsActive;
+
+    // Only check limit if not unlimited (-1)
+    if (maxListings !== -1) {
+      const currentCount = await countUserActiveListings(user.uid);
+
+      if (currentCount >= maxListings) {
+        setListingLimitInfo({ count: currentCount, limit: maxListings });
+        setUpgradeModalVisible(true);
+        return;
+      }
     }
 
     if (!userProfile?.isPublicProfile || !userProfile?.username || !userProfile?.displayName) {
@@ -280,6 +307,16 @@ export default function CreateMarketListingScreen({ navigation, route }) {
           Listings publish inside your neighborhood room. Add delivery details or availability so neighbors know how to respond.
         </Text>
       </ScrollView>
+
+      <UpgradePromptModal
+        visible={upgradeModalVisible}
+        onClose={() => setUpgradeModalVisible(false)}
+        onUpgrade={handleUpgradeNow}
+        featureName={`Market Listing Limit Reached (${listingLimitInfo.count}/${listingLimitInfo.limit})`}
+        featureDescription={`You've reached your limit of ${listingLimitInfo.limit} active market listings. Upgrade to Premium for unlimited listings!`}
+        requiredPlan="premium"
+        icon="pricetag"
+      />
     </ScreenLayout>
   );
 }

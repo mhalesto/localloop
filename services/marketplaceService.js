@@ -78,3 +78,25 @@ export async function fetchMarketListingsForCity(city, { limit: limitCount = 8 }
     return [];
   }
 }
+
+/**
+ * Count how many active market listings a user has
+ */
+export async function countUserActiveListings(userId) {
+  if (!userId || !db) return 0;
+
+  try {
+    const postsRef = collection(db, 'posts');
+    const q = query(
+      postsRef,
+      where('author.uid', '==', userId),
+      where('isMarketListing', '==', true)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  } catch (error) {
+    console.warn('[Marketplace] Failed to count user listings:', error?.message || error);
+    return 0;
+  }
+}
