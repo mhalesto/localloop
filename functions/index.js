@@ -827,6 +827,239 @@ exports.resetMySubscription = functions.https.onCall(async (data, context) => {
 });
 
 // ====================================
+// DATABASE CLEANUP FUNCTION
+// ====================================
+
+/**
+ * Cleanup all database data (collections and auth users)
+ * HTTP endpoint - requires secret key
+ */
+exports.cleanupDatabaseHTTP = functions.https.onRequest(async (req, res) => {
+  // Only allow POST
+  if (req.method !== 'POST') {
+    res.status(405).json({error: 'Method not allowed'});
+    return;
+  }
+
+  // Check secret key
+  const secretKey = req.body?.secretKey || req.query.secretKey;
+  if (secretKey !== 'cleanup_secret_2024_temp') {
+    console.log('[cleanupDatabaseHTTP] Invalid secret key');
+    res.status(403).json({error: 'Invalid secret key'});
+    return;
+  }
+
+  console.log('[cleanupDatabaseHTTP] Starting cleanup...');
+
+  try {
+    const db = admin.firestore();
+    const auth = admin.auth();
+    const results = {
+      collections: {},
+      authUsers: 0,
+      errors: [],
+    };
+
+    // Delete Firestore collections
+    const collections = [
+      'posts',
+      'statuses',
+      'users',
+      'notifications',
+      'marketListings',
+      'followers',
+      'following',
+      'blocks',
+      'reports',
+    ];
+
+    for (const collectionName of collections) {
+      try {
+        console.log(`[cleanupDatabaseHTTP] Deleting collection: ${collectionName}`);
+        let deletedCount = 0;
+        let query = db.collection(collectionName).limit(100);
+
+        while (true) {
+          const snapshot = await query.get();
+          if (snapshot.empty) break;
+
+          const batch = db.batch();
+          snapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+            deletedCount++;
+          });
+
+          await batch.commit();
+        }
+
+        results.collections[collectionName] = deletedCount;
+        console.log(`[cleanupDatabaseHTTP] Deleted ${deletedCount} documents from ${collectionName}`);
+      } catch (error) {
+        console.error(`[cleanupDatabaseHTTP] Error deleting collection ${collectionName}:`, error);
+        results.errors.push(`${collectionName}: ${error.message}`);
+      }
+    }
+
+    // Delete Authentication users
+    try {
+      console.log('[cleanupDatabaseHTTP] Deleting auth users');
+      let deletedCount = 0;
+      let pageToken;
+
+      do {
+        const listUsersResult = await auth.listUsers(1000, pageToken);
+
+        for (const userRecord of listUsersResult.users) {
+          try {
+            await auth.deleteUser(userRecord.uid);
+            deletedCount++;
+          } catch (error) {
+            console.error(`[cleanupDatabaseHTTP] Error deleting user ${userRecord.uid}:`, error.message);
+            results.errors.push(`User ${userRecord.uid}: ${error.message}`);
+          }
+        }
+
+        pageToken = listUsersResult.pageToken;
+      } while (pageToken);
+
+      results.authUsers = deletedCount;
+      console.log(`[cleanupDatabaseHTTP] Deleted ${deletedCount} auth users`);
+    } catch (error) {
+      console.error('[cleanupDatabaseHTTP] Error deleting auth users:', error);
+      results.errors.push(`Auth users: ${error.message}`);
+    }
+
+    console.log('[cleanupDatabaseHTTP] Cleanup complete', results);
+
+    res.status(200).json({
+      success: true,
+      message: 'Database cleanup complete',
+      results,
+    });
+  } catch (error) {
+    console.error('[cleanupDatabaseHTTP] Fatal error:', error);
+    res.status(500).json({
+      error: 'Internal error',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * Cleanup all database data (collections and auth users)
+ * HTTPS callable function - requires authentication (DEPRECATED - use HTTP version)
+ */
+exports.cleanupDatabase = functions.https.onCall(async (data, context) => {
+  // Require authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated',
+    );
+  }
+
+  const confirmationCode = data?.confirmationCode;
+  if (confirmationCode !== 'DELETE_EVERYTHING_NOW') {
+    throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Invalid confirmation code',
+    );
+  }
+
+  console.log(`[cleanupDatabase] Starting cleanup requested by user ${context.auth.uid}`);
+
+  try {
+    const db = admin.firestore();
+    const auth = admin.auth();
+    const results = {
+      collections: {},
+      authUsers: 0,
+      errors: [],
+    };
+
+    // Delete Firestore collections
+    const collections = [
+      'posts',
+      'statuses',
+      'users',
+      'notifications',
+      'marketListings',
+      'followers',
+      'following',
+      'blocks',
+      'reports',
+    ];
+
+    for (const collectionName of collections) {
+      try {
+        console.log(`[cleanupDatabase] Deleting collection: ${collectionName}`);
+        let deletedCount = 0;
+        let query = db.collection(collectionName).limit(100);
+
+        while (true) {
+          const snapshot = await query.get();
+          if (snapshot.empty) break;
+
+          const batch = db.batch();
+          snapshot.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+            deletedCount++;
+          });
+
+          await batch.commit();
+        }
+
+        results.collections[collectionName] = deletedCount;
+        console.log(`[cleanupDatabase] Deleted ${deletedCount} documents from ${collectionName}`);
+      } catch (error) {
+        console.error(`[cleanupDatabase] Error deleting collection ${collectionName}:`, error);
+        results.errors.push(`${collectionName}: ${error.message}`);
+      }
+    }
+
+    // Delete Authentication users
+    try {
+      console.log('[cleanupDatabase] Deleting auth users');
+      let deletedCount = 0;
+      let pageToken;
+
+      do {
+        const listUsersResult = await auth.listUsers(1000, pageToken);
+
+        for (const userRecord of listUsersResult.users) {
+          try {
+            await auth.deleteUser(userRecord.uid);
+            deletedCount++;
+          } catch (error) {
+            console.error(`[cleanupDatabase] Error deleting user ${userRecord.uid}:`, error.message);
+            results.errors.push(`User ${userRecord.uid}: ${error.message}`);
+          }
+        }
+
+        pageToken = listUsersResult.pageToken;
+      } while (pageToken);
+
+      results.authUsers = deletedCount;
+      console.log(`[cleanupDatabase] Deleted ${deletedCount} auth users`);
+    } catch (error) {
+      console.error('[cleanupDatabase] Error deleting auth users:', error);
+      results.errors.push(`Auth users: ${error.message}`);
+    }
+
+    console.log('[cleanupDatabase] Cleanup complete', results);
+
+    return {
+      success: true,
+      message: 'Database cleanup complete',
+      results,
+    };
+  } catch (error) {
+    console.error('[cleanupDatabase] Fatal error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ====================================
 // STRIPE PAYMENT INTEGRATION - REMOVED (Using PayFast instead)
 // ====================================
 // Stripe doesn't support South Africa, so we use PayFast for payments.
