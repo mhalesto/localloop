@@ -155,13 +155,9 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   try {
     console.log('[profileCartoonService] Starting cartoon generation with style:', style.name);
 
-    // Step 1: Analyze the profile picture to get a description
-    const personDescription = await analyzeProfilePicture(imageUrl, apiKey);
-    console.log('[profileCartoonService] Person description:', personDescription);
-
-    // Step 2: Generate cartoon based on the description
+    // Generate cartoon based on style and gender hint (simple, works reliably)
     const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-    const prompt = `Create a ${genderHint}portrait ${style.prompt} of this person: ${personDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture.`;
+    const prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
 
     console.log('[profileCartoonService] Full prompt:', prompt);
     console.log('[profileCartoonService] Prompt length:', prompt.length);
