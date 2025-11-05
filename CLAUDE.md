@@ -41,9 +41,7 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 #### Technical Details
 
 **Cost:**
-- Vision API (GPT-4o-mini): ~$0.0001 per image analysis
 - DALL-E 3 (Standard quality): $0.04 per generation
-- **Total per generation: ~$0.04**
 - 10,000 generations = $400
 
 **Storage:**
@@ -51,14 +49,13 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 - Automatic cleanup when history exceeds 3 items
 
 **API:**
-- OpenAI Vision API (GPT-4o-mini) for profile analysis
 - OpenAI DALL-E 3 API for cartoon generation
-- Two-step process:
-  1. Vision analyzes profile photo (~150 tokens)
-  2. DALL-E generates cartoon from description
+- Text-to-image generation based on style prompts
+- Generates generic cartoons in chosen artistic style
 - Image size: 1024x1024
 - Quality: Standard (cost-efficient)
 - Style: Vivid (more dramatic colors)
+- Note: Creates stylized portraits, not personalized to user's photo
 
 **Database Schema (Firestore):**
 ```
