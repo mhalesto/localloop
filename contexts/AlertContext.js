@@ -16,11 +16,14 @@ export function AlertProvider({ children }) {
   });
 
   const showAlert = useCallback((title, message, buttons = [], options = {}) => {
+    // If no buttons provided, create a default OK button that dismisses the alert
+    const buttonsToUse = buttons.length > 0 ? buttons : [{ text: 'OK' }];
+
     setAlertConfig({
       visible: true,
       title,
       message,
-      buttons: buttons.map((btn) => ({
+      buttons: buttonsToUse.map((btn) => ({
         ...btn,
         onPress: () => {
           setAlertConfig((prev) => ({ ...prev, visible: false }));
