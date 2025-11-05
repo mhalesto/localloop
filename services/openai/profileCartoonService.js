@@ -75,6 +75,65 @@ export const USAGE_LIMITS = {
 };
 
 /**
+ * Analyze profile picture using Vision API
+ * @param {string} imageUrl - URL of the profile picture
+ * @param {string} apiKey - OpenAI API key
+ * @returns {Promise<string>} Description of the person
+ */
+async function analyzeProfilePicture(imageUrl, apiKey) {
+  try {
+    console.log('[profileCartoonService] Analyzing profile picture with Vision API');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Describe this person\'s appearance in detail for creating a cartoon portrait. Focus on: facial features, hair style and color, skin tone, expression, clothing visible, and any distinctive characteristics. Keep it concise but descriptive (2-3 sentences).',
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl,
+                  detail: 'low', // Use 'low' for cost efficiency
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 150,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[profileCartoonService] Vision API error:', errorData);
+      throw new Error('Failed to analyze profile picture');
+    }
+
+    const data = await response.json();
+    const description = data.choices[0]?.message?.content || '';
+
+    console.log('[profileCartoonService] Profile description:', description);
+    return description;
+
+  } catch (error) {
+    console.error('[profileCartoonService] Error analyzing image:', error);
+    // If analysis fails, return generic description
+    return 'A person with a friendly expression';
+  }
+}
+
+/**
  * Generate a cartoon version of a profile picture
  * @param {string} imageUrl - URL of the original profile picture
  * @param {string} styleId - ID of the cartoon style to apply
@@ -93,12 +152,17 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
   const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
 
-  // Construct the prompt based on gender hint
-  const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-  const prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
-
   try {
-    console.log('[profileCartoonService] Generating cartoon with style:', style.name);
+    console.log('[profileCartoonService] Starting cartoon generation with style:', style.name);
+
+    // Step 1: Analyze the profile picture to get a description
+    const personDescription = await analyzeProfilePicture(imageUrl, apiKey);
+
+    // Step 2: Generate cartoon based on the description
+    const genderHint = gender !== 'neutral' ? `${gender} ` : '';
+    const prompt = `Create a ${genderHint}portrait ${style.prompt} of this person: ${personDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+
+    console.log('[profileCartoonService] Generating cartoon with DALL-E 3');
 
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',

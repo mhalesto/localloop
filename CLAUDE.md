@@ -33,15 +33,17 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
    - Automatic cleanup of old images
 
 4. **User Flow**
-   - Settings ’ Profile ’ "AI Cartoon Avatar"
-   - Tap "Generate" ’ Choose style ’ AI generates
+   - Settings ï¿½ Profile ï¿½ "AI Cartoon Avatar"
+   - Tap "Generate" ï¿½ Choose style ï¿½ AI generates
    - View "History" to manage saved cartoons
    - Set any cartoon as profile picture
 
 #### Technical Details
 
 **Cost:**
-- $0.04 per generation (DALL-E 3 Standard quality)
+- Vision API (GPT-4o-mini): ~$0.0001 per image analysis
+- DALL-E 3 (Standard quality): $0.04 per generation
+- **Total per generation: ~$0.04**
 - 10,000 generations = $400
 
 **Storage:**
@@ -49,7 +51,11 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 - Automatic cleanup when history exceeds 3 items
 
 **API:**
-- OpenAI DALL-E 3 API
+- OpenAI Vision API (GPT-4o-mini) for profile analysis
+- OpenAI DALL-E 3 API for cartoon generation
+- Two-step process:
+  1. Vision analyzes profile photo (~150 tokens)
+  2. DALL-E generates cartoon from description
 - Image size: 1024x1024
 - Quality: Standard (cost-efficient)
 - Style: Vivid (more dramatic colors)
