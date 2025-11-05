@@ -62,14 +62,14 @@ export const CARTOON_STYLES = {
 export const USAGE_LIMITS = {
   basic: {
     monthly: 0,
-    lifetime: 1, // Only once ever
+    lifetime: 100, // TESTING: Increased to 100 for development
   },
   premium: {
-    monthly: 2,
+    monthly: 100, // TESTING: Increased to 100 for development
     lifetime: null, // Unlimited lifetime
   },
   gold: {
-    monthly: 2,
+    monthly: 100, // TESTING: Increased to 100 for development
     lifetime: null, // Unlimited lifetime
   },
 };
