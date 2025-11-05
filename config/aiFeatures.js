@@ -147,6 +147,18 @@ export const AI_FEATURES_CONFIG = {
     requiresPremium: true,
     userCanToggle: false,
   },
+
+  /**
+   * Profile Cartoon Generator
+   * Convert profile picture to cartoon/artistic styles
+   * Cost: ~$0.04 per generation (DALL-E 3 Standard)
+   * Usage limits: Basic=1 lifetime, Premium/Gold=2/month
+   */
+  profileCartoon: {
+    enabled: true, // ✅ ENABLED
+    requiresPremium: false, // Basic gets 1, Premium gets more
+    userCanToggle: false, // Always available (usage limited by plan)
+  },
 };
 
 /**
@@ -301,6 +313,12 @@ export const FEATURE_INFO = {
     description: 'Rates post quality',
     icon: '⭐',
     badge: 'PREMIUM',
+  },
+  profileCartoon: {
+    title: 'Cartoon Profile',
+    description: 'AI-generated cartoon avatar',
+    icon: '🎨',
+    badge: null,
   },
 };
 

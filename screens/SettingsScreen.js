@@ -40,6 +40,18 @@ import { useSensors } from '../contexts/SensorsContext';
 import { canUserPerformAction, getRequiredPlan, getPlanLimits } from '../config/subscriptionPlans';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAlert } from '../contexts/AlertContext';
+import CartoonStyleModal from '../components/CartoonStyleModal';
+import CartoonHistoryModal from '../components/CartoonHistoryModal';
+import { generateCartoonProfile } from '../services/openai/profileCartoonService';
+import {
+  getCartoonProfileData,
+  checkAndResetMonthlyUsage,
+  uploadCartoonToStorage,
+  recordCartoonGeneration,
+  setAsProfilePicture,
+  removePictureFromHistory,
+  clearCartoonHistory,
+} from '../services/cartoonProfileService';
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -147,6 +159,14 @@ export default function SettingsScreen({ navigation }) {
   const [premiumSuccessVisible, setPremiumSuccessVisible] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [enablingDiscovery, setEnablingDiscovery] = useState(false);
+
+  // Cartoon profile state
+  const [cartoonStyleModalVisible, setCartoonStyleModalVisible] = useState(false);
+  const [cartoonHistoryModalVisible, setCartoonHistoryModalVisible] = useState(false);
+  const [cartoonUsageData, setCartoonUsageData] = useState(null);
+  const [cartoonPictureHistory, setCartoonPictureHistory] = useState([]);
+  const [isGeneratingCartoon, setIsGeneratingCartoon] = useState(false);
+  const [isCartoonProcessing, setIsCartoonProcessing] = useState(false);
 
   // Upgrade modal state
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
@@ -781,6 +801,126 @@ export default function SettingsScreen({ navigation }) {
         [featureName]: value,
       },
     });
+  };
+
+  // Load cartoon usage data when screen mounts or user changes
+  useEffect(() => {
+    if (user?.uid) {
+      loadCartoonData();
+    }
+  }, [user?.uid]);
+
+  const loadCartoonData = async () => {
+    try {
+      if (!user?.uid) return;
+
+      const data = await checkAndResetMonthlyUsage(user.uid);
+      setCartoonUsageData({
+        monthlyUsage: data.monthlyUsage,
+        lifetimeUsage: data.lifetimeUsage,
+      });
+      setCartoonPictureHistory(data.pictureHistory || []);
+    } catch (error) {
+      console.error('[SettingsScreen] Error loading cartoon data:', error);
+    }
+  };
+
+  // Open style selection modal
+  const handleOpenCartoonGenerator = () => {
+    setCartoonStyleModalVisible(true);
+  };
+
+  // Open history modal
+  const handleOpenCartoonHistory = () => {
+    setCartoonHistoryModalVisible(true);
+  };
+
+  // Handle style selection and generation
+  const handleGenerateCartoon = async (styleId) => {
+    if (!user?.uid || !userProfile?.profilePhoto) {
+      showAlert('Error', 'Please set a profile photo first before generating a cartoon.');
+      return;
+    }
+
+    setIsGeneratingCartoon(true);
+    try {
+      // Generate cartoon using OpenAI
+      const result = await generateCartoonProfile(
+        userProfile.profilePhoto,
+        styleId,
+        userProfile.gender || 'neutral'
+      );
+
+      // Upload to Firebase Storage
+      const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+
+      // Record generation and update history
+      await recordCartoonGeneration(user.uid, storageUrl, styleId);
+
+      // Reload data to update UI
+      await loadCartoonData();
+
+      // Close modal and show success
+      setCartoonStyleModalVisible(false);
+      showAlert('Success', 'Your cartoon avatar has been generated and saved!');
+    } catch (error) {
+      console.error('[SettingsScreen] Error generating cartoon:', error);
+      showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.');
+    } finally {
+      setIsGeneratingCartoon(false);
+    }
+  };
+
+  // Set cartoon as profile picture
+  const handleSetCartoonAsProfile = async (pictureUrl) => {
+    if (!user?.uid) return;
+
+    setIsCartoonProcessing(true);
+    try {
+      await setAsProfilePicture(user.uid, pictureUrl);
+      await reloadProfile();
+      showAlert('Success', 'Your cartoon avatar is now your profile picture!');
+    } catch (error) {
+      console.error('[SettingsScreen] Error setting profile:', error);
+      showAlert('Error', 'Failed to update profile picture. Please try again.');
+    } finally {
+      setIsCartoonProcessing(false);
+    }
+  };
+
+  // Delete a single cartoon picture
+  const handleDeleteCartoonPicture = async (pictureId) => {
+    if (!user?.uid) return;
+
+    setIsCartoonProcessing(true);
+    try {
+      await removePictureFromHistory(user.uid, pictureId);
+      await loadCartoonData();
+      showAlert('Success', 'Cartoon picture deleted.');
+    } catch (error) {
+      console.error('[SettingsScreen] Error deleting picture:', error);
+      showAlert('Error', 'Failed to delete picture. Please try again.');
+    } finally {
+      setIsCartoonProcessing(false);
+    }
+  };
+
+  // Clear all cartoon history
+  const handleClearCartoonHistory = async () => {
+    if (!user?.uid) return;
+
+    setIsCartoonProcessing(true);
+    try {
+      await clearCartoonHistory(user.uid);
+      await loadCartoonData();
+      setCartoonHistoryModalVisible(false);
+      showAlert('Success', 'All cartoon pictures cleared.');
+    } catch (error) {
+      console.error('[SettingsScreen] Error clearing history:', error);
+      showAlert('Error', 'Failed to clear history. Please try again.');
+    } finally {
+      setIsCartoonProcessing(false);
+    }
   };
 
   return (
@@ -1837,6 +1977,42 @@ export default function SettingsScreen({ navigation }) {
               })}
             </View>
           </View>
+
+          {/* Cartoon Profile Generator */}
+          <View style={styles.profileField}>
+            <Text style={styles.itemTitle}>AI Cartoon Avatar</Text>
+            <Text style={styles.profileSummary}>
+              Transform your profile into a fun cartoon avatar using AI. {'\n'}
+              {userProfile?.subscriptionPlan === 'basic'
+                ? `Basic: 1 lifetime generation${cartoonUsageData?.lifetimeUsage > 0 ? ' (used)' : ' available'}`
+                : `${userProfile?.subscriptionPlan || 'Premium'}: ${cartoonUsageData?.monthlyUsage || 0}/2 used this month`
+              }
+            </Text>
+            <View style={styles.cartoonButtonRow}>
+              <TouchableOpacity
+                style={[styles.cartoonButton, { borderColor: accentSwitchColor, flex: 1 }]}
+                onPress={handleOpenCartoonGenerator}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="color-wand" size={18} color={accentSwitchColor} />
+                <Text style={[styles.cartoonButtonText, { color: accentSwitchColor }]}>
+                  Generate
+                </Text>
+              </TouchableOpacity>
+              {cartoonPictureHistory.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.cartoonButton, { borderColor: themeColors.textSecondary, marginLeft: 8 }]}
+                  onPress={handleOpenCartoonHistory}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="images" size={18} color={themeColors.textSecondary} />
+                  <Text style={[styles.cartoonButtonText, { color: themeColors.textSecondary }]}>
+                    History ({cartoonPictureHistory.length})
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -1887,6 +2063,26 @@ export default function SettingsScreen({ navigation }) {
         visible={authLoading}
         onComplete={() => setAuthLoading(false)}
         duration={2000}
+      />
+
+      <CartoonStyleModal
+        visible={cartoonStyleModalVisible}
+        onClose={() => setCartoonStyleModalVisible(false)}
+        onStyleSelect={handleGenerateCartoon}
+        userProfile={userProfile}
+        usageData={cartoonUsageData}
+        isGenerating={isGeneratingCartoon}
+      />
+
+      <CartoonHistoryModal
+        visible={cartoonHistoryModalVisible}
+        onClose={() => setCartoonHistoryModalVisible(false)}
+        pictureHistory={cartoonPictureHistory}
+        currentProfilePhoto={userProfile?.profilePhoto}
+        onSetAsProfile={handleSetCartoonAsProfile}
+        onDelete={handleDeleteCartoonPicture}
+        onClearAll={handleClearCartoonHistory}
+        isProcessing={isCartoonProcessing}
       />
     </ScreenLayout>
   );
@@ -2412,6 +2608,25 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       alignSelf: 'flex-start'
     },
     profileButtonText: {
+      fontSize: 13,
+      fontWeight: '600'
+    },
+    cartoonButtonRow: {
+      flexDirection: 'row',
+      marginTop: 12,
+      gap: 8
+    },
+    cartoonButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderWidth: 1.5,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 16
+    },
+    cartoonButtonText: {
       fontSize: 13,
       fontWeight: '600'
     },
