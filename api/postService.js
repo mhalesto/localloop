@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit as limitQuery,
   onSnapshot,
@@ -139,6 +140,47 @@ export async function reportPostRemote(postId, userId, reason = 'inappropriate')
   } catch (error) {
     console.warn('[postService] reportPostRemote failed', error);
     return { ok: false, error: error?.message ?? 'report_failed' };
+  }
+}
+
+export async function fetchPostById(postId) {
+  try {
+    ensureDb();
+  } catch (error) {
+    console.warn('[postService] fetchPostById skipped:', error.message);
+    return null;
+  }
+
+  if (!postId) {
+    return null;
+  }
+
+  try {
+    const postRef = doc(db, POSTS_COLLECTION, postId);
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) {
+      return null;
+    }
+
+    const data = postSnap.data();
+    const normalizedTitle =
+      typeof data.title === 'string' && data.title.trim().length > 0
+        ? data.title
+        : typeof data.message === 'string'
+        ? data.message
+        : '';
+
+    return {
+      id: postSnap.id,
+      ...data,
+      title: normalizedTitle,
+      createdAt: normaliseTimestamp(data.createdAt),
+      highlightDescription: !!data.highlightDescription
+    };
+  } catch (error) {
+    console.warn('[postService] fetchPostById failed:', error);
+    return null;
   }
 }
 

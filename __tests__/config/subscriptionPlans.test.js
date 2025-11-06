@@ -76,7 +76,7 @@ describe('subscriptionPlans', () => {
       expect(limits.postsPerDay).toBe(-1);
       expect(limits.customThemes).toBe(true);
       expect(limits.aiFeatures).toBe(true);
-      expect(limits.premiumBadge).toBe(true);
+      expect(limits.premiumBadge).toBe(false); // Gold has its own goldBadge instead
       expect(limits.prioritySupport).toBe(true);
       expect(limits.earlyAccess).toBe(true);
       expect(limits.goldBadge).toBe(true);

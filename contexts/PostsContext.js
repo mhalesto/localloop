@@ -1285,6 +1285,36 @@ export function PostsProvider({ children }) {
     [postsByCity]
   );
 
+  const addFetchedPost = useCallback(
+    (city, post) => {
+      if (!city || !post || !post.id) {
+        console.warn('[PostsProvider] addFetchedPost: invalid parameters');
+        return false;
+      }
+
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        // Check if post already exists
+        const existingIndex = cityPosts.findIndex((p) => p.id === post.id);
+
+        if (existingIndex >= 0) {
+          // Post already exists, don't add again
+          return prev;
+        }
+
+        // Add the post to the city's posts
+        const updatedCityPosts = [...cityPosts, post];
+        return {
+          ...prev,
+          [city]: updatedCityPosts
+        };
+      });
+
+      return true;
+    },
+    [setPostsWithPersist]
+  );
+
   const getAllPosts = useCallback(() => {
     return Object.entries(postsByCity).flatMap(([city, posts]) =>
       posts.map((post) => ({ ...post, city }))
@@ -1904,6 +1934,7 @@ export function PostsProvider({ children }) {
     () => ({
       addComment,
       addPost,
+      addFetchedPost,
       deletePost,
       getPostById,
       getPostsForCity,
@@ -1935,6 +1966,7 @@ export function PostsProvider({ children }) {
     [
       addComment,
       addPost,
+      addFetchedPost,
       deletePost,
       getPostById,
       getPostsForCity,

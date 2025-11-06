@@ -2648,6 +2648,27 @@ export default function PostThreadScreen({ route, navigation }) {
     ]
   );
 
+  // Show loading indicator while post is being fetched
+  if (!hasPost) {
+    return (
+      <ScreenLayout
+        title="Thread"
+        subtitle={`${city} Room`}
+        onBack={() => navigation.goBack()}
+        navigation={navigation}
+        activeTab="home"
+        showFooter={false}
+      >
+        <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
+          <ActivityIndicator size="large" color={primaryColor} />
+          <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
+            Loading post...
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   return (
     <ScreenLayout
       title="Thread"
@@ -3241,6 +3262,17 @@ const createStyles = (
   const resolvedDescriptionLineHeight = Math.round(resolvedDescriptionFontSize * 1.33);
 
   return StyleSheet.create({
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+    },
+    loadingText: {
+      fontSize: 16,
+      marginTop: 16,
+      textAlign: 'center',
+    },
     /* Sticky header wrapper so the pinned card blends with background */
     stickyHeaderWrap: {
       width: '100%',

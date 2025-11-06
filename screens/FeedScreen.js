@@ -19,6 +19,7 @@ import { usePosts } from '../contexts/PostsContext';
 import { getFeedPosts, togglePublicPostVote } from '../services/publicPostsService';
 import { getFollowing } from '../services/followService';
 import { fetchMarketListingsForCity } from '../services/marketplaceService';
+import { fetchPostById } from '../api/postService';
 import useHaptics from '../hooks/useHaptics';
 
 const categoryVisuals = {
@@ -39,7 +40,7 @@ export default function FeedScreen({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
-  const { getPostById, getPostsForCity, refreshPosts } = usePosts();
+  const { getPostById, getPostsForCity, refreshPosts, addFetchedPost } = usePosts();
   const [rawFeedPosts, setRawFeedPosts] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +166,7 @@ export default function FeedScreen({ navigation }) {
   );
 
   const handleOpenPost = useCallback(
-    (post) => {
+    async (post) => {
       if (!post?.id) {
         Alert.alert('Post unavailable', 'We could not open this post right now.');
         return;
@@ -178,26 +179,62 @@ export default function FeedScreen({ navigation }) {
       openRequestsRef.current.add(post.id);
       haptics.light();
 
-      // Navigate immediately with available data
       // If we have sourceCity/sourcePostId, use those (original post)
       // Otherwise use the post's own data
       const targetCity = post.sourceCity || post.city;
       const targetPostId = post.sourcePostId || post.id;
 
-      if (targetCity && targetPostId) {
+      if (!targetCity || !targetPostId) {
+        openRequestsRef.current.delete(post.id);
+        Alert.alert(
+          'Post unavailable',
+          'We could not locate the original thread for this post. It may have been removed.'
+        );
+        return;
+      }
+
+      // Check if the post exists in cache
+      const existingPost = getPostById(targetCity, targetPostId);
+
+      if (existingPost) {
+        // Post exists, navigate immediately
         navigation.navigate('PostThread', { city: targetCity, postId: targetPostId });
         openRequestsRef.current.delete(post.id);
         return;
       }
 
-      // Fallback: if we don't have the data, show error
-      openRequestsRef.current.delete(post.id);
-      Alert.alert(
-        'Post unavailable',
-        'We could not locate the original thread for this post. It may have been removed.'
-      );
+      // Post doesn't exist in cache, fetch it from Firestore
+      try {
+        console.log('[Feed] Fetching missing post:', targetPostId, 'from city:', targetCity);
+        const fetchedPost = await fetchPostById(targetPostId);
+
+        if (fetchedPost) {
+          // Add the fetched post to the cache
+          const city = fetchedPost.city || fetchedPost.sourceCity || targetCity;
+          addFetchedPost(city, { ...fetchedPost, city });
+          console.log('[Feed] Successfully fetched and cached post:', targetPostId);
+
+          // Navigate to the post
+          navigation.navigate('PostThread', { city, postId: targetPostId });
+        } else {
+          // Post not found in Firestore
+          console.warn('[Feed] Post not found in Firestore:', targetPostId);
+          Alert.alert(
+            'Post unavailable',
+            'This post is no longer available. It may have been removed.'
+          );
+        }
+      } catch (error) {
+        console.error('[Feed] Error fetching post:', error);
+        Alert.alert(
+          'Error',
+          'Could not load the post. Please check your connection and try again.'
+        );
+      } finally {
+        openRequestsRef.current.delete(post.id);
+      }
     },
-    [haptics, navigation]
+    [haptics, navigation, getPostById, addFetchedPost]
   );
 
   const navigateToProfile = useCallback(
