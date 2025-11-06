@@ -194,41 +194,73 @@
         async function loadStats() {
             try {
                 // Get total users
-                const usersSnapshot = await getCountFromServer(collection(db, 'users'));
-                document.getElementById('totalUsers').textContent = usersSnapshot.data().count.toLocaleString();
+                try {
+                    const usersSnapshot = await getCountFromServer(collection(db, 'users'));
+                    document.getElementById('totalUsers').textContent = usersSnapshot.data().count.toLocaleString();
+                } catch (error) {
+                    console.warn('Error loading user count:', error);
+                    document.getElementById('totalUsers').textContent = '0';
+                }
 
                 // Get active posts (last 7 days)
-                const sevenDaysAgo = new Date();
-                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                const postsQuery = query(
-                    collection(db, 'posts'),
-                    where('createdAt', '>=', Timestamp.fromDate(sevenDaysAgo))
-                );
-                const postsSnapshot = await getCountFromServer(postsQuery);
-                document.getElementById('activePosts').textContent = postsSnapshot.data().count.toLocaleString();
+                try {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    const postsQuery = query(
+                        collection(db, 'posts'),
+                        where('createdAt', '>=', Timestamp.fromDate(sevenDaysAgo))
+                    );
+                    const postsSnapshot = await getCountFromServer(postsQuery);
+                    document.getElementById('activePosts').textContent = postsSnapshot.data().count.toLocaleString();
+                } catch (error) {
+                    console.warn('Error loading active posts:', error);
+                    // Fallback to simple count
+                    try {
+                        const postsSnapshot = await getCountFromServer(collection(db, 'posts'));
+                        document.getElementById('activePosts').textContent = postsSnapshot.data().count.toLocaleString();
+                    } catch (fallbackError) {
+                        document.getElementById('activePosts').textContent = '0';
+                    }
+                }
 
-                // Get today's reports
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const reportsQuery = query(
-                    collection(db, 'reports'),
-                    where('createdAt', '>=', Timestamp.fromDate(today))
-                );
-                const reportsSnapshot = await getCountFromServer(reportsQuery);
-                document.getElementById('reportsToday').textContent = reportsSnapshot.data().count;
+                // Get today's reports - handle permission errors
+                try {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const reportsQuery = query(
+                        collection(db, 'reports'),
+                        where('createdAt', '>=', Timestamp.fromDate(today))
+                    );
+                    const reportsSnapshot = await getCountFromServer(reportsQuery);
+                    document.getElementById('reportsToday').textContent = reportsSnapshot.data().count;
+                } catch (error) {
+                    if (error.code === 'permission-denied') {
+                        console.warn('Reports access denied - admin permissions may be required');
+                        document.getElementById('reportsToday').textContent = '0';
+                    } else {
+                        console.warn('Error loading reports:', error);
+                        document.getElementById('reportsToday').textContent = '0';
+                    }
+                }
 
-                // Calculate monthly revenue
-                const usersSnapshot2 = await getDocs(collection(db, 'users'));
-                let revenue = 0;
-                usersSnapshot2.forEach(doc => {
-                    const user = doc.data();
-                    if (user.subscriptionPlan === 'premium') revenue += 99;
-                    if (user.subscriptionPlan === 'gold') revenue += 199;
-                });
-                document.getElementById('monthlyRevenue').textContent = `R${revenue.toLocaleString()}`;
+                // Calculate monthly revenue - using consistent pricing
+                try {
+                    const usersSnapshot2 = await getDocs(collection(db, 'users'));
+                    let revenue = 0;
+                    usersSnapshot2.forEach(doc => {
+                        const user = doc.data();
+                        // Use consistent pricing: Premium R99, Gold R199
+                        if (user.subscriptionPlan === 'premium') revenue += 99;
+                        if (user.subscriptionPlan === 'gold') revenue += 199;
+                    });
+                    document.getElementById('monthlyRevenue').textContent = `R${revenue.toLocaleString()}`;
+                } catch (error) {
+                    console.warn('Error calculating revenue:', error);
+                    document.getElementById('monthlyRevenue').textContent = 'R0';
+                }
             } catch (error) {
                 console.error('Error loading stats:', error);
-                showMessage('Error loading statistics', 'error');
+                // Don't show error message to avoid spam, just log it
             }
         }
 
@@ -436,8 +468,8 @@
 
         // Load reports
         async function loadReports() {
+            const tbody = document.getElementById('reportsTableBody');
             try {
-                const tbody = document.getElementById('reportsTableBody');
                 tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">Loading reports...</td></tr>';
 
                 const reportsQuery = query(
@@ -486,7 +518,14 @@
                 }
             } catch (error) {
                 console.error('Error loading reports:', error);
-                showMessage('Error loading reports', 'error');
+                tbody.innerHTML = '';
+                if (error.code === 'permission-denied') {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">Admin access required to view reports</td></tr>';
+                } else if (error.message?.includes('index')) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">Database indexes are being created. Please try again in a few minutes.</td></tr>';
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">Unable to load reports</td></tr>';
+                }
             }
         }
 
