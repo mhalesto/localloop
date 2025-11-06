@@ -80,7 +80,8 @@ service cloud.firestore {
             .hasAny(['authorId', 'createdAt'])
         );
 
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn()
+        && resource.data.authorId == request.auth.uid;
 
       match /replies/{replyId} {
         allow read: if true;

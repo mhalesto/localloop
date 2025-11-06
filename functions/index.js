@@ -2,6 +2,9 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {sendNotificationToUser} = require("./notificationHelper");
 
+// Load environment variables from .env file (for local development and new deployment method)
+require('dotenv').config();
+
 admin.initializeApp();
 
 // ====================================
@@ -621,16 +624,22 @@ const crypto = require('crypto');
 
 // PayFast configuration
 const getPayFastConfig = () => {
-  const config = functions.config().payfast || {};
+  // Try new env variables first, fall back to functions.config() for backward compatibility
+  const merchantId = process.env.PAYFAST_MERCHANT_ID || functions.config().payfast?.merchant_id;
+  const merchantKey = process.env.PAYFAST_MERCHANT_KEY || functions.config().payfast?.merchant_key;
+  const passphrase = process.env.PAYFAST_PASSPHRASE || functions.config().payfast?.passphrase || '';
 
-  // PRODUCTION MODE - Using live PayFast
-  // Credentials should be set via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY"
+  // Ensure production credentials are configured
+  if (!merchantId || !merchantKey) {
+    console.error('[getPayFastConfig] PayFast credentials not configured');
+    throw new Error('PayFast payment processing is not configured. Please contact support.');
+  }
+
   return {
-    merchantId: config.merchant_id || '10043394', // Fallback to sandbox if not configured
-    merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Fallback to sandbox if not configured
-    passphrase: config.passphrase || '',
+    merchantId,
+    merchantKey,
+    passphrase,
     processUrl: 'https://www.payfast.co.za/eng/process', // PRODUCTION URL
-    // For testing, use: 'https://sandbox.payfast.co.za/eng/process'
   };
 };
 
@@ -710,6 +719,305 @@ function generatePayFastSignature(data, passphrase = null) {
 
   return crypto.createHash('md5').update(signatureBase).digest('hex');
 }
+
+// ====================================
+// ADMIN MANAGEMENT
+// ====================================
+
+/**
+ * Set admin custom claim for a user
+ * Only existing admins can grant admin access to other users
+ */
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+  // Verify the caller is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated',
+    );
+  }
+
+  // Check if the caller is an admin
+  if (!context.auth.token.admin) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'Only admins can grant admin access',
+    );
+  }
+
+  const {targetUserId, isAdmin} = data;
+
+  if (!targetUserId) {
+    throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Target user ID is required',
+    );
+  }
+
+  try {
+    // Set custom user claim for admin
+    await admin.auth().setCustomUserClaims(targetUserId, {admin: isAdmin});
+
+    console.log(`[setAdminClaim] Admin ${context.auth.uid} set admin=${isAdmin} for user ${targetUserId}`);
+
+    return {
+      success: true,
+      message: `Admin claim ${isAdmin ? 'granted' : 'revoked'} for user ${targetUserId}`,
+    };
+  } catch (error) {
+    console.error('[setAdminClaim] Error:', error);
+    throw new functions.https.HttpsError(
+        'internal',
+        'Failed to set admin claim',
+    );
+  }
+});
+
+// ====================================
+// OPENAI API PROXY (SECURE)
+// ====================================
+
+/**
+ * Rate limiting helper for AI features
+ * Tracks usage per user to prevent abuse
+ */
+async function checkRateLimit(userId, service) {
+  const now = Date.now();
+  const minuteAgo = now - 60000;
+  const dayAgo = now - 86400000;
+
+  // Get rate limits from environment or use defaults
+  const limitPerMinute = parseInt(process.env.RATE_LIMIT_OPENAI_PER_MINUTE || '10');
+  const limitPerDay = parseInt(process.env.RATE_LIMIT_OPENAI_PER_DAY || '100');
+
+  const rateLimitDoc = admin.firestore().collection('rateLimits').doc(userId);
+
+  try {
+    const doc = await rateLimitDoc.get();
+    const data = doc.exists ? doc.data() : {};
+
+    // Get or initialize usage arrays
+    const recentRequests = data.requests || [];
+
+    // Filter requests within time windows
+    const requestsLastMinute = recentRequests.filter(timestamp => timestamp > minuteAgo);
+    const requestsLastDay = recentRequests.filter(timestamp => timestamp > dayAgo);
+
+    // Check limits
+    if (requestsLastMinute.length >= limitPerMinute) {
+      console.log(`[RateLimit] User ${userId} exceeded per-minute limit for ${service}`);
+      throw new functions.https.HttpsError(
+          'resource-exhausted',
+          'Too many requests. Please wait a minute and try again.',
+      );
+    }
+
+    if (requestsLastDay.length >= limitPerDay) {
+      console.log(`[RateLimit] User ${userId} exceeded daily limit for ${service}`);
+      throw new functions.https.HttpsError(
+          'resource-exhausted',
+          'Daily limit reached. Please try again tomorrow.',
+      );
+    }
+
+    // Add current request and clean old ones
+    const updatedRequests = [...requestsLastDay, now];
+
+    // Update Firestore
+    await rateLimitDoc.set({
+      requests: updatedRequests,
+      lastRequest: now,
+      service,
+      userId,
+    }, {merge: true});
+
+    return {
+      minuteUsage: requestsLastMinute.length + 1,
+      dailyUsage: requestsLastDay.length + 1,
+      limitPerMinute,
+      limitPerDay,
+    };
+  } catch (error) {
+    if (error.code && error.code.includes('resource-exhausted')) {
+      throw error;
+    }
+    console.error('[RateLimit] Error checking rate limit:', error);
+    // Don't block on rate limit errors, just log them
+    return {minuteUsage: 0, dailyUsage: 0, limitPerMinute, limitPerDay};
+  }
+}
+
+/**
+ * Secure OpenAI API proxy - handles all OpenAI requests from the client
+ * This ensures API keys are never exposed to the client
+ * Includes rate limiting to prevent abuse
+ */
+exports.openAIProxy = functions.https.onCall(async (data, context) => {
+  // Verify user is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to use AI features',
+    );
+  }
+
+  // Optional: Enforce App Check for additional security
+  // Uncomment when App Check is fully configured in production
+  // if (!context.app) {
+  //   console.warn('[openAIProxy] App Check token missing or invalid');
+  //   // In production, you should reject requests without valid App Check tokens:
+  //   // throw new functions.https.HttpsError('failed-precondition', 'Invalid app');
+  // }
+
+  const {service, params} = data;
+  const userId = context.auth.uid;
+
+  // Check rate limits
+  await checkRateLimit(userId, service);
+
+  // Get OpenAI API key from environment (with fallback to functions.config for backward compatibility)
+  const openaiKey = process.env.OPENAI_API_KEY || functions.config().openai?.key;
+  if (!openaiKey) {
+    console.error('[openAIProxy] OpenAI API key not configured');
+    throw new functions.https.HttpsError(
+        'failed-precondition',
+        'OpenAI service is not configured. Please contact support.',
+    );
+  }
+
+  try {
+    let response;
+
+    switch (service) {
+      case 'cartoon-profile':
+        // Generate cartoon profile using DALL-E 3
+        response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3',
+            prompt: params.prompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'standard',
+            style: 'vivid',
+          }),
+        });
+        break;
+
+      case 'summarization':
+        // Text summarization
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: params.model || 'gpt-3.5-turbo',
+            messages: params.messages,
+            temperature: params.temperature || 0.3,
+            max_tokens: params.max_tokens || 150,
+          }),
+        });
+        break;
+
+      case 'moderation':
+        // Content moderation
+        response = await fetch('https://api.openai.com/v1/moderations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: params.input,
+          }),
+        });
+        break;
+
+      case 'auto-tagging':
+        // Auto-generate tags for posts
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: params.messages,
+            temperature: 0.5,
+            max_tokens: 50,
+          }),
+        });
+        break;
+
+      case 'translation':
+        // Translate text
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: params.messages,
+            temperature: 0.3,
+            max_tokens: params.max_tokens || 500,
+          }),
+        });
+        break;
+
+      case 'embeddings':
+        // Generate embeddings for semantic search
+        response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-ada-002',
+            input: params.input,
+          }),
+        });
+        break;
+
+      default:
+        throw new functions.https.HttpsError(
+            'invalid-argument',
+            `Unknown service: ${service}`,
+        );
+    }
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[openAIProxy] OpenAI API error:', error);
+      throw new functions.https.HttpsError(
+          'internal',
+          'Failed to process AI request',
+      );
+    }
+
+    const result = await response.json();
+
+    // Log usage for monitoring (without exposing sensitive data)
+    console.log(`[openAIProxy] Service: ${service}, User: ${context.auth.uid}`);
+
+    return {success: true, data: result};
+  } catch (error) {
+    console.error('[openAIProxy] Error:', error);
+    throw new functions.https.HttpsError(
+        'internal',
+        'Failed to process AI request',
+    );
+  }
+});
 
 /**
  * Create PayFast payment URL with subscription
@@ -845,9 +1153,10 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
     console.log('[payFastWebhook] Calculated signature:', signature);
 
     if (signature !== pfData.signature) {
-      console.warn('[payFastWebhook] Signature mismatch - proceeding anyway for debugging');
-      // TEMPORARY: Don't reject for debugging purposes
-      // return res.status(400).send('Invalid signature');
+      console.error('[payFastWebhook] Invalid signature - rejecting webhook');
+      console.error('[payFastWebhook] Expected:', signature);
+      console.error('[payFastWebhook] Received:', pfData.signature);
+      return res.status(400).send('Invalid signature');
     }
 
     // Check payment status
@@ -916,36 +1225,10 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
  * Reset User Subscription (for testing)
  * Allows users to reset their subscription back to basic
  */
-exports.resetMySubscription = functions.https.onCall(async (data, context) => {
-  // Verify user is authenticated
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-        'unauthenticated',
-        'User must be authenticated',
-    );
-  }
-
-  try {
-    const userId = context.auth.uid;
-
-    await admin.firestore().collection('users').doc(userId).update({
-      subscriptionPlan: 'basic',
-      premiumUnlocked: false,
-      subscriptionStartDate: admin.firestore.FieldValue.delete(),
-      subscriptionEndDate: admin.firestore.FieldValue.delete(),
-      payFastPaymentId: admin.firestore.FieldValue.delete(),
-      payFastToken: admin.firestore.FieldValue.delete(),
-      lastPaymentDate: admin.firestore.FieldValue.delete(),
-    });
-
-    console.log(`[resetMySubscription] Reset subscription for user ${userId}`);
-
-    return {success: true, message: 'Subscription reset to basic'};
-  } catch (error) {
-    console.error('[resetMySubscription] Error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
+// REMOVED FOR PRODUCTION: resetMySubscription test function
+// This function allowed users to reset their subscription for free
+// It should only be used in development environments
+// exports.resetMySubscription = ...
 
 // ====================================
 // DATABASE CLEANUP FUNCTION
@@ -962,11 +1245,30 @@ exports.cleanupDatabaseHTTP = functions.https.onRequest(async (req, res) => {
     return;
   }
 
-  // Check secret key
-  const secretKey = req.body?.secretKey || req.query.secretKey;
-  if (secretKey !== 'cleanup_secret_2024_temp') {
-    console.log('[cleanupDatabaseHTTP] Invalid secret key');
-    res.status(403).json({error: 'Invalid secret key'});
+  // Verify authorization header
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('[cleanupDatabaseHTTP] No authorization header');
+    res.status(401).json({error: 'Unauthorized - no token provided'});
+    return;
+  }
+
+  try {
+    // Verify the Firebase ID token
+    const idToken = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+    // Check if user has admin custom claim
+    if (!decodedToken.admin) {
+      console.log(`[cleanupDatabaseHTTP] Non-admin user attempted cleanup: ${decodedToken.uid}`);
+      res.status(403).json({error: 'Forbidden - admin access required'});
+      return;
+    }
+
+    console.log(`[cleanupDatabaseHTTP] Admin user ${decodedToken.uid} authorized for cleanup`);
+  } catch (error) {
+    console.error('[cleanupDatabaseHTTP] Token verification failed:', error);
+    res.status(401).json({error: 'Unauthorized - invalid token'});
     return;
   }
 
