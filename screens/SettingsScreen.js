@@ -929,66 +929,93 @@ export default function SettingsScreen({ navigation }) {
     console.log('[SettingsScreen] handleDeleteCartoonPicture called with:', pictureId);
     if (!user?.uid) return;
 
-    // Show confirmation dialog
-    showAlert(
-      'Delete Picture',
-      'Are you sure you want to delete this cartoon picture? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => console.log('[SettingsScreen] Delete cancelled') },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('[SettingsScreen] Delete confirmed, removing picture:', pictureId);
-            try {
-              await removePictureFromHistory(user.uid, pictureId);
-              console.log('[SettingsScreen] Picture removed, reloading data');
-              await loadCartoonData();
-              console.log('[SettingsScreen] Data reloaded successfully');
-            } catch (error) {
-              console.error('[SettingsScreen] Error deleting picture:', error);
-              showAlert('Error', 'Failed to delete picture. Please try again.', [], { type: 'error' });
+    // Close the history modal first
+    setCartoonHistoryModalVisible(false);
+
+    // Wait for modal to close, then show confirmation
+    setTimeout(() => {
+      console.log('[SettingsScreen] Showing delete confirmation');
+      showAlert(
+        'Delete Picture',
+        'Are you sure you want to delete this cartoon picture? This cannot be undone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              console.log('[SettingsScreen] Delete cancelled, reopening history modal');
+              setCartoonHistoryModalVisible(true);
             }
           },
-        },
-      ],
-      { type: 'warning' }
-    );
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              console.log('[SettingsScreen] Delete confirmed, removing picture:', pictureId);
+              try {
+                await removePictureFromHistory(user.uid, pictureId);
+                console.log('[SettingsScreen] Picture removed, reloading data');
+                await loadCartoonData();
+                console.log('[SettingsScreen] Data reloaded successfully');
+                // Reopen history modal after successful deletion
+                setCartoonHistoryModalVisible(true);
+              } catch (error) {
+                console.error('[SettingsScreen] Error deleting picture:', error);
+                showAlert('Error', 'Failed to delete picture. Please try again.', [], { type: 'error' });
+              }
+            },
+          },
+        ],
+        { type: 'warning' }
+      );
+    }, 350);
   };
 
   // Clear all cartoon history
   const handleClearCartoonHistory = async () => {
     if (!user?.uid) return;
 
-    // Show confirmation dialog
-    showAlert(
-      'Clear All History',
-      'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            setIsCartoonProcessing(true);
+    // Close the history modal first
+    setCartoonHistoryModalVisible(false);
 
-            try {
-              await clearCartoonHistory(user.uid);
-              await loadCartoonData();
-
-              // Show success after completion
-              showAlert('Success', 'All cartoon pictures cleared.', [], { type: 'success' });
-            } catch (error) {
-              console.error('[SettingsScreen] Error clearing history:', error);
-              showAlert('Error', 'Failed to clear history. Please try again.', [], { type: 'error' });
-            } finally {
-              setIsCartoonProcessing(false);
+    // Wait for modal to close, then show confirmation
+    setTimeout(() => {
+      showAlert(
+        'Clear All History',
+        'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              // Reopen history modal if cancelled
+              setCartoonHistoryModalVisible(true);
             }
           },
-        },
-      ],
-      { type: 'warning' }
-    );
+          {
+            text: 'Clear All',
+            style: 'destructive',
+            onPress: async () => {
+              setIsCartoonProcessing(true);
+
+              try {
+                await clearCartoonHistory(user.uid);
+                await loadCartoonData();
+
+                // Show success after completion (don't reopen history modal since it's now empty)
+                showAlert('Success', 'All cartoon pictures cleared.', [], { type: 'success' });
+              } catch (error) {
+                console.error('[SettingsScreen] Error clearing history:', error);
+                showAlert('Error', 'Failed to clear history. Please try again.', [], { type: 'error' });
+              } finally {
+                setIsCartoonProcessing(false);
+              }
+            },
+          },
+        ],
+        { type: 'warning' }
+      );
+    }, 350);
   };
 
   return (
