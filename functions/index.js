@@ -747,8 +747,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Merchant details
       merchant_id: config.merchantId,
       merchant_key: config.merchantKey,
-      return_url: `localloop://payment-success`,
-      cancel_url: `localloop://payment-cancelled`,
+      return_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastReturn`,
+      cancel_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastCancel`,
       notify_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
 
       // Buyer details
@@ -1178,6 +1178,32 @@ exports.cleanupDatabase = functions.https.onCall(async (data, context) => {
     console.error('[cleanupDatabase] Fatal error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+});
+
+// ====================================
+// PAYFAST REDIRECT HANDLERS
+// ====================================
+
+/**
+ * PayFast Return URL Handler
+ * Redirects successful payments back to the app
+ */
+exports.payFastReturn = functions.https.onRequest(async (req, res) => {
+  console.log('[payFastReturn] Payment success, redirecting to app');
+
+  // Redirect to app with success deep link
+  res.redirect(301, 'localloop://payment-success');
+});
+
+/**
+ * PayFast Cancel URL Handler
+ * Redirects cancelled payments back to the app
+ */
+exports.payFastCancel = functions.https.onRequest(async (req, res) => {
+  console.log('[payFastCancel] Payment cancelled, redirecting to app');
+
+  // Redirect to app with cancel deep link
+  res.redirect(301, 'localloop://payment-cancelled');
 });
 
 // ====================================
