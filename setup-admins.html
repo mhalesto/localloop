@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLoop - Setup Admin Users</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #6C4DF4;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .admin-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .admin-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .admin-card p {
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #6C4DF4, #9C27B0);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(108, 77, 244, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6C4DF4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            display: block;
+        }
+
+        .code {
+            background: #f4f4f4;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .results h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .results ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .results li {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .results .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="logo.png" alt="LocalLoop" class="logo">
+        <h1>Setup Admin Users</h1>
+
+        <div class="admin-card">
+            <h3>Admin User 1</h3>
+            <p><strong>Email:</strong> <span class="code">currenttech.co.za@gmail.com</span></p>
+            <p><strong>Password:</strong> <span class="code">42524Halahc.</span></p>
+            <p><strong>Display Name:</strong> Admin - CurrentTech</p>
+            <div class="status" id="status1" style="display:none;"></div>
+        </div>
+
+        <div class="admin-card">
+            <h3>Admin User 2</h3>
+            <p><strong>Email:</strong> <span class="code">mbanjwa.hg@gmail.com</span></p>
+            <p><strong>Password:</strong> <span class="code">42524Halah</span></p>
+            <p><strong>Display Name:</strong> Admin - Mbanjwa</p>
+            <div class="status" id="status2" style="display:none;"></div>
+        </div>
+
+        <button class="btn" id="createBtn" onclick="createAdminUsers()">
+            Create Admin Users
+        </button>
+
+        <div class="results" id="results">
+            <h3>✅ Setup Complete!</h3>
+            <p>Admin users have been created successfully. They can now login at:</p>
+            <p style="margin-top: 10px;">
+                <a href="https://mhalesto.github.io/toilet/admin.html" target="_blank" style="color: #6C4DF4;">
+                    https://mhalesto.github.io/toilet/admin.html
+                </a>
+            </p>
+            <ul id="resultsList"></ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            createUserWithEmailAndPassword,
+            updateProfile,
+            signInWithEmailAndPassword
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            doc,
+            setDoc,
+            getDoc,
+            updateDoc,
+            serverTimestamp
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+            authDomain: "share-your-story-1.firebaseapp.com",
+            projectId: "share-your-story-1",
+            storageBucket: "share-your-story-1.firebasestorage.app",
+            messagingSenderId: "673056432219",
+            appId: "1:673056432219:web:8d54e53d9124fb6e441f7e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const adminUsers = [
+            {
+                email: 'currenttech.co.za@gmail.com',
+                password: '42524Halahc.',
+                displayName: 'Admin - CurrentTech',
+                statusId: 'status1'
+            },
+            {
+                email: 'mbanjwa.hg@gmail.com',
+                password: '42524Halah',
+                displayName: 'Admin - Mbanjwa',
+                statusId: 'status2'
+            }
+        ];
+
+        window.createAdminUsers = async () => {
+            const btn = document.getElementById('createBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Creating Admin Users...';
+
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = '';
+
+            let successCount = 0;
+
+            for (const userData of adminUsers) {
+                const statusEl = document.getElementById(userData.statusId);
+                statusEl.style.display = 'block';
+                statusEl.className = 'status info';
+                statusEl.textContent = 'Creating user...';
+
+                try {
+                    let user;
+                    let isNewUser = true;
+
+                    // Try to create new user
+                    try {
+                        const userCredential = await createUserWithEmailAndPassword(
+                            auth,
+                            userData.email,
+                            userData.password
+                        );
+                        user = userCredential.user;
+
+                        // Update display name
+                        await updateProfile(user, {
+                            displayName: userData.displayName
+                        });
+
+                        statusEl.textContent = '✅ User created successfully';
+                    } catch (createError) {
+                        if (createError.code === 'auth/email-already-in-use') {
+                            // User exists, try to sign in and update
+                            statusEl.textContent = 'User exists, updating admin privileges...';
+                            isNewUser = false;
+
+                            try {
+                                const signInCredential = await signInWithEmailAndPassword(
+                                    auth,
+                                    userData.email,
+                                    userData.password
+                                );
+                                user = signInCredential.user;
+                            } catch (signInError) {
+                                // If sign in fails, we can still update their Firestore doc if we know their UID
+                                // For now, we'll note that the user exists but password might be different
+                                statusEl.className = 'status info';
+                                statusEl.textContent = '⚠️ User exists (password may be different). Attempting to update admin role...';
+
+                                // We'll still try to update the Firestore document
+                                // In a real scenario, you'd need to look up the user by email
+                            }
+                        } else {
+                            throw createError;
+                        }
+                    }
+
+                    if (user) {
+                        // Create/Update Firestore document with admin role
+                        await setDoc(doc(db, 'users', user.uid), {
+                            email: userData.email,
+                            name: userData.displayName,
+                            role: 'admin',
+                            isAdmin: true,
+                            createdAt: serverTimestamp(),
+                            updatedAt: serverTimestamp(),
+                            subscriptionPlan: 'gold',
+                            uid: user.uid
+                        }, { merge: true });
+
+                        // Also add to admins collection
+                        await setDoc(doc(db, 'admins', user.uid), {
+                            email: userData.email,
+                            name: userData.displayName,
+                            addedAt: serverTimestamp(),
+                            uid: user.uid
+                        });
+
+                        statusEl.className = 'status success';
+                        statusEl.textContent = isNewUser ?
+                            '✅ Admin user created successfully!' :
+                            '✅ Admin privileges granted!';
+
+                        // Add to results
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <span class="icon">✅</span>
+                            <div>
+                                <strong>${userData.email}</strong><br>
+                                Password: ${userData.password}<br>
+                                UID: ${user.uid}
+                            </div>
+                        `;
+                        resultsList.appendChild(li);
+                        successCount++;
+                    }
+
+                } catch (error) {
+                    console.error(`Error with ${userData.email}:`, error);
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `❌ Error: ${error.message}`;
+
+                    // Add to results
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span class="icon">❌</span>
+                        <div>
+                            <strong>${userData.email}</strong><br>
+                            Error: ${error.message}
+                        </div>
+                    `;
+                    resultsList.appendChild(li);
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Setup Complete';
+
+            if (successCount > 0) {
+                document.getElementById('results').style.display = 'block';
+            }
+
+            // Sign out after creating users
+            await auth.signOut();
+        };
+    </script>
+</body>
+</html>
