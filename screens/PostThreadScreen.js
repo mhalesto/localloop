@@ -31,6 +31,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAlert } from '../contexts/AlertContext';
 import ScreenLayout from '../components/ScreenLayout';
 import CreatePostModal from '../components/CreatePostModal';
+import MentionTextInput from '../components/MentionTextInput';
+import MentionText from '../components/MentionText';
 import {
   useSettings,
   accentPresets,
@@ -51,6 +53,7 @@ import { isFeatureEnabled } from '../config/aiFeatures';
 import { togglePublicPostVote } from '../services/publicPostsService';
 import { getDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../api/firebaseClient';
+import { processMentions } from '../utils/mentionUtils';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
@@ -77,6 +80,7 @@ const CommentListItem = React.memo(
     availableReactions,
     onReply,
     onCopyComment,
+    onMentionPress,
   }) => {
     const bubbleScale = React.useRef(new Animated.Value(1)).current;
     const pickerOpacity = React.useRef(new Animated.Value(showPicker ? 1 : 0)).current;
@@ -255,7 +259,14 @@ const CommentListItem = React.memo(
                 </View>
               ) : null}
 
-              <Text style={[styles.commentMessage, mine && { color: linkColor }]}>{comment.message}</Text>
+              <MentionText
+                style={styles.commentMessage}
+                textColor={mine ? linkColor : themeColors.textPrimary}
+                accentColor={linkColor}
+                onMentionPress={onMentionPress}
+              >
+                {comment.message}
+              </MentionText>
             </Animated.View>
           </LongPressGestureHandler>
 
@@ -1649,6 +1660,26 @@ export default function PostThreadScreen({ route, navigation }) {
     [sendTypingUpdate]
   );
 
+  // Handle mention press to navigate to user profile
+  const handleMentionPress = useCallback(
+    async (username) => {
+      try {
+        const { getUserProfileByUsername } = await import('../services/userProfileService');
+        const profile = await getUserProfileByUsername(username);
+
+        if (profile && profile.id) {
+          navigation.push('PublicProfile', { userId: profile.id });
+        } else {
+          showAlert('User not found', `Could not find user @${username}`, [], { type: 'info' });
+        }
+      } catch (error) {
+        console.error('[PostThread] Error finding user:', error);
+        showAlert('Error', 'Could not load user profile', [], { type: 'error' });
+      }
+    },
+    [navigation, showAlert]
+  );
+
   // --- Keyboard listeners (robust with absolute-positioned composer)
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -1674,6 +1705,10 @@ export default function PostThreadScreen({ route, navigation }) {
     if (!t) return;
 
     try {
+      // Process mentions to extract user IDs
+      const { userIds: mentionedUserIds } = await processMentions(t);
+      console.log('[PostThread] Mentions processed:', mentionedUserIds);
+
       // Moderation check
       console.log('[PostThread] Running moderation on comment...');
       const moderation = await analyzePostContent({ message: t });
@@ -1689,15 +1724,15 @@ export default function PostThreadScreen({ route, navigation }) {
         return;
       }
 
-      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null);
+      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null, mentionedUserIds);
       setReply('');
       setReplyingToComment(null);
       closeReactionPicker();
       sendTypingUpdate(false);
     } catch (error) {
-      console.warn('[PostThread] Moderation failed:', error);
-      // On moderation error, allow the comment (don't block legitimate content)
-      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null);
+      console.warn('[PostThread] Comment processing failed:', error);
+      // On error, allow the comment but without mention notifications
+      addComment(city, postId, t, userProfile, replyingToComment?.id ?? null, []);
       setReply('');
       setReplyingToComment(null);
       closeReactionPicker();
@@ -2730,6 +2765,7 @@ export default function PostThreadScreen({ route, navigation }) {
           availableReactions={availableReactions}
           onReply={handleReplyToComment}
           onCopyComment={handleCopyComment}
+          onMentionPress={handleMentionPress}
         />
       );
     },
@@ -2743,6 +2779,7 @@ export default function PostThreadScreen({ route, navigation }) {
       handleCopyComment,
       handleSelectReaction,
       handleToggleReactionPicker,
+      handleMentionPress,
       highlightedCommentId,
       linkColor,
       reactionPickerCommentId,
@@ -2940,18 +2977,18 @@ export default function PostThreadScreen({ route, navigation }) {
           </View>
         ) : null}
         <View style={styles.composerInner}>
-          <TextInput
+          <MentionTextInput
             value={reply}
             onChangeText={handleReplyChange}
-            placeholder="Share your thoughts…"
-            placeholderTextColor={themeColors.textSecondary}
+            placeholder="Share your thoughts… (@username to mention)"
+            placeholderColor={themeColors.textSecondary}
+            textColor={themeColors.textPrimary}
+            accentColor={linkColor}
+            backgroundColor={themeColors.card}
             style={styles.composerInput}
-            autoCapitalize="sentences"
-            autoCorrect
             returnKeyType="send"
             onSubmitEditing={handleAddComment}
-            clearButtonMode="while-editing"
-            onBlur={() => sendTypingUpdate(false)}
+            blurOnSubmit={false}
           />
           <TouchableOpacity
             onPress={handleAddComment}

@@ -274,7 +274,7 @@ function applyReactionToggle(comment, emoji, clientId) {
   };
 }
 
-function createComment(message, clientId, authorProfile = null, parentId = null) {
+function createComment(message, clientId, authorProfile = null, parentId = null, mentionedUserIds = []) {
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     message,
@@ -284,7 +284,8 @@ function createComment(message, clientId, authorProfile = null, parentId = null)
     author: normalizeProfile(authorProfile),
     parentId: parentId ?? null,
     reactions: {},
-    userReaction: null
+    userReaction: null,
+    mentionedUserIds: mentionedUserIds || []
   };
 }
 
@@ -968,7 +969,8 @@ export function PostsProvider({ children }) {
       pollData = null, // Poll data if post has a poll
       postingMode = 'anonymous', // [PUBLIC-MODE] New parameter
       publicProfile = null, // [PUBLIC-MODE] User's public profile data
-      marketMeta = null // Marketplace listing metadata
+      marketMeta = null, // Marketplace listing metadata
+      mentionedUserIds = [] // User IDs mentioned in the post
     ) => {
       const trimmedTitle = title?.trim?.();
       if (!trimmedTitle) {
@@ -1022,6 +1024,7 @@ export function PostsProvider({ children }) {
         highlightDescription: !!highlightDescription,
         moderation: moderation ?? null,
         moderationStatus,
+        mentionedUserIds: mentionedUserIds || [],
         // Add poll if provided
         ...(pollData ? { poll: pollData } : {}),
         // [PUBLIC-MODE] Add mode and public profile fields
@@ -1053,14 +1056,14 @@ export function PostsProvider({ children }) {
   );
 
   const addComment = useCallback(
-    (city, postId, message, authorProfile = null, parentId = null) => {
+    (city, postId, message, authorProfile = null, parentId = null, mentionedUserIds = []) => {
       const trimmed = message.trim();
       if (!trimmed) {
         return;
       }
 
       const ownerId = ensureClientId();
-      const newComment = createComment(trimmed, ownerId, authorProfile, parentId);
+      const newComment = createComment(trimmed, ownerId, authorProfile, parentId, mentionedUserIds);
 
       setPostsWithPersist((prev) => {
         const cityPosts = prev[city] ?? [];

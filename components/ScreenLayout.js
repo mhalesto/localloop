@@ -23,6 +23,7 @@ import { isFeatureEnabled } from '../config/aiFeatures';
 import { createPublicPost } from '../services/publicPostsService'; // [PUBLIC-MODE]
 import { canCreatePost, recordPostCreated } from '../utils/subscriptionUtils';
 import UpgradePromptModal from './UpgradePromptModal';
+import { processMentions } from '../utils/mentionUtils';
 
 export default function ScreenLayout({
   children,
@@ -133,6 +134,17 @@ export default function ScreenLayout({
     // Moderation will run in background and update the post
     const tempModeration = { action: 'review', matchedLabels: [] };
 
+    // Process mentions in post message
+    let mentionedUserIds = [];
+    try {
+      const mentionData = await processMentions(message);
+      mentionedUserIds = mentionData.userIds;
+      console.log('[ScreenLayout] Post mentions processed:', mentionedUserIds);
+    } catch (error) {
+      console.warn('[ScreenLayout] Failed to process mentions:', error);
+      // Continue without mentions if processing fails
+    }
+
     // [PUBLIC-MODE] Pass posting mode and public profile to addPost
     const published = addPost(
       location.city,
@@ -142,8 +154,11 @@ export default function ScreenLayout({
       mergedAuthor,
       highlightDescription,
       tempModeration,
+      null, // pollData
       postingMode || 'anonymous', // Default to anonymous if not specified
-      isPublic ? userProfile : null // Pass public profile data if posting publicly
+      isPublic ? userProfile : null, // Pass public profile data if posting publicly
+      null, // marketMeta
+      mentionedUserIds // User IDs mentioned in the post
     );
 
     if (!published) {

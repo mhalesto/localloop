@@ -33,6 +33,8 @@ import { smartSummarize } from '../services/openai/summarizationService';
 import { generateTitle, TITLE_STYLES, generateFallbackTitle } from '../services/openai/titleGenerationService';
 import { checkDuplicate } from '../services/openai/embeddingsService';
 import { isFeatureEnabled } from '../config/aiFeatures';
+import MentionTextInput from './MentionTextInput';
+import MentionText from './MentionText';
 
 const LENGTH_STEPS = ['concise', 'balanced', 'detailed']; // [AI-SUMMARY]
 const SUMMARY_CACHE_DEFAULT = Object.freeze({
@@ -815,21 +817,21 @@ export default function CreatePostModal({
                 )}
                 {titleError ? <Text style={styles.titleErrorText}>{titleError}</Text> : null}
               </View>
-              <TextInput
+              <MentionTextInput
+                ref={messageInputRef}
                 style={[
                   styles.previewBodyInput,
-                  { color: previewPrimary },
                   highlightDescription && [styles.previewBodyInputHighlighted, { backgroundColor: previewHighlightFill }]
                 ]}
-                placeholder="Description (optional)"
-                placeholderTextColor={previewMuted}
+                placeholder="Description (optional) - @username to mention"
+                placeholderColor={previewMuted}
+                textColor={previewPrimary}
+                accentColor={selectedPreset.linkColor ?? themeColors.primaryDark}
+                backgroundColor={highlightDescription ? previewHighlightFill : previewBackground}
                 multiline
                 value={message}
                 onChangeText={handleMessageChange}
                 autoCapitalize="sentences"
-                ref={messageInputRef}
-                onSelectionChange={(e) => updateSelection(e?.nativeEvent?.selection)}
-                selection={messageSelection}
               />
               {pollData && pollData.question && pollData.options && (
                 <View style={[styles.pollPreview, { backgroundColor: previewHighlightFill }]}>

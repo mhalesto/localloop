@@ -48,6 +48,8 @@ exports.onPostComment = functions.firestore
 
         const commenterName = comment.author?.nickname || comment.author?.displayName || "Someone";
         const commentText = (comment.message || "").substring(0, 100);
+        const postTitle = post.title || "your post";
+        const city = post.city || post.location?.city || "";
 
         await sendNotificationToUser(postAuthorUid, {
           title: `${commenterName} commented on your post`,
@@ -56,6 +58,8 @@ exports.onPostComment = functions.firestore
             type: "post_comment",
             postId: postId,
             commentId: snap.id,
+            city: city,
+            postTitle: postTitle,
             screen: "PostThread",
           },
           channelId: "social",
@@ -244,12 +248,17 @@ exports.onPostReaction = functions.firestore
           (reactorDoc.data().nickname || reactorDoc.data().displayName || "Someone") :
           "Someone";
 
+        const postTitle = after.title || "your post";
+        const city = after.city || after.location?.city || "";
+
         await sendNotificationToUser(postAuthorUid, {
           title: `${reactorName} reacted to your post`,
           body: `${emoji || "👍"} ${(after.message || "").substring(0, 50)}`,
           data: {
             type: "post_reaction",
             postId: postId,
+            city: city,
+            postTitle: postTitle,
             screen: "PostThread",
           },
           channelId: "social",
@@ -421,6 +430,115 @@ exports.onEngagementMilestone = functions.firestore
         return null;
       } catch (error) {
         console.error("[onEngagementMilestone] Error:", error);
+        return null;
+      }
+    });
+
+// ====================================
+// USER MENTION NOTIFICATIONS
+// ====================================
+
+/**
+ * Send notification when someone mentions you in a post comment
+ */
+exports.onCommentMention = functions.firestore
+    .document("posts/{postId}/comments/{commentId}")
+    .onCreate(async (snap, context) => {
+      const {postId} = context.params;
+      const comment = snap.data();
+      const commentMessage = comment.message || "";
+      const mentionedUserIds = comment.mentionedUserIds || [];
+
+      if (mentionedUserIds.length === 0) return null;
+
+      const mentionerUid = comment.author?.uid;
+      if (!mentionerUid) return null;
+
+      try {
+        // Get the post details
+        const postDoc = await admin.firestore().collection("posts").doc(postId).get();
+        if (!postDoc.exists) return null;
+
+        const post = postDoc.data();
+        const postTitle = post.title || "a post";
+        const city = post.city || post.location?.city || "";
+
+        const mentionerName = comment.author?.nickname || comment.author?.displayName || "Someone";
+        const commentPreview = commentMessage.substring(0, 100);
+
+        // Send notification to each mentioned user (except the commenter)
+        const notificationPromises = mentionedUserIds
+            .filter((userId) => userId !== mentionerUid)
+            .map((userId) =>
+              sendNotificationToUser(userId, {
+                title: `${mentionerName} mentioned you`,
+                body: commentPreview,
+                data: {
+                  type: "user_mention",
+                  postId: postId,
+                  commentId: snap.id,
+                  city: city,
+                  postTitle: postTitle,
+                  screen: "PostThread",
+                },
+                channelId: "social",
+              }),
+            );
+
+        await Promise.all(notificationPromises);
+        console.log(`[onCommentMention] Sent ${notificationPromises.length} mention notifications`);
+        return null;
+      } catch (error) {
+        console.error("[onCommentMention] Error:", error);
+        return null;
+      }
+    });
+
+/**
+ * Send notification when someone mentions you in a post
+ */
+exports.onPostMention = functions.firestore
+    .document("posts/{postId}")
+    .onCreate(async (snap, context) => {
+      const {postId} = context.params;
+      const post = snap.data();
+      const postMessage = post.message || "";
+      const mentionedUserIds = post.mentionedUserIds || [];
+
+      if (mentionedUserIds.length === 0) return null;
+
+      const authorUid = post.author?.uid;
+      if (!authorUid) return null;
+
+      try {
+        const postTitle = post.title || "a post";
+        const city = post.city || post.location?.city || "";
+        const authorName = post.author?.nickname || post.author?.displayName || "Someone";
+        const postPreview = postMessage.substring(0, 100);
+
+        // Send notification to each mentioned user (except the author)
+        const notificationPromises = mentionedUserIds
+            .filter((userId) => userId !== authorUid)
+            .map((userId) =>
+              sendNotificationToUser(userId, {
+                title: `${authorName} mentioned you`,
+                body: postPreview,
+                data: {
+                  type: "user_mention",
+                  postId: postId,
+                  city: city,
+                  postTitle: postTitle,
+                  screen: "PostThread",
+                },
+                channelId: "social",
+              }),
+            );
+
+        await Promise.all(notificationPromises);
+        console.log(`[onPostMention] Sent ${notificationPromises.length} mention notifications`);
+        return null;
+      } catch (error) {
+        console.error("[onPostMention] Error:", error);
         return null;
       }
     });
