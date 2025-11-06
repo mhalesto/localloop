@@ -106,7 +106,7 @@ export default function ScreenLayout({
       return false;
     }
     if (!firebaseUser?.uid) {
-      showAlert('Sign in required', 'Sign in to publish posts to the community.', 'warning');
+      showAlert('Sign in required', 'Sign in to publish posts to the community.', [], { type: 'warning' });
       setComposerVisible(false);
       return false;
     }
@@ -162,7 +162,7 @@ export default function ScreenLayout({
     );
 
     if (!published) {
-      showAlert('Unable to publish', 'We could not create that post. Please try again in a moment.', 'error');
+      showAlert('Unable to publish', 'We could not create that post. Please try again in a moment.', [], { type: 'error' });
       setComposerVisible(false);
       return false;
     }

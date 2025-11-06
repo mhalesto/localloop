@@ -21,7 +21,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
     (async () => {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        showAlert('Permission required', 'Microphone permission is required to record voice notes', 'warning');
+        showAlert('Permission required', 'Microphone permission is required to record voice notes', [], { type: 'warning' });
         onCancel?.();
       }
     })();
@@ -62,7 +62,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
 
     } catch (err) {
       console.error('[VoiceRecorder] Failed to start recording:', err);
-      showAlert('Error', 'Failed to start recording', 'error');
+      showAlert('Error', 'Failed to start recording', [], { type: 'error' });
     }
   };
 
@@ -86,7 +86,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       if (duration < 500) {
-        showAlert('Recording too short', 'Please record at least 1 second', 'warning');
+        showAlert('Recording too short', 'Please record at least 1 second', [], { type: 'warning' });
         onCancel?.();
         return;
       }
@@ -95,7 +95,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
 
     } catch (err) {
       console.error('[VoiceRecorder] Failed to stop recording:', err);
-      showAlert('Error', 'Failed to save recording', 'error');
+      showAlert('Error', 'Failed to save recording', [], { type: 'error' });
     }
   };
 

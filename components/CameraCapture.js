@@ -80,7 +80,7 @@ export default function CameraCapture({ visible, onClose, onCapture, mode = 'pho
     } catch (error) {
       console.error('Failed to take picture:', error);
       haptics.error();
-      showAlert('Error', 'Failed to capture photo. Please try again.', 'error');
+      showAlert('Error', 'Failed to capture photo. Please try again.', [], { type: 'error' });
     } finally {
       setIsCapturing(false);
     }

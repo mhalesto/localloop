@@ -573,7 +573,7 @@ export default function CreatePostModal({
     } catch (error) {
       console.warn('[CreatePostModal] submit failed', error);
       result = false;
-      showAlert('Unable to publish', error?.message ?? 'Please try again in a moment.', 'error');
+      showAlert('Unable to publish', error?.message ?? 'Please try again in a moment.', [], { type: 'error' });
     }
 
     setIsSubmitting(false);

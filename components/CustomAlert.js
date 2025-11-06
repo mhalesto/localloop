@@ -67,6 +67,7 @@ export default function CustomAlert({
       transparent
       animationType="fade"
       statusBarTranslucent
+      presentationStyle="overFullScreen"
       onRequestClose={() => {
         if (cancelButton) {
           cancelButton.onPress?.();

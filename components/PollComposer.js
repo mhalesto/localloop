@@ -37,7 +37,7 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
 
   const addOption = () => {
     if (options.length >= 6) {
-      showAlert('Maximum options', 'You can add up to 6 poll options', 'warning');
+      showAlert('Maximum options', 'You can add up to 6 poll options', [], { type: 'warning' });
       return;
     }
     setOptions([...options, '']);
@@ -45,7 +45,7 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
 
   const removeOption = (index) => {
     if (options.length <= 2) {
-      showAlert('Minimum options', 'A poll must have at least 2 options', 'warning');
+      showAlert('Minimum options', 'A poll must have at least 2 options', [], { type: 'warning' });
       return;
     }
     const newOptions = options.filter((_, i) => i !== index);
@@ -63,12 +63,12 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
     const trimmedOptions = options.map(o => o.trim()).filter(o => o);
 
     if (!trimmedQuestion) {
-      showAlert('Question required', 'Please enter a poll question', 'warning');
+      showAlert('Question required', 'Please enter a poll question', [], { type: 'warning' });
       return;
     }
 
     if (trimmedOptions.length < 2) {
-      showAlert('Options required', 'Please enter at least 2 poll options', 'warning');
+      showAlert('Options required', 'Please enter at least 2 poll options', [], { type: 'warning' });
       return;
     }
 
