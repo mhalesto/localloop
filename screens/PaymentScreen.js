@@ -262,11 +262,18 @@ export default function PaymentScreen({ route, navigation }) {
           </Text>
         </View>
 
-        {/* Note about sandbox mode */}
+        {/* Terms & Conditions link */}
         <View style={[styles.noteCard, { backgroundColor: `${primaryColor}10` }]}>
           <Ionicons name="information-circle" size={20} color={primaryColor} />
           <Text style={[styles.noteText, { color: primaryColor }]}>
-            Currently using PayFast Sandbox for testing. Use test card: 5200 0000 0000 1096 to complete payment.
+            By completing this payment, you agree to our{' '}
+            <Text
+              style={{ textDecorationLine: 'underline', fontWeight: '600' }}
+              onPress={() => Linking.openURL('https://mhalesto.github.io/toilet/policy.html')}
+            >
+              Terms & Conditions
+            </Text>
+            .
           </Text>
         </View>
       </ScrollView>
