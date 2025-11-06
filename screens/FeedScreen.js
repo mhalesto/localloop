@@ -1,21 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Image,
   RefreshControl,
   Alert,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import FeedSkeleton from '../components/FeedSkeleton';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
-import { getFeedPosts } from '../services/publicPostsService';
+import { usePosts } from '../contexts/PostsContext';
+import { getFeedPosts, togglePublicPostVote } from '../services/publicPostsService';
 import { getFollowing } from '../services/followService';
 import { fetchMarketListingsForCity } from '../services/marketplaceService';
 import useHaptics from '../hooks/useHaptics';
@@ -29,23 +30,50 @@ const categoryVisuals = {
   Neighbors: { icon: 'hand-left-outline', color: '#f59e0b' }
 };
 
+const presetByKey = accentPresets.reduce((acc, preset) => {
+  acc[preset.key] = preset;
+  return acc;
+}, {});
+
 export default function FeedScreen({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
-  const [feedItems, setFeedItems] = useState([]);
+  const { getPostById, getPostsForCity, refreshPosts } = usePosts();
   const [rawFeedPosts, setRawFeedPosts] = useState([]);
+  const [marketListings, setMarketListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const voteRequestsRef = useRef(new Set());
+  const openRequestsRef = useRef(new Set());
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+
+  const enhancePost = useCallback(
+    (post) => {
+      if (!post) {
+        return post;
+      }
+      const votes = sanitizeVoteMap(post.votes);
+      const { upvotes, downvotes } = deriveVoteCounts(votes);
+      const userVote = user?.uid ? votes[user.uid] ?? post.userVote ?? null : null;
+      return {
+        ...post,
+        votes,
+        upvotes: Number.isFinite(post.upvotes) ? post.upvotes : upvotes,
+        downvotes: Number.isFinite(post.downvotes) ? post.downvotes : downvotes,
+        userVote,
+      };
+    },
+    [user?.uid]
+  );
 
   const loadFeed = useCallback(async () => {
     if (!user?.uid) {
       setLoading(false);
       setRefreshing(false);
-      setFeedItems([]);
       setRawFeedPosts([]);
+      setMarketListings([]);
       return;
     }
 
@@ -57,34 +85,24 @@ export default function FeedScreen({ navigation }) {
       if (followingIds.length > 0) {
         feedPosts = await getFeedPosts(followingIds);
       }
-      setRawFeedPosts(feedPosts);
-
-      let combinedItems = feedPosts.map((post) => ({
-        kind: 'post',
-        id: `post-${post.id}`,
-        data: post
-      }));
+      const mappedPosts = feedPosts.map(enhancePost);
+      setRawFeedPosts(mappedPosts);
 
       if (userProfile?.city) {
         const marketListings = await fetchMarketListingsForCity(userProfile.city, { limit: 6 });
-        const marketItems = marketListings.map((listing) => ({
-          kind: 'market',
-          id: `market-${listing.id}`,
-          data: listing
-        }));
-        combinedItems = injectMarketplaceItems(combinedItems, marketItems);
+        setMarketListings(marketListings);
+      } else {
+        setMarketListings([]);
       }
-
-      setFeedItems(combinedItems);
     } catch (error) {
       console.error('[Feed] Error loading feed:', error);
-      setFeedItems([]);
       setRawFeedPosts([]);
+      setMarketListings([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.uid, userProfile?.city]);
+  }, [enhancePost, user?.uid, userProfile?.city]);
 
   useEffect(() => {
     loadFeed();
@@ -96,98 +114,403 @@ export default function FeedScreen({ navigation }) {
     loadFeed();
   }, [loadFeed, haptics]);
 
-  const navigateToPost = (post) => {
-    haptics.light();
-    // Navigate to post detail (you can create a PostDetailScreen later)
-    console.log('Navigate to post:', post.id);
-  };
+  const resolveThreadTarget = useCallback(
+    async (post) => {
+      if (!post) {
+        return null;
+      }
 
-  const navigateToProfile = (userId) => {
-    haptics.light();
-    navigation.push('PublicProfile', { userId });
-  };
+      const combos = buildPostTargetCombos(post);
+      if (!combos.length) {
+        return null;
+      }
 
-  const navigateToDiscover = () => {
+      const uniqueCities = extractUniqueCities(post, combos);
+
+      const findExisting = () => {
+        for (const combo of combos) {
+          const existing = getPostById?.(combo.city, combo.postId);
+          if (existing) {
+            return combo;
+          }
+        }
+        return null;
+      };
+
+      let resolved = findExisting();
+      if (resolved) {
+        return resolved;
+      }
+
+      if (typeof refreshPosts === 'function') {
+        try {
+          await refreshPosts();
+          resolved = findExisting();
+          if (resolved) {
+            return resolved;
+          }
+        } catch (error) {
+          console.warn('[Feed] Failed to refresh posts for thread navigation', error);
+        }
+      }
+
+      const fuzzyMatch = findPostByContent(uniqueCities, post, getPostsForCity);
+      if (fuzzyMatch) {
+        return fuzzyMatch;
+      }
+
+      return null;
+    },
+    [getPostById, getPostsForCity, refreshPosts]
+  );
+
+  const handleOpenPost = useCallback(
+    (post) => {
+      if (!post?.id) {
+        Alert.alert('Post unavailable', 'We could not open this post right now.');
+        return;
+      }
+
+      if (openRequestsRef.current.has(post.id)) {
+        return;
+      }
+
+      openRequestsRef.current.add(post.id);
+      haptics.light();
+
+      // Navigate immediately with available data
+      // If we have sourceCity/sourcePostId, use those (original post)
+      // Otherwise use the post's own data
+      const targetCity = post.sourceCity || post.city;
+      const targetPostId = post.sourcePostId || post.id;
+
+      if (targetCity && targetPostId) {
+        navigation.navigate('PostThread', { city: targetCity, postId: targetPostId });
+        openRequestsRef.current.delete(post.id);
+        return;
+      }
+
+      // Fallback: if we don't have the data, show error
+      openRequestsRef.current.delete(post.id);
+      Alert.alert(
+        'Post unavailable',
+        'We could not locate the original thread for this post. It may have been removed.'
+      );
+    },
+    [haptics, navigation]
+  );
+
+  const navigateToProfile = useCallback(
+    (userId) => {
+      if (!userId) {
+        return;
+      }
+      haptics.light();
+      navigation.push('PublicProfile', { userId });
+    },
+    [haptics, navigation]
+  );
+
+  const navigateToDiscover = useCallback(() => {
     haptics.light();
     navigation.navigate('Discover');
-  };
+  }, [haptics, navigation]);
 
-  const handleMarketPress = (listing) => {
-    haptics.light();
-    const details = listing.marketListing?.details || listing.message || 'Message the neighbor in the room to coordinate.';
-    Alert.alert(listing.title, details, [
-      { text: 'Close', style: 'cancel' },
-      {
-        text: 'Browse Markets',
-        onPress: () => navigation.navigate('LocalLoopMarkets')
+  const handleMarketPress = useCallback(
+    (listing) => {
+      if (!listing) {
+        return;
       }
-    ]);
-  };
-
-  const renderPostCard = (item) => (
-    <TouchableOpacity
-      style={[styles.postCard, { backgroundColor: themeColors.card }]}
-      onPress={() => navigateToPost(item)}
-      activeOpacity={0.7}
-    >
-      {/* Author Info */}
-      <TouchableOpacity
-        style={styles.authorRow}
-        onPress={() => navigateToProfile(item.authorId)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.authorAvatar, { borderColor: primaryColor }]}>
-          {item.authorAvatar ? (
-            <Image source={{ uri: item.authorAvatar }} style={styles.avatarImage} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
-              <Ionicons name="person" size={20} color={primaryColor} />
-            </View>
-          )}
-        </View>
-        <View style={styles.authorInfo}>
-          <Text style={[styles.authorName, { color: themeColors.textPrimary }]}>
-            {item.authorDisplayName || item.authorUsername}
-          </Text>
-          <Text style={[styles.authorUsername, { color: themeColors.textSecondary }]}>
-            @{item.authorUsername}
-          </Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Post Content */}
-      <Text style={[styles.postTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-        {item.title}
-      </Text>
-      {item.message && (
-        <Text style={[styles.postMessage, { color: themeColors.textSecondary }]} numberOfLines={3}>
-          {item.message}
-        </Text>
-      )}
-
-      {/* Post Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Ionicons name="heart-outline" size={16} color={themeColors.textSecondary} />
-          <Text style={[styles.statText, { color: themeColors.textSecondary }]}>
-            {item.likesCount || 0}
-          </Text>
-        </View>
-        <View style={styles.stat}>
-          <Ionicons name="chatbubble-outline" size={16} color={themeColors.textSecondary} />
-          <Text style={[styles.statText, { color: themeColors.textSecondary }]}>
-            {item.commentsCount || 0}
-          </Text>
-        </View>
-        <View style={styles.stat}>
-          <Ionicons name="time-outline" size={16} color={themeColors.textSecondary} />
-          <Text style={[styles.statText, { color: themeColors.textSecondary }]}>
-            {formatTimeAgo(item.createdAt)}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      haptics.light();
+      const details =
+        listing.marketListing?.details ||
+        listing.message ||
+        'Message the neighbor in the room to coordinate.';
+      Alert.alert(listing.title ?? 'Marketplace', details, [
+        { text: 'Close', style: 'cancel' },
+        {
+          text: 'Browse Markets',
+          onPress: () => navigation.navigate('LocalLoopMarkets')
+        }
+      ]);
+    },
+    [haptics, navigation]
   );
+
+  const feedItems = useMemo(() => {
+    const postEntries = rawFeedPosts.map((post) => ({
+      kind: 'post',
+      id: `post-${post.id}`,
+      data: post,
+    }));
+    const marketEntries = marketListings.map((listing) => ({
+      kind: 'market',
+      id: `market-${listing.id}`,
+      data: listing,
+    }));
+    return injectMarketplaceItems(postEntries, marketEntries);
+  }, [marketListings, rawFeedPosts]);
+
+  const handleVotePress = useCallback(
+    async (event, post, direction) => {
+      event?.stopPropagation?.();
+      if (!post?.id) {
+        return;
+      }
+      if (!user?.uid) {
+        Alert.alert('Sign in required', 'Create a public profile to vote on posts.');
+        return;
+      }
+      if (voteRequestsRef.current.has(post.id)) {
+        return;
+      }
+
+      haptics.light();
+      voteRequestsRef.current.add(post.id);
+      let previousSnapshot = null;
+
+      setRawFeedPosts((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== post.id) {
+            return entry;
+          }
+
+          const baseVotes = sanitizeVoteMap(entry.votes);
+          previousSnapshot = {
+            ...entry,
+            votes: { ...baseVotes },
+          };
+
+          const currentVote = baseVotes[user.uid] ?? null;
+          let nextVote = currentVote;
+          if (direction === 'up') {
+            nextVote = currentVote === 'up' ? null : 'up';
+          } else if (direction === 'down') {
+            nextVote = currentVote === 'down' ? null : 'down';
+          }
+
+          const nextVotes = { ...baseVotes };
+          if (nextVote) {
+            nextVotes[user.uid] = nextVote;
+          } else {
+            delete nextVotes[user.uid];
+          }
+
+          const counts = deriveVoteCounts(nextVotes);
+          return {
+            ...entry,
+            votes: nextVotes,
+            upvotes: counts.upvotes,
+            downvotes: counts.downvotes,
+            userVote: nextVote,
+          };
+        })
+      );
+
+      try {
+        const result = await togglePublicPostVote(post.id, user.uid, direction);
+        setRawFeedPosts((prev) =>
+          prev.map((entry) =>
+            entry.id === post.id
+              ? {
+                  ...entry,
+                  votes: sanitizeVoteMap(result.votes),
+                  upvotes: result.upvotes,
+                  downvotes: result.downvotes,
+                  userVote: result.userVote ?? null,
+                }
+              : entry
+          )
+        );
+      } catch (error) {
+        console.error('[Feed] Failed to toggle vote:', error);
+        if (previousSnapshot) {
+          setRawFeedPosts((prev) =>
+            prev.map((entry) => (entry.id === post.id ? enhancePost(previousSnapshot) : entry))
+          );
+        }
+        Alert.alert('Unable to vote', 'Please try again in a moment.');
+      } finally {
+        voteRequestsRef.current.delete(post.id);
+      }
+    },
+    [enhancePost, haptics, user?.uid]
+  );
+
+  const renderPostCard = (post) => {
+    if (!post) {
+      return null;
+    }
+
+    const preset = post.colorKey ? presetByKey[post.colorKey] : null;
+    const accentColor =
+      preset?.buttonBackground ?? preset?.background ?? primaryColor;
+    const locationLabel =
+      post.sourceCity ||
+      post.city ||
+      post.sourceProvince ||
+      post.province ||
+      null;
+    const upActive = post.userVote === 'up';
+    const downActive = post.userVote === 'down';
+
+    return (
+      <Pressable
+        style={[
+          styles.postCard,
+          {
+            backgroundColor: themeColors.card,
+            borderColor: `${accentColor}26`,
+          },
+        ]}
+        onPress={() => handleOpenPost(post)}
+      >
+        <View style={styles.cardHeader}>
+          <TouchableOpacity
+            style={styles.authorBlock}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              if (post.authorId) {
+                navigateToProfile(post.authorId);
+              }
+            }}
+            activeOpacity={0.75}
+          >
+            <View
+              style={[
+                styles.avatarOuter,
+                {
+                  borderColor: `${accentColor}40`,
+                  backgroundColor: `${accentColor}1a`,
+                },
+              ]}
+            >
+              {post.authorAvatar ? (
+                <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={20} color={accentColor} />
+              )}
+            </View>
+            <View style={styles.authorText}>
+              <Text
+                style={[styles.authorName, { color: themeColors.textPrimary }]}
+                numberOfLines={1}
+              >
+                {post.authorDisplayName || post.authorUsername || 'Unknown'}
+              </Text>
+              {post.authorUsername ? (
+                <Text
+                  style={[styles.authorHandle, { color: themeColors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  @{post.authorUsername}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.cardMeta}>
+            {locationLabel ? (
+              <View style={[styles.metaChip, { backgroundColor: `${accentColor}1a` }]}>
+                <Ionicons name="location-outline" size={12} color={accentColor} />
+                <Text
+                  style={[styles.metaChipText, { color: accentColor }]}
+                  numberOfLines={1}
+                >
+                  {locationLabel}
+                </Text>
+              </View>
+            ) : null}
+            <Text style={[styles.timeText, { color: themeColors.textSecondary }]}>
+              {formatTimeAgo(post.createdAt)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.postBody}>
+          <Text
+            style={[styles.postTitle, { color: themeColors.textPrimary }]}
+            numberOfLines={2}
+          >
+            {post.title?.trim?.() || post.message?.trim?.() || 'Untitled post'}
+          </Text>
+          {post.message ? (
+            <Text
+              style={[styles.postMessage, { color: themeColors.textSecondary }]}
+              numberOfLines={3}
+            >
+              {post.message}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.postFooter}>
+          <View style={styles.voteGroup}>
+            <TouchableOpacity
+              style={[
+                styles.voteButton,
+                upActive && { backgroundColor: `${accentColor}1f` },
+              ]}
+              onPress={(event) => handleVotePress(event, post, 'up')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={upActive ? 'arrow-up-circle' : 'arrow-up-circle-outline'}
+                size={20}
+                color={upActive ? accentColor : themeColors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.voteCount,
+                  { color: upActive ? accentColor : themeColors.textPrimary },
+                ]}
+              >
+                {post.upvotes ?? 0}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.voteButton,
+                downActive && { backgroundColor: `${accentColor}1f` },
+              ]}
+              onPress={(event) => handleVotePress(event, post, 'down')}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={downActive ? 'arrow-down-circle' : 'arrow-down-circle-outline'}
+                size={20}
+                color={downActive ? accentColor : themeColors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.voteCount,
+                  { color: downActive ? accentColor : themeColors.textPrimary },
+                ]}
+              >
+                {post.downvotes ?? 0}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footerSpacer} />
+
+          <View style={styles.metaStat}>
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={18}
+              color={themeColors.textSecondary}
+            />
+            <Text
+              style={[styles.metaStatText, { color: themeColors.textSecondary }]}
+            >
+              {post.commentsCount ?? 0}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
 
   const renderMarketPlacement = (listing) => {
     const meta = listing.marketListing || {};
@@ -308,6 +631,222 @@ export default function FeedScreen({ navigation }) {
   );
 }
 
+function buildPostTargetCombos(post) {
+  if (!post) {
+    return [];
+  }
+
+  const combos = [];
+  const seen = new Set();
+
+  const pushCombo = (city, postId) => {
+    if (!city || !postId) {
+      return;
+    }
+    const key = `${city}::${postId}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    combos.push({ city, postId });
+  };
+
+  const cityCandidates = [
+    post.sourceCity,
+    post.city,
+    post.sharedFrom?.city,
+    post.author?.city,
+    post.marketListing?.city,
+  ].filter(Boolean);
+
+  const idCandidates = [
+    post.sourcePostId,
+    post.postId,
+    post.threadId,
+    post.originalPostId,
+    post.basePostId,
+    post.sharedFrom?.postId,
+    post.rootPostId,
+    post.primaryPostId,
+    post.id,
+  ].filter(Boolean);
+
+  if (!idCandidates.length && post.publicPostId) {
+    idCandidates.push(post.publicPostId);
+  }
+
+  cityCandidates.forEach((city) => {
+    idCandidates.forEach((postId) => {
+      pushCombo(city, postId);
+    });
+  });
+
+  // If we somehow did not include the default mapping, push fallback
+  if (!combos.length && post.city && post.id) {
+    pushCombo(post.city, post.id);
+  }
+
+  return combos;
+}
+
+function extractUniqueCities(post, combos) {
+  const cities = new Set();
+  if (combos?.length) {
+    combos.forEach((combo) => {
+      if (combo.city) {
+        cities.add(combo.city);
+      }
+    });
+  }
+  if (post?.sourceCity) {
+    cities.add(post.sourceCity);
+  }
+  if (post?.city) {
+    cities.add(post.city);
+  }
+  if (post?.sharedFrom?.city) {
+    cities.add(post.sharedFrom.city);
+  }
+  if (post?.author?.city) {
+    cities.add(post.author.city);
+  }
+  return Array.from(cities);
+}
+
+function findPostByContent(cities, post, getPostsForCity) {
+  if (!Array.isArray(cities) || !post || typeof getPostsForCity !== 'function') {
+    return null;
+  }
+
+  const normalizedTitle = normalizeText(post.title);
+  const normalizedMessage = normalizeText(post.message);
+  const targetAuthorId =
+    post.authorId ||
+    post.author?.uid ||
+    post.author?.id ||
+    (typeof post.author === 'string' ? post.author : null);
+  const referenceCreatedAt = resolveTimestampValue(post.createdAt) || post.createdAtMs || 0;
+
+  for (const city of cities) {
+    if (!city) {
+      continue;
+    }
+    const localPosts = getPostsForCity(city) ?? [];
+    if (!Array.isArray(localPosts) || !localPosts.length) {
+      continue;
+    }
+
+    let fallbackMatch = null;
+
+    for (const candidate of localPosts) {
+      if (!candidate) {
+        continue;
+      }
+      const candidateTitle = normalizeText(candidate.title);
+      const candidateMessage = normalizeText(candidate.message);
+      const candidateAuthorId =
+        candidate.author?.uid ||
+        candidate.author?.id ||
+        candidate.authorId ||
+        null;
+      const candidateCreatedAt = Number(candidate.createdAt ?? 0);
+
+      const titleMatches = Boolean(normalizedTitle && candidateTitle === normalizedTitle);
+      const messageMatches = Boolean(normalizedMessage && candidateMessage === normalizedMessage);
+      const authorMatches = Boolean(targetAuthorId && candidateAuthorId === targetAuthorId);
+      const timeDelta =
+        referenceCreatedAt && candidateCreatedAt
+          ? Math.abs(candidateCreatedAt - referenceCreatedAt)
+          : null;
+      const timeAligned = timeDelta != null && timeDelta <= 10 * 60 * 1000; // within 10 minutes
+
+      if ((titleMatches && authorMatches) || (messageMatches && authorMatches)) {
+        return { city, postId: candidate.id };
+      }
+
+      if (titleMatches && timeAligned) {
+        return { city, postId: candidate.id };
+      }
+
+      if (titleMatches && messageMatches && !fallbackMatch) {
+        fallbackMatch = { city, postId: candidate.id };
+      }
+    }
+
+    if (fallbackMatch) {
+      return fallbackMatch;
+    }
+  }
+
+  return null;
+}
+
+function normalizeText(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().toLowerCase();
+}
+
+function resolveTimestampValue(value) {
+  if (value == null) {
+    return 0;
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    if (typeof value.toMillis === 'function') {
+      return value.toMillis();
+    }
+    if (typeof value.seconds === 'number') {
+      return value.seconds * 1000;
+    }
+  }
+  return 0;
+}
+
+function sanitizeVoteMap(rawVotes) {
+  if (!rawVotes || typeof rawVotes !== 'object' || Array.isArray(rawVotes)) {
+    return {};
+  }
+  const result = {};
+  Object.entries(rawVotes).forEach(([key, value]) => {
+    if (!key) {
+      return;
+    }
+    if (value === 'up' || value === 'down') {
+      result[key] = value;
+    }
+  });
+  return result;
+}
+
+function deriveVoteCounts(votes) {
+  const entries = Object.values(votes ?? {});
+  let upvotes = 0;
+  let downvotes = 0;
+  entries.forEach((value) => {
+    if (value === 'up') {
+      upvotes += 1;
+    } else if (value === 'down') {
+      downvotes += 1;
+    }
+  });
+  return { upvotes, downvotes };
+}
+
+function hashString(value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return 0;
+  }
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) % 9973;
+  }
+  return hash;
+}
+
 function injectMarketplaceItems(postItems, marketItems) {
   if (!marketItems.length) return postItems;
   const queue = [...marketItems];
@@ -318,7 +857,8 @@ function injectMarketplaceItems(postItems, marketItems) {
     if (!queue.length) {
       return;
     }
-    const shouldInsert = Math.random() < 0.25 && ((index + 1) % 3 === 0);
+    const hash = hashString(item.id ?? `${index}`);
+    const shouldInsert = ((index + 1) % 3 === 0) && ((hash % 100) < 25);
     if (shouldInsert) {
       result.push(queue.shift());
     }
@@ -427,68 +967,124 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 18,
   },
   postCard: {
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
-  authorRow: {
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+  },
+  authorBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+    flex: 1,
   },
-  authorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  avatarOuter: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
   },
-  avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  authorInfo: {
+  authorText: {
     flex: 1,
     gap: 2,
   },
   authorName: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  authorUsername: {
+  authorHandle: {
     fontSize: 13,
   },
-  postTitle: {
-    fontSize: 17,
+  cardMeta: {
+    alignItems: 'flex-end',
+    gap: 6,
+    minWidth: 80,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  metaChipText: {
+    fontSize: 12,
     fontWeight: '600',
-    lineHeight: 24,
+  },
+  timeText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  postBody: {
+    gap: 10,
+  },
+  postTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 26,
   },
   postMessage: {
     fontSize: 15,
     lineHeight: 22,
   },
-  statsRow: {
+  postFooter: {
     flexDirection: 'row',
-    gap: 20,
+    alignItems: 'center',
     marginTop: 4,
   },
-  stat: {
+  voteGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  voteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+  },
+  voteCount: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  footerSpacer: {
+    flex: 1,
+  },
+  metaStat: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  statText: {
+  metaStatText: {
     fontSize: 13,
+    fontWeight: '500',
   },
   marketCard: {
     borderRadius: 14,

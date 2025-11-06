@@ -141,7 +141,17 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if isSignedIn()
+
+      // Allow author to update/delete everything
+      // Allow anyone signed in to update votes, upvotes, downvotes, lastInteractionAt
+      allow update: if isSignedIn()
+        && (
+          resource.data.authorId == request.auth.uid ||
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['authorId', 'createdAt', 'title', 'content', 'imageUrl', 'tags'])
+        );
+
+      allow delete: if isSignedIn()
         && resource.data.authorId == request.auth.uid;
     }
 

@@ -179,6 +179,10 @@ export default function ScreenLayout({
         province: location.province,
         country: location.country,
         colorKey,
+        sourcePostId: published.id,
+        sourceCity: location.city,
+        sourceProvince: location.province ?? userProfile?.province ?? '',
+        sourceCountry: location.country ?? userProfile?.country ?? '',
       }).catch(err => {
         console.warn('[ScreenLayout] Failed to save public post:', err.message);
       });
