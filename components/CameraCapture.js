@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
-  Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAlert } from '../contexts/AlertContext';
 import useHaptics from '../hooks/useHaptics';
 
 /**
@@ -33,6 +33,7 @@ import useHaptics from '../hooks/useHaptics';
  */
 export default function CameraCapture({ visible, onClose, onCapture, mode = 'photo' }) {
   const { themeColors } = useSettings();
+  const { showAlert } = useAlert();
   const haptics = useHaptics();
   const cameraRef = useRef(null);
 
@@ -79,7 +80,7 @@ export default function CameraCapture({ visible, onClose, onCapture, mode = 'pho
     } catch (error) {
       console.error('Failed to take picture:', error);
       haptics.error();
-      Alert.alert('Error', 'Failed to capture photo. Please try again.');
+      showAlert('Error', 'Failed to capture photo. Please try again.', 'error');
     } finally {
       setIsCapturing(false);
     }

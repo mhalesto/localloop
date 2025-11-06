@@ -233,16 +233,18 @@ export function AuthProvider({ children }) {
       const data = snap.data();
       const next = normalizeProfile(data);
       const updates = {};
-      if ((user.displayName ?? '') !== next.displayName) {
-        updates.displayName = user.displayName ?? '';
+      // Only update displayName from Firebase Auth if it has a non-empty value
+      if (user.displayName && user.displayName !== next.displayName) {
+        updates.displayName = user.displayName;
         next.displayName = updates.displayName;
       }
       if ((user.email ?? '') !== next.email) {
         updates.email = user.email ?? '';
         next.email = updates.email;
       }
-      if ((user.photoURL ?? '') !== next.photoURL) {
-        updates.photoURL = user.photoURL ?? '';
+      // Only update photoURL from Firebase Auth if it has a non-empty value
+      if (user.photoURL && user.photoURL !== next.photoURL) {
+        updates.photoURL = user.photoURL;
         next.photoURL = updates.photoURL;
       }
       updates.lastLoginAt = now;

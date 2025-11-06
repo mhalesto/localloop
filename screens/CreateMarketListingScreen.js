@@ -5,8 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  TouchableOpacity,
-  Alert
+  TouchableOpacity
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
@@ -14,6 +13,7 @@ import UpgradePromptModal from '../components/UpgradePromptModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import { countUserActiveListings } from '../services/marketplaceService';
 import { getPlanLimits } from '../config/subscriptionPlans';
 
@@ -33,6 +33,7 @@ export default function CreateMarketListingScreen({ navigation, route }) {
   const { themeColors, isDarkMode, accentPreset, userProfile } = useSettings();
   const { addPost } = usePosts();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode, accent: accentPreset }),
     [themeColors, isDarkMode, accentPreset]
@@ -60,12 +61,12 @@ export default function CreateMarketListingScreen({ navigation, route }) {
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      Alert.alert('Add a title', 'Give your listing a clear title so neighbors know what it is.');
+      showAlert('Add a title', 'Give your listing a clear title so neighbors know what it is.', [], { type: 'warning' });
       return;
     }
 
     if (!user?.uid) {
-      Alert.alert('Sign in required', 'Sign in to publish listings to your neighborhood.');
+      showAlert('Sign in required', 'Sign in to publish listings to your neighborhood.', [], { type: 'info' });
       return;
     }
 
@@ -85,7 +86,7 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     }
 
     if (!userProfile?.isPublicProfile || !userProfile?.username || !userProfile?.displayName) {
-      Alert.alert(
+      showAlert(
         'Public profile required',
         'LocalLoop Markets uses real neighbor identities. Set up your public profile with a display name and username before listing.',
         [
@@ -94,7 +95,8 @@ export default function CreateMarketListingScreen({ navigation, route }) {
             text: 'Open settings',
             onPress: () => navigation.navigate('Settings')
           }
-        ]
+        ],
+        { type: 'info' }
       );
       return;
     }
@@ -114,9 +116,11 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     const resolvedCity = cityFromInput || userProfile?.city;
 
     if (!resolvedCity) {
-      Alert.alert(
+      showAlert(
         'Add your city',
-        'Listings need a neighborhood. Update your location in settings first so neighbors see the right posts.'
+        'Listings need a neighborhood. Update your location in settings first so neighbors see the right posts.',
+        [],
+        { type: 'info' }
       );
       return;
     }
@@ -151,9 +155,11 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     );
 
     if (!created) {
-      Alert.alert(
+      showAlert(
         'Unable to list right now',
-        'We could not publish your listing. Check your connection and try again.'
+        'We could not publish your listing. Check your connection and try again.',
+        [],
+        { type: 'error' }
       );
       return;
     }
@@ -165,12 +171,12 @@ export default function CreateMarketListingScreen({ navigation, route }) {
     setCondition(listingConditions[0]);
     setContact(userProfile?.contactMethod ?? '');
 
-    Alert.alert('Listing published', 'Your neighbors can now see this in LocalLoop Markets.', [
+    showAlert('Listing published', 'Your neighbors can now see this in LocalLoop Markets.', [
       {
         text: 'Great',
         onPress: () => navigation.navigate('LocalLoopMarkets')
       }
-    ]);
+    ], { type: 'success' });
   };
 
   const renderPillRow = (items, value, onChange) => (

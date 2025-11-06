@@ -1,8 +1,9 @@
 import { useEffect, useCallback } from 'react';
 import * as ScreenCapture from 'expo-screen-capture';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../api/firebaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 /**
  * Hook to detect screenshots and optionally prevent them
@@ -22,6 +23,8 @@ export function useScreenshotDetection({
   contentOwnerId,
   currentUserId,
 }) {
+  const { showAlert } = useAlert();
+
   const handleScreenshot = useCallback(async () => {
     console.log('[ScreenshotDetection] Screenshot detected!');
 
@@ -60,12 +63,13 @@ export function useScreenshotDetection({
     }
 
     // Show alert to user (optional)
-    Alert.alert(
+    showAlert(
       'Screenshot Detected',
       'The content owner has been notified that you took a screenshot.',
-      [{ text: 'OK' }]
+      [{ text: 'OK' }],
+      { type: 'info' }
     );
-  }, [contentId, contentType, contentOwnerId, currentUserId, onScreenshot]);
+  }, [contentId, contentType, contentOwnerId, currentUserId, onScreenshot, showAlert]);
 
   useEffect(() => {
     let subscription = null;

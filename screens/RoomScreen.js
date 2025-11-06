@@ -6,7 +6,6 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,7 @@ import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import AccentBackground from '../components/AccentBackground';
 import { analyzePostContent } from '../services/openai/moderationService';
 import PollComposer from '../components/PollComposer';
@@ -27,6 +27,7 @@ export default function RoomScreen({ navigation, route }) {
   const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
   const { accentPreset, accentKey, userProfile, themeColors, isDarkMode, themeDarkness = 0 } = useSettings();
   const { user: firebaseUser } = useAuth();
+  const { showAlert } = useAlert();
   const posts = getPostsForCity(city);
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
@@ -95,7 +96,7 @@ export default function RoomScreen({ navigation, route }) {
         return;
       }
       if (!firebaseUser?.uid) {
-        Alert.alert('Sign in required', 'Sign in to share posts to another room.');
+        showAlert('Sign in required', 'Sign in to share posts to another room.', [], { type: 'warning' });
         closeShareModal();
         return;
       }
@@ -103,11 +104,11 @@ export default function RoomScreen({ navigation, route }) {
       if (shared) {
         setShareToast(`Shared to ${targetCity}`);
       } else {
-        Alert.alert('Unable to share', 'We could not share that post right now. Please try again soon.');
+        showAlert('Unable to share', 'We could not share that post right now. Please try again soon.', [], { type: 'error' });
       }
       closeShareModal();
     },
-    [city, closeShareModal, firebaseUser?.uid, postToShare, sharePost, userProfile]
+    [city, closeShareModal, firebaseUser?.uid, postToShare, sharePost, userProfile, showAlert]
   );
 
   const handleAddPost = useCallback(async () => {
@@ -115,7 +116,7 @@ export default function RoomScreen({ navigation, route }) {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
     if (!firebaseUser?.uid) {
-      Alert.alert('Sign in required', 'Sign in to publish posts to this room.');
+      showAlert('Sign in required', 'Sign in to publish posts to this room.', [], { type: 'warning' });
       return;
     }
     setIsPublishing(true);
@@ -129,12 +130,12 @@ export default function RoomScreen({ navigation, route }) {
 
       if (moderation?.action === 'block') {
         const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
-        Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
+        showAlert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`, [], { type: 'error' });
         return;
       }
       if (moderation?.action === 'review') {
         const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
-        Alert.alert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`);
+        showAlert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`, [], { type: 'warning' });
       }
 
       const created = addPost(
@@ -156,7 +157,7 @@ export default function RoomScreen({ navigation, route }) {
         pollData // Include poll data if exists
       );
       if (!created) {
-        Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+        showAlert('Unable to publish', 'We could not create that post. Please try again in a moment.', [], { type: 'error' });
         return;
       }
       setTitle('');
@@ -176,7 +177,8 @@ export default function RoomScreen({ navigation, route }) {
     selectedColorKey,
     title,
     userProfile,
-    pollData
+    pollData,
+    showAlert
   ]);
 
   const handleOpenPost = (postId) => {
@@ -220,7 +222,7 @@ export default function RoomScreen({ navigation, route }) {
       initialAccentKey: selectedColorKey,
       onSubmit: async ({ title: postTitle, message: postMessage, colorKey, poll }) => {
         if (!firebaseUser?.uid) {
-          Alert.alert('Sign in required', 'Sign in to publish posts to this room.');
+          showAlert('Sign in required', 'Sign in to publish posts to this room.', [], { type: 'warning' });
           return;
         }
 
@@ -234,12 +236,12 @@ export default function RoomScreen({ navigation, route }) {
 
           if (moderation?.action === 'block') {
             const reasons = (moderation.matchedLabels ?? []).join(', ') || 'policy violation';
-            Alert.alert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`);
+            showAlert('Post blocked', `This post appears to contain ${reasons}. Please revise and try again.`, [], { type: 'error' });
             return false;
           }
           if (moderation?.action === 'review') {
             const reasons = (moderation.matchedLabels ?? []).join(', ') || 'sensitive content';
-            Alert.alert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`);
+            showAlert('Pending review', `This post contains ${reasons}. It will be submitted for review before being visible to others.`, [], { type: 'warning' });
           }
 
           const created = addPost(
@@ -262,7 +264,7 @@ export default function RoomScreen({ navigation, route }) {
           );
 
           if (!created) {
-            Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+            showAlert('Unable to publish', 'We could not create that post. Please try again in a moment.', [], { type: 'error' });
             return false;
           }
 
@@ -270,12 +272,12 @@ export default function RoomScreen({ navigation, route }) {
           return true;
         } catch (error) {
           console.error('[RoomScreen] Error creating post:', error);
-          Alert.alert('Error', 'Failed to create post. Please try again.');
+          showAlert('Error', 'Failed to create post. Please try again.', [], { type: 'error' });
           return false;
         }
       }
     });
-  }, [navigation, city, userProfile, selectedColorKey, firebaseUser?.uid, addPost]);
+  }, [navigation, city, userProfile, selectedColorKey, firebaseUser?.uid, addPost, showAlert]);
 
   const renderComposerButton = () => (
     <TouchableOpacity

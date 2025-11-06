@@ -13,10 +13,10 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAlert } from '../contexts/AlertContext';
 import { CARTOON_STYLES } from '../services/openai/profileCartoonService';
 
 export default function CartoonHistoryModal({
@@ -30,6 +30,7 @@ export default function CartoonHistoryModal({
   isProcessing = false,
 }) {
   const { themeColors, accentPreset } = useSettings();
+  const { showAlert } = useAlert();
   const [processingId, setProcessingId] = useState(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
@@ -43,9 +44,10 @@ export default function CartoonHistoryModal({
   };
 
   const handleDelete = (picture) => {
-    Alert.alert(
+    showAlert(
       'Delete Picture',
       'Are you sure you want to delete this cartoon picture? This cannot be undone.',
+      'warning',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -61,9 +63,10 @@ export default function CartoonHistoryModal({
   };
 
   const handleClearAll = () => {
-    Alert.alert(
+    showAlert(
       'Clear All History',
       'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
+      'warning',
       [
         { text: 'Cancel', style: 'cancel' },
         {

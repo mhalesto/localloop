@@ -1298,8 +1298,13 @@ export function PostsProvider({ children }) {
         const existingIndex = cityPosts.findIndex((p) => p.id === post.id);
 
         if (existingIndex >= 0) {
-          // Post already exists, don't add again
-          return prev;
+          // Post already exists, update it with new data
+          const updatedCityPosts = [...cityPosts];
+          updatedCityPosts[existingIndex] = { ...updatedCityPosts[existingIndex], ...post };
+          return {
+            ...prev,
+            [city]: updatedCityPosts
+          };
         }
 
         // Add the post to the city's posts

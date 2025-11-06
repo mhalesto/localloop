@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Modal,
   ScrollView,
@@ -29,6 +28,7 @@ import * as Clipboard from 'expo-clipboard';
 
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import ScreenLayout from '../components/ScreenLayout';
 import CreatePostModal from '../components/CreatePostModal';
 import {
@@ -48,6 +48,9 @@ import { suggestComment, SUGGESTION_TYPES } from '../services/openai/commentSugg
 import { translatePost, LANGUAGES, COMMON_LANGUAGES } from '../services/openai/translationService';
 import { analyzePostContent } from '../services/openai/moderationService';
 import { isFeatureEnabled } from '../config/aiFeatures';
+import { togglePublicPostVote } from '../services/publicPostsService';
+import { getDoc, doc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../api/firebaseClient';
 
 const REACTION_OPTIONS = ['👍', '🎉', '😂', '❤️', '🔥', '😮'];
 const HEADER_SCROLL_DISTANCE = 96;
@@ -423,7 +426,8 @@ export default function PostThreadScreen({ route, navigation }) {
     togglePostSubscription,
     watchThread,
     setTypingStatus,
-    observeTyping
+    observeTyping,
+    addFetchedPost
   } = usePosts();
   const {
     accentPreset,
@@ -438,6 +442,7 @@ export default function PostThreadScreen({ route, navigation }) {
     premiumDescriptionFontSize
   } = useSettings();
   const { user: firebaseUser } = useAuth();
+  const { showAlert } = useAlert();
   const effectiveTitleFontSize =
     premiumTypographyEnabled && premiumTitleFontSizeEnabled
       ? premiumTitleFontSize
@@ -1675,9 +1680,11 @@ export default function PostThreadScreen({ route, navigation }) {
       console.log('[PostThread] Moderation result:', moderation.action);
 
       if (moderation.action === 'block') {
-        Alert.alert(
+        showAlert(
           'Content Blocked',
-          'Your comment contains inappropriate content and cannot be posted. Please revise and try again.'
+          'Your comment contains inappropriate content and cannot be posted. Please revise and try again.',
+          [],
+          { type: 'error' }
         );
         return;
       }
@@ -1706,7 +1713,7 @@ export default function PostThreadScreen({ route, navigation }) {
     }
 
     if (comments.length < 10) {
-      Alert.alert('Too few comments', 'Threads need at least 10 comments to summarize');
+      showAlert('Too few comments', 'Threads need at least 10 comments to summarize', [], { type: 'info' });
       return;
     }
 
@@ -1731,9 +1738,9 @@ export default function PostThreadScreen({ route, navigation }) {
       console.log('[ThreadSummary] Summarization failed:', error.message);
       isSummarizingRef.current = false;
       setIsSummarizing(false);
-      Alert.alert('Summary failed', error.message);
+      showAlert('Summary failed', error.message, [], { type: 'error' });
     }
-  }, [comments, post, navigation]);
+  }, [comments, post, navigation, showAlert]);
 
   // [AI-FEATURES] Comment Suggestions
   const handleGetSuggestion = async (type = SUGGESTION_TYPES.THOUGHTFUL) => {
@@ -1742,7 +1749,7 @@ export default function PostThreadScreen({ route, navigation }) {
       const result = await suggestComment(post, type);
       setReply(result.suggestion);
     } catch (error) {
-      Alert.alert('Suggestion failed', error.message);
+      showAlert('Suggestion failed', error.message, [], { type: 'error' });
     } finally {
       setIsLoadingSuggestion(false);
     }
@@ -1766,7 +1773,7 @@ export default function PostThreadScreen({ route, navigation }) {
       });
     } catch (error) {
       setIsTranslating(false);
-      Alert.alert('Translation failed', error.message);
+      showAlert('Translation failed', error.message, [], { type: 'error' });
     }
   };
 
@@ -1857,6 +1864,103 @@ export default function PostThreadScreen({ route, navigation }) {
     return () => clearTimeout(t);
   }, [feedbackMessage]);
 
+  // Custom vote handler that syncs both local post and public post
+  const handleVotePress = useCallback(
+    async (direction) => {
+      if (!firebaseUser?.uid || !post) {
+        return;
+      }
+
+      // Check if this is a synthetic post (created from public post data)
+      const isSyntheticPost = post.isPublicPostView === true;
+
+      if (isSyntheticPost && post.publicPostId) {
+        // For synthetic posts, vote directly on the public post only
+        try {
+          await togglePublicPostVote(post.publicPostId, firebaseUser.uid, direction);
+          console.log('[PostThread] Voted on public post (synthetic):', post.publicPostId);
+
+          // Optimistically update the local UI
+          // Note: We don't call toggleVote since this post doesn't exist in posts collection
+          // Instead we manually update the post object that will trigger a re-render
+          const currentVote = post.userVote;
+          let nextVote = currentVote;
+          if (direction === 'up') {
+            nextVote = currentVote === 'up' ? null : 'up';
+          } else if (direction === 'down') {
+            nextVote = currentVote === 'down' ? null : 'down';
+          }
+
+          // Force a refresh by updating the cached post
+          const updatedPost = { ...post };
+
+          // Update vote counts
+          if (currentVote === 'up') {
+            updatedPost.upvotes = Math.max(0, (post.upvotes || 0) - 1);
+          } else if (currentVote === 'down') {
+            updatedPost.downvotes = Math.max(0, (post.downvotes || 0) - 1);
+          }
+
+          if (nextVote === 'up') {
+            updatedPost.upvotes = (updatedPost.upvotes || 0) + 1;
+          } else if (nextVote === 'down') {
+            updatedPost.downvotes = (updatedPost.downvotes || 0) + 1;
+          }
+
+          updatedPost.userVote = nextVote;
+
+          // Update votes map
+          const votes = { ...(post.votes || {}) };
+          if (nextVote) {
+            votes[firebaseUser.uid] = nextVote;
+          } else {
+            delete votes[firebaseUser.uid];
+          }
+          updatedPost.votes = votes;
+
+          // Update the cached post
+          addFetchedPost(city, updatedPost);
+        } catch (error) {
+          console.warn('[PostThread] Failed to vote on public post:', error);
+        }
+      } else {
+        // For real posts, update local post and sync to public posts
+        // Update local post immediately (optimistic update)
+        toggleVote(city, postId, direction);
+
+        // Also update the public post if it exists
+        // Public posts reference this post via sourcePostId and sourceCity
+        try {
+          // Find public posts that reference this post
+          const publicPostsRef = collection(db, 'publicPosts');
+          const q = query(
+            publicPostsRef,
+            where('sourcePostId', '==', postId),
+            where('sourceCity', '==', city)
+          );
+
+          const snapshot = await getDocs(q);
+
+          // Update all matching public posts
+          const updatePromises = snapshot.docs.map(async (docSnap) => {
+            const publicPostId = docSnap.id;
+            try {
+              await togglePublicPostVote(publicPostId, firebaseUser.uid, direction);
+              console.log('[PostThread] Synced vote to public post:', publicPostId);
+            } catch (error) {
+              console.warn('[PostThread] Failed to sync vote to public post:', error);
+            }
+          });
+
+          await Promise.all(updatePromises);
+        } catch (error) {
+          console.warn('[PostThread] Failed to find/update public posts:', error);
+        }
+      }
+    },
+    [city, postId, firebaseUser?.uid, toggleVote, post, addFetchedPost]
+  );
+
   const openShareModal = useCallback(() => {
     setShareModalVisible(true);
   }, []);
@@ -1872,7 +1976,7 @@ export default function PostThreadScreen({ route, navigation }) {
         return;
       }
       if (!firebaseUser?.uid) {
-        Alert.alert('Sign in required', 'Sign in to share posts to another room.');
+        showAlert('Sign in required', 'Sign in to share posts to another room.', [], { type: 'warning' });
         closeShareModal();
         return;
       }
@@ -1880,11 +1984,11 @@ export default function PostThreadScreen({ route, navigation }) {
       if (shared) {
         setFeedbackMessage(`Shared to ${targetCity}`);
       } else {
-        Alert.alert('Unable to share', 'We could not share that post right now. Please try again soon.');
+        showAlert('Unable to share', 'We could not share that post right now. Please try again soon.', [], { type: 'error' });
       }
       closeShareModal();
     },
-    [city, closeShareModal, firebaseUser?.uid, postId, sharePost, userProfile]
+    [city, closeShareModal, firebaseUser?.uid, postId, sharePost, userProfile, showAlert]
   );
 
   const handleShareOutside = useCallback(async () => {
@@ -2011,7 +2115,7 @@ export default function PostThreadScreen({ route, navigation }) {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Delete post',
       'Are you sure you want to delete this post?',
       [
@@ -2029,10 +2133,9 @@ export default function PostThreadScreen({ route, navigation }) {
             }
           },
         },
-      ],
-      { cancelable: true }
+      ]
     );
-  }, [city, deletePost, navigation, post?.createdByMe, postId]);
+  }, [city, deletePost, navigation, post?.createdByMe, postId, showAlert]);
 
   const closeOwnerMenu = useCallback(() => {
     setOwnerMenuVisible(false);
@@ -2451,7 +2554,7 @@ export default function PostThreadScreen({ route, navigation }) {
               <View style={styles.actionsRow}>
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => toggleVote(city, postId, 'up')}
+                  onPress={() => handleVotePress('up')}
                   activeOpacity={0.7}
                 >
                   <Ionicons
@@ -2464,7 +2567,7 @@ export default function PostThreadScreen({ route, navigation }) {
 
                 <TouchableOpacity
                   style={styles.actionButton}
-                  onPress={() => toggleVote(city, postId, 'down')}
+                  onPress={() => handleVotePress('down')}
                   activeOpacity={0.7}
                 >
                   <Ionicons

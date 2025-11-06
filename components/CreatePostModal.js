@@ -11,12 +11,12 @@ import {
   Platform,
   ScrollView,
   Switch,
-  Alert,
   TouchableWithoutFeedback
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard'; // [AI-SUMMARY]
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
+import { useAlert } from '../contexts/AlertContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 import LoadingOverlay from './LoadingOverlay';
@@ -30,7 +30,7 @@ import {
   hasRichFormatting
 } from '../utils/textFormatting';
 import { smartSummarize } from '../services/openai/summarizationService';
-import { generateTitle, TITLE_STYLES } from '../services/openai/titleGenerationService';
+import { generateTitle, TITLE_STYLES, generateFallbackTitle } from '../services/openai/titleGenerationService';
 import { checkDuplicate } from '../services/openai/embeddingsService';
 import { isFeatureEnabled } from '../config/aiFeatures';
 
@@ -69,6 +69,7 @@ export default function CreatePostModal({
     userProfile,
     updateUserProfile
   } = useSettings();
+  const { showAlert } = useAlert();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const [title, setTitle] = useState('');
@@ -511,7 +512,16 @@ export default function CreatePostModal({
       setTitle(result.title);
     } catch (error) {
       console.warn('[CreatePostModal] Title generation failed', error);
-      setTitleError(error instanceof Error ? error.message : 'Unable to generate title right now');
+
+      // Fallback to simple title extraction
+      try {
+        const fallbackTitle = generateFallbackTitle(message);
+        setTitle(fallbackTitle);
+        console.log('[CreatePostModal] Using fallback title:', fallbackTitle);
+      } catch (fallbackError) {
+        console.error('[CreatePostModal] Fallback title generation failed', fallbackError);
+        setTitleError('Unable to generate title. Please write one manually.');
+      }
     } finally {
       setIsGeneratingTitle(false);
     }
@@ -561,7 +571,7 @@ export default function CreatePostModal({
     } catch (error) {
       console.warn('[CreatePostModal] submit failed', error);
       result = false;
-      Alert.alert('Unable to publish', error?.message ?? 'Please try again in a moment.');
+      showAlert('Unable to publish', error?.message ?? 'Please try again in a moment.', 'error');
     }
 
     setIsSubmitting(false);

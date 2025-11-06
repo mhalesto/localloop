@@ -8,13 +8,13 @@ import {
   ActivityIndicator,
   TextInput,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import ProgressiveImage from '../components/ProgressiveImage';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import { getThumbnailUrl } from '../utils/imageUtils';
 import { getFollowing, unfollowUser } from '../services/followService';
 
@@ -22,6 +22,7 @@ export default function FollowingScreen({ navigation, route }) {
   const { userId, username } = route.params;
   const { themeColors, accentPreset } = useSettings();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const [following, setFollowing] = useState([]);
   const [filteredFollowing, setFilteredFollowing] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +75,7 @@ export default function FollowingScreen({ navigation, route }) {
   const handleUnfollow = async (followedUser) => {
     if (!isOwnProfile) return;
 
-    Alert.alert(
+    showAlert(
       'Unfollow User',
       `Are you sure you want to unfollow @${followedUser.username}?`,
       [
@@ -89,7 +90,7 @@ export default function FollowingScreen({ navigation, route }) {
               setFollowing(prev => prev.filter(u => u.id !== followedUser.id));
             } catch (error) {
               console.error('[Following] Error unfollowing user:', error);
-              Alert.alert('Error', 'Failed to unfollow user. Please try again.');
+              showAlert('Error', 'Failed to unfollow user. Please try again.', [], { type: 'error' });
             } finally {
               setUnfollowingIds(prev => {
                 const next = new Set(prev);
@@ -99,7 +100,8 @@ export default function FollowingScreen({ navigation, route }) {
             }
           },
         },
-      ]
+      ],
+      { type: 'warning' }
     );
   };
 

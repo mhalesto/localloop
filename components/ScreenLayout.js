@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, Modal, Pressable, Animated, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, Animated, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -9,6 +9,7 @@ import FooterMenu from './FooterMenu';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import CreatePostModal from './CreatePostModal';
 import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
@@ -63,6 +64,7 @@ export default function ScreenLayout({
   } = usePosts();
 
   const { user: firebaseUser } = useAuth();
+  const { showAlert } = useAlert();
   const insets = useSafeAreaInsets();
 
   // Status bar icons (white on dark headers, dark on light headers)
@@ -103,7 +105,7 @@ export default function ScreenLayout({
       return false;
     }
     if (!firebaseUser?.uid) {
-      Alert.alert('Sign in required', 'Sign in to publish posts to the community.');
+      showAlert('Sign in required', 'Sign in to publish posts to the community.', 'warning');
       setComposerVisible(false);
       return false;
     }
@@ -145,7 +147,7 @@ export default function ScreenLayout({
     );
 
     if (!published) {
-      Alert.alert('Unable to publish', 'We could not create that post. Please try again in a moment.');
+      showAlert('Unable to publish', 'We could not create that post. Please try again in a moment.', 'error');
       setComposerVisible(false);
       return false;
     }

@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Image,
   Keyboard,
   Pressable
@@ -21,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import ScreenLayout from '../components/ScreenLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAlert } from '../contexts/AlertContext';
 import { buildConversationId, sendDirectMessage, subscribeToMessages, addReaction } from '../services/messagesService';
 import VoiceNotePlayer from '../components/VoiceNotePlayer';
 import MessageReactions from '../components/MessageReactions';
@@ -42,6 +42,7 @@ export default function DirectMessageScreen() {
   const route = useRoute();
   const { user, profile: currentProfile } = useAuth();
   const { themeColors, isDarkMode } = useSettings();
+  const { showAlert } = useAlert();
   const { userId: recipientId, username, displayName, profilePhoto } = route.params ?? {};
   const insets = useSafeAreaInsets();
 
@@ -123,7 +124,7 @@ export default function DirectMessageScreen() {
 
   const handleSendVoiceNote = useCallback(async ({ uri, duration }) => {
     if (!conversationId || !user?.uid || !recipientId) {
-      Alert.alert('Error', 'Unable to send voice note');
+      showAlert('Error', 'Unable to send voice note', [], { type: 'error' });
       return;
     }
 
@@ -153,11 +154,11 @@ export default function DirectMessageScreen() {
 
     } catch (error) {
       console.error('[DirectMessage] Failed to send voice note:', error);
-      Alert.alert('Error', 'Failed to send voice note');
+      showAlert('Error', 'Failed to send voice note', [], { type: 'error' });
     } finally {
       setUploadingVoice(false);
     }
-  }, [conversationId, user?.uid, recipientId]);
+  }, [conversationId, user?.uid, recipientId, showAlert]);
 
   const handleReact = useCallback(async (messageId, emoji, remove = false) => {
     if (!conversationId || !user?.uid) return;
@@ -226,25 +227,25 @@ export default function DirectMessageScreen() {
         setShowGifPicker(true);
         break;
       case 'camera':
-        Alert.alert('Camera', 'Camera feature coming soon!');
+        showAlert('Camera', 'Camera feature coming soon!', [], { type: 'info' });
         break;
       case 'photo':
-        Alert.alert('Photos', 'Photo picker coming soon!');
+        showAlert('Photos', 'Photo picker coming soon!', [], { type: 'info' });
         break;
       case 'location':
-        Alert.alert('Location', 'Location sharing coming soon!');
+        showAlert('Location', 'Location sharing coming soon!', [], { type: 'info' });
         break;
       case 'contact':
-        Alert.alert('Contact', 'Contact sharing coming soon!');
+        showAlert('Contact', 'Contact sharing coming soon!', [], { type: 'info' });
         break;
       case 'document':
-        Alert.alert('Document', 'Document sharing coming soon!');
+        showAlert('Document', 'Document sharing coming soon!', [], { type: 'info' });
         break;
       case 'poll':
-        Alert.alert('Poll', 'Poll feature coming soon!');
+        showAlert('Poll', 'Poll feature coming soon!', [], { type: 'info' });
         break;
     }
-  }, []);
+  }, [showAlert]);
 
   const handleSend = useCallback(async () => {
     console.log('[DirectMessageScreen] handleSend called');
@@ -350,20 +351,20 @@ export default function DirectMessageScreen() {
       resetRecordingVisualState();
       if (!uri || duration < 600) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
-        Alert.alert('Recording too short', 'Hold the microphone a little longer to capture a voice note.');
+        showAlert('Recording too short', 'Hold the microphone a little longer to capture a voice note.', [], { type: 'warning' });
         return;
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
       await handleSendVoiceNote({ uri, duration });
     } catch (error) {
       console.error('[DirectMessage] Failed to finalize recording:', error);
-      Alert.alert('Error', 'Failed to save voice note');
+      showAlert('Error', 'Failed to save voice note', [], { type: 'error' });
       resetRecordingVisualState();
     } finally {
       recordingRef.current = null;
       isFinalizingRecordingRef.current = false;
     }
-  }, [clearRecordingTimer, handleSendVoiceNote, releaseAudioResources, resetRecordingVisualState]);
+  }, [clearRecordingTimer, handleSendVoiceNote, releaseAudioResources, resetRecordingVisualState, showAlert]);
 
   const restartRecordingTimer = useCallback(() => {
     clearRecordingTimer();
@@ -383,14 +384,14 @@ export default function DirectMessageScreen() {
       return false;
     }
     if (!conversationId || !user?.uid || !recipientId) {
-      Alert.alert('Sign in required', 'Sign in to send voice notes.');
+      showAlert('Sign in required', 'Sign in to send voice notes.', [], { type: 'info' });
       return false;
     }
     try {
       if (!hasMicPermissionRef.current) {
         const { status } = await Audio.requestPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permission required', 'Microphone permission is required to record voice notes.');
+          showAlert('Permission required', 'Microphone permission is required to record voice notes.', [], { type: 'warning' });
           return false;
         }
         hasMicPermissionRef.current = true;
@@ -418,7 +419,7 @@ export default function DirectMessageScreen() {
       return true;
     } catch (error) {
       console.error('[DirectMessage] Failed to start recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
+      showAlert('Error', 'Failed to start recording', [], { type: 'error' });
       recordingRef.current = null;
       recordingStartRef.current = null;
       resetRecordingVisualState();
@@ -434,7 +435,8 @@ export default function DirectMessageScreen() {
     setShowAttachmentMenu,
     uploadingVoice,
     user?.uid,
-    recipientId
+    recipientId,
+    showAlert
   ]);
 
   const handleMicResponderGrant = useCallback(
@@ -443,7 +445,7 @@ export default function DirectMessageScreen() {
         return;
       }
       if (!conversationId || !user?.uid || !recipientId) {
-        Alert.alert('Sign in required', 'Sign in to send voice notes.');
+        showAlert('Sign in required', 'Sign in to send voice notes.', [], { type: 'info' });
         return;
       }
       micGestureOriginRef.current = {
@@ -455,7 +457,7 @@ export default function DirectMessageScreen() {
         micGestureOriginRef.current = { x: 0, y: 0 };
       }
     },
-    [conversationId, messageText, recipientId, recordingLocked, startVoiceRecording, uploadingVoice, user?.uid]
+    [conversationId, messageText, recipientId, recordingLocked, startVoiceRecording, uploadingVoice, user?.uid, showAlert]
   );
 
   const handleMicResponderMove = useCallback(
@@ -691,9 +693,9 @@ export default function DirectMessageScreen() {
         case 'copy':
           if (current.text) {
             Clipboard.setStringAsync(current.text);
-            Alert.alert('Copied', 'Message copied to clipboard.');
+            showAlert('Copied', 'Message copied to clipboard.', [], { type: 'success' });
           } else {
-            Alert.alert('Nothing to copy', 'This message has no text to copy.');
+            showAlert('Nothing to copy', 'This message has no text to copy.', [], { type: 'info' });
           }
           break;
         case 'delete':
@@ -704,12 +706,12 @@ export default function DirectMessageScreen() {
         case 'star':
         case 'more':
         default:
-          Alert.alert('Coming soon', 'This action will be available in a future update.');
+          showAlert('Coming soon', 'This action will be available in a future update.', [], { type: 'info' });
           break;
       }
       return null;
     });
-  }, []);
+  }, [showAlert]);
 
   const closeActionSheet = useCallback(() => setActionSheetMessage(null), []);
 

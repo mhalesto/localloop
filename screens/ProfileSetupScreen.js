@@ -6,7 +6,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -15,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import {
   validateUsernameFormat,
   isUsernameAvailable,
@@ -25,6 +25,7 @@ import { updateUserProfile } from '../services/userProfileService';
 export default function ProfileSetupScreen({ navigation, route }) {
   const { themeColors, accentPreset, userProfile, updateUserProfile: updateLocalProfile, reloadProfile } = useSettings();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const isEditing = route.params?.isEditing ?? false;
 
   const [username, setUsername] = useState(userProfile?.username || '');
@@ -89,9 +90,11 @@ export default function ProfileSetupScreen({ navigation, route }) {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        showAlert(
           'Permission Required',
-          'Please allow access to your photo library to upload a profile picture.'
+          'Please allow access to your photo library to upload a profile picture.',
+          [],
+          { type: 'warning' }
         );
         return;
       }
@@ -108,24 +111,24 @@ export default function ProfileSetupScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error('[ProfileSetup] Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
+      showAlert('Error', 'Failed to select image. Please try again.', [], { type: 'error' });
     }
   };
 
   const handleSave = async () => {
     // Validation
     if (!username) {
-      Alert.alert('Username Required', 'Please enter a username.');
+      showAlert('Username Required', 'Please enter a username.', [], { type: 'warning' });
       return;
     }
 
     if (!isUsernameValid) {
-      Alert.alert('Invalid Username', usernameError || 'Please choose a valid username.');
+      showAlert('Invalid Username', usernameError || 'Please choose a valid username.', [], { type: 'warning' });
       return;
     }
 
     if (!displayName) {
-      Alert.alert('Display Name Required', 'Please enter a display name.');
+      showAlert('Display Name Required', 'Please enter a display name.', [], { type: 'warning' });
       return;
     }
 
@@ -158,7 +161,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
       // Reload profile from Firebase to ensure all screens get the latest data
       await reloadProfile();
 
-      Alert.alert(
+      showAlert(
         'Profile Updated! 🎉',
         isEditing
           ? 'Your profile has been updated successfully.'
@@ -168,13 +171,16 @@ export default function ProfileSetupScreen({ navigation, route }) {
             text: 'Great!',
             onPress: () => navigation.goBack(),
           },
-        ]
+        ],
+        { type: 'success' }
       );
     } catch (error) {
       console.error('[ProfileSetup] Error saving profile:', error);
-      Alert.alert(
+      showAlert(
         'Error',
-        error.message || 'Failed to save profile. Please try again.'
+        error.message || 'Failed to save profile. Please try again.',
+        [],
+        { type: 'error' }
       );
     } finally {
       setIsSaving(false);

@@ -45,6 +45,34 @@ export async function getUserProfile(userId) {
 }
 
 /**
+ * Get multiple user profiles by user IDs
+ * Returns a map of userId -> profile
+ */
+export async function getUserProfiles(userIds) {
+  if (!userIds || userIds.length === 0) {
+    return {};
+  }
+
+  try {
+    const uniqueIds = [...new Set(userIds)];
+    const profilePromises = uniqueIds.map(userId => getUserProfile(userId));
+    const profiles = await Promise.all(profilePromises);
+
+    const profileMap = {};
+    profiles.forEach((profile, index) => {
+      if (profile) {
+        profileMap[uniqueIds[index]] = profile;
+      }
+    });
+
+    return profileMap;
+  } catch (error) {
+    console.error('[UserProfile] Error getting profiles:', error);
+    return {};
+  }
+}
+
+/**
  * Get user profile by username
  */
 export async function getUserProfileByUsername(username) {

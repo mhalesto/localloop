@@ -359,11 +359,13 @@ export default function SettingsScreen({ navigation }) {
 
   const showPremiumRequiredAlert = useCallback(
     () =>
-      Alert.alert(
+      showAlert(
         'Premium required',
-        'Redeem a premium day from the Account section to unlock this feature.'
+        'Redeem a premium day from the Account section to unlock this feature.',
+        [],
+        { type: 'warning' }
       ),
-    []
+    [showAlert]
   );
 
   const handleGoogleSignInPress = useCallback(async () => {
@@ -471,16 +473,17 @@ export default function SettingsScreen({ navigation }) {
   const handleViewOnboarding = useCallback(async () => {
     try {
       await AsyncStorage.removeItem('@onboarding_completed');
-      Alert.alert(
+      showAlert(
         'Restart Required',
         'Please restart the app to view the onboarding experience again.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
+        { type: 'info' }
       );
     } catch (error) {
       console.error('Error resetting onboarding:', error);
-      Alert.alert('Error', 'Unable to reset onboarding. Please try again.');
+      showAlert('Error', 'Unable to reset onboarding. Please try again.', [], { type: 'error' });
     }
-  }, []);
+  }, [showAlert]);
 
   // Show upgrade prompt helper
   const showUpgradePrompt = useCallback((featureName, featureDescription, requiredPlan, icon) => {
@@ -755,9 +758,11 @@ export default function SettingsScreen({ navigation }) {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setLocationPermissionStatus(status);
-          Alert.alert(
+          showAlert(
             'Permission needed',
-            'We need location permission to suggest nearby rooms.'
+            'We need location permission to suggest nearby rooms.',
+            [],
+            { type: 'warning' }
           );
           return;
         }
@@ -776,7 +781,7 @@ export default function SettingsScreen({ navigation }) {
           // ignore reverse geocode failures
         }
       } catch (error) {
-        Alert.alert('Location error', 'Unable to access location right now.');
+        showAlert('Location error', 'Unable to access location right now.', [], { type: 'error' });
         setLocationPermissionStatus('denied');
       }
     } else {

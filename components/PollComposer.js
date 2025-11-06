@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAlert } from '../contexts/AlertContext';
 
 export default function PollComposer({ onPollCreate, themeColors, accentColor, initialPoll = null }) {
+  const { showAlert } = useAlert();
   const [question, setQuestion] = useState(initialPoll?.question || '');
   const [options, setOptions] = useState(
     initialPoll?.options?.map(opt => typeof opt === 'string' ? opt : opt.text) || ['', '']
@@ -35,7 +37,7 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
 
   const addOption = () => {
     if (options.length >= 6) {
-      Alert.alert('Maximum options', 'You can add up to 6 poll options');
+      showAlert('Maximum options', 'You can add up to 6 poll options', 'warning');
       return;
     }
     setOptions([...options, '']);
@@ -43,7 +45,7 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
 
   const removeOption = (index) => {
     if (options.length <= 2) {
-      Alert.alert('Minimum options', 'A poll must have at least 2 options');
+      showAlert('Minimum options', 'A poll must have at least 2 options', 'warning');
       return;
     }
     const newOptions = options.filter((_, i) => i !== index);
@@ -61,12 +63,12 @@ export default function PollComposer({ onPollCreate, themeColors, accentColor, i
     const trimmedOptions = options.map(o => o.trim()).filter(o => o);
 
     if (!trimmedQuestion) {
-      Alert.alert('Question required', 'Please enter a poll question');
+      showAlert('Question required', 'Please enter a poll question', 'warning');
       return;
     }
 
     if (trimmedOptions.length < 2) {
-      Alert.alert('Options required', 'Please enter at least 2 poll options');
+      showAlert('Options required', 'Please enter at least 2 poll options', 'warning');
       return;
     }
 

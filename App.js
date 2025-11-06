@@ -1,8 +1,8 @@
 // App.js
 import 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
-import { View, Alert, Linking } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { View, Linking } from 'react-native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoadingOverlay from './components/LoadingOverlay';
 import CustomSplashScreen from './components/SplashScreen';
+import { useAlert } from './contexts/AlertContext';
 
 import CountryScreen from './screens/CountryScreen';
 import ProvinceScreen from './screens/ProvinceScreen';
@@ -50,6 +51,67 @@ import { NotificationsProvider } from './contexts/NotificationsContext';
 import { AlertProvider } from './contexts/AlertContext';
 
 const Stack = createNativeStackNavigator();
+
+// Component to handle deep links with access to AlertContext
+function DeepLinkHandler() {
+  const navigation = useNavigation();
+  const { showAlert } = useAlert();
+
+  useEffect(() => {
+    const handleDeepLink = (event) => {
+      const url = event.url;
+      console.log('[App] Deep link received:', url);
+
+      if (url.includes('payment-success')) {
+        // Payment successful - navigate to subscription screen
+        showAlert(
+          'Payment Processing',
+          'Your payment was successful! Your subscription will be activated shortly.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Subscription');
+              },
+            },
+          ],
+          { type: 'success' }
+        );
+      } else if (url.includes('payment-cancelled')) {
+        // Payment cancelled
+        showAlert(
+          'Payment Cancelled',
+          'Your payment was cancelled. You can try again anytime.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Subscription');
+              },
+            },
+          ],
+          { type: 'warning' }
+        );
+      }
+    };
+
+    // Listen for deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [navigation, showAlert]);
+
+  return null; // This component doesn't render anything
+}
 
 function RootNavigator() {
   return (
@@ -150,7 +212,6 @@ function AuthGate() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-  const navigationRef = React.useRef(null);
 
   // Deep link configuration for PayFast redirects
   const linking = {
@@ -161,62 +222,6 @@ export default function App() {
       },
     },
   };
-
-  // Handle deep links from PayFast
-  useEffect(() => {
-    const handleDeepLink = (event) => {
-      const url = event.url;
-      console.log('[App] Deep link received:', url);
-
-      if (url.includes('payment-success')) {
-        // Payment successful - navigate to subscription screen
-        Alert.alert(
-          'Payment Processing',
-          'Your payment was successful! Your subscription will be activated shortly.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (navigationRef.current) {
-                  navigationRef.current.navigate('Subscription');
-                }
-              },
-            },
-          ]
-        );
-      } else if (url.includes('payment-cancelled')) {
-        // Payment cancelled
-        Alert.alert(
-          'Payment Cancelled',
-          'Your payment was cancelled. You can try again anytime.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (navigationRef.current) {
-                  navigationRef.current.navigate('Subscription');
-                }
-              },
-            },
-          ]
-        );
-      }
-    };
-
-    // Listen for deep links
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   if (showSplash) {
     return <CustomSplashScreen onAnimationComplete={() => setShowSplash(false)} />;
@@ -232,8 +237,9 @@ export default function App() {
                 <StatusesProvider>
                   <NotificationsProvider>
                     <SafeAreaProvider>
-                      <NavigationContainer ref={navigationRef} linking={linking}>
+                      <NavigationContainer linking={linking}>
                         <StatusBar style="light" />
+                        <DeepLinkHandler />
                         <AuthGate />
                       </NavigationContainer>
                     </SafeAreaProvider>

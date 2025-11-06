@@ -7,8 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Modal,
-  Alert
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
@@ -16,6 +15,7 @@ import ProgressiveImage from '../components/ProgressiveImage';
 import ProfileSkeleton from '../components/ProfileSkeleton';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import { getUserProfile } from '../services/userProfileService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
 import { getUserPosts } from '../services/publicPostsService';
@@ -58,6 +58,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const { userId, username } = route.params;
   const { themeColors, accentPreset, userProfile: currentUserProfile } = useSettings();
   const { user, profile: authProfile, hasActivePremium, pointsToNextPremium, premiumDayCost, premiumAccessDurationMs } = useAuth();
+  const { showAlert } = useAlert();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -251,7 +252,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     }
     const remaining = Math.max(ALBUM_MAX_ITEMS - albumPhotos.length, 0);
     if (remaining <= 0) {
-      Alert.alert('Album is full', 'You can upload up to 10 photos. Remove a photo to add a new one.');
+      showAlert('Album is full', 'You can upload up to 10 photos. Remove a photo to add a new one.', [], { type: 'warning' });
       return;
     }
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -280,17 +281,17 @@ export default function PublicProfileScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error('[PublicProfile] album upload failed', error);
-      Alert.alert('Upload failed', 'We could not upload the selected photos. Please try again.');
+      showAlert('Upload failed', 'We could not upload the selected photos. Please try again.', [], { type: 'error' });
     } finally {
       setAlbumUploading(false);
     }
-  }, [albumPhotos.length, albumUploading, isOwnProfile, navigation, user?.uid]);
+  }, [albumPhotos.length, albumUploading, isOwnProfile, navigation, user?.uid, showAlert]);
 
   const handleDeleteAlbumPhoto = useCallback((photo) => {
     if (!isOwnProfile || !user?.uid || !photo?.id) {
       return;
     }
-    Alert.alert('Remove photo', 'Do you want to remove this photo from your album?', [
+    showAlert('Remove photo', 'Do you want to remove this photo from your album?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -302,7 +303,7 @@ export default function PublicProfileScreen({ navigation, route }) {
         }
       }
     ]);
-  }, [isOwnProfile, user?.uid]);
+  }, [isOwnProfile, user?.uid, showAlert]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
@@ -341,9 +342,9 @@ export default function PublicProfileScreen({ navigation, route }) {
       }
     } catch (error) {
       console.warn('[PublicProfile] save preferences failed', error);
-      Alert.alert('Error', 'Failed to save preferences. Please try again.');
+      showAlert('Error', 'Failed to save preferences. Please try again.', [], { type: 'error' });
     }
-  }, [isOwnProfile, userId, albumColumns, albumShape, albumLayout, masonryColumns, navigation]);
+  }, [isOwnProfile, userId, albumColumns, albumShape, albumLayout, masonryColumns, navigation, showAlert]);
 
   // Discard changes and revert to original values
   const handleDiscardChanges = useCallback(() => {

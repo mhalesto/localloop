@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   ActivityIndicator,
   Platform,
   Modal,
@@ -18,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import PollComposer from '../components/PollComposer';
@@ -35,6 +35,7 @@ export default function PostComposerScreen({ navigation, route }) {
   const { initialLocation, initialAccentKey, onSubmit } = route.params || {};
   const { themeColors, isDarkMode, userProfile } = useSettings();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
 
@@ -83,13 +84,14 @@ export default function PostComposerScreen({ navigation, route }) {
 
   const handleClose = () => {
     if (trimmedTitle || trimmedMessage || pollData) {
-      Alert.alert(
+      showAlert(
         'Discard post?',
         'You have unsaved changes. Are you sure you want to discard this post?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() }
-        ]
+        ],
+        { type: 'warning' }
       );
     } else {
       navigation.goBack();
@@ -105,10 +107,11 @@ export default function PostComposerScreen({ navigation, route }) {
 
   const handleTogglePostingMode = (mode) => {
     if (!userProfile?.isPublicProfile && mode === 'public') {
-      Alert.alert(
+      showAlert(
         'Public Profile Required',
         'You need to set up a public profile to post publicly.',
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
+        { type: 'info' }
       );
       return;
     }
@@ -144,7 +147,7 @@ export default function PostComposerScreen({ navigation, route }) {
       }
     } catch (error) {
       console.warn('[PostComposer] submit failed', error);
-      Alert.alert('Unable to publish', error?.message ?? 'Please try again in a moment.');
+      showAlert('Unable to publish', error?.message ?? 'Please try again in a moment.', [], { type: 'error' });
     } finally {
       setIsSubmitting(false);
     }

@@ -45,7 +45,7 @@ export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, o
   const systemPrompt = systemPrompts[style] || systemPrompts.descriptive;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 8000);
+  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
 
   try {
     // Truncate long messages

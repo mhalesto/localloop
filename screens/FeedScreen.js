@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
-  Alert,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,10 +15,12 @@ import FeedSkeleton from '../components/FeedSkeleton';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { usePosts } from '../contexts/PostsContext';
+import { useAlert } from '../contexts/AlertContext';
 import { getFeedPosts, togglePublicPostVote } from '../services/publicPostsService';
 import { getFollowing } from '../services/followService';
 import { fetchMarketListingsForCity } from '../services/marketplaceService';
 import { fetchPostById } from '../api/postService';
+import { getUserProfiles } from '../services/userProfileService';
 import useHaptics from '../hooks/useHaptics';
 
 const categoryVisuals = {
@@ -40,6 +41,7 @@ export default function FeedScreen({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
+  const { showAlert } = useAlert();
   const { getPostById, getPostsForCity, refreshPosts, addFetchedPost } = usePosts();
   const [rawFeedPosts, setRawFeedPosts] = useState([]);
   const [marketListings, setMarketListings] = useState([]);
@@ -85,6 +87,19 @@ export default function FeedScreen({ navigation }) {
       let feedPosts = [];
       if (followingIds.length > 0) {
         feedPosts = await getFeedPosts(followingIds);
+
+        // Fetch current author profiles to get up-to-date profile pictures and display names
+        const authorIds = [...new Set(feedPosts.map(p => p.authorId).filter(Boolean))];
+        if (authorIds.length > 0) {
+          const authorProfiles = await getUserProfiles(authorIds);
+
+          // Update posts with current author profile data
+          feedPosts = feedPosts.map(post => ({
+            ...post,
+            authorAvatar: authorProfiles[post.authorId]?.profilePhoto || post.authorAvatar,
+            authorDisplayName: authorProfiles[post.authorId]?.displayName || post.authorDisplayName,
+          }));
+        }
       }
       const mappedPosts = feedPosts.map(enhancePost);
       setRawFeedPosts(mappedPosts);
@@ -168,7 +183,7 @@ export default function FeedScreen({ navigation }) {
   const handleOpenPost = useCallback(
     async (post) => {
       if (!post?.id) {
-        Alert.alert('Post unavailable', 'We could not open this post right now.');
+        showAlert('Post unavailable', 'We could not open this post right now.', [], { type: 'error' });
         return;
       }
 
@@ -186,9 +201,11 @@ export default function FeedScreen({ navigation }) {
 
       if (!targetCity || !targetPostId) {
         openRequestsRef.current.delete(post.id);
-        Alert.alert(
+        showAlert(
           'Post unavailable',
-          'We could not locate the original thread for this post. It may have been removed.'
+          'We could not locate the original thread for this post. It may have been removed.',
+          [],
+          { type: 'error' }
         );
         return;
       }
@@ -217,24 +234,51 @@ export default function FeedScreen({ navigation }) {
           // Navigate to the post
           navigation.navigate('PostThread', { city, postId: targetPostId });
         } else {
-          // Post not found in Firestore
-          console.warn('[Feed] Post not found in Firestore:', targetPostId);
-          Alert.alert(
-            'Post unavailable',
-            'This post is no longer available. It may have been removed.'
-          );
+          // Post not found in Firestore - use public post data as fallback
+          console.warn('[Feed] Source post not found, using public post data as fallback');
+
+          // Create a synthetic post from the public post data
+          const syntheticPost = {
+            id: targetPostId,
+            city: targetCity,
+            title: post.title || '',
+            message: post.message || '',
+            colorKey: post.colorKey || 'red',
+            tags: post.tags || [],
+            createdAt: post.createdAt,
+            votes: post.votes || {},
+            upvotes: post.upvotes || 0,
+            downvotes: post.downvotes || 0,
+            userVote: post.userVote || null,
+            comments: [],
+            commentsCount: 0,
+            // Mark as public post view
+            isPublicPostView: true,
+            publicPostId: post.id,
+          };
+
+          // Add synthetic post to cache
+          addFetchedPost(targetCity, syntheticPost);
+          console.log('[Feed] Created synthetic post from public data:', targetPostId);
+
+          // Navigate to the post after state update completes
+          setTimeout(() => {
+            navigation.navigate('PostThread', { city: targetCity, postId: targetPostId });
+          }, 0);
         }
       } catch (error) {
         console.error('[Feed] Error fetching post:', error);
-        Alert.alert(
+        showAlert(
           'Error',
-          'Could not load the post. Please check your connection and try again.'
+          'Could not load the post. Please check your connection and try again.',
+          [],
+          { type: 'error' }
         );
       } finally {
         openRequestsRef.current.delete(post.id);
       }
     },
-    [haptics, navigation, getPostById, addFetchedPost]
+    [haptics, navigation, getPostById, addFetchedPost, showAlert]
   );
 
   const navigateToProfile = useCallback(
@@ -263,15 +307,15 @@ export default function FeedScreen({ navigation }) {
         listing.marketListing?.details ||
         listing.message ||
         'Message the neighbor in the room to coordinate.';
-      Alert.alert(listing.title ?? 'Marketplace', details, [
+      showAlert(listing.title ?? 'Marketplace', details, [
         { text: 'Close', style: 'cancel' },
         {
           text: 'Browse Markets',
           onPress: () => navigation.navigate('LocalLoopMarkets')
         }
-      ]);
+      ], { type: 'info' });
     },
-    [haptics, navigation]
+    [haptics, navigation, showAlert]
   );
 
   const feedItems = useMemo(() => {
@@ -295,7 +339,7 @@ export default function FeedScreen({ navigation }) {
         return;
       }
       if (!user?.uid) {
-        Alert.alert('Sign in required', 'Create a public profile to vote on posts.');
+        showAlert('Sign in required', 'Create a public profile to vote on posts.', [], { type: 'warning' });
         return;
       }
       if (voteRequestsRef.current.has(post.id)) {
@@ -359,6 +403,30 @@ export default function FeedScreen({ navigation }) {
               : entry
           )
         );
+
+        // Also update the source post (local anonymous post) if it exists
+        if (post.sourceCity && post.sourcePostId) {
+          try {
+            const sourcePost = getPostById(post.sourceCity, post.sourcePostId);
+            if (sourcePost) {
+              // Directly update the source post in Firestore
+              const { doc, updateDoc } = await import('firebase/firestore');
+              const { db } = await import('../api/firebaseClient');
+              const sourcePostRef = doc(db, 'posts', post.sourcePostId);
+
+              await updateDoc(sourcePostRef, {
+                votes: result.votes,
+                upvotes: result.upvotes,
+                downvotes: result.downvotes,
+                userVote: result.userVote ?? null,
+              });
+
+              console.log('[Feed] Synced vote to source post:', post.sourcePostId);
+            }
+          } catch (syncError) {
+            console.warn('[Feed] Failed to sync vote to source post:', syncError);
+          }
+        }
       } catch (error) {
         console.error('[Feed] Failed to toggle vote:', error);
         if (previousSnapshot) {
@@ -366,12 +434,12 @@ export default function FeedScreen({ navigation }) {
             prev.map((entry) => (entry.id === post.id ? enhancePost(previousSnapshot) : entry))
           );
         }
-        Alert.alert('Unable to vote', 'Please try again in a moment.');
+        showAlert('Unable to vote', 'Please try again in a moment.', [], { type: 'error' });
       } finally {
         voteRequestsRef.current.delete(post.id);
       }
     },
-    [enhancePost, haptics, user?.uid]
+    [enhancePost, haptics, user?.uid, showAlert]
   );
 
   const renderPostCard = (post) => {

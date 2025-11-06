@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +12,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 
 const categories = [
   'All',
@@ -60,6 +60,7 @@ export default function LocalLoopMarketsScreen({ navigation }) {
   const { themeColors, isDarkMode, accentPreset, userProfile } = useSettings();
   const { getPostsForCity, boostMarketListing } = usePosts();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const styles = useMemo(
     () => createStyles(themeColors, { isDarkMode }),
     [themeColors, isDarkMode]
@@ -128,10 +129,12 @@ export default function LocalLoopMarketsScreen({ navigation }) {
   }, [listings, selectedCategory, searchValue]);
 
   const handleListingPress = (listing) => {
-    Alert.alert(
+    showAlert(
       listing.title,
       listing.post?.message ||
-        'Marketplace chats and payments are coming soon. For now, DM this neighbor in the room to coordinate.'
+        'Marketplace chats and payments are coming soon. For now, DM this neighbor in the room to coordinate.',
+      [],
+      { type: 'info' }
     );
   };
 
@@ -141,10 +144,10 @@ export default function LocalLoopMarketsScreen({ navigation }) {
     }
     if (listing.isBoosted) {
       const expires = new Date(listing.boostedUntil).toLocaleString();
-      Alert.alert('Already boosted', `This listing is boosted until ${expires}.`);
+      showAlert('Already boosted', `This listing is boosted until ${expires}.`, [], { type: 'info' });
       return;
     }
-    Alert.alert(
+    showAlert(
       'Boost listing',
       'Give this listing priority placement for the next 12 hours so more neighbors in your city see it.',
       [
@@ -155,9 +158,9 @@ export default function LocalLoopMarketsScreen({ navigation }) {
           onPress: () => {
             const ok = boostMarketListing(listing.city, listing.id, 12);
             if (!ok) {
-              Alert.alert('Unable to boost', 'We could not boost this listing right now. Try again soon.');
+              showAlert('Unable to boost', 'We could not boost this listing right now. Try again soon.', [], { type: 'error' });
             } else {
-              Alert.alert('Boost activated', 'Your listing will be highlighted to neighbors for the next 12 hours.');
+              showAlert('Boost activated', 'Your listing will be highlighted to neighbors for the next 12 hours.', [], { type: 'success' });
             }
           }
         }

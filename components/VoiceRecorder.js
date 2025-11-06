@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
+import { useAlert } from '../contexts/AlertContext';
 
 const MAX_DURATION_MS = 30000; // 30 seconds
 
 export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColors, accentColor }) {
+  const { showAlert } = useAlert();
   const [recording, setRecording] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -19,7 +21,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
     (async () => {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'Microphone permission is required to record voice notes');
+        showAlert('Permission required', 'Microphone permission is required to record voice notes', 'warning');
         onCancel?.();
       }
     })();
@@ -29,7 +31,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
         clearInterval(timerRef.current);
       }
     };
-  }, [onCancel]);
+  }, [onCancel, showAlert]);
 
   const startRecording = async () => {
     try {
@@ -60,7 +62,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
 
     } catch (err) {
       console.error('[VoiceRecorder] Failed to start recording:', err);
-      Alert.alert('Error', 'Failed to start recording');
+      showAlert('Error', 'Failed to start recording', 'error');
     }
   };
 
@@ -84,7 +86,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       if (duration < 500) {
-        Alert.alert('Recording too short', 'Please record at least 1 second');
+        showAlert('Recording too short', 'Please record at least 1 second', 'warning');
         onCancel?.();
         return;
       }
@@ -93,7 +95,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, themeColo
 
     } catch (err) {
       console.error('[VoiceRecorder] Failed to stop recording:', err);
-      Alert.alert('Error', 'Failed to save recording');
+      showAlert('Error', 'Failed to save recording', 'error');
     }
   };
 
