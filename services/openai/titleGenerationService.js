@@ -3,7 +3,7 @@
  * Auto-generates catchy, relevant titles from post content using OpenAI GPT-3.5-turbo
  */
 
-import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
+import { callOpenAI, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Title styles
@@ -44,40 +44,23 @@ export async function generateTitle(message, style = TITLE_STYLES.DESCRIPTIVE, o
 
   const systemPrompt = systemPrompts[style] || systemPrompts.descriptive;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
-
   try {
     // Truncate long messages
     const truncatedMessage = message.length > 1000 ? message.substring(0, 1000) + '...' : message;
 
-    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
-      method: 'POST',
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: `Generate a title for this post:\n\n${truncatedMessage}`,
-          },
-        ],
-        temperature: style === TITLE_STYLES.CATCHY ? 0.8 : 0.5,
-        max_tokens: 30,
-      }),
-      signal: controller.signal,
+    const data = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `Generate a title for this post:\n\n${truncatedMessage}`,
+        },
+      ],
+      temperature: style === TITLE_STYLES.CATCHY ? 0.8 : 0.5,
+      max_tokens: 30,
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn('[Title Generation] API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
     let title = data.choices?.[0]?.message?.content?.trim();
 
     if (!title) {

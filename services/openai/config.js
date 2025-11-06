@@ -1,67 +1,67 @@
 /**
  * OpenAI Configuration
- * Centralized config for OpenAI API access
+ * Centralized config for OpenAI API access through Firebase proxy
  */
 
-import Constants from 'expo-constants';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '../../api/firebaseClient';
 
 /**
- * Get OpenAI API key from environment
- * Tries multiple sources to ensure it works in all Expo environments
- */
-export function getOpenAIKey() {
-  // Try process.env first (works in most cases)
-  if (process.env.EXPO_PUBLIC_OPENAI_API_KEY) {
-    return process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-  }
-
-  // Try Constants.expoConfig.extra (works with app.config.js)
-  if (Constants.expoConfig?.extra?.EXPO_PUBLIC_OPENAI_API_KEY) {
-    return Constants.expoConfig.extra.EXPO_PUBLIC_OPENAI_API_KEY;
-  }
-
-  // Try Constants.manifest.extra (works with older Expo versions)
-  if (Constants.manifest?.extra?.EXPO_PUBLIC_OPENAI_API_KEY) {
-    return Constants.manifest.extra.EXPO_PUBLIC_OPENAI_API_KEY;
-  }
-
-  // Try Constants.manifest2 (works with EAS builds)
-  if (Constants.manifest2?.extra?.expoClient?.extra?.EXPO_PUBLIC_OPENAI_API_KEY) {
-    return Constants.manifest2.extra.expoClient.extra.EXPO_PUBLIC_OPENAI_API_KEY;
-  }
-
-  return null;
-}
-
-/**
- * Check if OpenAI is configured
+ * Check if OpenAI is configured on the server
+ * For now, we always return true since the check happens server-side
  */
 export function isOpenAIConfigured() {
-  const key = getOpenAIKey();
-  return Boolean(key && key.length > 20);
+  return true; // The server will handle the actual check
 }
 
 /**
  * OpenAI API endpoints
  */
 export const OPENAI_ENDPOINTS = {
-  CHAT: 'https://api.openai.com/v1/chat/completions',
-  MODERATION: 'https://api.openai.com/v1/moderations',
-  EMBEDDINGS: 'https://api.openai.com/v1/embeddings',
+  CHAT: '/v1/chat/completions',
+  MODERATION: '/v1/moderations',
+  EMBEDDINGS: '/v1/embeddings',
+  IMAGES: '/v1/images/generations',
 };
 
 /**
- * Common OpenAI request headers
+ * Make a request to OpenAI through our Firebase proxy
+ * This keeps the API key secure on the server side
  */
-export function getOpenAIHeaders() {
-  const apiKey = getOpenAIKey();
+export async function callOpenAI(endpoint, body) {
+  try {
+    const functions = getFunctions(app);
+    const openAIProxy = httpsCallable(functions, 'openAIProxy');
 
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured. Please set EXPO_PUBLIC_OPENAI_API_KEY in your .env file.');
+    const result = await openAIProxy({
+      endpoint,
+      body
+    });
+
+    return result.data;
+  } catch (error) {
+    console.error('[OpenAI Config] Error calling proxy:', error);
+
+    // Handle specific error types
+    if (error.code === 'unauthenticated') {
+      throw new Error('You must be signed in to use AI features');
+    } else if (error.code === 'failed-precondition') {
+      throw new Error('AI features are not available at the moment. Please try again later.');
+    } else {
+      throw new Error(error.message || 'Failed to process AI request');
+    }
   }
+}
 
-  return {
-    'Authorization': `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-  };
+/**
+ * Legacy functions for backward compatibility
+ */
+export function getOpenAIKey() {
+  // No longer used - API key is stored server-side
+  return null;
+}
+
+export function getOpenAIHeaders() {
+  // No longer used - headers are set server-side
+  throw new Error('Direct OpenAI API access is disabled. Use callOpenAI() instead.');
 }

@@ -4,7 +4,7 @@
  * Much faster and more reliable than Hugging Face
  */
 
-import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
+import { callOpenAI, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Quality levels for summarization
@@ -48,37 +48,21 @@ export async function summarizeText(text, options = {}) {
   }
 
   const settings = QUALITY_SETTINGS[quality] || QUALITY_SETTINGS.balanced;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     // Truncate very long texts to stay within token limits
     const truncatedText = text.length > 3000 ? text.substring(0, 3000) + '...' : text;
 
-    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
-      method: 'POST',
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: settings.systemPrompt },
-          { role: 'user', content: `Summarize this text:\n\n${truncatedText}` },
-        ],
-        temperature: settings.temperature,
-        max_tokens: settings.maxTokens,
-      }),
-      signal: controller.signal,
+    const data = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: settings.systemPrompt },
+        { role: 'user', content: `Summarize this text:\n\n${truncatedText}` },
+      ],
+      temperature: settings.temperature,
+      max_tokens: settings.maxTokens,
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn('[OpenAI Summary] API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
     const summary = data.choices?.[0]?.message?.content?.trim();
 
     if (!summary) {
@@ -94,8 +78,6 @@ export async function summarizeText(text, options = {}) {
       timestamp: Date.now(),
     };
   } catch (error) {
-    clearTimeout(timeoutId);
-
     if (error.name === 'AbortError') {
       console.warn('[OpenAI Summary] Timeout after', timeout, 'ms');
       throw new Error('Summarization timeout');

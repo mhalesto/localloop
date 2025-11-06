@@ -4,7 +4,7 @@
  */
 
 import { isFeatureEnabled } from '../../config/aiFeatures';
-import { getOpenAIKey } from './config';
+import { callOpenAI, OPENAI_ENDPOINTS } from './config';
 
 // Available cartoon styles
 export const CARTOON_STYLES = {
@@ -150,11 +150,6 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     throw new Error('Profile cartoon generation is not enabled');
   }
 
-  const apiKey = getOpenAIKey();
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
   // Rate limiting: ensure minimum time between requests
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -193,48 +188,27 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
       try {
         console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
-        const response = await fetch('https://api.openai.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'dall-e-3',
-            prompt: prompt,
-            n: 1,
-            size: '1024x1024',
-            quality: 'standard',
-            style: 'vivid',
-          }),
+        const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
+          model: 'dall-e-3',
+          prompt: prompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'standard',
+          style: 'vivid',
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error(`[profileCartoonService] Attempt ${attempt} failed:`, errorData);
+        if (!data || !data.data || data.data.length === 0) {
+          console.error(`[profileCartoonService] Attempt ${attempt} failed: No image in response`);
 
-          // If it's a server error and we can retry, wait longer
-          if (errorData.error?.type === 'server_error' && attempt < 2) {
+          // Retry if we haven't exceeded attempts
+          if (attempt < 2) {
             const delay = 5000; // Wait 5 seconds before retry
-            console.log(`[profileCartoonService] Server error, retrying in ${delay}ms...`);
+            console.log(`[profileCartoonService] Retrying in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
-            lastError = new Error('OpenAI servers are busy. Please try again in a moment.');
+            lastError = new Error('AI service is busy. Please try again in a moment.');
             continue;
           }
 
-          // User-friendly error messages
-          if (errorData.error?.type === 'server_error') {
-            throw new Error('OpenAI servers are temporarily busy. Please try again in a few seconds.');
-          } else if (errorData.error?.code === 'rate_limit_exceeded') {
-            throw new Error('Too many requests. Please wait a moment and try again.');
-          } else {
-            throw new Error(errorData.error?.message || 'Failed to generate cartoon. Please try again.');
-          }
-        }
-
-        const data = await response.json();
-
-        if (!data.data || data.data.length === 0) {
           throw new Error('No image generated. Please try again.');
         }
 

@@ -1,6 +1,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {sendNotificationToUser} = require("./notificationHelper");
+const https = require("https");
 
 admin.initializeApp();
 
@@ -944,6 +945,93 @@ exports.resetMySubscription = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error('[resetMySubscription] Error:', error);
     throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ====================================
+// OPENAI PROXY FUNCTION
+// ====================================
+
+/**
+ * Proxy OpenAI requests through Firebase Functions
+ * This keeps the API key secure on the server side
+ */
+exports.openAIProxy = functions.https.onCall(async (data, context) => {
+  // Verify user is authenticated
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'User must be authenticated to use AI features'
+    );
+  }
+
+  const { endpoint, body } = data;
+
+  // Validate input
+  if (!endpoint || !body) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Missing required parameters'
+    );
+  }
+
+  // Get OpenAI API key from Firebase config
+  const openaiKey = functions.config().openai?.key;
+
+  if (!openaiKey) {
+    console.error('[openAIProxy] OpenAI API key not configured');
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'OpenAI API is not configured on the server'
+    );
+  }
+
+  try {
+    // Make request to OpenAI
+    const response = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.openai.com',
+        path: endpoint,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed.error?.message || 'OpenAI API error'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse OpenAI response'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.write(JSON.stringify(body));
+      req.end();
+    });
+
+    return response;
+  } catch (error) {
+    console.error('[openAIProxy] Error:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      error.message || 'Failed to process AI request'
+    );
   }
 });
 
