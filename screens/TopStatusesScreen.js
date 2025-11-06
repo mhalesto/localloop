@@ -1,15 +1,17 @@
 import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import ScreenLayout from '../components/ScreenLayout';
 import StatusCard from '../components/StatusCard';
 import FeedSkeleton from '../components/FeedSkeleton';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { buildDreamyAccent } from '../utils/dreamyPalette';
 
 export default function TopStatusesScreen({ navigation }) {
-  const { themeColors } = useSettings();
+  const { themeColors, accentPreset } = useSettings();
   const {
     statuses,
     isLoading,
@@ -26,7 +28,12 @@ export default function TopStatusesScreen({ navigation }) {
     [statuses]
   );
 
-  const styles = useMemo(() => createStyles(themeColors), [themeColors]);
+  const dreamyAccent = useMemo(
+    () => buildDreamyAccent(accentPreset, themeColors),
+    [accentPreset, themeColors]
+  );
+
+  const styles = useMemo(() => createStyles(themeColors, dreamyAccent), [themeColors, dreamyAccent]);
   const statusesEmpty = statusList.length === 0;
 
   const handleOpenStatus = useCallback(
@@ -78,14 +85,38 @@ export default function TopStatusesScreen({ navigation }) {
           )}
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <TouchableOpacity
-                style={styles.newStatusButton}
-                onPress={handleAddStatusPress}
-                activeOpacity={0.85}
+              <LinearGradient
+                colors={dreamyAccent.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroBanner}
               >
-                <Ionicons name="create-outline" size={18} color={themeColors.primaryDark} />
-                <Text style={styles.newStatusLabel}>Share a new status</Text>
-              </TouchableOpacity>
+                <View style={styles.heroTag}>
+                  <Ionicons name="sparkles-outline" size={16} color="#fff" />
+                  <Text style={styles.heroTagText}>Neighborhood vibes</Text>
+                </View>
+                <Text style={styles.heroTitle}>Share a new status</Text>
+                <Text style={styles.heroSubtitle}>
+                  Paint a quick update and brighten someone’s timeline.
+                </Text>
+                <TouchableOpacity
+                  style={styles.heroButton}
+                  onPress={handleAddStatusPress}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name="create-outline" size={16} color={themeColors.primaryDark} />
+                  <Text style={styles.heroButtonText}>Start writing</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionLabel}>Trending feed</Text>
+                <View style={styles.sectionChip}>
+                  <Ionicons name="flash-outline" size={14} color={themeColors.primaryDark} />
+                  <Text style={styles.sectionChipText}>{statusList.length} live</Text>
+                </View>
+              </View>
+
               {statusesError ? <Text style={styles.errorText}>{statusesError}</Text> : null}
             </View>
           }
@@ -109,7 +140,7 @@ export default function TopStatusesScreen({ navigation }) {
   );
 }
 
-const createStyles = (palette) =>
+const createStyles = (palette, accent) =>
   StyleSheet.create({
     loader: {
       flex: 1,
@@ -117,30 +148,60 @@ const createStyles = (palette) =>
       justifyContent: 'center',
     },
     listHeader: {
-      marginBottom: 18,
+      marginBottom: 20,
+      gap: 14,
     },
-    newStatusButton: {
+    heroBanner: {
+      borderRadius: 24,
+      padding: 20,
+      shadowColor: accent.glow,
+      shadowOpacity: 0.35,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 12 },
+    },
+    heroTag: {
       flexDirection: 'row',
       alignItems: 'center',
       alignSelf: 'flex-start',
-      backgroundColor: palette.card,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: 'rgba(0,0,0,0.25)',
+      marginBottom: 14,
+    },
+    heroTagText: { marginLeft: 6, color: '#fff', fontSize: 12, fontWeight: '600' },
+    heroTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+    heroSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 20, marginTop: 6 },
+    heroButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: '#fff',
       borderRadius: 16,
       paddingHorizontal: 16,
       paddingVertical: 12,
+      marginTop: 16,
+    },
+    heroButtonText: { marginLeft: 8, fontWeight: '700', color: palette.primaryDark },
+    sectionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 4,
+    },
+    sectionLabel: { fontSize: 16, fontWeight: '700', color: palette.textPrimary },
+    sectionChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: palette.card,
       borderWidth: 1,
       borderColor: palette.divider,
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 2,
     },
-    newStatusLabel: {
-      marginLeft: 8,
-      fontSize: 14,
-      fontWeight: '600',
-      color: palette.primaryDark,
-    },
+    sectionChipText: { fontSize: 12, fontWeight: '600', color: palette.primaryDark },
     errorText: {
       marginTop: 12,
       fontSize: 12,
@@ -148,6 +209,7 @@ const createStyles = (palette) =>
     },
     listContent: {
       paddingBottom: 120,
+      paddingHorizontal: 20,
     },
     listContentEmpty: {
       flexGrow: 1,

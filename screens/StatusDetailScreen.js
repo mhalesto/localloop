@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ScreenLayout from '../components/ScreenLayout';
@@ -19,10 +20,9 @@ import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { analyzePostContent } from '../services/openai/moderationService';
+import { buildDreamyAccent } from '../utils/dreamyPalette';
 
 const MAX_CONTENT_WIDTH = 680;
-// This should match the horizontal padding that ScreenLayout gives its content.
-// Adjust if your ScreenLayout uses a different padding value.
 const PAGE_GUTTER = 20;
 
 const formatTimestamp = (ts) => {
@@ -34,6 +34,7 @@ const formatTimestamp = (ts) => {
     return '';
   }
 };
+
 
 export default function StatusDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -47,7 +48,7 @@ export default function StatusDetailScreen({ route, navigation }) {
     toggleStatusReaction,
     reportStatus,
   } = useStatuses();
-  const { themeColors } = useSettings();
+  const { themeColors, accentPreset } = useSettings();
   const { user } = useAuth();
 
   const [reply, setReply] = useState('');
@@ -55,9 +56,14 @@ export default function StatusDetailScreen({ route, navigation }) {
   const [reporting, setReporting] = useState(false);
   const [error, setError] = useState('');
 
+  const dreamyAccent = useMemo(
+    () => buildDreamyAccent(accentPreset, themeColors),
+    [accentPreset, themeColors]
+  );
+
   const styles = useMemo(
-    () => createStyles(themeColors, insets.bottom),
-    [themeColors, insets.bottom]
+    () => createStyles(themeColors, insets.bottom, dreamyAccent),
+    [themeColors, insets.bottom, dreamyAccent]
   );
 
   const status = useMemo(
@@ -172,29 +178,27 @@ export default function StatusDetailScreen({ route, navigation }) {
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={styles.constrain}>
-              <View style={styles.card}>
-                <View style={styles.headerRow}>
-                  <Ionicons name="person-circle" size={48} color={themeColors.primaryDark} />
+              <LinearGradient
+                colors={dreamyAccent.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroCard}
+              >
+                <View style={styles.heroHeaderRow}>
+                  <View style={styles.heroAvatar}>
+                    <Ionicons name="person" size={24} color="#fff" />
+                  </View>
                   <View style={styles.authorTextBlock}>
                     <Text style={styles.authorName}>
                       {status.author?.nickname || status.author?.displayName || 'Anonymous'}
                     </Text>
-                    <View style={styles.metaRow}>
-                      <View style={styles.metaChip}>
-                        <Ionicons name="location-outline" size={14} color={themeColors.textSecondary} />
-                        <Text style={styles.metaChipText}>{locationSummary}</Text>
-                      </View>
-                      <View style={[styles.metaChip, styles.metaChipGhost]}>
-                        <Ionicons name="time-outline" size={14} color={themeColors.textSecondary} />
-                        <Text style={styles.metaChipText}>{formatTimestamp(status.createdAt)}</Text>
-                      </View>
-                    </View>
+                    <Text style={styles.heroSubtitle}>sharing from {locationSummary}</Text>
                   </View>
                   <TouchableOpacity
-                    style={styles.reportButton}
+                    style={styles.heroGhostButton}
                     onPress={handleReport}
-                    activeOpacity={0.85}
                     disabled={reporting}
+                    activeOpacity={0.85}
                   >
                     {reporting ? (
                       <ActivityIndicator size="small" color="#fff" />
@@ -204,57 +208,104 @@ export default function StatusDetailScreen({ route, navigation }) {
                   </TouchableOpacity>
                 </View>
 
-                {!!status.message && <Text style={styles.message}>{status.message}</Text>}
+                <View style={styles.heroChipRow}>
+                  <View style={styles.heroChip}>
+                    <Ionicons name="sparkles-outline" size={14} color="#fff" />
+                    <Text style={styles.heroChipText}>Live mood</Text>
+                  </View>
+                  <View style={styles.heroChip}>
+                    <Ionicons name="location-outline" size={14} color="#fff" />
+                    <Text style={styles.heroChipText}>{locationSummary}</Text>
+                  </View>
+                  <View style={[styles.heroChip, styles.heroChipGhost]}>
+                    <Ionicons name="time-outline" size={14} color="#fff" />
+                    <Text style={styles.heroChipText}>{formatTimestamp(status.createdAt)}</Text>
+                  </View>
+                </View>
+
+                {!!status.message && <Text style={styles.heroMessage}>{status.message}</Text>}
 
                 {status.imageUrl ? (
-                  <Image source={{ uri: status.imageUrl }} style={styles.image} resizeMode="cover" />
+                  <View style={styles.heroImageWrap}>
+                    <Image source={{ uri: status.imageUrl }} style={styles.heroImage} resizeMode="cover" />
+                  </View>
                 ) : null}
 
-                <View style={styles.footerRow}>
+                <View style={styles.heroStatsRow}>
+                  <View style={styles.heroStat}>
+                    <Text style={styles.heroStatValue}>{totalReactions}</Text>
+                    <Text style={styles.heroStatLabel}>Hearts</Text>
+                  </View>
+                  <View style={styles.heroStat}>
+                    <Text style={styles.heroStatValue}>{replies.length}</Text>
+                    <Text style={styles.heroStatLabel}>Replies</Text>
+                  </View>
+                  <View style={styles.heroStat}>
+                    <Text style={styles.heroStatValue}>✨</Text>
+                    <Text style={styles.heroStatLabel}>{status.mood || 'Chill vibes'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.heroControls}>
                   <TouchableOpacity
-                    style={[styles.footerPill, viewerReacted && styles.footerPillActive]}
+                    style={[styles.heroControlButton, viewerReacted && styles.heroControlButtonActive]}
                     onPress={handleReact}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
                     <Ionicons
                       name={viewerReacted ? 'heart' : 'heart-outline'}
                       size={18}
-                      color={viewerReacted ? '#fff' : themeColors.primaryDark}
+                      color="#fff"
                     />
-                    <Text style={[styles.footerLabel, viewerReacted && styles.footerLabelActive]}>
-                      {totalReactions}
-                    </Text>
+                    <Text style={styles.heroControlLabel}>{viewerReacted ? 'Loved' : 'Send love'}</Text>
                   </TouchableOpacity>
 
-                  <View style={[styles.footerPill, styles.footerPillGhost]}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={18} color={themeColors.textSecondary} />
-                    <Text style={styles.footerLabel}>{replies.length}</Text>
+                  <View style={[styles.heroControlButton, styles.heroControlGhost]}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
+                    <Text style={styles.heroControlLabel}>{replies.length} replies</Text>
                   </View>
                 </View>
+              </LinearGradient>
 
-                {repliesEmpty ? (
-                  <View style={styles.emptyReplies}>
-                    <Ionicons name="chatbubbles-outline" size={22} color={themeColors.textSecondary} />
-                    <Text style={styles.emptyRepliesText}>No replies yet. Start the conversation below.</Text>
+              {repliesEmpty ? (
+                <View style={styles.emptyRepliesHero}>
+                  <Ionicons name="chatbubbles-outline" size={22} color={themeColors.textSecondary} />
+                  <View style={styles.emptyRepliesCopy}>
+                    <Text style={styles.emptyRepliesTitle}>Start the conversation</Text>
+                    <Text style={styles.emptyRepliesText}>
+                      Drop the first reply and keep the vibes going 🌈
+                    </Text>
                   </View>
-                ) : null}
-              </View>
+                </View>
+              ) : (
+                <View style={styles.sectionHeading}>
+                  <Text style={styles.sectionHeadingText}>Replies</Text>
+                  <View style={styles.sectionDivider} />
+                </View>
+              )}
             </View>
           }
           renderItem={({ item }) => (
             <View style={styles.constrain}>
-              <View style={styles.replyCard}>
-                <View style={styles.replyHeader}>
-                  <Ionicons name="person-circle" size={28} color={themeColors.textSecondary} />
-                  <View style={styles.replyTextBlock}>
-                    <Text style={styles.replyAuthor} numberOfLines={1}>
-                      {item.author?.nickname || item.author?.displayName || 'Guest'}
-                    </Text>
-                    <Text style={styles.replyMeta}>{formatTimestamp(item.createdAt)}</Text>
+              <LinearGradient
+                colors={dreamyAccent.softGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.replyCardGradient}
+              >
+                <View style={styles.replyCard}>
+                  <View style={styles.replyHeader}>
+                    <Ionicons name="person-circle" size={28} color={themeColors.textSecondary} />
+                    <View style={styles.replyTextBlock}>
+                      <Text style={styles.replyAuthor} numberOfLines={1}>
+                        {item.author?.nickname || item.author?.displayName || 'Guest'}
+                      </Text>
+                      <Text style={styles.replyMeta}>{formatTimestamp(item.createdAt)}</Text>
+                    </View>
                   </View>
+                  <Text style={styles.replyMessage}>{item.message}</Text>
                 </View>
-                <Text style={styles.replyMessage}>{item.message}</Text>
-              </View>
+              </LinearGradient>
             </View>
           )}
           // keep last item clear of the reply bar
@@ -282,11 +333,18 @@ export default function StatusDetailScreen({ route, navigation }) {
               disabled={submittingReply}
               activeOpacity={0.85}
             >
-              {submittingReply ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="send" size={18} color="#fff" />
-              )}
+              <LinearGradient
+                colors={dreamyAccent.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sendButtonGradient}
+              >
+                {submittingReply ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={18} color="#fff" />
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -302,123 +360,164 @@ export default function StatusDetailScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (palette, bottomInset) =>
+const createStyles = (palette, bottomInset, accent) =>
   StyleSheet.create({
     flex: { flex: 1 },
-
     listContent: {
       paddingHorizontal: 12,
       paddingTop: 20,
       paddingBottom: 20,
     },
-
     constrain: {
       width: '100%',
       alignSelf: 'center',
       maxWidth: MAX_CONTENT_WIDTH,
+      gap: 16,
     },
-
-    card: {
-      backgroundColor: palette.card,
-      borderRadius: 24,
-      padding: 22,
-      borderWidth: 1,
-      borderColor: palette.divider,
+    heroCard: {
+      borderRadius: 30,
+      padding: 24,
       marginBottom: 18,
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 3,
+      shadowColor: accent.glow,
+      shadowOpacity: 0.45,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 24 },
+      elevation: 6,
     },
-
-    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-    authorTextBlock: { flex: 1, marginLeft: 14 },
-    authorName: { fontSize: 18, fontWeight: '700', color: palette.textPrimary },
-
-    metaRow: {
-      flexDirection: 'row',
+    heroHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+    heroAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: 'rgba(255,255,255,0.18)',
       alignItems: 'center',
+      justifyContent: 'center',
+    },
+    authorTextBlock: { flex: 1, marginLeft: 14 },
+    authorName: { fontSize: 20, fontWeight: '700', color: '#fff' },
+    heroSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 4 },
+    heroGhostButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.35)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+    },
+    heroChipRow: {
+      flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 10,
-      rowGap: 8,
-      marginTop: 10,
+      marginTop: 18,
     },
-    metaChip: {
+    heroChip: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 999,
-      backgroundColor: palette.background,
+      backgroundColor: 'rgba(255,255,255,0.14)',
     },
-    metaChipGhost: { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.divider },
-    metaChipText: { marginLeft: 6, fontSize: 12, color: palette.textSecondary },
-
-    reportButton: {
-      marginLeft: 12,
-      backgroundColor: palette.primary,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 14,
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 2,
+    heroChipGhost: {
+      backgroundColor: 'rgba(0,0,0,0.25)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
     },
-
-    message: { fontSize: 17, lineHeight: 26, color: palette.textPrimary },
-    image: { borderRadius: 18, marginTop: 20, width: '100%', height: 240 },
-
-    footerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 22, justifyContent: 'space-between' },
-    footerPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 999,
-      backgroundColor: palette.background,
-      marginRight: 12,
+    heroChipText: {
+      marginLeft: 6,
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#fff',
     },
-    footerPillActive: { backgroundColor: palette.primary },
-    footerPillGhost: { backgroundColor: palette.background, marginRight: 0 },
-    footerLabel: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: palette.textSecondary },
-    footerLabelActive: { color: '#fff' },
-
-    emptyReplies: {
+    heroMessage: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '600',
+      lineHeight: 27,
+      marginTop: 16,
+    },
+    heroImageWrap: {
       marginTop: 18,
+      borderRadius: 24,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.35)',
+    },
+    heroImage: { width: '100%', height: 240 },
+    heroStatsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 22,
+      gap: 12,
+    },
+    heroStat: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 18,
+      backgroundColor: 'rgba(0,0,0,0.25)',
+      alignItems: 'center',
+    },
+    heroStatValue: { color: '#fff', fontSize: 18, fontWeight: '700' },
+    heroStatLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 4 },
+    heroControls: { flexDirection: 'row', gap: 12, marginTop: 20 },
+    heroControlButton: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: palette.background,
-      borderRadius: 16,
+      justifyContent: 'center',
       paddingVertical: 12,
-      paddingHorizontal: 14,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.35)',
+      backgroundColor: 'rgba(0,0,0,0.15)',
+    },
+    heroControlButtonActive: {
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      borderColor: 'transparent',
+    },
+    heroControlGhost: {
+      backgroundColor: 'rgba(0,0,0,0.2)',
+    },
+    heroControlLabel: { color: '#fff', fontWeight: '600', marginLeft: 8 },
+    emptyRepliesHero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 20,
+      backgroundColor: palette.card,
       borderWidth: 1,
       borderColor: palette.divider,
     },
-    emptyRepliesText: { marginLeft: 10, fontSize: 13, color: palette.textSecondary, flex: 1 },
-
+    emptyRepliesCopy: { marginLeft: 12, flex: 1 },
+    emptyRepliesTitle: { fontSize: 16, fontWeight: '700', color: palette.textPrimary },
+    emptyRepliesText: { fontSize: 13, color: palette.textSecondary, marginTop: 4, lineHeight: 20 },
+    sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+    sectionHeadingText: { fontSize: 16, fontWeight: '700', color: palette.textPrimary },
+    sectionDivider: { flex: 1, height: 1, backgroundColor: palette.divider, opacity: 0.6 },
+    replyCardGradient: {
+      borderRadius: 20,
+      padding: 1,
+      marginBottom: 14,
+      shadowColor: accent.glow,
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 2,
+    },
     replyCard: {
       backgroundColor: palette.card,
-      borderRadius: 18,
+      borderRadius: 19,
       padding: 18,
       borderWidth: 1,
       borderColor: palette.divider,
-      marginBottom: 12,
-      shadowColor: '#000',
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 2,
     },
     replyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     replyTextBlock: { marginLeft: 12, flex: 1 },
     replyAuthor: { fontSize: 15, fontWeight: '600', color: palette.textPrimary },
     replyMeta: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
     replyMessage: { fontSize: 14, color: palette.textPrimary, lineHeight: 21 },
-
-    // Full-screen width container; negative margins cancel ScreenLayout padding
     replyBarContainer: {
       position: 'absolute',
       left: 0,
@@ -426,20 +525,24 @@ const createStyles = (palette, bottomInset) =>
       bottom: 0,
       paddingBottom: 12 + bottomInset,
       paddingTop: 10,
-      backgroundColor: palette.card,
+      backgroundColor: palette.background,
       borderTopWidth: 1,
       borderColor: palette.divider,
       paddingHorizontal: PAGE_GUTTER,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: -6 },
     },
     replyPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#ffffff',
+      backgroundColor: palette.card,
       borderRadius: 24,
       paddingHorizontal: 16,
       paddingVertical: 10,
       borderWidth: 1,
-      borderColor: 'rgba(0,0,0,0.08)',
+      borderColor: palette.divider,
       width: '100%',
       alignSelf: 'stretch',
     },
@@ -449,11 +552,10 @@ const createStyles = (palette, bottomInset) =>
       fontSize: 14,
       marginRight: 12,
     },
-    sendButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: palette.primary,
+    sendButton: { width: 44, height: 44 },
+    sendButtonGradient: {
+      flex: 1,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },

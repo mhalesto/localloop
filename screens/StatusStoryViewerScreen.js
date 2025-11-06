@@ -247,13 +247,13 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
     handleNext();
   }, [handleNext]);
 
-  // compute displayed image size; never upscale beyond original
-  const availableW = winW;
-  const availableH = winH;
+  // compute displayed image size; make it smaller and centered
+  const availableW = winW * 0.85; // Reduce to 85% of screen width
+  const availableH = winH * 0.6; // Reduce to 60% of screen height for cleaner look
   let displayW = availableW;
   let displayH = availableH;
   if (imgNatural.w && imgNatural.h) {
-    const scale = Math.min(1, availableW / imgNatural.w, availableH / imgNatural.h);
+    const scale = Math.min(0.9, availableW / imgNatural.w, availableH / imgNatural.h);
     displayW = Math.round(imgNatural.w * scale);
     displayH = Math.round(imgNatural.h * scale);
   }
@@ -296,21 +296,68 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
           />
         </View>
 
-        {/* Media: center at natural size, never upscale */}
-        {currentStatus?.imageUrl ? (
-          <View style={styles.media}>
-            <Image
-              source={{ uri: currentStatus.imageUrl }}
-              style={[styles.mediaImage, { width: displayW, height: displayH }]}
-              resizeMode="contain"
-            />
-            <View style={styles.mediaOverlay} />
+        {/* Media container with overlaid header */}
+        <View style={styles.mediaContainer}>
+          {/* Media: center at natural size, never upscale */}
+          {currentStatus?.imageUrl ? (
+            <View style={styles.media}>
+              <Image
+                source={{ uri: currentStatus.imageUrl }}
+                style={[styles.mediaImage, { width: displayW, height: displayH, borderRadius: 12 }]}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            <View style={[styles.media, styles.mediaFallback]}>
+              <Text style={styles.fallbackText}>{currentStatus?.message}</Text>
+            </View>
+          )}
+
+          {/* Semi-transparent header overlay on top of image */}
+          <View style={[styles.headerOverlay, { paddingTop: insets.top + 8 }]}>
+            {/* progress bars */}
+            <View style={styles.progressRow}>
+              {storyItems.map((_, index) => {
+                let fill = 0;
+                if (index < currentIndex) fill = 1;
+                else if (index === currentIndex) fill = progress;
+                return (
+                  <View key={storyItems[index]?.id ?? `progress-${index}`} style={styles.progressTrack}>
+                    <View style={styles.progressBackground} />
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.min(Math.max(fill, 0), 1) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* header — hidden while holding */}
+            <View
+              style={[styles.headerRow, isHolding && { opacity: 0 }]}
+              pointerEvents={isHolding ? 'none' : 'auto'}
+            >
+              <TouchableOpacity onPress={handleExit} style={styles.headerButton} activeOpacity={0.8}>
+                <Ionicons name="chevron-back" size={20} color="#fff" />
+              </TouchableOpacity>
+              <View style={styles.headerMeta}>
+                <Text style={styles.headerName} numberOfLines={1}>
+                  {currentStatus?.author?.nickname ||
+                    currentStatus?.author?.displayName ||
+                    'Anonymous'}
+                </Text>
+                <Text style={styles.headerLocation}>
+                  {currentStatus?.city && currentStatus?.province
+                    ? `${currentStatus.city}, ${currentStatus.province}`
+                    : formatRelativeTime(currentStatus?.createdAt)}
+                </Text>
+              </View>
+            </View>
           </View>
-        ) : (
-          <View style={[styles.media, styles.mediaFallback]}>
-            <Text style={styles.fallbackText}>{currentStatus?.message}</Text>
-          </View>
-        )}
+        </View>
 
         {/* UI chrome */}
         <View
@@ -319,55 +366,12 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 },
           ]}
         >
-          {/* progress bars */}
-          <View style={styles.progressRow}>
-            {storyItems.map((_, index) => {
-              let fill = 0;
-              if (index < currentIndex) fill = 1;
-              else if (index === currentIndex) fill = progress;
-              return (
-                <View key={storyItems[index]?.id ?? `progress-${index}`} style={styles.progressTrack}>
-                  <View style={styles.progressBackground} />
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.min(Math.max(fill, 0), 1) * 100}%` },
-                    ]}
-                  />
-                </View>
-              );
-            })}
-          </View>
-
-          {/* header — hidden while holding */}
-          <View
-            style={[styles.headerRow, isHolding && { opacity: 0 }]}
-            pointerEvents={isHolding ? 'none' : 'auto'}
-          >
-            <TouchableOpacity onPress={handleExit} style={styles.headerButton} activeOpacity={0.8}>
-              <Ionicons name="chevron-back" size={22} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.headerMeta}>
-              <Text style={styles.headerName} numberOfLines={1}>
-                {currentStatus?.author?.nickname ||
-                  currentStatus?.author?.displayName ||
-                  'Anonymous'}
-              </Text>
-              <Text style={styles.headerTime}>
-                {formatRelativeTime(currentStatus?.createdAt)}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
-              <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
           {/* spacer */}
           <View style={styles.bodyContent} />
 
-          {/* caption above reply */}
+          {/* caption below image, simplified */}
           {!!currentStatus?.message && (
-            <Text style={styles.captionBelow} numberOfLines={3}>
+            <Text style={styles.captionBelow} numberOfLines={2}>
               {currentStatus.message}
             </Text>
           )}
@@ -392,13 +396,13 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
                 disabled={sendingReply}
                 activeOpacity={0.85}
               >
-                <Ionicons name="send" size={18} color="#fff" />
+                <Ionicons name="send" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.actionButtons}>
               <TouchableOpacity style={styles.iconButton} onPress={handleShare} activeOpacity={0.85}>
-                <Ionicons name="arrow-redo" size={22} color="#fff" />
+                <Ionicons name="arrow-redo" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.iconButton, viewerReacted && styles.iconButtonActive]}
@@ -407,7 +411,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
               >
                 <Ionicons
                   name={viewerReacted ? 'heart' : 'heart-outline'}
-                  size={22}
+                  size={20}
                   color={viewerReacted ? '#F87171' : '#fff'}
                 />
               </TouchableOpacity>
@@ -425,18 +429,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
 
+  // Media container for image and header overlay
+  mediaContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+
   // Media container centers image
   media: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   mediaImage: {
     // width/height supplied dynamically
-  },
-  mediaOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,15,35,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 
   mediaFallback: {
@@ -447,9 +459,21 @@ const styles = StyleSheet.create({
   fallbackText: {
     textAlign: 'center',
     color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    lineHeight: 34,
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: 28,
+  },
+
+  // Semi-transparent header overlay
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    zIndex: 5,
   },
 
   chromeOverlay: {
@@ -461,15 +485,15 @@ const styles = StyleSheet.create({
 
   progressRow: {
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 10,
   },
   progressTrack: {
     flex: 1,
-    height: 4,
-    borderRadius: 3,
+    height: 3,
+    borderRadius: 2,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   progressBackground: {
     position: 'absolute',
@@ -491,53 +515,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  headerButton: { padding: 6 },
-  headerMeta: { flex: 1, marginHorizontal: 12 },
-  headerName: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerButton: { padding: 8 },
+  headerMeta: { flex: 1, marginHorizontal: 10 },
+  headerName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  headerLocation: { marginTop: 1, color: 'rgba(255,255,255,0.8)', fontSize: 11 },
   headerTime: { marginTop: 2, color: 'rgba(255,255,255,0.7)', fontSize: 12 },
 
   // Spacer pushes bottom content down
   bodyContent: { flex: 1, justifyContent: 'center' },
 
   captionBelow: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 26,
-    marginBottom: 10,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 20,
+    marginBottom: 8,
+    textAlign: 'center',
   },
 
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 12,
+    marginBottom: 8,
+    gap: 10,
   },
   replyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15,15,35,0.65)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     flex: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   replyInput: {
     flex: 1,
     color: '#fff',
-    fontSize: 14,
-    marginRight: 12,
+    fontSize: 13,
+    marginRight: 10,
   },
   sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -545,21 +570,21 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   iconButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15,15,35,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   iconButtonActive: {
-    backgroundColor: 'rgba(248,113,113,0.2)',
-    borderColor: 'rgba(248,113,113,0.45)',
+    backgroundColor: 'rgba(248,113,113,0.15)',
+    borderColor: 'rgba(248,113,113,0.3)',
   },
 
   errorText: {
