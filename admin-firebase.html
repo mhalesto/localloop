@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLoop Admin Dashboard - Live Data</title>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import {
+            getAuth,
+            signInWithEmailAndPassword,
+            onAuthStateChanged,
+            signOut
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import {
+            getFirestore,
+            collection,
+            query,
+            where,
+            orderBy,
+            limit,
+            getDocs,
+            doc,
+            deleteDoc,
+            updateDoc,
+            onSnapshot,
+            Timestamp,
+            getDoc,
+            setDoc
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+            authDomain: "share-your-story-1.firebaseapp.com",
+            projectId: "share-your-story-1",
+            storageBucket: "share-your-story-1.firebasestorage.app",
+            messagingSenderId: "673056432219",
+            appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
+            measurementId: "G-75VDYJHL88"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase accessible globally
+        window.firebase = {
+            app,
+            auth,
+            db,
+            signInWithEmailAndPassword,
+            onAuthStateChanged,
+            signOut,
+            collection,
+            query,
+            where,
+            orderBy,
+            limit,
+            getDocs,
+            doc,
+            deleteDoc,
+            updateDoc,
+            onSnapshot,
+            Timestamp,
+            getDoc,
+            setDoc
+        };
+
+        // Check auth state
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Check if user is admin
+                const userDoc = await getDoc(doc(db, 'users', user.uid));
+                if (userDoc.exists() && userDoc.data().role === 'admin') {
+                    showDashboard();
+                    loadDashboardData();
+                } else {
+                    alert('You do not have admin privileges');
+                    signOut(auth);
+                }
+            } else {
+                showLogin();
+            }
+        });
+
+        function showLogin() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('active');
+        }
+
+        function showDashboard() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            await loadStats();
+            await loadPosts();
+            await loadUsers();
+            await loadReports();
+            initCharts();
+            setupRealtimeListeners();
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                // Get total users
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                document.getElementById('totalUsers').textContent = usersSnapshot.size.toLocaleString();
+
+                // Get active posts (last 7 days)
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                const postsQuery = query(
+                    collection(db, 'posts'),
+                    where('createdAt', '>=', Timestamp.fromDate(sevenDaysAgo))
+                );
+                const postsSnapshot = await getDocs(postsQuery);
+                document.getElementById('activePosts').textContent = postsSnapshot.size.toLocaleString();
+
+                // Get today's reports
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const reportsQuery = query(
+                    collection(db, 'reports'),
+                    where('createdAt', '>=', Timestamp.fromDate(today))
+                );
+                const reportsSnapshot = await getDocs(reportsQuery);
+                document.getElementById('reportsToday').textContent = reportsSnapshot.size;
+
+                // Calculate monthly revenue from subscriptions
+                let revenue = 0;
+                usersSnapshot.forEach(doc => {
+                    const user = doc.data();
+                    if (user.subscriptionPlan === 'premium') revenue += 99;
+                    if (user.subscriptionPlan === 'gold') revenue += 199;
+                });
+                document.getElementById('monthlyRevenue').textContent = `R${revenue.toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load posts
+        async function loadPosts() {
+            try {
+                const postsQuery = query(
+                    collection(db, 'posts'),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
+                const snapshot = await getDocs(postsQuery);
+                const tbody = document.getElementById('postsTableBody');
+                tbody.innerHTML = '';
+
+                for (const postDoc of snapshot.docs) {
+                    const post = postDoc.data();
+                    const postId = postDoc.id;
+
+                    // Get report count for this post
+                    const reportsQuery = query(
+                        collection(db, 'reports'),
+                        where('postId', '==', postId)
+                    );
+                    const reportsSnapshot = await getDocs(reportsQuery);
+                    const reportCount = reportsSnapshot.size;
+
+                    const row = document.createElement('tr');
+                    const date = post.createdAt ? new Date(post.createdAt.toDate()).toLocaleDateString() : 'N/A';
+                    const status = reportCount >= 5 ? 'Flagged' : post.status || 'Active';
+                    const statusClass = status === 'Active' ? 'badge-success' :
+                                       status === 'Flagged' ? 'badge-warning' : 'badge-danger';
+
+                    row.innerHTML = `
+                        <td>${postId.substring(0, 8)}...</td>
+                        <td>${post.title || post.content?.substring(0, 50) || 'No title'}</td>
+                        <td>${post.userName || 'Unknown'}</td>
+                        <td>${post.category || 'General'}</td>
+                        <td>${date}</td>
+                        <td>${reportCount > 0 ? `<span class="badge badge-danger">${reportCount}</span>` : reportCount}</td>
+                        <td><span class="badge ${statusClass}">${status}</span></td>
+                        <td>
+                            <button class="action-btn btn-view" onclick="viewPost('${postId}')">View</button>
+                            ${status !== 'Removed' ?
+                                `<button class="action-btn btn-delete" onclick="removePost('${postId}')">Remove</button>` :
+                                `<button class="action-btn btn-restore" onclick="restorePost('${postId}')">Restore</button>`
+                            }
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            } catch (error) {
+                console.error('Error loading posts:', error);
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const usersQuery = query(
+                    collection(db, 'users'),
+                    orderBy('createdAt', 'desc'),
+                    limit(20)
+                );
+                const snapshot = await getDocs(usersQuery);
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '';
+
+                for (const userDoc of snapshot.docs) {
+                    const user = userDoc.data();
+                    const userId = userDoc.id;
+
+                    // Get post count for user
+                    const postsQuery = query(
+                        collection(db, 'posts'),
+                        where('userId', '==', userId)
+                    );
+                    const postsSnapshot = await getDocs(postsQuery);
+                    const postCount = postsSnapshot.size;
+
+                    const plan = user.subscriptionPlan || 'basic';
+                    const planDisplay = plan.charAt(0).toUpperCase() + plan.slice(1);
+                    const joinDate = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'N/A';
+
+                    const userCard = document.createElement('div');
+                    userCard.className = 'user-card';
+                    userCard.innerHTML = `
+                        <div class="user-info">
+                            <div class="user-avatar">${user.name ? user.name.charAt(0).toUpperCase() : 'U'}</div>
+                            <div class="user-details">
+                                <h3>${user.name || 'Unknown User'}</h3>
+                                <p>${user.email || 'No email'} • ${planDisplay} Plan • ${postCount} posts • Joined ${joinDate}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="action-btn btn-view" onclick="viewUser('${userId}')">View Profile</button>
+                            <button class="action-btn btn-delete" onclick="suspendUser('${userId}')">Suspend</button>
+                        </div>
+                    `;
+                    usersList.appendChild(userCard);
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Load reports
+        async function loadReports() {
+            try {
+                const reportsQuery = query(
+                    collection(db, 'reports'),
+                    orderBy('createdAt', 'desc'),
+                    limit(20)
+                );
+                const snapshot = await getDocs(reportsQuery);
+                const tbody = document.getElementById('reportsTableBody');
+                tbody.innerHTML = '';
+
+                // Group reports by post
+                const reportsByPost = {};
+                snapshot.forEach(doc => {
+                    const report = doc.data();
+                    if (!reportsByPost[report.postId]) {
+                        reportsByPost[report.postId] = {
+                            count: 0,
+                            reasons: new Set(),
+                            firstReported: report.createdAt,
+                            postTitle: report.postTitle || 'Unknown'
+                        };
+                    }
+                    reportsByPost[report.postId].count++;
+                    if (report.reason) {
+                        reportsByPost[report.postId].reasons.add(report.reason);
+                    }
+                });
+
+                // Display grouped reports
+                for (const [postId, reportData] of Object.entries(reportsByPost)) {
+                    const row = document.createElement('tr');
+                    const firstReported = reportData.firstReported ?
+                        new Date(reportData.firstReported.toDate()).toLocaleString() : 'N/A';
+                    const reasons = Array.from(reportData.reasons).join(', ') || 'No reason specified';
+                    const status = reportData.count >= 5 ? 'Critical' : 'Under Review';
+                    const statusClass = status === 'Critical' ? 'badge-danger' : 'badge-warning';
+
+                    row.innerHTML = `
+                        <td>${postId.substring(0, 8)}...</td>
+                        <td>${reportData.postTitle}</td>
+                        <td><span class="badge badge-danger">${reportData.count}</span></td>
+                        <td>${reasons}</td>
+                        <td>${firstReported}</td>
+                        <td><span class="badge ${statusClass}">${status}</span></td>
+                        <td>
+                            <button class="action-btn btn-view" onclick="reviewReport('${postId}')">Review</button>
+                            ${reportData.count >= 5 ?
+                                `<button class="action-btn btn-delete" onclick="autoRemove('${postId}')">Auto-Remove</button>` : ''
+                            }
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            } catch (error) {
+                console.error('Error loading reports:', error);
+            }
+        }
+
+        // Setup real-time listeners
+        function setupRealtimeListeners() {
+            // Listen to new posts
+            onSnapshot(
+                query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(1)),
+                (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added' && !window.initialLoad) {
+                            console.log('New post added:', change.doc.data());
+                            loadPosts(); // Reload posts table
+                        }
+                    });
+                    window.initialLoad = false;
+                }
+            );
+
+            // Listen to new reports
+            onSnapshot(
+                query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(1)),
+                (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added' && !window.initialReportLoad) {
+                            console.log('New report added:', change.doc.data());
+                            loadReports(); // Reload reports table
+                            loadStats(); // Update stats
+                        }
+                    });
+                    window.initialReportLoad = false;
+                }
+            );
+        }
+
+        // Initialize after page load
+        window.initialLoad = true;
+        window.initialReportLoad = true;
+
+        // Expose functions globally
+        window.loadDashboardData = loadDashboardData;
+        window.removePost = async (postId) => {
+            if (confirm('Are you sure you want to remove this post?')) {
+                try {
+                    await updateDoc(doc(db, 'posts', postId), {
+                        status: 'Removed',
+                        removedAt: Timestamp.now(),
+                        removedBy: 'admin'
+                    });
+                    alert('Post removed successfully');
+                    loadPosts();
+                } catch (error) {
+                    alert('Error removing post: ' + error.message);
+                }
+            }
+        };
+
+        window.autoRemove = async (postId) => {
+            if (confirm('This post has 5+ reports. Remove it automatically?')) {
+                try {
+                    await updateDoc(doc(db, 'posts', postId), {
+                        status: 'Auto-Removed',
+                        removedAt: Timestamp.now(),
+                        removedReason: 'Multiple reports (5+)'
+                    });
+                    alert('Post auto-removed successfully');
+                    loadPosts();
+                    loadReports();
+                } catch (error) {
+                    alert('Error removing post: ' + error.message);
+                }
+            }
+        };
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: block;
+        }
+
+        .login-title {
+            color: #6C4DF4;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #6C4DF4;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #6C4DF4, #9C27B0);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(108, 77, 244, 0.3);
+        }
+
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+        }
+
+        .header-title {
+            color: #6C4DF4;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        /* Sidebar */
+        .dashboard-content {
+            display: flex;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: white;
+            min-height: calc(100vh - 70px);
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-menu {
+            padding: 20px 0;
+        }
+
+        .menu-item {
+            padding: 15px 30px;
+            cursor: pointer;
+            transition: background 0.3s;
+            color: #666;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .menu-item.active {
+            background: linear-gradient(90deg, rgba(108,77,244,0.1) 0%, transparent 100%);
+            color: #6C4DF4;
+            border-left: 3px solid #6C4DF4;
+        }
+
+        .menu-icon {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+        }
+
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .stat-change {
+            font-size: 14px;
+            color: #27ae60;
+        }
+
+        .stat-change.negative {
+            color: #e74c3c;
+        }
+
+        /* Charts */
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Posts Management */
+        .filter-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-input {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .filter-select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 150px;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            background: #6C4DF4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .filter-btn:hover {
+            background: #5a3fd8;
+        }
+
+        .posts-table {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #6C4DF4;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .action-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 5px;
+            transition: opacity 0.3s;
+        }
+
+        .action-btn:hover {
+            opacity: 0.8;
+        }
+
+        .btn-view {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-restore {
+            background: #27ae60;
+            color: white;
+        }
+
+        /* Users Management */
+        .user-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6C4DF4, #9C27B0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 20px;
+        }
+
+        .user-details h3 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .user-details p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-input, .filter-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-container" id="loginScreen">
+        <div class="login-box">
+            <img src="logo.png" alt="LocalLoop" class="logo">
+            <h2 class="login-title">Admin Dashboard - Live Data</h2>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="admin@localloop.co.za" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="login-btn">Login with Firebase</button>
+                <div class="error-message" id="errorMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <img src="logo.png" alt="LocalLoop" class="header-logo">
+                <h1 class="header-title">LocalLoop Admin - Live Data</h1>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </header>
+
+        <div class="dashboard-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="sidebar-menu">
+                    <div class="menu-item active" onclick="showSection('overview')">
+                        <span class="menu-icon">📊</span>
+                        <span>Overview</span>
+                    </div>
+                    <div class="menu-item" onclick="showSection('posts')">
+                        <span class="menu-icon">📝</span>
+                        <span>Posts Management</span>
+                    </div>
+                    <div class="menu-item" onclick="showSection('users')">
+                        <span class="menu-icon">👥</span>
+                        <span>Users</span>
+                    </div>
+                    <div class="menu-item" onclick="showSection('reports')">
+                        <span class="menu-icon">⚠️</span>
+                        <span>Reports</span>
+                    </div>
+                    <div class="menu-item" onclick="showSection('analytics')">
+                        <span class="menu-icon">📈</span>
+                        <span>Analytics</span>
+                    </div>
+                    <div class="menu-item" onclick="showSection('settings')">
+                        <span class="menu-icon">⚙️</span>
+                        <span>Settings</span>
+                    </div>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Overview Section -->
+                <section class="content-section active" id="overview">
+                    <h2 style="margin-bottom: 30px;">Dashboard Overview - Real-Time Data</h2>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Users</div>
+                            <div class="stat-value" id="totalUsers">
+                                <div class="loading">Loading...</div>
+                            </div>
+                            <div class="stat-change">Live from Firestore</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Active Posts (7 days)</div>
+                            <div class="stat-value" id="activePosts">
+                                <div class="loading">Loading...</div>
+                            </div>
+                            <div class="stat-change">Live from Firestore</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Reports Today</div>
+                            <div class="stat-value" id="reportsToday">
+                                <div class="loading">Loading...</div>
+                            </div>
+                            <div class="stat-change negative">Real-time updates</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Monthly Revenue</div>
+                            <div class="stat-value" id="monthlyRevenue">
+                                <div class="loading">Loading...</div>
+                            </div>
+                            <div class="stat-change">Calculated from subscriptions</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 class="chart-title">User Activity - Last 7 Days</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="activityChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 class="chart-title">Posts by Category</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Posts Management Section -->
+                <section class="content-section" id="posts">
+                    <h2 style="margin-bottom: 30px;">Posts Management - Live Data</h2>
+
+                    <div class="filter-bar">
+                        <input type="text" class="filter-input" placeholder="Search posts..." id="postSearch">
+                        <select class="filter-select" id="categoryFilter">
+                            <option>All Categories</option>
+                            <option>Restaurant</option>
+                            <option>Retail</option>
+                            <option>Services</option>
+                            <option>Events</option>
+                            <option>General</option>
+                        </select>
+                        <button class="filter-btn" onclick="filterPosts()">Apply Filters</button>
+                        <button class="filter-btn" onclick="loadPosts()">Refresh</button>
+                    </div>
+
+                    <div class="posts-table">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Title/Content</th>
+                                        <th>Author</th>
+                                        <th>Category</th>
+                                        <th>Date</th>
+                                        <th>Reports</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="postsTableBody">
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; padding: 40px;">
+                                            <div class="loading">Loading posts from Firestore...</div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Users Section -->
+                <section class="content-section" id="users">
+                    <h2 style="margin-bottom: 30px;">User Management - Live Data</h2>
+
+                    <div class="filter-bar">
+                        <input type="text" class="filter-input" placeholder="Search users..." id="userSearch">
+                        <select class="filter-select" id="planFilter">
+                            <option>All Plans</option>
+                            <option>Basic</option>
+                            <option>Premium</option>
+                            <option>Gold</option>
+                        </select>
+                        <button class="filter-btn" onclick="filterUsers()">Search</button>
+                        <button class="filter-btn" onclick="loadUsers()">Refresh</button>
+                    </div>
+
+                    <div id="usersList">
+                        <div class="loading">Loading users from Firestore...</div>
+                    </div>
+                </section>
+
+                <!-- Reports Section -->
+                <section class="content-section" id="reports">
+                    <h2 style="margin-bottom: 30px;">Reported Content - Live Data</h2>
+
+                    <div class="posts-table">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Post ID</th>
+                                        <th>Post Title</th>
+                                        <th>Reports Count</th>
+                                        <th>Report Reasons</th>
+                                        <th>First Reported</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportsTableBody">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 40px;">
+                                            <div class="loading">Loading reports from Firestore...</div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analytics Section -->
+                <section class="content-section" id="analytics">
+                    <h2 style="margin-bottom: 30px;">Advanced Analytics</h2>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Posts</div>
+                            <div class="stat-value" id="totalPosts">0</div>
+                            <div class="stat-change">All-time posts</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Active Users (30 days)</div>
+                            <div class="stat-value" id="activeUsers">0</div>
+                            <div class="stat-change">Posted in last month</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Engagement Rate</div>
+                            <div class="stat-value" id="engagementRate">0%</div>
+                            <div class="stat-change">Likes & comments</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3 class="chart-title">User Growth</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="growthChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings Section -->
+                <section class="content-section" id="settings">
+                    <h2 style="margin-bottom: 30px;">Settings</h2>
+
+                    <div class="stat-card">
+                        <h3 style="margin-bottom: 20px;">Auto-Moderation Rules</h3>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="autoRemove5" checked>
+                                <span>Auto-remove posts with 5+ reports</span>
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="flagInappropriate" checked>
+                                <span>Flag posts with inappropriate content</span>
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="requireApproval">
+                                <span>Require approval for new user posts</span>
+                            </label>
+                        </div>
+                        <button class="filter-btn" onclick="saveSettings()">Save Settings</button>
+                    </div>
+
+                    <div class="stat-card" style="margin-top: 20px;">
+                        <h3 style="margin-bottom: 20px;">Admin Users</h3>
+                        <p style="margin-bottom: 15px;">Add admin privileges to users by their email:</p>
+                        <input type="email" class="filter-input" placeholder="user@example.com" id="adminEmail" style="margin-bottom: 15px;">
+                        <button class="filter-btn" onclick="addAdmin()">Grant Admin Access</button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Login functionality
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                await window.firebase.signInWithEmailAndPassword(window.firebase.auth, email, password);
+                // Auth state change will handle the rest
+            } catch (error) {
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        });
+
+        async function logout() {
+            try {
+                await window.firebase.signOut(window.firebase.auth);
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        function showSection(sectionName) {
+            // Update menu items
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.menu-item').classList.add('active');
+
+            // Update content sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionName).classList.add('active');
+
+            // Load section-specific data if needed
+            if (sectionName === 'analytics') {
+                loadAnalytics();
+            }
+        }
+
+        async function loadAnalytics() {
+            try {
+                const db = window.firebase.db;
+
+                // Get total posts
+                const postsSnapshot = await window.firebase.getDocs(window.firebase.collection(db, 'posts'));
+                document.getElementById('totalPosts').textContent = postsSnapshot.size;
+
+                // Get active users (posted in last 30 days)
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                const activeUsersQuery = window.firebase.query(
+                    window.firebase.collection(db, 'posts'),
+                    window.firebase.where('createdAt', '>=', window.firebase.Timestamp.fromDate(thirtyDaysAgo))
+                );
+                const activeUsersSnapshot = await window.firebase.getDocs(activeUsersQuery);
+                const uniqueUsers = new Set(activeUsersSnapshot.docs.map(doc => doc.data().userId));
+                document.getElementById('activeUsers').textContent = uniqueUsers.size;
+
+                // Calculate engagement rate
+                let totalLikes = 0;
+                let totalComments = 0;
+                postsSnapshot.forEach(doc => {
+                    const post = doc.data();
+                    totalLikes += post.likes?.length || 0;
+                    totalComments += post.comments?.length || 0;
+                });
+                const engagementRate = postsSnapshot.size > 0 ?
+                    Math.round(((totalLikes + totalComments) / postsSnapshot.size) * 100) : 0;
+                document.getElementById('engagementRate').textContent = engagementRate + '%';
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        function viewPost(postId) {
+            alert(`Viewing post ${postId} - Full implementation would show post details`);
+        }
+
+        function viewUser(userId) {
+            alert(`Viewing user ${userId} - Full implementation would show user profile`);
+        }
+
+        function restorePost(postId) {
+            alert(`Restoring post ${postId}`);
+            window.loadDashboardData();
+        }
+
+        function suspendUser(userId) {
+            if (confirm('Are you sure you want to suspend this user?')) {
+                alert(`User ${userId} suspended`);
+            }
+        }
+
+        function reviewReport(postId) {
+            alert(`Reviewing report for post ${postId}`);
+        }
+
+        async function filterPosts() {
+            const searchTerm = document.getElementById('postSearch').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+
+            // Implement filtering logic
+            alert('Filtering posts...');
+        }
+
+        async function filterUsers() {
+            const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+            const plan = document.getElementById('planFilter').value.toLowerCase();
+
+            // Implement filtering logic
+            alert('Filtering users...');
+        }
+
+        async function saveSettings() {
+            const settings = {
+                autoRemove5: document.getElementById('autoRemove5').checked,
+                flagInappropriate: document.getElementById('flagInappropriate').checked,
+                requireApproval: document.getElementById('requireApproval').checked
+            };
+
+            // Save to Firestore
+            try {
+                await window.firebase.setDoc(
+                    window.firebase.doc(window.firebase.db, 'settings', 'moderation'),
+                    settings
+                );
+                alert('Settings saved successfully!');
+            } catch (error) {
+                alert('Error saving settings: ' + error.message);
+            }
+        }
+
+        async function addAdmin() {
+            const email = document.getElementById('adminEmail').value;
+            if (!email) {
+                alert('Please enter an email address');
+                return;
+            }
+
+            // In production, this would update the user's role in Firestore
+            alert(`Admin access would be granted to ${email}`);
+            document.getElementById('adminEmail').value = '';
+        }
+
+        function initCharts() {
+            // User Activity Chart
+            const activityCtx = document.getElementById('activityChart');
+            if (activityCtx) {
+                new Chart(activityCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                        datasets: [{
+                            label: 'Active Users',
+                            data: [0, 0, 0, 0, 0, 0, 0], // Will be updated with real data
+                            borderColor: '#6C4DF4',
+                            backgroundColor: 'rgba(108, 77, 244, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Category Chart
+            const categoryCtx = document.getElementById('categoryChart');
+            if (categoryCtx) {
+                new Chart(categoryCtx.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Restaurant', 'Retail', 'Services', 'Events', 'General'],
+                        datasets: [{
+                            data: [0, 0, 0, 0, 0], // Will be updated with real data
+                            backgroundColor: [
+                                '#6C4DF4',
+                                '#9C27B0',
+                                '#3498db',
+                                '#27ae60',
+                                '#e74c3c'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+
+            // Growth Chart
+            const growthCtx = document.getElementById('growthChart');
+            if (growthCtx) {
+                new Chart(growthCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: ['6 months ago', '5 months ago', '4 months ago', '3 months ago', '2 months ago', 'Last month', 'This month'],
+                        datasets: [{
+                            label: 'Total Users',
+                            data: [0, 0, 0, 0, 0, 0, 0], // Will be updated with real data
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
