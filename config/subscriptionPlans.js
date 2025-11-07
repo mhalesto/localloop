@@ -178,8 +178,17 @@ export function hasFeatureAccess(planId, featureName) {
 
 /**
  * Check if user can perform action based on plan
+ * @param {string} planId - User's subscription plan ID
+ * @param {string} action - Action/feature to check access for
+ * @param {boolean} isAdmin - Whether the user is an admin (bypasses all checks)
+ * @returns {boolean} - True if user has access, false otherwise
  */
-export function canUserPerformAction(planId, action) {
+export function canUserPerformAction(planId, action, isAdmin = false) {
+  // Admin users have access to all features for testing
+  if (isAdmin) {
+    return true;
+  }
+
   const limits = getPlanLimits(planId);
 
   switch (action) {

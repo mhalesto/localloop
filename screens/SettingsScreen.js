@@ -567,7 +567,7 @@ export default function SettingsScreen({ navigation }) {
 
   const handleTogglePremiumAccent = (value) => {
     // Check if user has access to premium themes
-    if (value && !canUserPerformAction(userPlan, 'premiumThemes')) {
+    if (value && !canUserPerformAction(userPlan, 'premiumThemes', isAdmin)) {
       showUpgradePrompt(
         'Premium Gradient Themes',
         'Unlock 15+ stunning gradient accent themes with smooth animations and beautiful colors.',
@@ -643,7 +643,7 @@ export default function SettingsScreen({ navigation }) {
 
   const handleTogglePremiumTypography = (value) => {
     // Check if user has access to custom typography
-    if (value && !canUserPerformAction(userPlan, 'customTypography')) {
+    if (value && !canUserPerformAction(userPlan, 'customTypography', isAdmin)) {
       showUpgradePrompt(
         'Custom Typography',
         'Adjust title and description font sizes to match your reading preference.',

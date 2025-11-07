@@ -33,8 +33,11 @@ The contact form looks for `window.LOCALLOOP_API_BASE_URL` or the value in `conf
 - `index.html`: Main marketing page showcasing LocalLoop.
 - `policy.html`: Privacy, data, and community policy reference suitable for Google Play submission.
 - `contact.html`: Tier breakdown plus lead capture form wired to the backend email endpoint.
+- `404.html`: Friendly lost-page experience with a Lottie animation and helpful navigation links.
 - `main.jsx` / `policy.jsx`: React entry files rendered via Babel Standalone.
+- `404.jsx`: React entry for the custom 404 experience.
 - `styles.css`: Shared design system for both pages.
 - `logo.svg`, `mockup.svg`: Lightweight branded assets.
+- `error-404.json`: Lottie animation used on the 404 page.
 - `screens/`: Faux app screenshots for the product tour.
 - `config.js`: Optional override for hosting-specific configuration like API base URLs.
