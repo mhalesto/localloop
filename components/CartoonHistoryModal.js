@@ -47,7 +47,6 @@ export default function CartoonHistoryModal({
     showAlert(
       'Delete Picture',
       'Are you sure you want to delete this cartoon picture? This cannot be undone.',
-      'warning',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -58,7 +57,8 @@ export default function CartoonHistoryModal({
             onDelete(picture.id).finally(() => setProcessingId(null));
           },
         },
-      ]
+      ],
+      { type: 'warning' }
     );
   };
 
@@ -66,7 +66,6 @@ export default function CartoonHistoryModal({
     showAlert(
       'Clear All History',
       'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
-      'warning',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -74,7 +73,8 @@ export default function CartoonHistoryModal({
           style: 'destructive',
           onPress: onClearAll,
         },
-      ]
+      ],
+      { type: 'warning' }
     );
   };
 
