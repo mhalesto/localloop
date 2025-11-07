@@ -19,6 +19,7 @@ export const SUBSCRIPTION_PLANS = {
       { text: '5 AI cartoon avatars (lifetime)', badge: 'NEW', badgeColor: '#FF9500' },
       'Free AI features',
       'Standard support (48h)',
+      'Ads + watermark on uploads until you upgrade',
     ],
     limits: {
       postsPerDay: 5,
@@ -54,6 +55,8 @@ export const SUBSCRIPTION_PLANS = {
     price: 49.99,
     currency: 'ZAR',
     interval: 'month',
+    yearlyPrice: 499,
+    yearlySavings: 'save almost 20%',
     popular: true,
     description: 'Perfect for active community members',
     features: [
@@ -68,6 +71,7 @@ export const SUBSCRIPTION_PLANS = {
       'Premium badge',
       'Ad-free experience',
       'Priority support (12h)',
+      'Monthly marketplace boost credit',
     ],
     limits: {
       postsPerDay: -1, // unlimited
@@ -101,9 +105,11 @@ export const SUBSCRIPTION_PLANS = {
   GOLD: {
     id: 'gold',
     name: 'Gold',
-    price: 499.99,
+    price: 79.99,
     currency: 'ZAR',
-    interval: 'year',
+    interval: 'month',
+    yearlyPrice: 799,
+    yearlySavings: 'save 20% (2 months)',
     description: 'Ultimate VIP experience',
     features: [
       'Everything in Premium',
@@ -113,11 +119,11 @@ export const SUBSCRIPTION_PLANS = {
       'Gold Crown badge',
       '5 exclusive Gold themes',
       'Advanced color controls',
-      'Early access to features',
+      'Early access to features & roadmap peeks',
       'Market listing priority',
       'Profile analytics dashboard',
       'VIP support (2h)',
-      'Save 2 months',
+      'Save 2 months every year',
     ],
     limits: {
       postsPerDay: -1,
@@ -149,7 +155,6 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsLifetime: null,
       customCartoonPrompts: true, // GOLD EXCLUSIVE
     },
-    savings: 'Save R100/year',
   },
 };
 
