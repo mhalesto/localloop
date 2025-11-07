@@ -108,7 +108,8 @@ const pricingTiers = [
       '5 basic accent themes',
       '5 AI cartoon avatars (lifetime)',
       'Free AI features',
-      'Standard support (48h)'
+      'Standard support (48h)',
+      'Ads + watermark on uploads until you upgrade'
     ],
     cta: 'Get started'
   },
@@ -116,6 +117,8 @@ const pricingTiers = [
     name: 'Premium',
     price: 'R49.99',
     cadence: '/month',
+    secondaryPrice: 'R499/year',
+    secondaryLabel: 'save almost 20%',
     description: 'Perfect for active community members who want full creative control.',
     features: [
       'Unlimited posts & statuses',
@@ -126,15 +129,18 @@ const pricingTiers = [
       'AI thread summaries & smart suggestions',
       'Translation in 11 languages',
       'Premium badge & ad-free experience',
-      'Priority support (12h)'
+      'Priority support (12h)',
+      'Monthly marketplace boost credit'
     ],
     cta: 'Subscribe now',
     recommended: true
   },
   {
     name: 'Gold',
-    price: 'R499.99',
-    cadence: '/year',
+    price: 'R79.99',
+    cadence: '/month',
+    secondaryPrice: 'R799/year',
+    secondaryLabel: 'save 20% (2 months)',
     description: 'Ultimate VIP experience with advanced branding, analytics, and support.',
     features: [
       'Everything in Premium',
@@ -145,10 +151,32 @@ const pricingTiers = [
       'Advanced color controls',
       'Market listing priority',
       'Profile analytics dashboard',
-      'Early access features & VIP support (2h)',
-      'Save 2 months'
+      'Early access to features & roadmap peeks',
+      'VIP support (2h)',
+      'Save 2 months every year'
     ],
     cta: 'Go Gold'
+  }
+];
+
+const addOns = [
+  {
+    title: 'AI avatar boost packs',
+    price: 'R19',
+    description: 'Top up with 20 additional avatars whenever inspiration strikes. Stacks with Premium or Gold quotas.',
+    icon: '✨'
+  },
+  {
+    title: 'Community bundles',
+    price: 'from R249',
+    description: 'Bundle 5 Premium seats + shared Gold analytics for HOAs, BIDs, or clubs. Includes onboarding support.',
+    icon: '🤝'
+  },
+  {
+    title: 'Launch promos',
+    price: 'R29.99 intro',
+    description: 'Offer a three-month Premium promo rate before rolling to R49.99. Perfect for new Loops ramping up.',
+    icon: '🎁'
   }
 ];
 
@@ -290,6 +318,12 @@ const PricingTier = ({ tier }) => (
       <strong>{tier.price}</strong>
       <span>{tier.cadence}</span>
     </div>
+    {tier.secondaryPrice ? (
+      <div className="tier-price-secondary">
+        <span>{tier.secondaryPrice}</span>
+        {tier.secondaryLabel ? <span className="tier-price-badge">{tier.secondaryLabel}</span> : null}
+      </div>
+    ) : null}
     <p>{tier.description}</p>
     <ul>
       {tier.features.map(feature => (
@@ -320,6 +354,30 @@ const Pricing = () => (
     <div className="pricing-grid">
       {pricingTiers.map(tier => (
         <PricingTier key={tier.name} tier={tier} />
+      ))}
+    </div>
+  </section>
+);
+
+const AddOns = () => (
+  <section id="addons">
+    <div className="section-header">
+      <span className="pill">Add-ons & bundles</span>
+      <h2>Mix in extras when your Loop needs a boost.</h2>
+      <p>Top up AI credits, bundle seats for HOAs, or launch with a limited-time promo—no commitment required.</p>
+    </div>
+    <div className="addon-grid">
+      {addOns.map(addon => (
+        <article key={addon.title} className="addon-card">
+          <span className="feature-icon" role="img" aria-hidden="true">
+            {addon.icon}
+          </span>
+          <div className="addon-price-row">
+            <strong>{addon.price}</strong>
+            <span>{addon.title}</span>
+          </div>
+          <p>{addon.description}</p>
+        </article>
       ))}
     </div>
   </section>
@@ -395,6 +453,7 @@ const App = () => (
       <Experience />
       <Testimonials />
       <Pricing />
+      <AddOns />
       <CallToAction />
     </main>
     <AppFooter />

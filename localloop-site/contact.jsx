@@ -23,7 +23,7 @@ const tierDetails = [
     name: 'Premium',
     price: 'R49.99',
     cadence: '/month',
-    summary: 'Perfect for active community members who publish frequently and want premium creative control.',
+    summary: 'R49.99/month or R499/year (save almost 20%) for active community members who publish frequently and want premium creative control.',
     features: [
       {
         title: 'Creation & style',
@@ -43,7 +43,7 @@ const tierDetails = [
     name: 'Gold',
     price: 'R499.99',
     cadence: '/year',
-    summary: 'Ultimate VIP experience for creators and teams that need advanced branding, analytics, and concierge support.',
+    summary: 'R79.99/month or R799/year (save 20%) for creators and teams that need advanced branding, analytics, and concierge support.',
     features: [
       {
         title: 'AI studio+',
