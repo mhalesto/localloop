@@ -143,7 +143,8 @@ export default function PostComposerScreen({ navigation, route }) {
       });
 
       if (result !== false) {
-        navigation.goBack();
+        // Navigate to MyPosts screen to show post status (published or in review)
+        navigation.navigate('MyPosts');
       }
     } catch (error) {
       console.warn('[PostComposer] submit failed', error);

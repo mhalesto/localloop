@@ -369,12 +369,16 @@ export default function ScreenLayout({
         navigation.navigate('MyComments');
       }
     } else if (tab === 'profile') {
-      // [PUBLIC-MODE] Navigate to user's own public profile
+      // [PUBLIC-MODE] Navigate to user's own public profile or setup
       if (firebaseUser?.uid && userProfile?.username) {
+        // User has a public profile - navigate to it
         navigation.navigate('PublicProfile', {
           userId: firebaseUser.uid,
           username: userProfile.username
         });
+      } else if (firebaseUser?.uid) {
+        // User is logged in but doesn't have a public profile - navigate to setup
+        navigation.navigate('ProfileSetup');
       }
     } else if (tab === 'settings') {
       // Navigate to Settings when not logged in

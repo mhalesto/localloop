@@ -52,6 +52,11 @@ import {
   removePictureFromHistory,
   clearCartoonHistory,
 } from '../services/cartoonProfileService';
+import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
+import { buildDreamyAccent } from '../utils/dreamyPalette';
+
+const GOLD_BADGE_ANIMATION = require('../assets/premium-gold-badge.json');
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -184,6 +189,11 @@ export default function SettingsScreen({ navigation }) {
 
   // Get user's current plan
   const userPlan = userProfile?.subscriptionPlan || 'basic';
+  const isGoldMember = userPlan === 'gold';
+  const goldAccent = useMemo(
+    () => buildDreamyAccent(accentPreset, themeColors),
+    [accentPreset, themeColors]
+  );
 
   const emailModeTitle = useMemo(() => {
     switch (emailAuthMode) {
@@ -869,7 +879,7 @@ export default function SettingsScreen({ navigation }) {
       const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
 
       // Record generation and update history (use 'custom' as style if custom prompt)
-      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId);
+      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin);
 
       // Reload data to update UI
       await loadCartoonData();
@@ -1113,6 +1123,54 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.sectionHint}>
                 Signed in with Google. Your rewards travel with you.
               </Text>
+              {isGoldMember ? (
+                <LinearGradient
+                  colors={goldAccent.gradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.goldHero}
+                >
+                  <View style={styles.goldHeroCopy}>
+                    <View style={styles.goldHeroBadgeRow}>
+                      <PremiumBadge size={40} />
+                      <Text style={styles.goldHeroTitle}>Gold lounge access</Text>
+                    </View>
+                    <Text style={styles.goldHeroSubtitle}>
+                      Thanks for backing the community. Your boosts, VIP support, and secret drops stay active while this badge glows.
+                    </Text>
+                    <View style={styles.goldHeroPerks}>
+                      <View style={styles.goldHeroChip}>
+                        <Ionicons name="flash-outline" size={14} color="#fff" />
+                        <Text style={styles.goldHeroChipText}>Daily boost</Text>
+                      </View>
+                      <View style={styles.goldHeroChip}>
+                        <Ionicons name="shield-checkmark-outline" size={14} color="#fff" />
+                        <Text style={styles.goldHeroChipText}>Priority support</Text>
+                      </View>
+                      <View style={styles.goldHeroChip}>
+                        <Ionicons name="sparkles-outline" size={14} color="#fff" />
+                        <Text style={styles.goldHeroChipText}>Exclusive drops</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.goldHeroButton}
+                      onPress={() => navigation.navigate('Subscription')}
+                      activeOpacity={0.9}
+                    >
+                      <Text style={styles.goldHeroButtonText}>View Gold perks</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#0d0f1c" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.goldHeroArt}>
+                    <LottieView
+                      source={GOLD_BADGE_ANIMATION}
+                      autoPlay
+                      loop
+                      style={styles.goldHeroAnimation}
+                    />
+                  </View>
+                </LinearGradient>
+              ) : null}
               <View style={styles.item}>
                 <View>
                   <Text style={styles.itemTitle}>
@@ -2113,6 +2171,7 @@ export default function SettingsScreen({ navigation }) {
         userProfile={userProfile}
         usageData={cartoonUsageData}
         isGenerating={isGeneratingCartoon}
+        isAdmin={isAdmin}
       />
 
       <CartoonHistoryModal
@@ -2165,6 +2224,83 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 13,
       color: palette.textSecondary,
       marginBottom: 16
+    },
+    goldHero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 26,
+      padding: 20,
+      marginBottom: 20,
+      gap: 16,
+      shadowColor: '#FACC15',
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 4
+    },
+    goldHeroCopy: {
+      flex: 1,
+      gap: 10
+    },
+    goldHeroBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12
+    },
+    goldHeroTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#fff'
+    },
+    goldHeroSubtitle: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: 13,
+      lineHeight: 20
+    },
+    goldHeroPerks: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8
+    },
+    goldHeroChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 14,
+      backgroundColor: 'rgba(0,0,0,0.25)'
+    },
+    goldHeroChipText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600'
+    },
+    goldHeroButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: '#fff',
+      marginTop: 4
+    },
+    goldHeroButtonText: {
+      color: '#0d0f1c',
+      fontSize: 13,
+      fontWeight: '700'
+    },
+    goldHeroArt: {
+      width: 130,
+      height: 130,
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    goldHeroAnimation: {
+      width: '100%',
+      height: '100%'
     },
     discoveryPresetCard: {
       flexDirection: 'row',

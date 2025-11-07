@@ -1025,6 +1025,10 @@ export function PostsProvider({ children }) {
         moderation: moderation ?? null,
         moderationStatus,
         mentionedUserIds: mentionedUserIds || [],
+        // Extract content analysis fields for display
+        tags: moderation?.tags || [],
+        contentWarnings: moderation?.contentWarnings || [],
+        sentiment: moderation?.sentiment || null,
         // Add poll if provided
         ...(pollData ? { poll: pollData } : {}),
         // [PUBLIC-MODE] Add mode and public profile fields

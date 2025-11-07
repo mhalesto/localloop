@@ -87,8 +87,15 @@ async function incrementCount(key) {
 
 /**
  * Check if user can create a post today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
  */
-export async function canCreatePost(userPlan = 'basic') {
+export async function canCreatePost(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
   const limits = getPlanLimits(userPlan);
 
   // Unlimited posts
@@ -109,8 +116,15 @@ export async function canCreatePost(userPlan = 'basic') {
 
 /**
  * Check if user can create a status today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
  */
-export async function canCreateStatus(userPlan = 'basic') {
+export async function canCreateStatus(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
   const limits = getPlanLimits(userPlan);
 
   // Unlimited statuses

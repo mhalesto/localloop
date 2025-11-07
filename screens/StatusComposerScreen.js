@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import CameraCapture from '../components/CameraCapture';
 import UpgradePromptModal from '../components/UpgradePromptModal';
+import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useStatuses } from '../contexts/StatusesContext';
 import { analyzePostContent } from '../services/openai/moderationService';
@@ -26,6 +27,7 @@ import { canCreateStatus, recordStatusCreated } from '../utils/subscriptionUtils
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export default function StatusComposerScreen({ navigation }) {
+  const { isAdmin } = useAuth();
   const { themeColors, userProfile } = useSettings();
   const { createStatus } = useStatuses();
 
@@ -118,8 +120,8 @@ export default function StatusComposerScreen({ navigation }) {
     const trimmed = message.trim();
     if (!trimmed) { setError('Write something to share.'); return; }
 
-    // Check status limit
-    const limitCheck = await canCreateStatus(userPlan);
+    // Check status limit (admins bypass limits)
+    const limitCheck = await canCreateStatus(userPlan, isAdmin);
     if (!limitCheck.allowed) {
       setStatusLimitInfo(limitCheck);
       setUpgradeModalVisible(true);

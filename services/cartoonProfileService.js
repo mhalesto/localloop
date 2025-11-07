@@ -116,9 +116,10 @@ export async function uploadCartoonToStorage(userId, imageUrl, styleId) {
  * @param {string} userId - User ID
  * @param {string} imageUrl - Firebase Storage URL
  * @param {string} styleId - Style used
+ * @param {boolean} isAdmin - Whether the user is an admin
  * @returns {Promise<void>}
  */
-export async function recordCartoonGeneration(userId, imageUrl, styleId) {
+export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false) {
   try {
     const data = await checkAndResetMonthlyUsage(userId);
     const docRef = doc(db, 'users', userId);
@@ -137,10 +138,11 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId) {
     // Add new entry at the beginning
     updatedHistory.unshift(historyEntry);
 
-    // Keep only the last 3 entries
-    if (updatedHistory.length > 3) {
+    // Keep only the last 3 entries (unless admin)
+    const maxHistory = isAdmin ? 10 : 3; // Admins can keep more history
+    if (updatedHistory.length > maxHistory) {
       // Delete old images from storage before removing from history
-      const toDelete = updatedHistory.slice(3);
+      const toDelete = updatedHistory.slice(maxHistory);
       for (const entry of toDelete) {
         try {
           await deleteCartoonImage(entry.url);
@@ -148,16 +150,22 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId) {
           console.warn('[cartoonProfileService] Failed to delete old image:', error);
         }
       }
-      updatedHistory = updatedHistory.slice(0, 3);
+      updatedHistory = updatedHistory.slice(0, maxHistory);
     }
 
-    // Update Firestore
-    await updateDoc(docRef, {
-      cartoonMonthlyUsage: (data.monthlyUsage || 0) + 1,
-      cartoonLifetimeUsage: (data.lifetimeUsage || 0) + 1,
+    // Update Firestore - Don't increment usage counters for admins
+    const updateData = {
       cartoonPictureHistory: updatedHistory,
       cartoonLastGeneratedAt: serverTimestamp(),
-    });
+    };
+
+    // Only track usage for non-admin users
+    if (!isAdmin) {
+      updateData.cartoonMonthlyUsage = (data.monthlyUsage || 0) + 1;
+      updateData.cartoonLifetimeUsage = (data.lifetimeUsage || 0) + 1;
+    }
+
+    await updateDoc(docRef, updateData);
 
     console.log('[cartoonProfileService] Recorded generation, new usage:', {
       monthly: data.monthlyUsage + 1,

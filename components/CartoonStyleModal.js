@@ -27,6 +27,7 @@ export default function CartoonStyleModal({
   userProfile,
   usageData,
   isGenerating = false,
+  isAdmin = false,
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [selectedStyle, setSelectedStyle] = useState(null);
@@ -35,12 +36,13 @@ export default function CartoonStyleModal({
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
-  const isGoldUser = subscriptionPlan === 'gold';
+  const isGoldUser = subscriptionPlan === 'gold' || isAdmin; // Admin has Gold features
 
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,
     usageData?.monthlyUsage || 0,
-    usageData?.lifetimeUsage || 0
+    usageData?.lifetimeUsage || 0,
+    isAdmin
   );
 
   const usageText = getUsageStatsText(

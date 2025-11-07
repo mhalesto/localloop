@@ -228,10 +228,34 @@ export default function RoomScreen({ navigation, route }) {
 
         try {
           let moderation = null;
+          let tags = [];
+          let contentWarnings = [];
+          let sentiment = null;
+
           try {
+            // Run moderation check
             moderation = await analyzePostContent({ title: postTitle, message: postMessage });
+
+            // Run content analysis for warnings and sentiment
+            const { analyzeContent } = await import('../services/openai/contentAnalysisService');
+            const contentAnalysis = await analyzeContent(postTitle, postMessage);
+            contentWarnings = contentAnalysis.warnings || [];
+            sentiment = contentAnalysis.sentiment;
+
+            // Run auto-tagging
+            const { autoTagPost } = await import('../services/openai/autoTaggingService');
+            const taggingResult = await autoTagPost(postTitle, postMessage);
+            tags = taggingResult.tags || [];
+
+            // Merge all analysis into moderation object
+            moderation = {
+              ...moderation,
+              tags,
+              contentWarnings,
+              sentiment,
+            };
           } catch (error) {
-            console.warn('[RoomScreen] moderation analyze failed', error);
+            console.warn('[RoomScreen] content analysis failed', error);
           }
 
           if (moderation?.action === 'block') {

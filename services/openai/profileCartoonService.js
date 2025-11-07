@@ -241,9 +241,18 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
  * @param {object} userProfile - User profile with subscription info
  * @param {number} currentMonthUsage - Number of generations this month
  * @param {number} lifetimeUsage - Total number of generations ever
+ * @param {boolean} isAdmin - Whether the user is an admin
  * @returns {{canGenerate: boolean, reason: string}}
  */
-export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeUsage = 0) {
+export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeUsage = 0, isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return {
+      canGenerate: true,
+      reason: null,
+    };
+  }
+
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
   const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
 
