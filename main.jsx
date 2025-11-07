@@ -97,47 +97,58 @@ const testimonials = [
 
 const pricingTiers = [
   {
-    name: 'Neighbors (Free)',
-    price: '$0',
-    cadence: '/forever',
-    description: 'Perfect for resident groups getting started with their first Loop.',
+    name: 'Basic',
+    price: 'R0',
+    cadence: '/month',
+    description: 'Essential features for casual neighbors getting started.',
     features: [
-      'Up to 150 members per Loop',
-      'Instant alerts and block chat',
-      'Events with RSVP basics',
-      'Local marketplace browsing',
-      '5 marketplace posts per month'
+      '5 posts per day',
+      '5 statuses per day',
+      'Unlimited comments & replies',
+      '5 basic accent themes',
+      '5 AI cartoon avatars (lifetime)',
+      'Free AI features',
+      'Standard support (48h)'
     ],
-    cta: 'Start your free loop'
+    cta: 'Get started'
   },
   {
-    name: 'Neighborhood Plus',
-    price: '$9',
-    cadence: '/month per Loop',
-    description: 'Unlock commerce tools and moderation superpowers for active communities.',
+    name: 'Premium',
+    price: 'R49.99',
+    cadence: '/month',
+    description: 'Perfect for active community members who want full creative control.',
     features: [
-      'Unlimited members & private circles',
-      'Advanced alerts with auto-translate',
-      'Smart event planning and volunteer roles',
-      'Marketplace storefronts & payouts',
-      'Moderator insights & safety reviews'
+      'Unlimited posts & statuses',
+      '15+ premium gradient themes',
+      'Custom typography controls',
+      '10 AI cartoon avatars / month',
+      '8 cartoon styles (Pixar, Anime, etc.)',
+      'AI thread summaries & smart suggestions',
+      'Translation in 11 languages',
+      'Premium badge & ad-free experience',
+      'Priority support (12h)'
     ],
-    cta: 'Upgrade to Plus',
+    cta: 'Subscribe now',
     recommended: true
   },
   {
-    name: 'Civic Pro',
-    price: '$29',
-    cadence: '/month per district',
-    description: 'Ideal for city partners, business districts, and housing authorities.',
+    name: 'Gold',
+    price: 'R499.99',
+    cadence: '/year',
+    description: 'Ultimate VIP experience with advanced branding, analytics, and support.',
     features: [
-      'Multi-loop management dashboard',
-      'Unlimited analytics exports',
-      'API access for city data teams',
-      'Grant-ready impact reporting',
-      'Priority onboarding & training'
+      'Everything in Premium',
+      '20 AI cartoon avatars / month',
+      'Custom avatar prompts (Gold exclusive)',
+      'Describe your own cartoon style',
+      'Gold Crown badge & 5 Gold themes',
+      'Advanced color controls',
+      'Market listing priority',
+      'Profile analytics dashboard',
+      'Early access features & VIP support (2h)',
+      'Save 2 months'
     ],
-    cta: 'Talk with partnerships'
+    cta: 'Go Gold'
   }
 ];
 
