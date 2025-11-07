@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
-import { useAlert } from '../contexts/AlertContext';
 import { CARTOON_STYLES } from '../services/openai/profileCartoonService';
 
 export default function CartoonHistoryModal({
@@ -30,7 +29,6 @@ export default function CartoonHistoryModal({
   isProcessing = false,
 }) {
   const { themeColors, accentPreset } = useSettings();
-  const { showAlert } = useAlert();
   const [processingId, setProcessingId] = useState(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
@@ -44,38 +42,15 @@ export default function CartoonHistoryModal({
   };
 
   const handleDelete = (picture) => {
-    showAlert(
-      'Delete Picture',
-      'Are you sure you want to delete this cartoon picture? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setProcessingId(picture.id);
-            onDelete(picture.id).finally(() => setProcessingId(null));
-          },
-        },
-      ],
-      { type: 'warning' }
-    );
+    console.log('[CartoonHistoryModal] Delete button pressed for picture:', picture.id);
+    // Just call onDelete - parent will handle confirmation and processing state
+    onDelete(picture.id);
+    console.log('[CartoonHistoryModal] onDelete called');
   };
 
   const handleClearAll = () => {
-    showAlert(
-      'Clear All History',
-      'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: onClearAll,
-        },
-      ],
-      { type: 'warning' }
-    );
+    // Just call onClearAll directly - let parent handle confirmation
+    onClearAll();
   };
 
   const getStyleName = (styleId) => {
