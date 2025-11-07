@@ -879,7 +879,7 @@ export default function SettingsScreen({ navigation }) {
       const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
 
       // Record generation and update history (use 'custom' as style if custom prompt)
-      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin);
+      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin, userPlan);
 
       // Reload data to update UI
       await loadCartoonData();
@@ -2183,6 +2183,7 @@ export default function SettingsScreen({ navigation }) {
         onDelete={handleDeleteCartoonPicture}
         onClearAll={handleClearCartoonHistory}
         isProcessing={isCartoonProcessing}
+        userPlan={userPlan}
       />
     </ScreenLayout>
   );

@@ -117,9 +117,10 @@ export async function uploadCartoonToStorage(userId, imageUrl, styleId) {
  * @param {string} imageUrl - Firebase Storage URL
  * @param {string} styleId - Style used
  * @param {boolean} isAdmin - Whether the user is an admin
+ * @param {string} planId - User's subscription plan ('basic', 'premium', 'gold')
  * @returns {Promise<void>}
  */
-export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false) {
+export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false, planId = 'basic') {
   try {
     const data = await checkAndResetMonthlyUsage(userId);
     const docRef = doc(db, 'users', userId);
@@ -138,8 +139,19 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin
     // Add new entry at the beginning
     updatedHistory.unshift(historyEntry);
 
-    // Keep only the last 3 entries (unless admin)
-    const maxHistory = isAdmin ? 10 : 3; // Admins can keep more history
+    // Determine max history based on plan
+    let maxHistory = 3; // Basic: 3
+    if (planId === 'premium') {
+      maxHistory = 5; // Premium: 5
+    } else if (planId === 'gold') {
+      maxHistory = 10; // Gold: 10
+    }
+
+    // Admins get unlimited history
+    if (isAdmin) {
+      maxHistory = 50; // Large number for admin
+    }
+
     if (updatedHistory.length > maxHistory) {
       // Delete old images from storage before removing from history
       const toDelete = updatedHistory.slice(maxHistory);
