@@ -1,69 +1,61 @@
 const tierDetails = [
   {
-    name: 'Neighbors (Free)',
-    price: '$0',
-    cadence: '/forever',
-    summary: 'Launch your first Loop with enough power to keep neighbors connected and safe.',
+    name: 'Basic',
+    price: 'R0',
+    cadence: '/month',
+    summary: 'Essential features for casual users who want to stay tuned-in without the extras.',
     features: [
       {
-        title: 'Core communications',
-        items: ['Unlimited posts and comments', 'Priority & FYI alert types', 'Push + email notifications']
+        title: 'Creation limits',
+        items: ['5 posts per day', '5 statuses per day', 'Unlimited comments & replies']
       },
       {
-        title: 'Events & coordination',
-        items: ['Up to 3 concurrent events', 'RSVP tracking with reminders', 'Shared notes & resource links']
+        title: 'Customization & AI',
+        items: ['5 basic accent themes', '5 AI cartoon avatars (lifetime)', 'Free AI features']
       },
       {
-        title: 'Marketplace basics',
-        items: ['Browse local listings', 'Post up to 5 offers per month', 'Collect recommendations from neighbors']
+        title: 'Support',
+        items: ['Standard support (48h)', 'Community reporting tools']
       }
     ]
   },
   {
-    name: 'Neighborhood Plus',
-    price: '$9',
-    cadence: '/month per Loop',
-    summary: 'Ideal for active blocks ready to monetize and moderate at scale.',
+    name: 'Premium',
+    price: 'R49.99',
+    cadence: '/month',
+    summary: 'Perfect for active community members who publish frequently and want premium creative control.',
     features: [
       {
-        title: 'Enhanced communications',
-        items: ['Unlimited alert escalation tiers', 'Automatic language translation', 'Invite-only circles & channels']
+        title: 'Creation & style',
+        items: ['Unlimited posts & statuses', '15+ premium gradient themes', 'Custom typography controls', 'Ad-free experience']
       },
       {
-        title: 'Growth & monetization',
-        items: [
-          'Unlimited marketplace listings',
-          'Payment & payout integrations',
-          'Featured local business highlights'
-        ]
+        title: 'AI studio',
+        items: ['10 AI cartoon avatars per month', '8 cartoon styles (Pixar, Anime, etc.)', 'AI thread summaries & smart suggestions', 'Translation in 11 languages']
       },
       {
-        title: 'Safety & insights',
-        items: ['Moderator workflow with escalation inbox', 'Analytics dashboard with week-over-week trends', 'Audit logs for neighborhood admins']
+        title: 'Status & support',
+        items: ['Premium badge', 'Priority support (12h)', 'Premium marketplace boosts']
       }
     ]
   },
   {
-    name: 'Civic Pro',
-    price: '$29',
-    cadence: '/month per district',
-    summary: 'Built with municipalities, BID teams, and housing authorities to unify multiple Loops.',
+    name: 'Gold',
+    price: 'R499.99',
+    cadence: '/year',
+    summary: 'Ultimate VIP experience for creators and teams that need advanced branding, analytics, and concierge support.',
     features: [
       {
-        title: 'Multi-loop oversight',
-        items: ['Central command dashboard', 'District-wide announcements', 'Granular roles & permissions']
+        title: 'AI studio+',
+        items: ['20 AI cartoon avatars per month', 'Custom avatar prompts (Gold exclusive)', 'Describe your own cartoon style']
       },
       {
-        title: 'Data & integrations',
-        items: [
-          'Open API access & webhooks',
-          'Scheduled CSV / JSON exports',
-          'GIS-ready heatmaps for requests and resources'
-        ]
+        title: 'Branding & control',
+        items: ['Gold Crown badge & 5 Gold themes', 'Advanced color controls', 'Market listing priority', 'Save 2 months each year']
       },
       {
-        title: 'Support & enablement',
-        items: ['Dedicated partner manager', 'Custom onboarding workshops', 'SLA-backed support with 4h response']
+        title: 'Insights & support',
+        items: ['Profile analytics dashboard', 'Early access to new features', 'VIP support (2h)']
       }
     ]
   }
