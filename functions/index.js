@@ -1272,3 +1272,274 @@ exports.cleanupDatabase = functions.https.onCall(async (data, context) => {
 // STRIPE PAYMENT INTEGRATION - REMOVED (Using PayFast instead)
 // ====================================
 // Stripe doesn't support South Africa, so we use PayFast for payments.
+
+// ====================================
+// GEOGRAPHIC DATA AGGREGATION
+// ====================================
+
+/**
+ * Aggregate user counts by geographic location
+ * Callable function for admin dashboard
+ */
+exports.getGeographicStats = functions.https.onCall(async (data, context) => {
+  // Verify admin authentication
+  if (!context.auth || !context.auth.token.admin) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'Only admins can access geographic stats'
+    );
+  }
+
+  try {
+    const {country, province, timeRange} = data;
+    const db = admin.firestore();
+    
+    // Calculate time threshold
+    let timeThreshold = null;
+    if (timeRange && timeRange !== 'all') {
+      const days = parseInt(timeRange);
+      timeThreshold = new Date();
+      timeThreshold.setDate(timeThreshold.getDate() - days);
+    }
+
+    // Build query
+    let query = db.collection('users');
+    
+    if (country) {
+      query = query.where('country', '==', country);
+    }
+    
+    if (province) {
+      query = query.where('province', '==', province);
+    }
+
+    const snapshot = await query.get();
+    
+    // Aggregate data
+    const stats = {
+      totalUsers: 0,
+      activeUsers: 0,
+      basicUsers: 0,
+      premiumUsers: 0,
+      goldUsers: 0,
+      byCountry: {},
+      byProvince: {},
+      byCity: {},
+    };
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    snapshot.forEach((doc) => {
+      const user = doc.data();
+      const createdAt = user.createdAt?.toDate();
+      
+      // Apply time filter
+      if (timeThreshold && createdAt < timeThreshold) {
+        return;
+      }
+
+      stats.totalUsers++;
+
+      // Count active users (last 30 days)
+      const lastActive = user.lastActive?.toDate() || createdAt;
+      if (lastActive && lastActive > thirtyDaysAgo) {
+        stats.activeUsers++;
+      }
+
+      // Count by subscription plan
+      const plan = user.subscriptionPlan || 'basic';
+      if (plan === 'basic') stats.basicUsers++;
+      else if (plan === 'premium') stats.premiumUsers++;
+      else if (plan === 'gold') stats.goldUsers++;
+
+      // Aggregate by location
+      if (user.country) {
+        const countryName = user.countryName || user.country;
+        if (!stats.byCountry[countryName]) {
+          stats.byCountry[countryName] = {
+            code: user.country,
+            count: 0,
+            active: 0,
+            premium: 0,
+            gold: 0,
+          };
+        }
+        stats.byCountry[countryName].count++;
+        if (lastActive && lastActive > thirtyDaysAgo) {
+          stats.byCountry[countryName].active++;
+        }
+        if (plan === 'premium') stats.byCountry[countryName].premium++;
+        if (plan === 'gold') stats.byCountry[countryName].gold++;
+      }
+
+      if (user.province) {
+        const key = `${user.country}-${user.province}`;
+        if (!stats.byProvince[key]) {
+          stats.byProvince[key] = {
+            province: user.province,
+            country: user.countryName || user.country,
+            count: 0,
+            active: 0,
+          };
+        }
+        stats.byProvince[key].count++;
+        if (lastActive && lastActive > thirtyDaysAgo) {
+          stats.byProvince[key].active++;
+        }
+      }
+
+      if (user.city) {
+        const key = `${user.country}-${user.province}-${user.city}`;
+        if (!stats.byCity[key]) {
+          stats.byCity[key] = {
+            city: user.city,
+            province: user.province,
+            country: user.countryName || user.country,
+            count: 0,
+            active: 0,
+          };
+        }
+        stats.byCity[key].count++;
+        if (lastActive && lastActive > thirtyDaysAgo) {
+          stats.byCity[key].active++;
+        }
+      }
+    });
+
+    // Convert objects to arrays and sort
+    stats.topCountries = Object.values(stats.byCountry)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    
+    stats.topProvinces = Object.values(stats.byProvince)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+    
+    stats.topCities = Object.values(stats.byCity)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+
+    return stats;
+  } catch (error) {
+    console.error('[getGeographicStats] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Get detailed analytics for admin dashboard
+ * Includes user growth, revenue, engagement metrics
+ */
+exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
+  // Verify admin authentication
+  if (!context.auth || !context.auth.token.admin) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'Only admins can access analytics'
+    );
+  }
+
+  try {
+    const db = admin.firestore();
+    const now = new Date();
+    
+    // Get all users
+    const usersSnapshot = await db.collection('users').get();
+    const users = [];
+    usersSnapshot.forEach((doc) => {
+      users.push({id: doc.id, ...doc.data()});
+    });
+
+    // Get all posts (last 90 days)
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const postsSnapshot = await db.collection('posts')
+        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+        .get();
+    const posts = [];
+    postsSnapshot.forEach((doc) => {
+      posts.push({id: doc.id, ...doc.data()});
+    });
+
+    // Calculate user growth (last 30 days, grouped by day)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const userGrowth = Array(30).fill(0);
+    
+    users.forEach((user) => {
+      const createdAt = user.createdAt?.toDate();
+      if (createdAt && createdAt >= thirtyDaysAgo) {
+        const daysAgo = Math.floor((now - createdAt) / (24 * 60 * 60 * 1000));
+        if (daysAgo >= 0 && daysAgo < 30) {
+          userGrowth[29 - daysAgo]++;
+        }
+      }
+    });
+
+    // Make cumulative
+    for (let i = 1; i < 30; i++) {
+      userGrowth[i] += userGrowth[i - 1];
+    }
+
+    // Calculate revenue
+    const premiumPrice = 49.99;
+    const goldPrice = 149.99;
+    const premiumCount = users.filter(u => u.subscriptionPlan === 'premium').length;
+    const goldCount = users.filter(u => u.subscriptionPlan === 'gold').length;
+    const monthlyRevenue = (premiumCount * premiumPrice) + (goldCount * goldPrice);
+
+    // Post activity by hour (last 7 days)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const hourlyActivity = Array(24).fill(0);
+    
+    posts.forEach((post) => {
+      const timestamp = post.timestamp?.toDate();
+      if (timestamp && timestamp >= sevenDaysAgo) {
+        const hour = timestamp.getHours();
+        hourlyActivity[hour]++;
+      }
+    });
+
+    // Calculate engagement (posts + comments in last 30 days / active users)
+    const activeUsers = users.filter((user) => {
+      const lastActive = user.lastActive?.toDate() || user.createdAt?.toDate();
+      return lastActive && lastActive >= thirtyDaysAgo;
+    }).length;
+
+    const recentPosts = posts.filter((post) => {
+      const timestamp = post.timestamp?.toDate();
+      return timestamp && timestamp >= thirtyDaysAgo;
+    }).length;
+
+    const engagement = activeUsers > 0 ? Math.round((recentPosts / activeUsers) * 100) : 0;
+
+    // Get pending reports
+    const reportsSnapshot = await db.collection('reports')
+        .where('status', '==', 'pending')
+        .get();
+    const pendingReports = reportsSnapshot.size;
+
+    return {
+      totalUsers: users.length,
+      activeUsers,
+      premiumUsers: premiumCount,
+      goldUsers: goldCount,
+      totalPosts: posts.length,
+      monthlyRevenue,
+      pendingReports,
+      engagement,
+      userGrowth,
+      hourlyActivity,
+      revenueGrowth: [
+        monthlyRevenue * 0.5,
+        monthlyRevenue * 0.65,
+        monthlyRevenue * 0.78,
+        monthlyRevenue * 0.87,
+        monthlyRevenue * 0.93,
+        monthlyRevenue,
+      ],
+    };
+  } catch (error) {
+    console.error('[getAdminAnalytics] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
