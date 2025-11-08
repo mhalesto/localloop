@@ -49,6 +49,7 @@ import PollDisplay from '../components/PollDisplay';
 import { summarizeThread } from '../services/openai/threadSummarizationService';
 import { suggestComment, SUGGESTION_TYPES } from '../services/openai/commentSuggestionService';
 import { translatePost, LANGUAGES, COMMON_LANGUAGES } from '../services/openai/translationService';
+import { translateWithContext } from '../services/openai/gpt4Service';
 import { analyzePostContent } from '../services/openai/moderationService';
 import { isFeatureEnabled } from '../config/aiFeatures';
 import { togglePublicPostVote } from '../services/publicPostsService';
@@ -454,7 +455,7 @@ export default function PostThreadScreen({ route, navigation }) {
     premiumTitleFontSize,
     premiumDescriptionFontSize
   } = useSettings();
-  const { user: firebaseUser } = useAuth();
+  const { user: firebaseUser, profile: userProfile } = useAuth();
   const { showAlert } = useAlert();
   const effectiveTitleFontSize =
     premiumTypographyEnabled && premiumTitleFontSizeEnabled
@@ -504,6 +505,7 @@ export default function PostThreadScreen({ route, navigation }) {
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslationPicker, setShowTranslationPicker] = useState(false);
+  const [showSummaryStylePicker, setShowSummaryStylePicker] = useState(false);
 
   const typingActiveRef = useRef(false);
   const typingTimeoutRef = useRef(null);
@@ -1743,7 +1745,7 @@ export default function PostThreadScreen({ route, navigation }) {
   };
 
   // [AI-FEATURES] Thread Summarization
-  const handleSummarizeThread = useCallback(async () => {
+  const handleSummarizeThread = useCallback(async (style = 'professional') => {
     if (isSummarizingRef.current) {
       console.log('[ThreadSummary] Already summarizing, ignoring click');
       return;
@@ -1754,15 +1756,16 @@ export default function PostThreadScreen({ route, navigation }) {
       return;
     }
 
-    console.log('[ThreadSummary] Starting summarization...');
+    console.log('[ThreadSummary] Starting summarization with style:', style);
 
     // Update both ref and state
     isSummarizingRef.current = true;
     setIsSummarizing(true);
+    setShowSummaryStylePicker(false); // Close the picker
     console.log('[ThreadSummary] Set isSummarizingRef and state to true');
 
     try {
-      const result = await summarizeThread(comments, post);
+      const result = await summarizeThread(comments, post, { style });
       console.log('[ThreadSummary] Summarization complete');
       isSummarizingRef.current = false;
       setIsSummarizing(false);
@@ -1778,6 +1781,27 @@ export default function PostThreadScreen({ route, navigation }) {
       showAlert('Summary failed', error.message, [], { type: 'error' });
     }
   }, [comments, post, navigation, showAlert]);
+
+  // [AI-FEATURES] Handle summarize button press - show style picker for Gold users
+  const handleSummarizeButtonPress = useCallback(() => {
+    if (isSummarizingRef.current) {
+      console.log('[ThreadSummary] Already summarizing, ignoring click');
+      return;
+    }
+
+    if (comments.length < 10) {
+      showAlert('Too few comments', 'Threads need at least 10 comments to summarize', [], { type: 'info' });
+      return;
+    }
+
+    // Gold users get to choose style
+    if (userProfile?.subscriptionPlan === 'gold') {
+      setShowSummaryStylePicker(true);
+    } else {
+      // Non-Gold users get default professional style
+      handleSummarizeThread('professional');
+    }
+  }, [comments, userProfile, handleSummarizeThread, showAlert]);
 
   // [AI-FEATURES] Comment Suggestions
   const handleGetSuggestion = async (type = SUGGESTION_TYPES.THOUGHTFUL) => {
@@ -1797,13 +1821,31 @@ export default function PostThreadScreen({ route, navigation }) {
     setIsTranslating(true);
     setShowTranslationPicker(false);
     try {
-      const result = await translatePost(post, targetLang);
+      let result;
+      const isGold = userProfile?.subscriptionPlan === 'gold';
+
+      if (isGold) {
+        // Gold users get cultural translation with GPT-4o-mini
+        const [titleResult, messageResult] = await Promise.all([
+          translateWithContext(post.title || '', targetLang),
+          post.message ? translateWithContext(post.message, targetLang) : Promise.resolve({ translation: '' }),
+        ]);
+        result = {
+          title: titleResult.translation,
+          message: messageResult.translation || '',
+          targetLang,
+        };
+      } else {
+        // Non-Gold users get basic translation
+        result = await translatePost(post, targetLang);
+      }
+
       setIsTranslating(false);
 
       // Navigate to ThreadSummary screen with translation
       const languageName = Object.values(LANGUAGES).find(l => l.code === targetLang)?.name || targetLang;
       navigation.navigate('ThreadSummary', {
-        postTitle: `${post.title} (${languageName})`,
+        postTitle: `${post.title} (${languageName})${isGold ? ' ✨' : ''}`,
         summary: `${result.title}\n\n${result.message}`,
         isTranslation: true,
         targetLanguage: languageName,
@@ -2611,7 +2653,7 @@ export default function PostThreadScreen({ route, navigation }) {
                   return (
                     <TouchableOpacity
                       style={[styles.aiFeatureButton, { backgroundColor: `${linkColor}15`, opacity: isSummarizing ? 0.6 : 1 }]}
-                      onPress={handleSummarizeThread}
+                      onPress={handleSummarizeButtonPress}
                       disabled={isSummarizing}
                       activeOpacity={0.7}
                     >
@@ -3022,6 +3064,27 @@ export default function PostThreadScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         ) : null}
+        {userProfile?.subscriptionPlan === 'gold' && (
+          <TouchableOpacity
+            style={[styles.aiSuggestionButton, { backgroundColor: themeColors.cardBackground, borderColor: '#ffd700' }]}
+            onPress={() => handleGetSuggestion(SUGGESTION_TYPES.THOUGHTFUL)}
+            disabled={isLoadingSuggestion}
+          >
+            {isLoadingSuggestion ? (
+              <ActivityIndicator size="small" color="#ffd700" />
+            ) : (
+              <>
+                <Text style={styles.aiSuggestionIcon}>💡</Text>
+                <Text style={[styles.aiSuggestionText, { color: themeColors.textPrimary }]}>
+                  Get AI Comment Suggestions
+                </Text>
+                <View style={styles.goldBadgeMini}>
+                  <Text style={styles.goldBadgeMiniText}>GOLD</Text>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
         <View style={styles.composerInner}>
           <MentionTextInput
             value={reply}
@@ -3111,6 +3174,87 @@ export default function PostThreadScreen({ route, navigation }) {
             >
               <Ionicons name="trash-outline" size={18} color={destructiveColor} style={styles.ownerMenuItemIcon} />
               <Text style={[styles.ownerMenuItemText, { color: destructiveColor }]}>Delete post</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Summary Style Picker Modal */}
+      <Modal
+        visible={showSummaryStylePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSummaryStylePicker(false)}
+      >
+        <View style={styles.ownerMenuBackdrop}>
+          <TouchableWithoutFeedback onPress={() => setShowSummaryStylePicker(false)}>
+            <View style={styles.ownerMenuBackground} />
+          </TouchableWithoutFeedback>
+
+          <View style={[styles.stylePickerContainer, { backgroundColor: themeColors.card }]}>
+            <View style={styles.stylePickerHeader}>
+              <Text style={[styles.stylePickerTitle, { color: themeColors.textPrimary }]}>
+                Choose Summary Style
+              </Text>
+              <View style={styles.goldBadgeMini}>
+                <Text style={styles.goldBadgeMiniText}>GOLD</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.styleOption, { borderBottomColor: themeColors.divider }]}
+              onPress={() => handleSummarizeThread('professional')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.styleOptionIcon}>💼</Text>
+              <View style={styles.styleOptionContent}>
+                <Text style={[styles.styleOptionTitle, { color: themeColors.textPrimary }]}>Professional</Text>
+                <Text style={[styles.styleOptionDesc, { color: themeColors.textSecondary }]}>
+                  Clear, concise, and professional
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.styleOption, { borderBottomColor: themeColors.divider }]}
+              onPress={() => handleSummarizeThread('casual')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.styleOptionIcon}>😊</Text>
+              <View style={styles.styleOptionContent}>
+                <Text style={[styles.styleOptionTitle, { color: themeColors.textPrimary }]}>Casual</Text>
+                <Text style={[styles.styleOptionDesc, { color: themeColors.textSecondary }]}>
+                  Friendly and conversational
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.styleOption, { borderBottomColor: themeColors.divider }]}
+              onPress={() => handleSummarizeThread('emoji')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.styleOptionIcon}>✨</Text>
+              <View style={styles.styleOptionContent}>
+                <Text style={[styles.styleOptionTitle, { color: themeColors.textPrimary }]}>Emoji</Text>
+                <Text style={[styles.styleOptionDesc, { color: themeColors.textSecondary }]}>
+                  Engaging with relevant emojis
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.styleOption}
+              onPress={() => handleSummarizeThread('formal')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.styleOptionIcon}>📚</Text>
+              <View style={styles.styleOptionContent}>
+                <Text style={[styles.styleOptionTitle, { color: themeColors.textPrimary }]}>Formal</Text>
+                <Text style={[styles.styleOptionDesc, { color: themeColors.textSecondary }]}>
+                  Academic and objective tone
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -3405,13 +3549,25 @@ export default function PostThreadScreen({ route, navigation }) {
             <TouchableWithoutFeedback>
               <View style={[styles.languagePickerContainer, { backgroundColor: themeColors.card }]}>
                 <View style={styles.languagePickerHeader}>
-                  <Text style={[styles.languagePickerTitle, { color: themeColors.textPrimary }]}>
-                    Translate to
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.languagePickerTitle, { color: themeColors.textPrimary }]}>
+                      Translate to
+                    </Text>
+                    {userProfile?.subscriptionPlan === 'gold' && (
+                      <View style={styles.goldBadgeMini}>
+                        <Text style={styles.goldBadgeMiniText}>GOLD</Text>
+                      </View>
+                    )}
+                  </View>
                   <TouchableOpacity onPress={() => setShowTranslationPicker(false)}>
                     <Ionicons name="close" size={24} color={themeColors.textSecondary} />
                   </TouchableOpacity>
                 </View>
+                {userProfile?.subscriptionPlan === 'gold' && (
+                  <Text style={[styles.goldTranslationHint, { color: themeColors.textSecondary }]}>
+                    ✨ Cultural translation with GPT-4o
+                  </Text>
+                )}
 
                 <ScrollView style={styles.languageList}>
                   {Object.values(LANGUAGES).map((lang) => (
@@ -3648,6 +3804,54 @@ const createStyles = (
     ownerMenuItemIcon: { marginRight: 10 },
     ownerMenuItemText: { fontSize: 14, fontWeight: '600' },
     ownerMenuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 10 },
+
+    /* Style Picker Modal */
+    stylePickerContainer: {
+      position: 'absolute',
+      bottom: 40,
+      left: 20,
+      right: 20,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 10,
+    },
+    stylePickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+      paddingBottom: 12,
+    },
+    stylePickerTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    styleOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    styleOptionIcon: {
+      fontSize: 28,
+      marginRight: 14,
+    },
+    styleOptionContent: {
+      flex: 1,
+    },
+    styleOptionTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    styleOptionDesc: {
+      fontSize: 13,
+      lineHeight: 17,
+    },
 
     /* Comments (wider) */
     commentRow: {
@@ -3910,6 +4114,37 @@ const createStyles = (
     typingText: {
       fontSize: 13,
       color: palette.textSecondary
+    },
+    aiSuggestionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      borderWidth: 2,
+      padding: 12,
+      marginHorizontal: 10,
+      marginBottom: 8,
+      marginTop: 6,
+    },
+    aiSuggestionIcon: {
+      fontSize: 20,
+      marginRight: 10,
+    },
+    aiSuggestionText: {
+      fontSize: 14,
+      fontWeight: '600',
+      flex: 1,
+    },
+    goldBadgeMini: {
+      backgroundColor: '#ffd700',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    goldBadgeMiniText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: '#000',
+      letterSpacing: 0.5,
     },
     composerInner: {
       flexDirection: 'row',
@@ -4221,6 +4456,13 @@ const createStyles = (
     languagePickerTitle: {
       fontSize: 20,
       fontWeight: '700',
+    },
+    goldTranslationHint: {
+      fontSize: 13,
+      marginTop: -8,
+      marginBottom: 12,
+      paddingHorizontal: 20,
+      fontStyle: 'italic',
     },
     languageList: {
       paddingHorizontal: 20,
