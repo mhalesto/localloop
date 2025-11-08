@@ -21,6 +21,7 @@ import {
   validateAndReserveUsername,
 } from '../services/usernameService';
 import { updateUserProfile } from '../services/userProfileService';
+import { uploadProfilePhotoToStorage } from '../services/profilePhotoService';
 
 export default function ProfileSetupScreen({ navigation, route }) {
   const { themeColors, accentPreset, userProfile, updateUserProfile: updateLocalProfile, reloadProfile } = useSettings();
@@ -32,6 +33,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
   const [bio, setBio] = useState(userProfile?.bio || '');
   const [profilePhoto, setProfilePhoto] = useState(userProfile?.profilePhoto || '');
+  const [localPhotoUri, setLocalPhotoUri] = useState(null); // Local URI for preview before upload
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(false);
@@ -107,7 +109,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setProfilePhoto(result.assets[0].uri);
+        // Store local URI for preview, will upload to Firebase Storage when saving
+        setLocalPhotoUri(result.assets[0].uri);
       }
     } catch (error) {
       console.error('[ProfileSetup] Error picking image:', error);
@@ -135,6 +138,14 @@ export default function ProfileSetupScreen({ navigation, route }) {
     setIsSaving(true);
 
     try {
+      // Upload profile photo to Firebase Storage if a new one was selected
+      let photoUrl = profilePhoto; // Keep existing URL if no new photo
+      if (localPhotoUri) {
+        console.log('[ProfileSetup] Uploading new profile photo to Firebase Storage...');
+        photoUrl = await uploadProfilePhotoToStorage(user.uid, localPhotoUri);
+        console.log('[ProfileSetup] Photo uploaded successfully:', photoUrl);
+      }
+
       // Reserve username in Firestore
       await validateAndReserveUsername(username, user.uid, userProfile?.username);
 
@@ -143,7 +154,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
         username: username.toLowerCase(),
         displayName,
         bio: bio || '',
-        profilePhoto: profilePhoto || '',
+        profilePhoto: photoUrl || '',
         isPublicProfile: true,
         country: userProfile?.country || '',
         province: userProfile?.province || '',
@@ -214,8 +225,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
             onPress={pickImage}
             activeOpacity={0.7}
           >
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={styles.photo} />
+            {(localPhotoUri || profilePhoto) ? (
+              <Image source={{ uri: localPhotoUri || profilePhoto }} style={styles.photo} />
             ) : (
               <View style={[styles.photoPlaceholder, { backgroundColor: `${primaryColor}20` }]}>
                 <Ionicons name="person" size={50} color={primaryColor} />
