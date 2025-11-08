@@ -455,7 +455,7 @@ export default function PostThreadScreen({ route, navigation }) {
     premiumTitleFontSize,
     premiumDescriptionFontSize
   } = useSettings();
-  const { user: firebaseUser, profile: userProfile } = useAuth();
+  const { user: firebaseUser } = useAuth();
   const { showAlert } = useAlert();
   const effectiveTitleFontSize =
     premiumTypographyEnabled && premiumTitleFontSizeEnabled
