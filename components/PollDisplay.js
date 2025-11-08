@@ -11,18 +11,35 @@ export default function PollDisplay({
   postAuthorId = null,
   voterProfiles = {}
 }) {
+  if (!poll) {
+    return null;
+  }
   const [showVoterModal, setShowVoterModal] = useState(false);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
   const [resultsPreviewMode, setResultsPreviewMode] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const options = useMemo(() => {
+    if (!Array.isArray(poll?.options)) {
+      return [];
+    }
+    return poll.options.filter(Boolean).map((option, index) => ({
+      ...option,
+      text: typeof option?.text === 'string' ? option.text : `Option ${index + 1}`,
+      voters: Array.isArray(option?.voters) ? option.voters.filter(Boolean) : [],
+      votes: typeof option?.votes === 'number' ? option.votes : (Array.isArray(option?.voters) ? option.voters.length : 0),
+    }));
+  }, [poll?.options]);
+
+  const hasOptions = options.length > 0;
 
   const isExpired = useMemo(() => poll.endsAt < Date.now(), [poll.endsAt]);
   const userVote = useMemo(() => {
     if (!currentUserId) {
       return -1;
     }
-    return poll.options.findIndex((opt) => Array.isArray(opt.voters) && opt.voters.includes(currentUserId));
-  }, [poll.options, currentUserId]);
+    return options.findIndex((opt) => Array.isArray(opt.voters) && opt.voters.includes(currentUserId));
+  }, [options, currentUserId]);
   const hasVoted = userVote >= 0;
   const canVote = Boolean(currentUserId) && !isExpired;
   const isCreator = useMemo(
@@ -31,9 +48,12 @@ export default function PollDisplay({
   );
 
   const { optionEntries, totalVotes } = useMemo(() => {
-    const fallbackTotal = poll.options.reduce((sum, option) => sum + (option.votes || 0), 0);
+    if (!options.length) {
+      return { optionEntries: [], totalVotes: 0 };
+    }
+    const fallbackTotal = options.reduce((sum, option) => sum + (option.votes || 0), 0);
     const nextTotal = typeof poll.totalVotes === 'number' ? poll.totalVotes : fallbackTotal;
-    const entries = poll.options.map((option, index) => {
+    const entries = options.map((option, index) => {
       const votes = option.votes || 0;
       const percent = nextTotal > 0 ? Math.round((votes / nextTotal) * 100) : 0;
       const voters = Array.isArray(option.voters) ? option.voters : [];
@@ -322,7 +342,7 @@ export default function PollDisplay({
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: themeColors.text }]}>
-                Voted for "{selectedOptionIndex !== null ? poll.options[selectedOptionIndex]?.text : ''}"
+                Voted for "{selectedOptionIndex !== null ? options[selectedOptionIndex]?.text : ''}"
               </Text>
               <TouchableOpacity onPress={() => setShowVoterModal(false)}>
                 <Ionicons name="close" size={24} color={themeColors.textSecondary} />
