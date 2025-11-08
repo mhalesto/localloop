@@ -21,6 +21,7 @@ import { useAlert } from '../contexts/AlertContext';
 import { getAvatarConfig } from '../constants/avatars';
 import ShareLocationModal from '../components/ShareLocationModal';
 import PollComposer from '../components/PollComposer';
+import SmartComposerModal from '../components/SmartComposerModal';
 import useHaptics from '../hooks/useHaptics';
 import {
   EMAIL_ADDRESS_REGEX,
@@ -57,8 +58,11 @@ export default function PostComposerScreen({ navigation, route }) {
   const [pollData, setPollData] = useState(null);
   const [pollModalVisible, setPollModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSmartComposer, setShowSmartComposer] = useState(false);
 
   const messageInputRef = useRef(null);
+
+  const isGold = userProfile?.subscriptionPlan === 'gold';
 
   const selectedPreset = useMemo(
     () => accentPresets.find((preset) => preset.key === selectedColor) ?? accentPresets[0],
@@ -122,6 +126,20 @@ export default function PostComposerScreen({ navigation, route }) {
   const handlePollCreate = (poll) => {
     setPollData(poll);
     setPollModalVisible(false);
+  };
+
+  const handleUseAIPost = (content, hashtags) => {
+    // Populate post from AI composer
+    setMessage(content);
+
+    // Add hashtags to message if provided
+    if (hashtags && hashtags.length > 0) {
+      const hashtagText = hashtags.map(tag => `#${tag}`).join(' ');
+      setMessage(prev => `${prev}\n\n${hashtagText}`);
+    }
+
+    setShowSmartComposer(false);
+    showAlert('Success', 'Post populated with AI content!', [{ text: 'OK' }]);
   };
 
   const handleSubmit = async () => {
@@ -359,6 +377,27 @@ export default function PostComposerScreen({ navigation, route }) {
           <Text style={[styles.helperText, { color: themeColors.textSecondary }]}>Select a city to post into.</Text>
         )}
 
+        {/* AI Post Composer - Gold Feature */}
+        {isGold && (
+          <>
+            <Text style={[styles.sectionLabel, { marginTop: 18, color: themeColors.textPrimary }]}>AI Assistant</Text>
+            <TouchableOpacity
+              style={[styles.aiComposerButton, { backgroundColor: themeColors.primaryDark }]}
+              onPress={() => setShowSmartComposer(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.aiComposerIcon}>✨</Text>
+              <Text style={styles.aiComposerText}>AI Post Composer</Text>
+              <View style={styles.goldBadge}>
+                <Text style={styles.goldBadgeText}>GOLD</Text>
+              </View>
+            </TouchableOpacity>
+            <Text style={[styles.helperText, { color: themeColors.textSecondary }]}>
+              Let GPT-4o help you write engaging posts
+            </Text>
+          </>
+        )}
+
         {/* Card Style */}
         <Text style={[styles.sectionLabel, { marginTop: 18, color: themeColors.textPrimary }]}>Card style</Text>
         <ScrollView
@@ -572,6 +611,13 @@ export default function PostComposerScreen({ navigation, route }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Smart Composer Modal - Gold Feature */}
+      <SmartComposerModal
+        visible={showSmartComposer}
+        onClose={() => setShowSmartComposer(false)}
+        onUsePost={handleUseAIPost}
+      />
       </View>
     </KeyboardAvoidingView>
   );
@@ -822,5 +868,35 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  aiComposerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  aiComposerIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  aiComposerText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  goldBadge: {
+    backgroundColor: '#ffd700',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  goldBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#000',
+    letterSpacing: 0.5,
   },
 });

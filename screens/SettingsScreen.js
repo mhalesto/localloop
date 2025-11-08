@@ -872,7 +872,8 @@ export default function SettingsScreen({ navigation }) {
         userProfile.profilePhoto,
         styleId,
         userProfile.gender || 'neutral',
-        customPrompt // Pass custom prompt for Gold users
+        customPrompt, // Pass custom prompt for Gold users
+        userProfile?.subscriptionPlan || 'basic' // Pass subscription plan for Vision analysis
       );
 
       // Upload to Firebase Storage
@@ -2087,6 +2088,22 @@ export default function SettingsScreen({ navigation }) {
                 : `${userProfile?.subscriptionPlan || 'Premium'}: ${cartoonUsageData?.monthlyUsage || 0}/2 used this month`
               }
             </Text>
+
+            {/* Gold Enhancement Indicator */}
+            {userProfile?.subscriptionPlan === 'gold' && (
+              <View style={[styles.goldFeatureInfo, { backgroundColor: themeColors.card, borderColor: '#ffd700' }]}>
+                <Text style={styles.goldFeatureIcon}>✨</Text>
+                <View style={styles.goldFeatureContent}>
+                  <Text style={[styles.goldFeatureTitle, { color: themeColors.textPrimary }]}>
+                    Gold Enhancement Active
+                  </Text>
+                  <Text style={[styles.goldFeatureDesc, { color: themeColors.textSecondary }]}>
+                    Your cartoons will be personalized using GPT-4o Vision analysis + HD quality (1024x1024)
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.cartoonButtonRow}>
               <TouchableOpacity
                 style={[styles.cartoonButton, { borderColor: accentSwitchColor, flex: 1 }]}
@@ -3019,5 +3036,30 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     onboardingTextBlock: {
       flex: 1
-    }
+    },
+    goldFeatureInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      borderWidth: 2,
+      padding: 16,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    goldFeatureIcon: {
+      fontSize: 32,
+      marginRight: 12,
+    },
+    goldFeatureContent: {
+      flex: 1,
+    },
+    goldFeatureTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    goldFeatureDesc: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
   });
