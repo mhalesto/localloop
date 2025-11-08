@@ -571,22 +571,235 @@
         </main>
     </div>
 
-    <script>
-        // This will be loaded from external file
-        // Placeholder for demo
-        document.getElementById('userEmail').textContent = 'currenttech.co.za@gmail.com';
-        
-        // Initialize charts
-        function initCharts() {
-            // User Growth Chart
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+        import { getFirestore, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+            authDomain: "share-your-story-1.firebaseapp.com",
+            projectId: "share-your-story-1",
+            storageBucket: "share-your-story-1.firebasestorage.app",
+            messagingSenderId: "673056432219",
+            appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
+            measurementId: "G-75VDYJHL88"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+        const db = getFirestore(app);
+
+        // Global variables
+        let charts = {};
+        let currentFilters = {
+            country: 'all',
+            province: 'all',
+            city: 'all',
+            timeRange: '30'
+        };
+
+        // Check authentication
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('userEmail').textContent = user.email;
+                loadDashboardData();
+            } else {
+                window.location.href = 'admin.html';
+            }
+        });
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                // Call Cloud Functions
+                const getAdminAnalytics = httpsCallable(functions, 'getAdminAnalytics');
+                const getGeographicStats = httpsCallable(functions, 'getGeographicStats');
+
+                // Get analytics
+                const analyticsResult = await getAdminAnalytics();
+                const analytics = analyticsResult.data;
+
+                // Get geographic stats
+                const geoResult = await getGeographicStats({
+                    country: currentFilters.country !== 'all' ? currentFilters.country : null,
+                    province: currentFilters.province !== 'all' ? currentFilters.province : null,
+                    timeRange: currentFilters.timeRange
+                });
+                const geoStats = geoResult.data;
+
+                // Update stats cards
+                updateStatsCards(analytics, geoStats);
+
+                // Update charts
+                updateCharts(analytics);
+
+                // Update tables
+                updateTopCitiesTable(geoStats.topCities);
+                await updateRecentUsersTable();
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                alert('Error loading dashboard: ' + error.message);
+            }
+        }
+
+        function updateStatsCards(analytics, geoStats) {
+            document.getElementById('totalUsers').textContent = analytics.totalUsers.toLocaleString();
+            document.getElementById('activeUsers').textContent = analytics.activeUsers.toLocaleString();
+            document.getElementById('totalPosts').textContent = analytics.totalPosts.toLocaleString();
+            document.getElementById('revenue').textContent = 'R' + Math.round(analytics.monthlyRevenue).toLocaleString();
+            document.getElementById('premiumUsers').textContent = analytics.premiumUsers.toLocaleString();
+            document.getElementById('goldUsers').textContent = analytics.goldUsers.toLocaleString();
+            document.getElementById('pendingReports').textContent = analytics.pendingReports.toLocaleString();
+            document.getElementById('engagement').textContent = analytics.engagement + '%';
+        }
+
+        function updateTopCitiesTable(cities) {
+            const tbody = document.getElementById('topCitiesTable');
+            if (!cities || cities.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No data available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = cities.map((city, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${city.city}</strong></td>
+                    <td>${city.province}</td>
+                    <td>${city.country}</td>
+                    <td>${city.count}</td>
+                    <td>${city.active}</td>
+                    <td style="color: #10b981">+${Math.round((city.active / city.count) * 100)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        async function updateRecentUsersTable() {
+            try {
+                const usersQuery = query(
+                    collection(db, 'users'),
+                    orderBy('createdAt', 'desc'),
+                    limit(10)
+                );
+                const snapshot = await getDocs(usersQuery);
+
+                const tbody = document.getElementById('recentUsersTable');
+                if (snapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No users found</td></tr>';
+                    return;
+                }
+
+                const users = [];
+                snapshot.forEach(doc => {
+                    users.push({ id: doc.id, ...doc.data() });
+                });
+
+                tbody.innerHTML = users.map(user => {
+                    const plan = user.subscriptionPlan || 'basic';
+                    const badgeClass = plan === 'gold' ? 'gold' : plan === 'premium' ? 'premium' : 'basic';
+                    const location = user.city ? `${user.city}, ${user.province || user.country}` : (user.province || user.country || 'Not set');
+                    const lastActive = user.lastActive ? new Date(user.lastActive.toDate()).toLocaleDateString() : 'Never';
+                    const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+
+                    return `
+                        <tr>
+                            <td><strong>${user.displayName || 'Anonymous'}</strong></td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${location}</td>
+                            <td><span class="badge ${badgeClass}">${plan.toUpperCase()}</span></td>
+                            <td>${joined}</td>
+                            <td>${lastActive}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function updateCharts(analytics) {
+            initCharts(analytics);
+        }
+
+        // Make functions globally available
+        window.loadDashboardData = loadDashboardData;
+        window.refreshData = loadDashboardData;
+
+        window.logout = async () => {
+            if (confirm('Are you sure you want to logout?')) {
+                await signOut(auth);
+                window.location.href = 'admin.html';
+            }
+        };
+
+        window.applyFilters = () => {
+            currentFilters.country = document.getElementById('countryFilter').value;
+            currentFilters.province = document.getElementById('provinceFilter').value;
+            currentFilters.city = document.getElementById('cityFilter').value;
+            currentFilters.timeRange = document.getElementById('timeRangeFilter').value;
+            loadDashboardData();
+        };
+
+        window.updateProvinces = () => {
+            const country = document.getElementById('countryFilter').value;
+            currentFilters.country = country;
+            currentFilters.province = 'all';
+            currentFilters.city = 'all';
+
+            document.getElementById('provinceFilter').value = 'all';
+            document.getElementById('cityFilter').value = 'all';
+
+            loadDashboardData();
+        };
+
+        window.updateCities = () => {
+            const province = document.getElementById('provinceFilter').value;
+            currentFilters.province = province;
+            currentFilters.city = 'all';
+
+            document.getElementById('cityFilter').value = 'all';
+
+            loadDashboardData();
+        };
+
+        // Initialize charts with real data
+        function initCharts(analytics) {
+            if (!analytics) {
+                analytics = {
+                    userGrowth: [0, 0, 0, 0, 0],
+                    totalUsers: 0,
+                    premiumUsers: 0,
+                    goldUsers: 0,
+                    hourlyActivity: Array(6).fill(0),
+                    revenueGrowth: [0, 0, 0, 0, 0, 0]
+                };
+            }
+
+            const basicUsers = analytics.totalUsers - analytics.premiumUsers - analytics.goldUsers;
+
+            // Generate labels for 30-day user growth chart
+            const userGrowthLabels = [];
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                userGrowthLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+
+            // User Growth Chart - Use real data
             const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
             new Chart(userGrowthCtx, {
                 type: 'line',
                 data: {
-                    labels: ['Day 1', 'Day 7', 'Day 14', 'Day 21', 'Day 30'],
+                    labels: userGrowthLabels,
                     datasets: [{
                         label: 'Users',
-                        data: [120, 245, 387, 512, 678],
+                        data: analytics.userGrowth,
                         borderColor: '#6C4DF4',
                         backgroundColor: 'rgba(108, 77, 244, 0.1)',
                         tension: 0.4
@@ -595,18 +808,23 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
                 }
             });
 
-            // Subscription Chart
+            // Subscription Chart - Use real data
             const subCtx = document.getElementById('subscriptionChart').getContext('2d');
             new Chart(subCtx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Basic', 'Premium', 'Gold'],
                     datasets: [{
-                        data: [65, 25, 10],
+                        data: [basicUsers, analytics.premiumUsers, analytics.goldUsers],
                         backgroundColor: ['#e5e7eb', '#a78bfa', '#fbbf24']
                     }]
                 },
@@ -616,34 +834,51 @@
                 }
             });
 
-            // Activity Chart
+            // Activity Chart - Use real 24-hour data
+            const hourLabels = [];
+            for (let i = 0; i < 24; i++) {
+                hourLabels.push(`${i}:00`);
+            }
+
             const activityCtx = document.getElementById('activityChart').getContext('2d');
             new Chart(activityCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['6am', '9am', '12pm', '3pm', '6pm', '9pm'],
+                    labels: hourLabels,
                     datasets: [{
                         label: 'Posts',
-                        data: [45, 125, 230, 180, 290, 310],
+                        data: analytics.hourlyActivity,
                         backgroundColor: '#10b981'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
                 }
             });
 
-            // Revenue Chart
+            // Revenue Chart - Use real 6-month data
+            const revenueLabels = [];
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                revenueLabels.push(date.toLocaleDateString('en-US', { month: 'short' }));
+            }
+
             const revenueCtx = document.getElementById('revenueChart').getContext('2d');
             new Chart(revenueCtx, {
                 type: 'line',
                 data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    labels: revenueLabels,
                     datasets: [{
                         label: 'Revenue',
-                        data: [15000, 23000, 32000, 41000, 52000, 67000],
+                        data: analytics.revenueGrowth,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         tension: 0.4,
@@ -653,7 +888,17 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
                 }
             });
         }
