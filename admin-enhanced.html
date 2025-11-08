@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLoop Admin - Enhanced Dashboard</title>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module" src="./admin-enhanced.js" defer></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6C4DF4;
+            --primary-dark: #5038c5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1a1a2e;
+            --sidebar-bg: #1e293b;
+            --bg: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: #334155;
+        }
+
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-bg);
+            color: white;
+            padding: 1.5rem;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo img {
+            width: 40px;
+            height: 40px;
+        }
+
+        .logo h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+        }
+
+        .nav-item i {
+            width: 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-bar h1 {
+            font-size: 1.75rem;
+            color: var(--dark);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Geographic Filters */
+        .geo-filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .geo-filters h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        select, input {
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-icon.purple { background: #ede9fe; color: var(--primary); }
+        .stat-icon.green { background: #d1fae5; color: var(--success); }
+        .stat-icon.orange { background: #fed7aa; color: var(--warning); }
+        .stat-icon.red { background: #fee2e2; color: var(--danger); }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .stat-change {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .stat-change.positive {
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            color: var(--danger);
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+            font-size: 1.1rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Tables */
+        .table-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .table-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8fafc;
+        }
+
+        th {
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge.gold { background: #fef3c7; color: #92400e; }
+        .badge.premium { background: #ddd6fe; color: #5b21b6; }
+        .badge.basic { background: #e5e7eb; color: #374151; }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="logo.png" alt="LocalLoop">
+                <h2>LocalLoop Admin</h2>
+            </div>
+            
+            <nav>
+                <div class="nav-item active" data-page="overview">
+                    <i>📊</i>
+                    <span>Overview</span>
+                </div>
+                <div class="nav-item" data-page="users">
+                    <i>👥</i>
+                    <span>Users</span>
+                </div>
+                <div class="nav-item" data-page="posts">
+                    <i>📝</i>
+                    <span>Posts</span>
+                </div>
+                <div class="nav-item" data-page="geography">
+                    <i>🌍</i>
+                    <span>Geography</span>
+                </div>
+                <div class="nav-item" data-page="revenue">
+                    <i>💰</i>
+                    <span>Revenue</span>
+                </div>
+                <div class="nav-item" data-page="reports">
+                    <i>⚠️</i>
+                    <span>Reports</span>
+                </div>
+                <div class="nav-item" data-page="analytics">
+                    <i>📈</i>
+                    <span>Analytics</span>
+                </div>
+                <div class="nav-item" data-page="settings">
+                    <i>⚙️</i>
+                    <span>Settings</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <h1>Dashboard Overview</h1>
+                <div class="user-info">
+                    <span id="userEmail">Loading...</span>
+                    <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                    <button class="btn btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Geographic Filters -->
+            <div class="geo-filters">
+                <h3>🌍 Geographic Filters</h3>
+                <div class="filter-row">
+                    <select id="countryFilter" onchange="updateProvinces()">
+                        <option value="all">All Countries</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="US">United States</option>
+                        <option value="GB">United Kingdom</option>
+                        <option value="NG">Nigeria</option>
+                        <option value="KE">Kenya</option>
+                    </select>
+                    
+                    <select id="provinceFilter" onchange="updateCities()">
+                        <option value="all">All Provinces/States</option>
+                    </select>
+                    
+                    <select id="cityFilter" onchange="applyFilters()">
+                        <option value="all">All Cities</option>
+                    </select>
+
+                    <select id="timeRangeFilter" onchange="applyFilters()">
+                        <option value="7">Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="365">Last Year</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Total Users</span>
+                        <div class="stat-icon purple">👥</div>
+                    </div>
+                    <div class="stat-value" id="totalUsers">0</div>
+                    <div class="stat-change positive" id="usersChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Active Users (30d)</span>
+                        <div class="stat-icon green">✅</div>
+                    </div>
+                    <div class="stat-value" id="activeUsers">0</div>
+                    <div class="stat-change positive" id="activeChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Total Posts</span>
+                        <div class="stat-icon orange">📝</div>
+                    </div>
+                    <div class="stat-value" id="totalPosts">0</div>
+                    <div class="stat-change positive" id="postsChange">+0% from last week</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Monthly Revenue</span>
+                        <div class="stat-icon green">💰</div>
+                    </div>
+                    <div class="stat-value" id="revenue">R0</div>
+                    <div class="stat-change positive" id="revenueChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Premium Users</span>
+                        <div class="stat-icon purple">⭐</div>
+                    </div>
+                    <div class="stat-value" id="premiumUsers">0</div>
+                    <div class="stat-change positive" id="premiumChange">+0% conversion</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Gold Users</span>
+                        <div class="stat-icon orange">👑</div>
+                    </div>
+                    <div class="stat-value" id="goldUsers">0</div>
+                    <div class="stat-change positive" id="goldChange">+0% conversion</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Reports (Pending)</span>
+                        <div class="stat-icon red">⚠️</div>
+                    </div>
+                    <div class="stat-value" id="pendingReports">0</div>
+                    <div class="stat-change" id="reportsChange">Needs attention</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Avg. Engagement</span>
+                        <div class="stat-icon green">📊</div>
+                    </div>
+                    <div class="stat-value" id="engagement">0%</div>
+                    <div class="stat-change positive" id="engagementChange">+0% from last week</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>User Growth (Last 30 Days)</h3>
+                    <div class="chart-container">
+                        <canvas id="userGrowthChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Subscription Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="subscriptionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Post Activity by Hour</h3>
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Revenue Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Cities Table -->
+            <div class="table-card">
+                <h3>🏙️ Top Cities by Users</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>City</th>
+                            <th>Province/State</th>
+                            <th>Country</th>
+                            <th>Users</th>
+                            <th>Active (30d)</th>
+                            <th>Growth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topCitiesTable">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Recent Users Table -->
+            <div class="table-card">
+                <h3>👥 Recent Users</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Location</th>
+                            <th>Plan</th>
+                            <th>Joined</th>
+                            <th>Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentUsersTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 2rem;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // This will be loaded from external file
+        // Placeholder for demo
+        document.getElementById('userEmail').textContent = 'currenttech.co.za@gmail.com';
+        
+        // Initialize charts
+        function initCharts() {
+            // User Growth Chart
+            const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+            new Chart(userGrowthCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Day 1', 'Day 7', 'Day 14', 'Day 21', 'Day 30'],
+                    datasets: [{
+                        label: 'Users',
+                        data: [120, 245, 387, 512, 678],
+                        borderColor: '#6C4DF4',
+                        backgroundColor: 'rgba(108, 77, 244, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Subscription Chart
+            const subCtx = document.getElementById('subscriptionChart').getContext('2d');
+            new Chart(subCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Basic', 'Premium', 'Gold'],
+                    datasets: [{
+                        data: [65, 25, 10],
+                        backgroundColor: ['#e5e7eb', '#a78bfa', '#fbbf24']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Activity Chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            new Chart(activityCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['6am', '9am', '12pm', '3pm', '6pm', '9pm'],
+                    datasets: [{
+                        label: 'Posts',
+                        data: [45, 125, 230, 180, 290, 310],
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Revenue',
+                        data: [15000, 23000, 32000, 41000, 52000, 67000],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('load', initCharts);
+
+        function refreshData() {
+            alert('Refreshing dashboard data...');
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = 'admin.html';
+            }
+        }
+
+        function updateProvinces() {
+            // Update provinces based on selected country
+            console.log('Updating provinces...');
+        }
+
+        function updateCities() {
+            // Update cities based on selected province
+            console.log('Updating cities...');
+        }
+
+        function applyFilters() {
+            // Apply all filters and refresh data
+            console.log('Applying filters...');
+        }
+    </script>
+</body>
+</html>
