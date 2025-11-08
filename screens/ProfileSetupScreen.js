@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
@@ -34,10 +36,47 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [bio, setBio] = useState(userProfile?.bio || '');
   const [profilePhoto, setProfilePhoto] = useState(userProfile?.profilePhoto || '');
   const [localPhotoUri, setLocalPhotoUri] = useState(null); // Local URI for preview before upload
+  const [country, setCountry] = useState(userProfile?.country || '');
+  const [province, setProvince] = useState(userProfile?.province || '');
+  const [city, setCity] = useState(userProfile?.city || '');
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Location data
+  const countries = {
+    'ZA': 'South Africa',
+    'US': 'United States',
+    'GB': 'United Kingdom',
+    'NG': 'Nigeria',
+    'KE': 'Kenya',
+  };
+
+  const provinces = {
+    'ZA': ['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Free State', 'Limpopo', 'Mpumalanga', 'Northern Cape', 'North West'],
+    'US': ['California', 'Texas', 'Florida', 'New York', 'Pennsylvania', 'Illinois', 'Ohio', 'Georgia', 'North Carolina', 'Michigan'],
+    'GB': ['England', 'Scotland', 'Wales', 'Northern Ireland'],
+    'NG': ['Lagos', 'Kano', 'Rivers', 'Oyo', 'Kaduna', 'Abuja'],
+    'KE': ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret'],
+  };
+
+  const getAvailableProvinces = () => {
+    return country ? (provinces[country] || []) : [];
+  };
+
+  // Reset province and city when country changes
+  const handleCountryChange = (value) => {
+    setCountry(value);
+    setProvince('');
+    setCity('');
+  };
+
+  // Reset city when province changes
+  const handleProvinceChange = (value) => {
+    setProvince(value);
+    setCity('');
+  };
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
@@ -156,9 +195,10 @@ export default function ProfileSetupScreen({ navigation, route }) {
         bio: bio || '',
         profilePhoto: photoUrl || '',
         isPublicProfile: true,
-        country: userProfile?.country || '',
-        province: userProfile?.province || '',
-        city: userProfile?.city || '',
+        country: country || '',
+        province: province || '',
+        city: city || '',
+        countryName: country ? countries[country] : '',
         followersCount: userProfile?.followersCount || 0,
         followingCount: userProfile?.followingCount || 0,
         publicPostsCount: userProfile?.publicPostsCount || 0,
@@ -338,6 +378,102 @@ export default function ProfileSetupScreen({ navigation, route }) {
             maxLength={150}
             textAlignVertical="top"
           />
+        </View>
+
+        {/* Location Section */}
+        <View style={styles.locationSection}>
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+            📍 Location (Optional)
+          </Text>
+          <Text style={[styles.sectionHint, { color: themeColors.textSecondary }]}>
+            Help neighbors find you and improve local recommendations
+          </Text>
+
+          {/* Country */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Country</Text>
+            <View
+              style={[
+                styles.pickerContainer,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+            >
+              <Picker
+                selectedValue={country}
+                onValueChange={handleCountryChange}
+                style={[
+                  styles.picker,
+                  { color: themeColors.textPrimary },
+                  Platform.OS === 'ios' && { height: 150 },
+                ]}
+                itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary } : undefined}
+              >
+                <Picker.Item label="Select your country..." value="" />
+                {Object.entries(countries).map(([code, name]) => (
+                  <Picker.Item key={code} label={name} value={code} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+
+          {/* Province/State */}
+          {country && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                {country === 'US' ? 'State' : country === 'ZA' ? 'Province' : 'Region'}
+              </Text>
+              <View
+                style={[
+                  styles.pickerContainer,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.divider,
+                  },
+                ]}
+              >
+                <Picker
+                  selectedValue={province}
+                  onValueChange={handleProvinceChange}
+                  style={[
+                    styles.picker,
+                    { color: themeColors.textPrimary },
+                    Platform.OS === 'ios' && { height: 150 },
+                  ]}
+                  itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary } : undefined}
+                >
+                  <Picker.Item label={`Select your ${country === 'US' ? 'state' : 'province'}...`} value="" />
+                  {getAvailableProvinces().map((prov) => (
+                    <Picker.Item key={prov} label={prov} value={prov} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          )}
+
+          {/* City */}
+          {province && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: themeColors.textPrimary }]}>City</Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: themeColors.background,
+                    color: themeColors.textPrimary,
+                    borderColor: themeColors.divider,
+                  },
+                ]}
+                placeholder="Enter your city..."
+                placeholderTextColor={themeColors.textSecondary}
+                value={city}
+                onChangeText={setCity}
+                maxLength={50}
+              />
+            </View>
+          )}
         </View>
 
         {/* Privacy Info */}
@@ -530,5 +666,27 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  locationSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  sectionHint: {
+    fontSize: 14,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  picker: {
+    height: 50,
   },
 });
