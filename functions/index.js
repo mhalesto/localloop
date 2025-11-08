@@ -1543,3 +1543,59 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
+
+// ====================================
+// ADMIN CLAIM SETUP
+// ====================================
+
+/**
+ * Set admin custom claim for a user
+ * Use this function to grant admin access to the dashboard
+ *
+ * Usage:
+ * - Call this function with the user's email
+ * - The function will find the user and set admin custom claim
+ *
+ * Security: This should be called manually or with proper authentication
+ */
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+  try {
+    const {email, secretKey} = data;
+
+    // Simple security check - you can change this secret key
+    const ADMIN_SECRET = 'localloop-admin-setup-2025';
+
+    if (secretKey !== ADMIN_SECRET) {
+      throw new functions.https.HttpsError(
+          'permission-denied',
+          'Invalid secret key'
+      );
+    }
+
+    if (!email) {
+      throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Email is required'
+      );
+    }
+
+    // Get user by email
+    const userRecord = await admin.auth().getUserByEmail(email);
+
+    // Set admin custom claim
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      admin: true,
+    });
+
+    console.log(`[setAdminClaim] Admin claim set for user: ${email} (${userRecord.uid})`);
+
+    return {
+      success: true,
+      message: `Admin access granted to ${email}`,
+      uid: userRecord.uid,
+    };
+  } catch (error) {
+    console.error('[setAdminClaim] Error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
