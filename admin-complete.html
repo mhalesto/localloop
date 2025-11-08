@@ -18,224 +18,6 @@
             box-sizing: border-box;
         }
 
-        function buildUserGrowthModal(analytics, state) {
-            const days = Number(state.range || 30);
-            const base = analytics.userGrowth || [];
-            const scaledData = scaleArray(base, days);
-            const labels = buildDateLabels(days);
-            const style = state.style === 'area' ? 'line' : (state.style || 'line');
-
-            return {
-                type: style,
-                labels,
-                datasets: [{
-                    label: 'Total users',
-                    data: scaledData,
-                    borderColor: '#6C4DF4',
-                    backgroundColor: 'rgba(108, 77, 244,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
-                    fill: state.style === 'area',
-                    tension: 0.4,
-                    pointRadius: 3
-                }],
-                options: buildCartesianOptions({
-                    formatter: (value) => `${value.toLocaleString()} users`
-                })
-            };
-        }
-
-        function buildSubscriptionModal(analytics, state) {
-            const basicUsers = Math.max(analytics.totalUsers - analytics.premiumUsers - analytics.goldUsers, 0);
-
-            return {
-                type: 'doughnut',
-                labels: ['Basic', 'Premium', 'Gold'],
-                datasets: [{
-                    data: [basicUsers, analytics.premiumUsers, analytics.goldUsers],
-                    backgroundColor: ['#e2e8f0', '#a78bfa', '#fbbf24'],
-                    borderWidth: 2,
-                    hoverOffset: 12
-                }],
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    },
-                    cutout: '55%'
-                },
-                is3D: state.style === 'donut-3d'
-            };
-        }
-
-        function buildActivityModal(analytics, state) {
-            const buckets = Number(state.range || 24);
-            const { data, labels } = aggregateActivityData(analytics.hourlyActivity || [], buckets);
-            const style = state.style === 'area' ? 'line' : (state.style || 'bar');
-
-            return {
-                type: style,
-                labels,
-                datasets: [{
-                    label: 'Posts',
-                    data,
-                    borderColor: '#10b981',
-                    backgroundColor: state.style === 'bar' ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)',
-                    fill: state.style === 'area',
-                    tension: 0.4
-                }],
-                options: buildCartesianOptions({
-                    formatter: (value) => `${value} posts`
-                })
-            };
-        }
-
-        function buildRevenueModal(analytics, state) {
-            const months = Number(state.range || 6);
-            const data = extendRevenueData(analytics.revenueGrowth || [], months);
-            const labels = buildMonthLabels(months);
-            const style = state.style === 'area' ? 'line' : (state.style || 'line');
-
-            return {
-                type: style,
-                labels,
-                datasets: [{
-                    label: 'Revenue',
-                    data,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
-                    fill: state.style === 'area',
-                    tension: 0.4,
-                    borderWidth: 3
-                }],
-                options: buildCartesianOptions({
-                    formatter: (value) => 'R' + Number(value).toLocaleString()
-                })
-            };
-        }
-
-        function buildCartesianOptions({ formatter }) {
-            return {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => {
-                                const raw = context.parsed.y ?? context.parsed;
-                                if (formatter) {
-                                    return `${context.dataset.label}: ${formatter(raw)}`;
-                                }
-                                return `${context.dataset.label}: ${raw}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#e2e8f0' },
-                        ticks: {
-                            callback: (value) => formatter ? formatter(value) : value
-                        }
-                    }
-                }
-            };
-        }
-
-        function scaleArray(base, targetLength) {
-            if (!targetLength) {
-                return [...base];
-            }
-            if (!base.length) {
-                return new Array(targetLength).fill(0);
-            }
-            if (base.length === targetLength) {
-                return [...base];
-            }
-
-            const scaled = [];
-            for (let i = 0; i < targetLength; i++) {
-                const index = Math.floor(i * base.length / targetLength);
-                scaled.push(base[Math.min(index, base.length - 1)]);
-            }
-            return scaled;
-        }
-
-        function buildDateLabels(days) {
-            const labels = [];
-            const today = new Date();
-            for (let i = days - 1; i >= 0; i--) {
-                const date = new Date(today);
-                date.setDate(date.getDate() - i);
-                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-            }
-            return labels;
-        }
-
-        function buildMonthLabels(monthCount) {
-            const labels = [];
-            const tracker = new Date();
-            tracker.setMonth(tracker.getMonth() - (monthCount - 1));
-            for (let i = 0; i < monthCount; i++) {
-                labels.push(tracker.toLocaleDateString('en-US', { month: 'short' }));
-                tracker.setMonth(tracker.getMonth() + 1);
-            }
-            return labels;
-        }
-
-        function extendRevenueData(base, months) {
-            const data = [...base];
-            if (!data.length) {
-                data.push(0);
-            }
-            while (data.length < months) {
-                const last = data[data.length - 1];
-                const projectedGrowth = Math.max(last * 0.08, 15);
-                data.push(Math.round(last + projectedGrowth));
-            }
-
-            if (data.length > months) {
-                return data.slice(data.length - months);
-            }
-            return data;
-        }
-
-        function aggregateActivityData(base, targetBuckets) {
-            if (!base.length) {
-                return { data: new Array(targetBuckets).fill(0), labels: [] };
-            }
-            const bucketSize = Math.ceil(base.length / targetBuckets);
-            const aggregates = [];
-            const labels = [];
-
-            for (let i = 0; i < targetBuckets; i++) {
-                const start = i * bucketSize;
-                const end = Math.min(start + bucketSize, base.length);
-                if (start >= base.length) {
-                    break;
-                }
-                const slice = base.slice(start, end);
-                const sum = slice.reduce((acc, value) => acc + value, 0);
-                const avg = slice.length ? sum / slice.length : 0;
-                aggregates.push(Number(avg.toFixed(2)));
-                labels.push(`${padHour(start)}-${padHour(end)}`);
-            }
-
-            return { data: aggregates, labels };
-        }
-
-        function padHour(hour) {
-            if (hour >= 24) {
-                return '24:00';
-            }
-            const normalized = hour % 24;
-            return `${String(normalized).padStart(2, '0')}:00`;
-        }
-
         :root {
             --primary: #6C4DF4;
             --primary-dark: #5038c5;
@@ -2437,6 +2219,224 @@
                     }
                 }
             });
+        }
+
+        function buildUserGrowthModal(analytics, state) {
+            const days = Number(state.range || 30);
+            const base = analytics.userGrowth || [];
+            const scaledData = scaleArray(base, days);
+            const labels = buildDateLabels(days);
+            const style = state.style === 'area' ? 'line' : (state.style || 'line');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Total users',
+                    data: scaledData,
+                    borderColor: '#6C4DF4',
+                    backgroundColor: 'rgba(108, 77, 244,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
+                    fill: state.style === 'area',
+                    tension: 0.4,
+                    pointRadius: 3
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => `${value.toLocaleString()} users`
+                })
+            };
+        }
+
+        function buildSubscriptionModal(analytics, state) {
+            const basicUsers = Math.max(analytics.totalUsers - analytics.premiumUsers - analytics.goldUsers, 0);
+
+            return {
+                type: 'doughnut',
+                labels: ['Basic', 'Premium', 'Gold'],
+                datasets: [{
+                    data: [basicUsers, analytics.premiumUsers, analytics.goldUsers],
+                    backgroundColor: ['#e5e7eb', '#a78bfa', '#fbbf24'],
+                    borderWidth: 2,
+                    hoverOffset: 12
+                }],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    cutout: '55%'
+                },
+                is3D: state.style === 'donut-3d'
+            };
+        }
+
+        function buildActivityModal(analytics, state) {
+            const buckets = Number(state.range || 24);
+            const { data, labels } = aggregateActivityData(analytics.hourlyActivity || [], buckets);
+            const style = state.style === 'area' ? 'line' : (state.style || 'bar');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Posts',
+                    data,
+                    borderColor: '#10b981',
+                    backgroundColor: state.style === 'bar' ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)',
+                    fill: state.style === 'area',
+                    tension: 0.4
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => `${value} posts`
+                })
+            };
+        }
+
+        function buildRevenueModal(analytics, state) {
+            const months = Number(state.range || 6);
+            const data = extendRevenueData(analytics.revenueGrowth || [], months);
+            const labels = buildMonthLabels(months);
+            const style = state.style === 'area' ? 'line' : (state.style || 'line');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Revenue',
+                    data,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
+                    fill: state.style === 'area',
+                    tension: 0.4,
+                    borderWidth: 3
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => 'R' + Number(value).toLocaleString()
+                })
+            };
+        }
+
+        function buildCartesianOptions({ formatter }) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const raw = context.parsed.y ?? context.parsed;
+                                if (formatter) {
+                                    return `${context.dataset.label}: ${formatter(raw)}`;
+                                }
+                                return `${context.dataset.label}: ${raw}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e2e8f0' },
+                        ticks: {
+                            callback: (value) => formatter ? formatter(value) : value
+                        }
+                    }
+                }
+            };
+        }
+
+        function scaleArray(base, targetLength) {
+            if (!targetLength) {
+                return [...base];
+            }
+            if (!base.length) {
+                return new Array(targetLength).fill(0);
+            }
+            if (base.length === targetLength) {
+                return [...base];
+            }
+
+            const scaled = [];
+            for (let i = 0; i < targetLength; i++) {
+                const index = Math.floor(i * base.length / targetLength);
+                scaled.push(base[Math.min(index, base.length - 1)]);
+            }
+            return scaled;
+        }
+
+        function buildDateLabels(days) {
+            const labels = [];
+            const today = new Date();
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+            return labels;
+        }
+
+        function buildMonthLabels(monthCount) {
+            const labels = [];
+            const tracker = new Date();
+            tracker.setMonth(tracker.getMonth() - (monthCount - 1));
+            for (let i = 0; i < monthCount; i++) {
+                labels.push(tracker.toLocaleDateString('en-US', { month: 'short' }));
+                tracker.setMonth(tracker.getMonth() + 1);
+            }
+            return labels;
+        }
+
+        function extendRevenueData(base, months) {
+            const data = [...base];
+            if (!data.length) {
+                data.push(0);
+            }
+            while (data.length < months) {
+                const last = data[data.length - 1];
+                const projectedGrowth = Math.max(last * 0.08, 15);
+                data.push(Math.round(last + projectedGrowth));
+            }
+
+            if (data.length > months) {
+                return data.slice(data.length - months);
+            }
+            return data;
+        }
+
+        function aggregateActivityData(base, targetBuckets) {
+            if (!base.length) {
+                return { data: new Array(targetBuckets).fill(0), labels: [] };
+            }
+            const bucketSize = Math.ceil(base.length / targetBuckets);
+            const aggregates = [];
+            const labels = [];
+
+            for (let i = 0; i < targetBuckets; i++) {
+                const start = i * bucketSize;
+                const end = Math.min(start + bucketSize, base.length);
+                if (start >= base.length) {
+                    break;
+                }
+                const slice = base.slice(start, end);
+                const sum = slice.reduce((acc, value) => acc + value, 0);
+                const avg = slice.length ? sum / slice.length : 0;
+                aggregates.push(Number(avg.toFixed(2)));
+                labels.push(`${padHour(start)}-${padHour(end)}`);
+            }
+
+            return { data: aggregates, labels };
+        }
+
+        function padHour(hour) {
+            if (hour >= 24) {
+                return '24:00';
+            }
+            const normalized = hour % 24;
+            return `${String(normalized).padStart(2, '0')}:00`;
         }
 
         function refreshData() {
