@@ -15,7 +15,11 @@
             getAuth,
             signInWithEmailAndPassword,
             onAuthStateChanged,
-            signOut
+            signOut,
+            setPersistence,
+            browserLocalPersistence,
+            browserSessionPersistence,
+            inMemoryPersistence
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
         import {
             getFirestore,
@@ -49,6 +53,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        let activePersistence = 'local';
+        let authReady = false;
+        let hasLoadedLocalDashboard = false;
 
         // Make Firebase accessible globally
         window.firebase = {
@@ -73,23 +80,64 @@
             setDoc
         };
 
-        // Check auth state
-        onAuthStateChanged(auth, async (user) => {
-            // Check if we're being redirected here due to auth error (prevent loop)
-            const isRedirecting = sessionStorage.getItem('redirecting');
-            if (isRedirecting) {
-                sessionStorage.removeItem('redirecting');
-                showLogin();
-                return;
+        async function configureAuthPersistence() {
+            try {
+                await setPersistence(auth, browserLocalPersistence);
+                activePersistence = 'local';
+            } catch (error) {
+                console.warn('[Auth] Local persistence unavailable, falling back to session storage.', error);
+                try {
+                    await setPersistence(auth, browserSessionPersistence);
+                    activePersistence = 'session';
+                } catch (sessionError) {
+                    console.warn('[Auth] Session persistence unavailable, using in-memory auth (no cross-page retention).', sessionError);
+                    await setPersistence(auth, inMemoryPersistence);
+                    activePersistence = 'memory';
+                }
+            } finally {
+                authReady = true;
             }
+        }
 
-            if (user) {
-                // Redirect authenticated users to the enhanced dashboard
-                window.location.href = 'admin-complete.html';
-            } else {
-                showLogin();
-            }
-        });
+        function initAuthListener() {
+            onAuthStateChanged(auth, async (user) => {
+                const isRedirecting = sessionStorage.getItem('redirecting');
+                if (isRedirecting) {
+                    sessionStorage.removeItem('redirecting');
+                    showLogin();
+                    return;
+                }
+
+                if (user) {
+                    if (activePersistence === 'memory') {
+                        showDashboard();
+                        if (!hasLoadedLocalDashboard) {
+                            hasLoadedLocalDashboard = true;
+                            try {
+                                await loadDashboardData();
+                            } catch (error) {
+                                console.error('Error loading dashboard data:', error);
+                            }
+                        }
+                    } else {
+                        window.location.href = 'admin-complete.html';
+                    }
+                } else {
+                    hasLoadedLocalDashboard = false;
+                    showLogin();
+                }
+            });
+        }
+
+        configureAuthPersistence()
+            .then(() => {
+                console.log(`[Auth] Persistence configured: ${activePersistence}`);
+                initAuthListener();
+            })
+            .catch((error) => {
+                console.error('Failed to configure auth persistence:', error);
+                initAuthListener();
+            });
 
         function showLogin() {
             document.getElementById('loginScreen').style.display = 'flex';
@@ -1134,13 +1182,24 @@
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('errorMessage');
+
+            if (!authReady) {
+                errorEl.textContent = 'Preparing a secure login session. Please try again in a second.';
+                errorEl.style.display = 'block';
+                return;
+            }
 
             try {
                 await window.firebase.signInWithEmailAndPassword(window.firebase.auth, email, password);
                 // Auth state change will handle the rest
             } catch (error) {
-                document.getElementById('errorMessage').textContent = error.message;
-                document.getElementById('errorMessage').style.display = 'block';
+                let friendlyMessage = error.message;
+                if (error.code === 'auth/network-request-failed') {
+                    friendlyMessage = 'Secure login failed to reach Firebase. Disable Brave Shields / Tor mode or allow googleapis.com for this page, then try again.';
+                }
+                errorEl.textContent = friendlyMessage;
+                errorEl.style.display = 'block';
             }
         });
 
