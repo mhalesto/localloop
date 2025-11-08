@@ -1123,6 +1123,10 @@
             revenue: null
         };
 
+        // Loading state guard to prevent multiple simultaneous loads
+        let isLoading = false;
+        let isInitialized = false;
+
         // Page navigation system
         function switchPage(pageName) {
             // Hide all pages
@@ -1447,7 +1451,13 @@
 
         // Check authentication
         onAuthStateChanged(auth, async (user) => {
+            // Prevent multiple initializations
+            if (isInitialized) {
+                return;
+            }
+
             if (user) {
+                isInitialized = true;
                 document.getElementById('userEmail').textContent = user.email;
 
                 // Force token refresh to get latest custom claims
@@ -1477,6 +1487,15 @@
 
         // Load dashboard data
         async function loadDashboardData() {
+            // Prevent multiple simultaneous loads
+            if (isLoading) {
+                console.log('Already loading dashboard data, skipping...');
+                return;
+            }
+
+            isLoading = true;
+            console.log('Loading dashboard data...');
+
             try {
                 // Call Cloud Functions
                 const getAdminAnalytics = httpsCallable(functions, 'getAdminAnalytics');
@@ -1515,6 +1534,9 @@
                 } else {
                     alert('Error loading dashboard: ' + error.message + '\n\nPlease refresh the page or log out and try again.');
                 }
+            } finally {
+                isLoading = false;
+                console.log('Dashboard data load complete');
             }
         }
 
