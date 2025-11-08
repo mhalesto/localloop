@@ -35,25 +35,11 @@ jobs:
       - name: Build Android APK with EAS
         run: eas build --platform android --profile production --non-interactive --no-wait
 
-      - name: Get latest build info
-        id: build_info
-        run: |
-          # Wait a moment for build to be registered
-          sleep 10
-          # Get the latest build ID and URL
-          BUILD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl // empty')
-          BUILD_ID=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].id')
-          echo "build_url=$BUILD_URL" >> $GITHUB_OUTPUT
-          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
-          echo "Build ID: $BUILD_ID"
-          echo "Build will be available at: https://expo.dev/accounts/halalisani/projects/toilet/builds/$BUILD_ID"
-
       - name: Comment build status
         if: github.event_name == 'push'
         run: |
           echo "✅ EAS Build triggered successfully!"
-          echo "📱 Build ID: ${{ steps.build_info.outputs.build_id }}"
-          echo "🔗 Track your build at: https://expo.dev/accounts/halalisani/projects/toilet/builds/${{ steps.build_info.outputs.build_id }}"
+          echo "📱 Track your build at: https://expo.dev/accounts/halalisani/projects/toilet/builds"
           echo ""
           echo "The APK will be available for download once the build completes (usually 10-15 minutes)."
 
@@ -64,15 +50,19 @@ jobs:
           tag_name: eas-build-${{ github.run_number }}
           name: EAS Build ${{ github.run_number }}
           body: |
-            ## EAS Build Started
+            ## ✅ EAS Build Triggered Successfully
 
-            🚀 **Build ID:** ${{ steps.build_info.outputs.build_id }}
+            🚀 **Platform:** Android APK
+            📦 **Profile:** production
+            ⏱️ **Status:** Building on Expo's servers (typically takes 10-15 minutes)
 
-            📱 **Track Progress:** https://expo.dev/accounts/halalisani/projects/toilet/builds/${{ steps.build_info.outputs.build_id }}
+            ### Track Your Build
+            📱 https://expo.dev/accounts/halalisani/projects/toilet/builds
 
-            ⏱️ **Status:** Building (typically takes 10-15 minutes)
-
-            Once the build completes, download the APK from the Expo dashboard link above.
+            ### What's Next?
+            1. Monitor build progress on the Expo dashboard (link above)
+            2. Once complete, download the APK from the build page
+            3. Install and test on your device
 
             ---
             🤖 Generated with [Claude Code](https://claude.com/claude-code)
