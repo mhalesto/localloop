@@ -604,6 +604,14 @@
             timeRange: '30'
         };
 
+        // Store chart instances globally
+        let chartInstances = {
+            userGrowth: null,
+            subscription: null,
+            activity: null,
+            revenue: null
+        };
+
         // Check authentication
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -724,6 +732,12 @@
         }
 
         function updateCharts(analytics) {
+            // Destroy existing charts before creating new ones
+            Object.values(chartInstances).forEach(chart => {
+                if (chart) {
+                    chart.destroy();
+                }
+            });
             initCharts(analytics);
         }
 
@@ -793,7 +807,7 @@
 
             // User Growth Chart - Use real data
             const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
-            new Chart(userGrowthCtx, {
+            chartInstances.userGrowth = new Chart(userGrowthCtx, {
                 type: 'line',
                 data: {
                     labels: userGrowthLabels,
@@ -819,7 +833,7 @@
 
             // Subscription Chart - Use real data
             const subCtx = document.getElementById('subscriptionChart').getContext('2d');
-            new Chart(subCtx, {
+            chartInstances.subscription = new Chart(subCtx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Basic', 'Premium', 'Gold'],
@@ -841,7 +855,7 @@
             }
 
             const activityCtx = document.getElementById('activityChart').getContext('2d');
-            new Chart(activityCtx, {
+            chartInstances.activity = new Chart(activityCtx, {
                 type: 'bar',
                 data: {
                     labels: hourLabels,
@@ -872,7 +886,7 @@
             }
 
             const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-            new Chart(revenueCtx, {
+            chartInstances.revenue = new Chart(revenueCtx, {
                 type: 'line',
                 data: {
                     labels: revenueLabels,
@@ -902,9 +916,6 @@
                 }
             });
         }
-
-        // Initialize on load
-        window.addEventListener('load', initCharts);
 
         function refreshData() {
             alert('Refreshing dashboard data...');
