@@ -81,15 +81,8 @@
         // Check auth state
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Check if user is admin
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                if (userDoc.exists() && userDoc.data().role === 'admin') {
-                    showDashboard();
-                    loadDashboardData();
-                } else {
-                    alert('You do not have admin privileges');
-                    signOut(auth);
-                }
+                // Redirect authenticated users to the enhanced dashboard
+                window.location.href = 'admin-complete.html';
             } else {
                 showLogin();
             }
