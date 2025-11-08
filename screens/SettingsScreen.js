@@ -2091,7 +2091,10 @@ export default function SettingsScreen({ navigation }) {
 
             {/* Gold Enhancement Indicator */}
             {userProfile?.subscriptionPlan === 'gold' && (
-              <View style={[styles.goldFeatureInfo, { backgroundColor: themeColors.card, borderColor: '#ffd700' }]}>
+              <View style={[styles.goldFeatureInfo, {
+                backgroundColor: themeColors.card,
+                borderColor: isDarkMode ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.4)'
+              }]}>
                 <Text style={styles.goldFeatureIcon}>✨</Text>
                 <View style={styles.goldFeatureContent}>
                   <Text style={[styles.goldFeatureTitle, { color: themeColors.textPrimary }]}>
@@ -3041,25 +3044,26 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       flexDirection: 'row',
       alignItems: 'center',
       borderRadius: 12,
-      borderWidth: 2,
-      padding: 16,
+      borderWidth: StyleSheet.hairlineWidth,
+      padding: 12,
       marginTop: 12,
       marginBottom: 8,
     },
     goldFeatureIcon: {
-      fontSize: 32,
-      marginRight: 12,
+      fontSize: 20,
+      marginRight: 10,
     },
     goldFeatureContent: {
       flex: 1,
     },
     goldFeatureTitle: {
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: '700',
-      marginBottom: 4,
+      marginBottom: 3,
     },
     goldFeatureDesc: {
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 12,
+      lineHeight: 16,
+      opacity: 0.7,
     },
   });
