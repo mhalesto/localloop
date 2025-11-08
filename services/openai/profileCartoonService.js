@@ -169,9 +169,14 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   // Gold users get GPT-4o Vision analysis for personalized cartoons
   if (subscriptionPlan === 'gold' && imageUrl) {
     try {
-      console.log('[profileCartoonService] Gold user - analyzing photo with GPT-4o Vision');
-      personalizedDescription = await analyzePhotoForCartoon(imageUrl);
-      console.log('[profileCartoonService] Vision analysis complete');
+      // Check if we have a valid public URL
+      if (!imageUrl.startsWith('https://')) {
+        console.log('[profileCartoonService] Skipping Vision analysis - profile photo not yet uploaded to cloud storage (local file path)');
+      } else {
+        console.log('[profileCartoonService] Gold user - analyzing photo with GPT-4o Vision');
+        personalizedDescription = await analyzePhotoForCartoon(imageUrl);
+        console.log('[profileCartoonService] Vision analysis complete');
+      }
     } catch (visionError) {
       console.warn('[profileCartoonService] Vision analysis failed:', visionError.message);
       // Continue without personalization

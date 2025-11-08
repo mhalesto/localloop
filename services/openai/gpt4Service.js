@@ -71,11 +71,16 @@ export async function summarizeWithGPT4o(text, options = {}) {
  * Analyze photo with Vision for personalized cartoon generation (Gold tier only)
  * Uses GPT-4o Vision to create detailed description of person
  *
- * @param {string} imageUrl - URL of the profile picture
+ * @param {string} imageUrl - URL of the profile picture (must be publicly accessible https://)
  * @returns {Promise<string>} Detailed description of the person
  */
 export async function analyzePhotoForCartoon(imageUrl) {
   try {
+    // Validate that we have a publicly accessible URL
+    if (!imageUrl || !imageUrl.startsWith('https://')) {
+      throw new Error('Vision analysis requires a publicly accessible HTTPS URL. Local file paths are not supported.');
+    }
+
     console.log('[GPT-4o Vision] Analyzing profile photo for personalized cartoon');
 
     const response = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
