@@ -37,11 +37,13 @@ export const AI_FEATURES_CONFIG = {
   /**
    * AI Summarization
    * Summarizes long post descriptions
-   * Cost: ~$0.002 per summary
+   * Basic/Premium: Hugging Face BART (FREE)
+   * Gold: GPT-4o with style options (~$0.002 per summary)
    */
   summarization: {
     enabled: true,
     requiresPremium: false, // Available to all users
+    goldEnhancement: true, // Gold users get GPT-4o instead of BART
     userCanToggle: true, // Users can disable in settings
   },
 
@@ -85,11 +87,13 @@ export const AI_FEATURES_CONFIG = {
   /**
    * Smart Comment Suggestions
    * AI-powered comment writing help
-   * Cost: ~$0.002 per suggestion
+   * Premium: Basic suggestions
+   * Gold: GPT-4o personalized suggestions with tone control (~$0.003 per suggestion)
    */
   commentSuggestions: {
     enabled: true,
     requiresPremium: true, // Premium feature
+    goldEnhancement: true, // Gold users get GPT-4o suggestions
     userCanToggle: true,
   },
 
@@ -151,14 +155,46 @@ export const AI_FEATURES_CONFIG = {
   /**
    * Profile Cartoon Generator
    * Convert profile picture to cartoon/artistic styles
-   * Cost: ~$0.04 per generation (DALL-E 3 Standard)
+   * Basic/Premium: Generic cartoon styles (DALL-E 3 Standard ~$0.04)
+   * Gold: Personalized with GPT-4o Vision analysis + HD quality (~$0.05)
    * Usage limits: Basic=5 lifetime, Premium=10/month, Gold=20/month
-   * Gold Exclusive: Custom text prompts to describe your own cartoon style
+   * Gold Exclusive: Custom text prompts + Vision-analyzed personalization
    */
   profileCartoon: {
     enabled: true, // ✅ ENABLED
-    requiresPremium: false, // Basic gets 5, Premium gets 10/month, Gold gets 20/month + custom prompts
+    requiresPremium: false, // Basic gets 5, Premium gets 10/month, Gold gets 20/month
+    goldEnhancement: true, // Gold gets Vision analysis + HD quality
     userCanToggle: false, // Always available (usage limited by plan)
+  },
+
+  // ============================================================================
+  // GOLD-EXCLUSIVE FEATURES (GPT-4o Powered)
+  // ============================================================================
+
+  /**
+   * Smart Post Composer (GOLD ONLY)
+   * AI-assisted post writing with GPT-4o
+   * Helps users write engaging posts based on their ideas
+   * Cost: ~$0.01 per composition
+   */
+  smartComposer: {
+    enabled: true, // ✅ ENABLED
+    requiresPremium: true,
+    requiresGold: true, // GOLD ONLY
+    userCanToggle: true,
+  },
+
+  /**
+   * Enhanced Translation (GOLD ONLY)
+   * GPT-4o translation with cultural context
+   * More natural and culturally aware than basic translation
+   * Cost: ~$0.005 per translation
+   */
+  enhancedTranslation: {
+    enabled: true, // ✅ ENABLED
+    requiresPremium: true,
+    requiresGold: true, // GOLD ONLY
+    userCanToggle: true,
   },
 };
 
@@ -167,9 +203,10 @@ export const AI_FEATURES_CONFIG = {
  * @param {string} featureName - Name of the feature
  * @param {boolean} isPremium - Whether user has premium
  * @param {Object} userPreferences - User's feature preferences
+ * @param {string} subscriptionPlan - User's subscription plan ('basic' | 'premium' | 'gold')
  * @returns {boolean} Whether feature should be active
  */
-export function isFeatureEnabled(featureName, isPremium = false, userPreferences = {}) {
+export function isFeatureEnabled(featureName, isPremium = false, userPreferences = {}, subscriptionPlan = 'basic') {
   const feature = AI_FEATURES_CONFIG[featureName];
 
   if (!feature) {
@@ -185,6 +222,11 @@ export function isFeatureEnabled(featureName, isPremium = false, userPreferences
   // If feature is force enabled (like moderation), always on
   if (feature.forceEnabled) {
     return true;
+  }
+
+  // Check Gold requirement
+  if (feature.requiresGold && subscriptionPlan !== 'gold') {
+    return false;
   }
 
   // Check premium requirement
@@ -320,6 +362,19 @@ export const FEATURE_INFO = {
     description: 'AI-generated cartoon avatar',
     icon: '🎨',
     badge: null,
+    goldDescription: 'Personalized with GPT-4o Vision + HD quality',
+  },
+  smartComposer: {
+    title: 'AI Post Composer',
+    description: 'GPT-4o helps write engaging posts',
+    icon: '✍️',
+    badge: 'GOLD',
+  },
+  enhancedTranslation: {
+    title: 'Smart Translation',
+    description: 'GPT-4o with cultural context',
+    icon: '🌐',
+    badge: 'GOLD',
   },
 };
 

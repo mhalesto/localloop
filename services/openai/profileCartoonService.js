@@ -1,10 +1,12 @@
 /**
  * Profile Cartoon Generation Service
  * Uses OpenAI DALL-E to convert profile pictures into cartoon/artistic styles
+ * Gold users get GPT-4o Vision analysis for personalized results
  */
 
 import { isFeatureEnabled } from '../../config/aiFeatures';
 import { callOpenAI, OPENAI_ENDPOINTS } from './config';
+import { analyzePhotoForCartoon } from './gpt4Service';
 
 // Available cartoon styles
 export const CARTOON_STYLES = {
@@ -143,9 +145,10 @@ const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
  * @param {string} styleId - ID of the cartoon style to apply, or 'custom' for custom prompt
  * @param {string} gender - Optional gender hint (male/female/neutral)
  * @param {string} customPrompt - Optional custom prompt for Gold users (only used if styleId is 'custom')
- * @returns {Promise<{imageUrl: string, style: string}>}
+ * @param {string} subscriptionPlan - User's subscription plan ('basic' | 'premium' | 'gold')
+ * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean}>}
  */
-export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null) {
+export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic') {
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
@@ -161,19 +164,45 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
   let prompt;
   let styleName;
+  let personalizedDescription = null;
+
+  // Gold users get GPT-4o Vision analysis for personalized cartoons
+  if (subscriptionPlan === 'gold' && imageUrl) {
+    try {
+      console.log('[profileCartoonService] Gold user - analyzing photo with GPT-4o Vision');
+      personalizedDescription = await analyzePhotoForCartoon(imageUrl);
+      console.log('[profileCartoonService] Vision analysis complete');
+    } catch (visionError) {
+      console.warn('[profileCartoonService] Vision analysis failed:', visionError.message);
+      // Continue without personalization
+    }
+  }
 
   // Check if using custom prompt (Gold exclusive feature)
   if (styleId === 'custom' && customPrompt) {
     styleName = 'Custom';
-    // Enhance the custom prompt with some basic guidelines
-    prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
-    console.log('[profileCartoonService] Using CUSTOM prompt from Gold user');
+    // Enhance the custom prompt with personalized details if available
+    if (personalizedDescription) {
+      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Based on this person: ${personalizedDescription}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
+      console.log('[profileCartoonService] Using CUSTOM prompt with Vision personalization (Gold)');
+    } else {
+      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
+      console.log('[profileCartoonService] Using CUSTOM prompt from Gold user');
+    }
   } else {
     // Use predefined style
     const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
     styleName = style.name;
-    const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-    prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+
+    if (personalizedDescription) {
+      // Gold: Use personalized Vision description
+      prompt = `Create a portrait ${style.prompt} of this person: ${personalizedDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+      console.log('[profileCartoonService] Using predefined style with Vision personalization (Gold)');
+    } else {
+      // Basic/Premium: Use generic prompt
+      const genderHint = gender !== 'neutral' ? `${gender} ` : '';
+      prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+    }
   }
 
   try {
@@ -188,12 +217,16 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
       try {
         console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
+        // Gold users get HD quality for better results
+        const imageQuality = subscriptionPlan === 'gold' ? 'hd' : 'standard';
+        console.log(`[profileCartoonService] Using ${imageQuality} quality (${subscriptionPlan} plan)`);
+
         const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
           model: 'dall-e-3',
           prompt: prompt,
           n: 1,
           size: '1024x1024',
-          quality: 'standard',
+          quality: imageQuality,
           style: 'vivid',
         });
 
@@ -218,6 +251,9 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
           imageUrl: data.data[0].url,
           style: styleId === 'custom' ? 'custom' : styleId,
           revisedPrompt: data.data[0].revised_prompt,
+          enhanced: personalizedDescription !== null, // Indicates Vision analysis was used
+          quality: imageQuality,
+          subscriptionPlan,
         };
 
       } catch (error) {

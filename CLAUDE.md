@@ -2,6 +2,71 @@
 
 ## Recent Features
 
+### Gold Tier GPT-4o Features (November 2025)
+
+#### Overview
+Gold subscribers now get access to premium GPT-4o powered AI features that provide significantly better quality than Basic/Premium plans. All Gold features use GPT-4o for personalized, context-aware assistance.
+
+#### Documentation
+**📚 See `docs/GOLD_FEATURES.md` for complete documentation**
+
+#### Files Added
+- `services/openai/gpt4Service.js` - GPT-4o service with all Gold features
+- `components/SmartComposerModal.js` - AI post writing assistant UI
+- `docs/GOLD_FEATURES.md` - Complete Gold features documentation
+
+#### Files Modified
+- `config/aiFeatures.js` - Added Gold tier enhancements and new features
+- `services/summarizationService.js` - Added GPT-4o summarization for Gold users
+- `services/openai/profileCartoonService.js` - Added Vision analysis for Gold users
+
+#### Gold Features Summary
+
+1. **GPT-4o Enhanced Summarization**
+   - Gold: GPT-4o with 4 style options (Professional, Casual, Emoji, Formal)
+   - Basic/Premium: Hugging Face BART
+   - Cost: ~$0.002 per summary
+
+2. **Vision-Personalized Cartoon Avatars**
+   - Gold: GPT-4o Vision analyzes photo + HD DALL-E 3
+   - Basic/Premium: Generic DALL-E 3
+   - Cost: ~$0.085 per generation (Vision $0.005 + DALL-E HD $0.08)
+
+3. **Smart Post Composer** (Gold Only)
+   - AI writing assistant with tone/length control
+   - Auto-generates posts from user ideas
+   - Smart hashtag suggestions
+   - Cost: ~$0.01 per composition
+
+4. **Enhanced Comment Suggestions** (Gold Upgrade)
+   - Gold: GPT-4o personalized suggestions
+   - Basic/Premium: Template-based
+   - Cost: ~$0.003 per suggestion set
+
+5. **Cultural-Context Translation** (Gold Upgrade)
+   - Gold: GPT-4o with South African cultural awareness
+   - Basic/Premium: Basic translation API
+   - Cost: ~$0.005 per translation
+
+#### Cost Analysis
+Active Gold user monthly costs:
+- 20 cartoons: $1.70
+- 50 summaries: $0.10
+- 20 post compositions: $0.20
+- 100 comment suggestions: $0.30
+- 30 translations: $0.15
+- **Total: ~$2.45/month**
+
+**Recommended Gold price: $10-15/month (75-83% profit margin)**
+
+#### Technical Implementation
+- All Gold features proxy through `services/openai/gpt4Service.js`
+- Security: API key server-side only via Firebase Function proxy
+- Detection: `subscriptionPlan === 'gold'` checks throughout codebase
+- Fallback: If GPT-4o fails, falls back to Hugging Face/basic services
+
+---
+
 ### AI Cartoon Profile Generator (November 2025)
 
 #### Overview

@@ -2,6 +2,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { enhancedSummarize } from './enhancedSummarizationService';
+import { summarizeWithGPT4o } from './openai/gpt4Service';
 
 const DEFAULT_PORT = 4000;
 const SUMMARY_PATH = '/summaries';
@@ -108,15 +109,38 @@ const normalizeDescription = (value) =>
 /**
  * Summarize post description
  * @param {string} description
- * @param {{ signal?: AbortSignal, lengthPreference?: 'concise'|'balanced'|'detailed', quality?: 'fast'|'best', model?: string, timeoutMs?: number }} opts
+ * @param {{ signal?: AbortSignal, lengthPreference?: 'concise'|'balanced'|'detailed', quality?: 'fast'|'best', model?: string, timeoutMs?: number, subscriptionPlan?: string, style?: string }} opts
  */
 export async function summarizePostDescription(
   description,
-  { signal, lengthPreference, quality, model, timeoutMs = 20000 } = {}
+  { signal, lengthPreference, quality, model, timeoutMs = 20000, subscriptionPlan = 'basic', style = 'professional' } = {}
 ) {
   const text = normalizeDescription(description);
   if (!text) {
     throw new Error('Add a description before requesting a summary.');
+  }
+
+  // Gold users get GPT-4o summaries with style options
+  if (subscriptionPlan === 'gold') {
+    try {
+      console.log('[SummaryService] Gold user detected - using GPT-4o summarization');
+      const gpt4Result = await summarizeWithGPT4o(text, {
+        lengthPreference: lengthPreference || 'balanced',
+        style: style || 'professional',
+      });
+
+      return {
+        summary: clean(String(gpt4Result.summary)).normalize('NFC'),
+        model: gpt4Result.model,
+        options: { lengthPreference, style },
+        fallback: false,
+        quality: 'best',
+        goldFeature: true,
+      };
+    } catch (gpt4Error) {
+      console.log('[SummaryService] GPT-4o failed, falling back to HF:', gpt4Error.message);
+      // Fall through to Hugging Face
+    }
   }
 
   // Try enhanced summarizer with HF API first if quality is 'best'
