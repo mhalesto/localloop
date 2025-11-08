@@ -105,25 +105,29 @@ export const SUBSCRIPTION_PLANS = {
   GOLD: {
     id: 'gold',
     name: 'Gold',
-    price: 79.99,
+    price: 149.99,
     currency: 'ZAR',
     interval: 'month',
-    yearlyPrice: 799,
+    yearlyPrice: 1499,
     yearlySavings: 'save 20% (2 months)',
-    description: 'Ultimate VIP experience',
+    description: 'GPT-4o powered AI + VIP experience',
+    popular: true,
     features: [
       'Everything in Premium',
-      { text: '20 AI cartoon avatars/month', badge: 'NEW', badgeColor: '#FF9500' },
-      { text: '✨ Custom avatar prompts (Gold exclusive)', badge: 'EARLY ACCESS', badgeColor: '#5E5CE6' },
-      'Describe your own cartoon style',
+      { text: '✨ GPT-4o AI Post Composer', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '🎨 Vision-Personalized Cartoons', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '📝 GPT-4o Summaries (4 styles)', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '💬 Smart Comment Suggestions', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '🌍 Cultural Translation (11 SA languages)', badge: 'NEW', badgeColor: '#5E5CE6' },
+      '20 Vision-enhanced cartoon avatars/month (HD quality)',
+      'Custom cartoon prompts',
       'Gold Crown badge',
       '5 exclusive Gold themes',
       'Advanced color controls',
-      'Early access to features & roadmap peeks',
+      'Early access to features',
       'Market listing priority',
       'Profile analytics dashboard',
       'VIP support (2h)',
-      'Save 2 months every year',
     ],
     limits: {
       postsPerDay: -1,
@@ -154,6 +158,12 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsMonthly: 20,
       cartoonAvatarsLifetime: null,
       customCartoonPrompts: true, // GOLD EXCLUSIVE
+      // GPT-4o Features (Gold Exclusive)
+      gpt4oComposer: true, // AI Post Composer with GPT-4o
+      gpt4oSummarization: true, // 4 summary styles
+      gpt4oVisionCartoons: true, // Vision-personalized cartoons
+      gpt4oCommentSuggestions: true, // Enhanced comment suggestions
+      gpt4oCulturalTranslation: true, // 11 SA languages with cultural context
     },
   },
 };

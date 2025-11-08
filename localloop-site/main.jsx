@@ -132,30 +132,33 @@ const pricingTiers = [
       'Priority support (12h)',
       'Monthly marketplace boost credit'
     ],
-    cta: 'Subscribe now',
-    recommended: true
+    cta: 'Subscribe now'
   },
   {
     name: 'Gold',
-    price: 'R79.99',
+    price: 'R149.99',
     cadence: '/month',
-    secondaryPrice: 'R799/year',
+    secondaryPrice: 'R1499/year',
     secondaryLabel: 'save 20% (2 months)',
-    description: 'Ultimate VIP experience with advanced branding, analytics, and support.',
+    description: 'GPT-4o powered AI features + VIP experience. Same AI as ChatGPT Plus for 60% less!',
     features: [
       'Everything in Premium',
-      '20 AI cartoon avatars / month',
-      'Custom avatar prompts (Gold exclusive)',
-      'Describe your own cartoon style',
+      '✨ GPT-4o AI Post Composer (NEW)',
+      '🎨 Vision-Personalized Cartoons (NEW)',
+      '📝 GPT-4o Summaries - 4 styles (NEW)',
+      '💬 Smart Comment Suggestions (NEW)',
+      '🌍 Cultural Translation - 11 SA languages (NEW)',
+      '20 Vision-enhanced cartoon avatars/month (HD quality)',
+      'Custom cartoon prompts',
       'Gold Crown badge & 5 Gold themes',
       'Advanced color controls',
       'Market listing priority',
       'Profile analytics dashboard',
-      'Early access to features & roadmap peeks',
-      'VIP support (2h)',
-      'Save 2 months every year'
+      'Early access to features',
+      'VIP support (2h)'
     ],
-    cta: 'Go Gold'
+    cta: 'Try Gold Free',
+    recommended: true
   }
 ];
 
