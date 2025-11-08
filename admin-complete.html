@@ -1446,10 +1446,30 @@
         window.updateGeoData = loadGeographyPage;
 
         // Check authentication
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 document.getElementById('userEmail').textContent = user.email;
-                loadDashboardData();
+
+                // Force token refresh to get latest custom claims
+                try {
+                    await user.getIdToken(true); // Force refresh
+                    const idTokenResult = await user.getIdTokenResult();
+
+                    // Check if user has admin claim
+                    if (!idTokenResult.claims.admin) {
+                        alert('Access Denied: You do not have admin privileges.\n\nIf you just set up admin access:\n1. Log out\n2. Log back in\n3. Your admin access will be active');
+                        await signOut(auth);
+                        window.location.href = 'admin-firebase.html';
+                        return;
+                    }
+
+                    loadDashboardData();
+                } catch (error) {
+                    console.error('Token refresh error:', error);
+                    alert('Authentication error. Please log in again.');
+                    await signOut(auth);
+                    window.location.href = 'admin-firebase.html';
+                }
             } else {
                 window.location.href = 'admin-firebase.html';
             }
@@ -1486,7 +1506,15 @@
 
             } catch (error) {
                 console.error('Error loading dashboard:', error);
-                alert('Error loading dashboard: ' + error.message);
+
+                // Check if it's a permission error
+                if (error.code === 'functions/permission-denied') {
+                    alert('Access Denied: Only admins can access analytics.\n\nPlease:\n1. Make sure you have been granted admin access\n2. Log out and log back in to refresh your permissions');
+                    await signOut(auth);
+                    window.location.href = 'admin-firebase.html';
+                } else {
+                    alert('Error loading dashboard: ' + error.message + '\n\nPlease refresh the page or log out and try again.');
+                }
             }
         }
 
