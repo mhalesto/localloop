@@ -160,169 +160,182 @@ export default function PollDisplay({
     (!defaultReveal && canVote && totalVotes > 0) || (shouldRevealResults && totalVotes > 0);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="stats-chart" size={18} color={accentColor} />
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.question}>{poll.question}</Text>
-          <View style={styles.headerMeta}>
-            <Text
-              style={[
-                styles.metaText,
-                isExpired ? { color: themeColors.textSecondary } : { color: accentColor }
-              ]}
-            >
-              {getTimeRemaining()}
-            </Text>
-            <View style={[styles.metaDot, { backgroundColor: themeColors.textSecondary }]} />
-            <Text style={[styles.metaText, { color: themeColors.textSecondary }]}>
-              {shouldRevealResults
-                ? `${totalVotes} vote${totalVotes === 1 ? '' : 's'}`
-                : canVote
-                  ? totalVotes > 0
-                    ? 'Vote to unlock results'
-                    : 'Be first to vote'
-                  : 'Results hidden'}
-            </Text>
+    <View style={styles.wrapper}>
+      <View style={[styles.card, { shadowColor: accentColor }]}>
+        <View style={[styles.cardAccent, { backgroundColor: accentColor }]} />
+
+        <View style={styles.header}>
+          <Ionicons name="stats-chart" size={18} color={accentColor} />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.question}>{poll.question}</Text>
+            <View style={styles.headerMeta}>
+              <Text
+                style={[
+                  styles.metaText,
+                  isExpired ? { color: themeColors.textSecondary } : { color: accentColor }
+                ]}
+              >
+                {getTimeRemaining()}
+              </Text>
+              <View style={[styles.metaDot, { backgroundColor: themeColors.textSecondary }]} />
+              <Text style={[styles.metaText, { color: themeColors.textSecondary }]}>
+                {shouldRevealResults
+                  ? `${totalVotes} vote${totalVotes === 1 ? '' : 's'}`
+                  : canVote
+                    ? totalVotes > 0
+                      ? 'Vote to unlock results'
+                      : 'Be first to vote'
+                    : 'Results hidden'}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {(hasVoted || isCreator) && (
-        <View style={styles.pillRow}>
-          {hasVoted && userVoteLabel ? (
-            <View style={[styles.statusPill, { backgroundColor: `${accentColor}18` }]}>
-              <Ionicons name="checkmark-circle" size={14} color={accentColor} />
-              <Text style={[styles.statusPillText, { color: accentColor }]}>
-                You voted for {userVoteLabel}
-              </Text>
-            </View>
-          ) : null}
-          {isCreator ? (
-            <View style={[styles.statusPill, { backgroundColor: `${accentColor}12` }]}>
-              <Ionicons name="bar-chart-outline" size={14} color={accentColor} />
-              <Text style={[styles.statusPillText, { color: accentColor }]}>Your poll</Text>
-            </View>
-          ) : null}
-        </View>
-      )}
-
-      {leadingOption ? (
-        <View style={[styles.leadingRow, { borderColor: themeColors.border }]}>
-          <Ionicons name="trophy-outline" size={14} color={accentColor} />
-          <Text style={[styles.leadingText, { color: themeColors.text }]}>
-            {leadingOption.text} is leading ({leadingOption.percent}%)
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.optionsContainer}>
-        {optionEntries.map((option) => (
-          <TouchableOpacity
-            key={option.id}
-            onPress={() => handleVote(option.optionIndex)}
-            disabled={!canVote}
-            style={[
-              styles.optionButton,
-              shouldRevealResults && styles.optionButtonVoted,
-              option.isUserVote && { borderColor: accentColor, borderWidth: 2 },
-              !canVote && styles.optionButtonDisabled
-            ]}
-            activeOpacity={canVote ? 0.7 : 1}
-          >
-            <View
-              style={[
-                styles.optionProgress,
-                {
-                  width: `${shouldRevealResults ? option.percent : 0}%`,
-                  backgroundColor: option.isUserVote ? accentColor : themeColors.border
-                }
-              ]}
-            />
-            <View style={styles.optionContent}>
-              <View style={styles.optionTextContainer}>
-                <Text
-                  style={[
-                    styles.optionText,
-                    option.isUserVote && { fontWeight: '600', color: accentColor }
-                  ]}
-                >
-                  {option.text}
+        {(hasVoted || isCreator) && (
+          <View style={styles.pillRow}>
+            {hasVoted && userVoteLabel ? (
+              <View style={[styles.statusPill, { backgroundColor: `${accentColor}18` }]}>
+                <Ionicons name="checkmark-circle" size={14} color={accentColor} />
+                <Text style={[styles.statusPillText, { color: accentColor }]}>
+                  You voted for {userVoteLabel}
                 </Text>
-                {isCreator && shouldRevealResults && option.votes > 0 && (
-                  <TouchableOpacity
-                    onPress={() => handleViewVoters(option.optionIndex)}
-                    style={[styles.viewVotersButton, { backgroundColor: `${accentColor}15` }]}
-                  >
-                    <Ionicons name="people-outline" size={12} color={accentColor} />
-                    <Text style={[styles.viewVotersText, { color: accentColor }]}>{option.votes}</Text>
-                  </TouchableOpacity>
-                )}
               </View>
-              {shouldRevealResults ? (
-                <View style={styles.optionStats}>
-                  <Text
-                    style={[
-                      styles.percentage,
-                      option.isUserVote && { color: accentColor, fontWeight: '600' }
-                    ]}
-                  >
-                    {option.percent}%
-                  </Text>
-                  <Text style={styles.votes}>
-                    {option.votes} {option.votes === 1 ? 'vote' : 'votes'}
-                  </Text>
+            ) : null}
+            {isCreator ? (
+              <View style={[styles.statusPill, { backgroundColor: `${accentColor}12` }]}>
+                <Ionicons name="bar-chart-outline" size={14} color={accentColor} />
+                <Text style={[styles.statusPillText, { color: accentColor }]}>Your poll</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {leadingOption ? (
+          <View style={[styles.leadingRow, { borderColor: themeColors.border }]}>
+            <Ionicons name="trophy-outline" size={14} color={accentColor} />
+            <Text style={[styles.leadingText, { color: themeColors.text }]}>
+              {leadingOption.text} is leading ({leadingOption.percent}%)
+            </Text>
+          </View>
+        ) : null}
+
+        {hasOptions ? (
+          <View style={styles.optionsContainer}>
+            {optionEntries.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                onPress={() => handleVote(option.optionIndex)}
+                disabled={!canVote}
+                style={[
+                  styles.optionButton,
+                  shouldRevealResults && styles.optionButtonVoted,
+                  option.isUserVote && { borderColor: accentColor, borderWidth: 2 },
+                  !canVote && styles.optionButtonDisabled
+                ]}
+                activeOpacity={canVote ? 0.7 : 1}
+              >
+                <View
+                  style={[
+                    styles.optionProgress,
+                    {
+                      width: `${shouldRevealResults ? option.percent : 0}%`,
+                      backgroundColor: option.isUserVote ? accentColor : themeColors.border
+                    }
+                  ]}
+                />
+                <View style={styles.optionContent}>
+                  <View style={styles.optionTextContainer}>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        option.isUserVote && { fontWeight: '600', color: accentColor }
+                      ]}
+                    >
+                      {option.text}
+                    </Text>
+                    {isCreator && shouldRevealResults && option.votes > 0 && (
+                      <TouchableOpacity
+                        onPress={() => handleViewVoters(option.optionIndex)}
+                        style={[styles.viewVotersButton, { backgroundColor: `${accentColor}15` }]}
+                      >
+                        <Ionicons name="people-outline" size={12} color={accentColor} />
+                        <Text style={[styles.viewVotersText, { color: accentColor }]}>{option.votes}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {shouldRevealResults ? (
+                    <View style={styles.optionStats}>
+                      <Text
+                        style={[
+                          styles.percentage,
+                          option.isUserVote && { color: accentColor, fontWeight: '600' }
+                        ]}
+                      >
+                        {option.percent}%
+                      </Text>
+                      <Text style={styles.votes}>
+                        {option.votes} {option.votes === 1 ? 'vote' : 'votes'}
+                      </Text>
+                    </View>
+                  ) : (
+                    canVote && (
+                      <Text style={[styles.votePrompt, { color: themeColors.textSecondary }]}>Tap to vote</Text>
+                    )
+                  )}
                 </View>
-              ) : (
-                canVote && (
-                  <Text style={[styles.votePrompt, { color: themeColors.textSecondary }]}>Tap to vote</Text>
-                )
-              )}
-            </View>
-            {option.isUserVote && (
-              <Ionicons name="checkmark-circle" size={20} color={accentColor} style={styles.checkmark} />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
+                {option.isUserVote && (
+                  <Ionicons name="checkmark-circle" size={20} color={accentColor} style={styles.checkmark} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={18} color={themeColors.textSecondary} />
+            <Text style={[styles.emptyStateText, { color: themeColors.textSecondary }]}>
+              Poll options are still loading.
+            </Text>
+          </View>
+        )}
 
-      <View style={styles.footer}>
-        <Text style={styles.totalVotes}>
-          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
-        </Text>
-        <Text style={[styles.timeRemaining, isExpired && styles.expired]}>{getTimeRemaining()}</Text>
-      </View>
-
-      {toolbarVisible && (
-        <View style={styles.toolbar}>
-          {!defaultReveal && canVote && totalVotes > 0 ? (
-            <TouchableOpacity
-              onPress={() => setResultsPreviewMode((prev) => !prev)}
-              style={styles.toolbarButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={resultsPreviewMode ? 'eye-off-outline' : 'eye-outline'}
-                size={16}
-                color={accentColor}
-              />
-              <Text style={[styles.toolbarButtonText, { color: accentColor }]}>
-                {resultsPreviewMode ? 'Back to poll' : 'View results'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-          {shouldRevealResults && totalVotes > 0 ? (
-            <TouchableOpacity
-              onPress={() => setShowDetailsModal(true)}
-              style={styles.toolbarButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="list-circle-outline" size={16} color={accentColor} />
-              <Text style={[styles.toolbarButtonText, { color: accentColor }]}>Detailed results</Text>
-            </TouchableOpacity>
-          ) : null}
+        <View style={styles.footer}>
+          <Text style={styles.totalVotes}>
+            {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+          </Text>
+          <Text style={[styles.timeRemaining, isExpired && styles.expired]}>{getTimeRemaining()}</Text>
         </View>
-      )}
+
+        {toolbarVisible && (
+          <View style={styles.toolbar}>
+            {!defaultReveal && canVote && totalVotes > 0 ? (
+              <TouchableOpacity
+                onPress={() => setResultsPreviewMode((prev) => !prev)}
+                style={styles.toolbarButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={resultsPreviewMode ? 'eye-off-outline' : 'eye-outline'}
+                  size={16}
+                  color={accentColor}
+                />
+                <Text style={[styles.toolbarButtonText, { color: accentColor }]}>
+                  {resultsPreviewMode ? 'Back to poll' : 'View results'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {shouldRevealResults && totalVotes > 0 ? (
+              <TouchableOpacity
+                onPress={() => setShowDetailsModal(true)}
+                style={styles.toolbarButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="list-circle-outline" size={16} color={accentColor} />
+                <Text style={[styles.toolbarButtonText, { color: accentColor }]}>Detailed results</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        )}
+      </View>
 
       <Modal
         visible={showVoterModal}
@@ -427,12 +440,30 @@ export default function PollDisplay({
 }
 
 function createStyles(themeColors, accentColor) {
+  const cardBackground = themeColors.card ?? themeColors.surface;
   return StyleSheet.create({
-    container: {
-      padding: 12,
-      backgroundColor: themeColors.surface,
-      borderRadius: 12,
-      marginTop: 8
+    wrapper: {
+      marginTop: 8,
+    },
+    card: {
+      padding: 16,
+      borderRadius: 18,
+      backgroundColor: cardBackground,
+      borderWidth: 1,
+      borderColor: `${accentColor}18`,
+      shadowColor: accentColor,
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 5,
+    },
+    cardAccent: {
+      height: 4,
+      borderRadius: 999,
+      opacity: 0.4,
+      alignSelf: 'center',
+      width: 72,
+      marginBottom: 14,
     },
     header: {
       flexDirection: 'row',
@@ -541,6 +572,19 @@ function createStyles(themeColors, accentColor) {
       fontSize: 14,
       color: themeColors.text,
       flex: 1
+    },
+    emptyState: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      backgroundColor: themeColors.background,
+    },
+    emptyStateText: {
+      fontSize: 13,
     },
     votePrompt: {
       fontSize: 12,
