@@ -39,7 +39,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           echo "✅ EAS Build triggered successfully!"
-          echo "📱 Track your build at: https://expo.dev/accounts/halalisani/projects/toilet/builds"
+          echo "📱 Track your build at: https://expo.dev/accounts/halalisani/projects/localloop/builds"
           echo ""
           echo "The APK will be available for download once the build completes (usually 10-15 minutes)."
 
@@ -57,7 +57,7 @@ jobs:
             ⏱️ **Status:** Building on Expo's servers (typically takes 10-15 minutes)
 
             ### Track Your Build
-            📱 https://expo.dev/accounts/halalisani/projects/toilet/builds
+            📱 https://expo.dev/accounts/halalisani/projects/localloop/builds
 
             ### What's Next?
             1. Monitor build progress on the Expo dashboard (link above)
