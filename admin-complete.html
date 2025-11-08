@@ -382,10 +382,40 @@
             flex: 1;
         }
 
-        .chart-modal-body canvas {
+        .chart-modal-canvas {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .chart-modal-canvas canvas {
             width: 100% !important;
             height: auto !important;
             max-height: 60vh;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .chart-modal-canvas.canvas-3d {
+            perspective: 1600px;
+            padding-bottom: 2.5rem;
+        }
+
+        .chart-modal-canvas.canvas-3d canvas {
+            transform: rotateX(18deg);
+            filter: drop-shadow(0 30px 45px rgba(15,23,42,0.35));
+        }
+
+        .chart-modal-canvas.canvas-3d::after {
+            content: '';
+            position: absolute;
+            inset: 15% 22%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 25%, rgba(255,255,255,0.7), rgba(255,255,255,0));
+            opacity: 0.7;
+            pointer-events: none;
         }
 
         .chart-modal-close {
@@ -1254,9 +1284,11 @@
                 </div>
                 <button class="chart-modal-close" id="chartModalClose" aria-label="Close chart insights">✕</button>
             </div>
-            <div class="chart-modal-body">
+        <div class="chart-modal-body">
+            <div class="chart-modal-canvas" id="chartModalCanvasWrapper">
                 <canvas id="chartModalCanvas"></canvas>
             </div>
+        </div>
         </div>
     </div>
 
@@ -1321,6 +1353,7 @@
             rangeSelect: document.getElementById('chartModalRange'),
             styleSelect: document.getElementById('chartModalStyle'),
             closeBtn: document.getElementById('chartModalClose'),
+            canvasWrapper: document.getElementById('chartModalCanvasWrapper'),
             canvas: document.getElementById('chartModalCanvas')
         };
 
@@ -1580,7 +1613,11 @@
                 }
             });
 
-            modalElements.canvas.classList.toggle('is-3d', Boolean(payload.is3D));
+            const is3D = Boolean(payload.is3D);
+            modalElements.canvas.classList.toggle('is-3d', is3D);
+            if (modalElements.canvasWrapper) {
+                modalElements.canvasWrapper.classList.toggle('canvas-3d', is3D);
+            }
         }
 
         // Page-specific load functions
