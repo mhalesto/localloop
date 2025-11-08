@@ -57,6 +57,16 @@
         let authReady = false;
         let hasLoadedLocalDashboard = false;
 
+        // Bridge values/functions that the non-module script needs access to
+        const authBridge = window.adminAuthBridge ?? {};
+        authBridge.isReady = () => authReady;
+        authBridge.getPersistence = () => activePersistence;
+        authBridge.showLocalDashboard = () => {
+            window.location.hash = '#local-dashboard';
+            showDashboard();
+        };
+        window.adminAuthBridge = authBridge;
+
         // Make Firebase accessible globally
         window.firebase = {
             app,
@@ -1183,8 +1193,9 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const errorEl = document.getElementById('errorMessage');
+            const bridge = window.adminAuthBridge;
 
-            if (!authReady) {
+            if (!bridge || !bridge.isReady || !bridge.isReady()) {
                 errorEl.textContent = 'Preparing a secure login session. Please try again in a second.';
                 errorEl.style.display = 'block';
                 return;
