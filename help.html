@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center - LocalLoop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="logo.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #6C4DF4; --dark: #1a1a2e; }
+        body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; }
+        .navbar { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: fixed; width: 100%; top: 0; z-index: 1000; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+        .logo { display: flex; align-items: center; font-size: 1.5rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .logo img { margin-right: 10px; }
+        .hero { padding: 120px 0 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+        .content { padding: 60px 0; }
+        .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 3rem 0; }
+        .help-card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+        .help-card i { font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem; }
+        .help-card h3 { margin-bottom: 1rem; color: var(--dark); }
+        .faq { margin: 3rem 0; }
+        .faq-item { background: white; padding: 1.5rem; margin-bottom: 1rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .faq-item h3 { color: var(--primary); margin-bottom: 0.5rem; }
+        .footer { background: var(--dark); color: white; padding: 40px 0 20px; margin-top: 80px; text-align: center; }
+        .footer a { color: #bbb; text-decoration: none; margin: 0 10px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">
+                    <img src="logo.png" alt="LocalLoop" width="40" height="40">
+                    LocalLoop
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Help Center</h1>
+            <p>Find answers and get support</p>
+        </div>
+    </section>
+
+    <section class="content">
+        <div class="container">
+            <div class="help-grid">
+                <div class="help-card">
+                    <i class="fas fa-rocket"></i>
+                    <h3>Getting Started</h3>
+                    <p>Learn how to create your account, set up your profile, and join your neighborhood Loop.</p>
+                </div>
+                <div class="help-card">
+                    <i class="fas fa-user-circle"></i>
+                    <h3>Account & Profile</h3>
+                    <p>Manage your account settings, update your profile, and customize your experience.</p>
+                </div>
+                <div class="help-card">
+                    <i class="fas fa-comments"></i>
+                    <h3>Posts & Messaging</h3>
+                    <p>Create posts, engage with neighbors, and use direct messaging effectively.</p>
+                </div>
+                <div class="help-card">
+                    <i class="fas fa-crown"></i>
+                    <h3>Premium Features</h3>
+                    <p>Explore Premium and Gold tier features, including AI tools and custom themes.</p>
+                </div>
+                <div class="help-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Safety & Privacy</h3>
+                    <p>Learn about safety features, privacy settings, and reporting tools.</p>
+                </div>
+                <div class="help-card">
+                    <i class="fas fa-credit-card"></i>
+                    <h3>Billing & Subscriptions</h3>
+                    <p>Manage your subscription, update payment methods, and view billing history.</p>
+                </div>
+            </div>
+
+            <h2 style="margin-top: 4rem; margin-bottom: 2rem; text-align: center;">Frequently Asked Questions</h2>
+            
+            <div class="faq">
+                <div class="faq-item">
+                    <h3>How do I join my neighborhood?</h3>
+                    <p>After creating your account, set your location in the app. LocalLoop will automatically connect you with verified neighbors in your area. You may need to verify your address.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>What's the difference between Basic, Premium, and Gold?</h3>
+                    <p><strong>Basic:</strong> Free plan with 5 posts/day, basic themes, and 5 lifetime AI avatars.<br>
+                    <strong>Premium (R49.99/month):</strong> Unlimited posts, 10 AI avatars/month, premium themes, ad-free.<br>
+                    <strong>Gold (R149.99/month):</strong> Everything in Premium + GPT-4o AI features, 20 Vision-enhanced avatars/month, custom prompts.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>How do AI Cartoon Avatars work?</h3>
+                    <p>Upload a profile photo, choose from 8 art styles (Pixar, Anime, Disney, etc.), and our AI generates a cartoon version. Gold users can also create custom styles with text prompts.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>Can I cancel my subscription anytime?</h3>
+                    <p>Yes! You can cancel anytime from your account settings. You'll retain access until the end of your current billing period.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>How do I report inappropriate content?</h3>
+                    <p>Tap the three dots on any post or comment and select "Report." Our moderation team reviews all reports within 24 hours.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>Is my location data shared with others?</h3>
+                    <p>No. We only show your approximate neighborhood, never your exact address. Location data is used solely to connect you with nearby neighbors.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>How does the marketplace work?</h3>
+                    <p>Premium and Gold users can create marketplace listings to sell items or promote services. Transactions happen directly between neighbors.</p>
+                </div>
+                
+                <div class="faq-item">
+                    <h3>What languages does LocalLoop support?</h3>
+                    <p>The app is available in English. Premium and Gold users get AI-powered translation in 11 South African languages including Zulu, Xhosa, Afrikaans, and more.</p>
+                </div>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 3rem; border-radius: 15px; text-align: center; margin-top: 3rem;">
+                <h2 style="margin-bottom: 1rem;">Still Need Help?</h2>
+                <p style="margin-bottom: 1.5rem;">Our support team is here for you</p>
+                <div>
+                    <a href="mailto:support@localloop.app" style="display: inline-block; background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 50px; text-decoration: none; margin: 0.5rem;">Email Support</a>
+                    <a href="contact.html" style="display: inline-block; background: white; color: var(--primary); border: 2px solid var(--primary); padding: 1rem 2rem; border-radius: 50px; text-decoration: none; margin: 0.5rem;">Contact Us</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a>
+                <a href="privacy.html">Privacy</a>
+                <a href="terms.html">Terms</a>
+                <a href="contact.html">Contact</a>
+            </p>
+            <p style="margin-top: 1rem; color: #888;">&copy; 2024 LocalLoop. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

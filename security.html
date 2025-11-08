@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security - LocalLoop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="logo.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #6C4DF4; --dark: #1a1a2e; }
+        body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; }
+        .navbar { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: fixed; width: 100%; top: 0; z-index: 1000; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+        .logo { display: flex; align-items: center; font-size: 1.5rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .logo img { margin-right: 10px; }
+        .hero { padding: 120px 0 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+        .content { padding: 60px 0; }
+        .content h2 { margin: 2rem 0 1rem; color: var(--dark); }
+        .content h3 { margin: 1.5rem 0 0.5rem; color: var(--primary); }
+        .content p { margin-bottom: 1rem; line-height: 1.8; }
+        .content ul { margin-left: 2rem; margin-bottom: 1rem; }
+        .security-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 3rem 0; }
+        .security-card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+        .security-card i { font-size: 3rem; color: var(--primary); margin-bottom: 1rem; }
+        .security-card h3 { margin-bottom: 1rem; }
+        .alert-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 1.5rem; border-radius: 8px; margin: 2rem 0; }
+        .footer { background: var(--dark); color: white; padding: 40px 0 20px; margin-top: 80px; text-align: center; }
+        .footer a { color: #bbb; text-decoration: none; margin: 0 10px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">
+                    <img src="logo.png" alt="LocalLoop" width="40" height="40">
+                    LocalLoop
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Security at LocalLoop</h1>
+            <p>Your safety and privacy are our top priorities</p>
+        </div>
+    </section>
+
+    <section class="content">
+        <div class="container">
+            <p style="font-size: 1.1rem; margin-bottom: 2rem;"><strong>Security is at the core of everything we do.</strong> We employ industry-leading practices to protect your data and ensure a safe community experience.</p>
+
+            <div class="security-grid">
+                <div class="security-card">
+                    <i class="fas fa-lock"></i>
+                    <h3>End-to-End Encryption</h3>
+                    <p>All data transmitted between your device and our servers is encrypted using TLS 1.3, the latest encryption standard.</p>
+                </div>
+                <div class="security-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Firebase Security</h3>
+                    <p>We use Google Firebase with strict security rules to protect your data. Every request is authenticated and authorized.</p>
+                </div>
+                <div class="security-card">
+                    <i class="fas fa-user-secret"></i>
+                    <h3>Privacy by Design</h3>
+                    <p>We collect only what's necessary and never sell your data. Your exact location is never shared publicly.</p>
+                </div>
+            </div>
+
+            <h2>Our Security Measures</h2>
+
+            <h3>Data Encryption</h3>
+            <ul>
+                <li><strong>In Transit:</strong> TLS 1.3 encryption for all network communications</li>
+                <li><strong>At Rest:</strong> AES-256 encryption for stored data</li>
+                <li><strong>Secure Authentication:</strong> Firebase Auth with industry-standard protocols</li>
+            </ul>
+
+            <h3>Infrastructure Security</h3>
+            <ul>
+                <li>Hosted on Google Cloud Platform with 99.9% uptime SLA</li>
+                <li>Automatic security patches and updates</li>
+                <li>Regular penetration testing and vulnerability assessments</li>
+                <li>DDoS protection and rate limiting</li>
+                <li>24/7 security monitoring and incident response</li>
+            </ul>
+
+            <h3>Access Controls</h3>
+            <ul>
+                <li>Multi-factor authentication for team members</li>
+                <li>Principle of least privilege access</li>
+                <li>Detailed audit logs for all system access</li>
+                <li>Regular access reviews and revocation</li>
+            </ul>
+
+            <h3>Application Security</h3>
+            <ul>
+                <li>Secure coding practices and code reviews</li>
+                <li>Input validation and sanitization</li>
+                <li>Protection against OWASP Top 10 vulnerabilities</li>
+                <li>Regular security audits and updates</li>
+                <li>Automated dependency scanning</li>
+            </ul>
+
+            <h2>AI Content Moderation</h2>
+            <p>Our AI-powered moderation system helps keep LocalLoop safe:</p>
+            <ul>
+                <li>Real-time content scanning for harmful material</li>
+                <li>Automatic flagging of suspicious activity</li>
+                <li>Human review of all flagged content within 24 hours</li>
+                <li>Zero tolerance for hate speech, violence, and illegal content</li>
+            </ul>
+
+            <h2>User Safety Features</h2>
+            <ul>
+                <li><strong>Block & Report:</strong> Easy tools to block users and report inappropriate content</li>
+                <li><strong>Verification:</strong> Neighborhood verification to ensure authentic community members</li>
+                <li><strong>Privacy Controls:</strong> Granular settings to control who sees your posts</li>
+                <li><strong>Safe Messaging:</strong> Report and block features in direct messages</li>
+            </ul>
+
+            <div class="alert-box">
+                <h3 style="margin-top: 0;"><i class="fas fa-exclamation-triangle"></i> Report Security Issues</h3>
+                <p style="margin-bottom: 0;">If you discover a security vulnerability, please report it to <strong>security@localloop.app</strong>. We take all reports seriously and respond within 24 hours. We offer a responsible disclosure program for security researchers.</p>
+            </div>
+
+            <h2>Compliance & Certifications</h2>
+            <ul>
+                <li>GDPR compliant for European users</li>
+                <li>POPIA compliant (South Africa)</li>
+                <li>SOC 2 Type II audit (in progress)</li>
+                <li>Regular third-party security assessments</li>
+            </ul>
+
+            <h2>Data Backup & Recovery</h2>
+            <p>We maintain robust backup systems:</p>
+            <ul>
+                <li>Automated daily backups of all data</li>
+                <li>Geo-redundant storage across multiple regions</li>
+                <li>Regular backup testing and recovery drills</li>
+                <li>99.99% data durability guarantee</li>
+            </ul>
+
+            <h2>Incident Response</h2>
+            <p>In the unlikely event of a security incident:</p>
+            <ul>
+                <li>24/7 incident response team</li>
+                <li>Immediate containment and remediation</li>
+                <li>Transparent communication with affected users</li>
+                <li>Post-incident analysis and improvements</li>
+            </ul>
+
+            <h2>Security Best Practices for Users</h2>
+            <p>Help keep your account secure:</p>
+            <ul>
+                <li>Use a strong, unique password</li>
+                <li>Never share your password with anyone</li>
+                <li>Log out on shared devices</li>
+                <li>Be cautious of phishing attempts (we never ask for passwords via email)</li>
+                <li>Report suspicious accounts or messages immediately</li>
+                <li>Keep your app updated to the latest version</li>
+            </ul>
+
+            <div style="background: #f8f9fa; padding: 3rem; border-radius: 15px; text-align: center; margin-top: 3rem;">
+                <h2 style="margin-bottom: 1rem;">Questions About Security?</h2>
+                <p style="margin-bottom: 1.5rem;">Our security team is here to help</p>
+                <a href="mailto:security@localloop.app" style="display: inline-block; background: var(--primary); color: white; padding: 1rem 2rem; border-radius: 50px; text-decoration: none;">Contact Security Team</a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a>
+                <a href="privacy.html">Privacy</a>
+                <a href="terms.html">Terms</a>
+                <a href="contact.html">Contact</a>
+            </p>
+            <p style="margin-top: 1rem; color: #888;">&copy; 2024 LocalLoop. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

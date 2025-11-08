@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - LocalLoop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/png" href="logo.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary: #6C4DF4; --dark: #1a1a2e; }
+        body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #333; }
+        .navbar { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: fixed; width: 100%; top: 0; z-index: 1000; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+        .logo { display: flex; align-items: center; font-size: 1.5rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .logo img { margin-right: 10px; }
+        .hero { padding: 120px 0 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+        .hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+        .content { padding: 60px 0; }
+        .blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 2rem; margin-top: 3rem; }
+        .blog-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.08); transition: transform 0.3s; }
+        .blog-card:hover { transform: translateY(-5px); }
+        .blog-card img { width: 100%; height: 200px; object-fit: cover; }
+        .blog-card-content { padding: 2rem; }
+        .blog-meta { color: #888; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .blog-card h3 { margin-bottom: 0.5rem; color: var(--dark); }
+        .blog-card p { color: #555; margin-bottom: 1rem; }
+        .read-more { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .footer { background: var(--dark); color: white; padding: 40px 0 20px; margin-top: 80px; text-align: center; }
+        .footer a { color: #bbb; text-decoration: none; margin: 0 10px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <a href="index.html" class="logo">
+                    <img src="logo.png" alt="LocalLoop" width="40" height="40">
+                    LocalLoop
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1>LocalLoop Blog</h1>
+            <p>Community stories, product updates, and neighborhood insights</p>
+        </div>
+    </section>
+
+    <section class="content">
+        <div class="container">
+            <div class="blog-grid">
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">November 8, 2024 · Product Update</div>
+                        <h3>Introducing GPT-4o AI Features</h3>
+                        <p>We're excited to announce our new Gold tier with advanced GPT-4o AI capabilities including Vision-personalized avatars, smart comment suggestions, and cultural translation.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(45deg, #FF6B6B 0%, #4ECDC4 100%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">November 1, 2024 · Community</div>
+                        <h3>How Neighborhoods Are Using LocalLoop for Safety</h3>
+                        <p>Real stories from communities using LocalLoop to enhance neighborhood watch programs and emergency alerts.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(45deg, #F093FB 0%, #F5576C 100%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">October 25, 2024 · Tips & Tricks</div>
+                        <h3>10 Ways to Get the Most Out of LocalLoop</h3>
+                        <p>Essential tips for building connections, organizing events, and making your neighborhood thrive.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(45deg, #FA8BFF 0%, #2BD2FF 90%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">October 18, 2024 · Feature Spotlight</div>
+                        <h3>AI Cartoon Avatars: Behind the Scenes</h3>
+                        <p>Learn how our DALL-E 3 integration creates stunning profile cartoons in 8 different artistic styles.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(45deg, #FFECD2 0%, #FCB69F 100%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">October 10, 2024 · Success Story</div>
+                        <h3>How One Loop Organized a Community Garden</h3>
+                        <p>The inspiring story of neighbors who came together to transform an empty lot into a thriving community space.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+
+                <div class="blog-card">
+                    <div style="width: 100%; height: 200px; background: linear-gradient(45deg, #A8EDEA 0%, #FED6E3 100%);"></div>
+                    <div class="blog-card-content">
+                        <div class="blog-meta">October 3, 2024 · Local Business</div>
+                        <h3>Supporting Local Businesses Through the Marketplace</h3>
+                        <p>How LocalLoop's marketplace helps neighborhood businesses connect with customers and build community relationships.</p>
+                        <a href="#" class="read-more">Read more →</a>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 4rem;">
+                <p style="color: #888;">More posts coming soon! Stay tuned for updates.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a>
+                <a href="privacy.html">Privacy</a>
+                <a href="terms.html">Terms</a>
+                <a href="contact.html">Contact</a>
+            </p>
+            <p style="margin-top: 1rem; color: #888;">&copy; 2024 LocalLoop. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
