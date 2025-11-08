@@ -1451,7 +1451,7 @@
                 document.getElementById('userEmail').textContent = user.email;
                 loadDashboardData();
             } else {
-                window.location.href = 'admin.html';
+                window.location.href = 'admin-firebase.html';
             }
         });
 
@@ -1581,7 +1581,7 @@
         window.logout = async () => {
             if (confirm('Are you sure you want to logout?')) {
                 await signOut(auth);
-                window.location.href = 'admin.html';
+                window.location.href = 'admin-firebase.html';
             }
         };
 
@@ -1756,7 +1756,7 @@
 
         function logout() {
             if (confirm('Are you sure you want to logout?')) {
-                window.location.href = 'admin.html';
+                window.location.href = 'admin-firebase.html';
             }
         }
 
