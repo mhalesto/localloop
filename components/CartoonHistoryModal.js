@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
-import { useAlert } from '../contexts/AlertContext';
 import { CARTOON_STYLES } from '../services/openai/profileCartoonService';
 
 export default function CartoonHistoryModal({
@@ -28,62 +27,30 @@ export default function CartoonHistoryModal({
   onDelete,
   onClearAll,
   isProcessing = false,
-  userPlan = 'basic',
 }) {
   const { themeColors, accentPreset } = useSettings();
-  const { showAlert } = useAlert();
+  const [processingId, setProcessingId] = useState(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
-  // Calculate max history based on plan
-  const getMaxHistory = () => {
-    if (userPlan === 'gold') return 10;
-    if (userPlan === 'premium') return 5;
-    return 3; // basic
-  };
-
-  const maxHistory = getMaxHistory();
-
   const handleSetAsProfile = async (pictureUrl, pictureId) => {
-    // Just call parent handler - it will close modal and handle all state
-    onSetAsProfile(pictureUrl);
+    setProcessingId(pictureId);
+    try {
+      await onSetAsProfile(pictureUrl);
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleDelete = (picture) => {
-    showAlert(
-      'Delete Picture',
-      'Are you sure you want to delete this cartoon picture? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            console.log('[CartoonHistoryModal] Delete confirmed for picture:', picture.id);
-            onDelete(picture.id);
-          },
-        },
-      ],
-      { icon: 'trash-outline', iconColor: '#FF3B30' }
-    );
+    console.log('[CartoonHistoryModal] Delete button pressed for picture:', picture.id);
+    // Just call onDelete - parent will handle confirmation and processing state
+    onDelete(picture.id);
+    console.log('[CartoonHistoryModal] onDelete called');
   };
 
   const handleClearAll = () => {
-    showAlert(
-      'Clear All History',
-      'Are you sure you want to delete all your saved cartoon pictures? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: () => {
-            console.log('[CartoonHistoryModal] Clear all confirmed');
-            onClearAll();
-          },
-        },
-      ],
-      { icon: 'trash-outline', iconColor: '#FF3B30' }
-    );
+    // Just call onClearAll directly - let parent handle confirmation
+    onClearAll();
   };
 
   const getStyleName = (styleId) => {
@@ -123,7 +90,7 @@ export default function CartoonHistoryModal({
                   Cartoon History
                 </Text>
                 <Text style={[localStyles.subtitle, { color: themeColors.textSecondary }]}>
-                  {pictureHistory.length} of {maxHistory} saved
+                  {pictureHistory.length} of 3 saved
                 </Text>
               </View>
               <TouchableOpacity onPress={onClose}>
@@ -164,6 +131,7 @@ export default function CartoonHistoryModal({
             ) : (
               pictureHistory.map((picture) => {
                 const isCurrentProfile = picture.url === currentProfilePhoto;
+                const isProcessingThis = processingId === picture.id;
 
                 return (
                   <View
@@ -208,21 +176,31 @@ export default function CartoonHistoryModal({
                         <TouchableOpacity
                           style={[localStyles.actionButton, { backgroundColor: `${primaryColor}15` }]}
                           onPress={() => handleSetAsProfile(picture.url, picture.id)}
-                          disabled={isProcessing}
+                          disabled={isProcessingThis}
                         >
-                          <Ionicons name="person-circle-outline" size={18} color={primaryColor} />
-                          <Text style={[localStyles.actionText, { color: primaryColor }]}>
-                            Use as Profile
-                          </Text>
+                          {isProcessingThis ? (
+                            <ActivityIndicator size="small" color={primaryColor} />
+                          ) : (
+                            <>
+                              <Ionicons name="person-circle-outline" size={18} color={primaryColor} />
+                              <Text style={[localStyles.actionText, { color: primaryColor }]}>
+                                Use as Profile
+                              </Text>
+                            </>
+                          )}
                         </TouchableOpacity>
                       )}
 
                       <TouchableOpacity
                         style={[localStyles.deleteButton, { backgroundColor: '#FF353515' }]}
                         onPress={() => handleDelete(picture)}
-                        disabled={isProcessing}
+                        disabled={isProcessingThis}
                       >
-                        <Ionicons name="trash-outline" size={20} color="#FF3535" />
+                        {isProcessingThis ? (
+                          <ActivityIndicator size="small" color="#FF3535" />
+                        ) : (
+                          <Ionicons name="trash-outline" size={20} color="#FF3535" />
+                        )}
                       </TouchableOpacity>
                     </View>
                   </View>
