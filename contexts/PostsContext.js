@@ -1716,6 +1716,105 @@ export function PostsProvider({ children }) {
     [awardEngagementPoints, enqueueOperation, ensureClientId, setPostsWithPersist]
   );
 
+  /**
+   * Vote on a poll option
+   * @param {string} city - City ID
+   * @param {string} postId - Post ID
+   * @param {number} optionIndex - Index of the poll option to vote for
+   * @param {string} userId - User ID of the voter
+  */
+  const votePoll = useCallback(
+    async (city, postId, optionIndex, userId) => {
+      if (!userId) {
+        console.warn('[PostsContext] Cannot vote on poll without userId');
+        return;
+      }
+
+      let remotePayload = null;
+      const now = Date.now();
+
+      setPostsWithPersist((prev) => {
+        const cityPosts = prev[city] ?? [];
+        let mutated = false;
+        const updated = cityPosts.map((post) => {
+          if (post.id !== postId || !post.poll) {
+            return post;
+          }
+
+          if (post.poll.endsAt && post.poll.endsAt < now) {
+            console.warn('[PostsContext] Poll has ended; ignoring vote');
+            return post;
+          }
+
+          const options = post.poll.options ?? [];
+          if (!options[optionIndex]) {
+            console.warn('[PostsContext] Invalid poll option selected');
+            return post;
+          }
+
+          const currentSelection = options.findIndex(
+            (option) => Array.isArray(option.voters) && option.voters.includes(userId)
+          );
+
+          if (currentSelection === optionIndex) {
+            return post;
+          }
+
+          const updatedOptions = options.map((option, index) => {
+            let voters = Array.isArray(option.voters) ? option.voters.filter(Boolean) : [];
+
+            if (index === currentSelection) {
+              voters = voters.filter((voterId) => voterId !== userId);
+            }
+
+            if (index === optionIndex) {
+              if (!voters.includes(userId)) {
+                voters = [...voters, userId];
+              }
+            }
+
+            return {
+              ...option,
+              voters,
+              votes: voters.length
+            };
+          });
+
+          const updatedTotalVotes = updatedOptions.reduce((sum, option) => sum + (option.votes || 0), 0);
+          const updatedPoll = {
+            ...post.poll,
+            options: updatedOptions,
+            totalVotes: updatedTotalVotes,
+          };
+
+          const nextPost = {
+            ...post,
+            poll: updatedPoll,
+          };
+
+          remotePayload = {
+            id: postId,
+            poll: updatedPoll,
+          };
+          mutated = true;
+
+          return nextPost;
+        });
+
+        if (!mutated) {
+          return prev;
+        }
+
+        return { ...prev, [city]: updated };
+      });
+
+      if (remotePayload) {
+        enqueueOperation({ type: 'updatePost', payload: { post: remotePayload } });
+      }
+    },
+    [enqueueOperation, setPostsWithPersist]
+  );
+
   const reportPost = useCallback(
     async (postId, reason = 'inappropriate') => {
       if (!postId) {
@@ -1964,6 +2063,7 @@ export function PostsProvider({ children }) {
       markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
+      votePoll,
       toggleCommentReaction,
       updatePost,
       boostMarketListing,
@@ -1996,6 +2096,7 @@ export function PostsProvider({ children }) {
       markNotificationsForThreadRead,
       markThreadRead,
       toggleVote,
+      votePoll,
       toggleCommentReaction,
       updatePost,
       boostMarketListing,

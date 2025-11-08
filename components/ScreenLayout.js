@@ -100,7 +100,16 @@ export default function ScreenLayout({
     [userProfile?.avatarKey]
   );
 
-  const handleSubmitPost = async ({ location, colorKey, title, message, highlightDescription, postingMode, isPublic }) => {
+  const handleSubmitPost = async ({
+    location,
+    colorKey,
+    title,
+    message,
+    highlightDescription,
+    postingMode,
+    isPublic,
+    poll,
+  }) => {
     if (!location?.city || !title?.trim?.()) {
       setComposerVisible(false);
       return false;
@@ -154,7 +163,7 @@ export default function ScreenLayout({
       mergedAuthor,
       highlightDescription,
       tempModeration,
-      null, // pollData
+      poll ?? null,
       postingMode || 'anonymous', // Default to anonymous if not specified
       isPublic ? userProfile : null, // Pass public profile data if posting publicly
       null, // marketMeta

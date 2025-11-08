@@ -120,7 +120,12 @@ export default function MyCommentsScreen({ navigation }) {
 
       <FlatList
         data={filteredThreads}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => {
+          if (item?.city && item?.id) {
+            return `${item.city}-${item.id}`;
+          }
+          return `thread-${item?.id ?? index}`;
+        }}
         renderItem={({ item }) => {
           const trimmedTitle = item.title?.trim?.() ?? '';
           const trimmedDescription = item.message?.trim?.() ?? '';

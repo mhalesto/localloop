@@ -45,6 +45,32 @@ const SUMMARY_CACHE_DEFAULT = Object.freeze({
   meta: null
 });
 const toLengthLabel = (value) => (value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : '');
+const describePollPreviewMeta = (poll) => {
+  if (!poll) {
+    return '';
+  }
+  const totalVotes = poll.totalVotes || 0;
+  if (totalVotes > 0) {
+    return `${totalVotes} vote${totalVotes === 1 ? '' : 's'} recorded`;
+  }
+  if (poll.endsAt) {
+    const remaining = poll.endsAt - Date.now();
+    if (remaining <= 0) {
+      return 'Poll ended';
+    }
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    if (hours >= 24) {
+      const days = Math.ceil(hours / 24);
+      return `Ends in ${days} day${days === 1 ? '' : 's'}`;
+    }
+    if (hours >= 1) {
+      return `Ends in ${hours} hour${hours === 1 ? '' : 's'}`;
+    }
+    const minutes = Math.max(1, Math.floor(remaining / (60 * 1000)));
+    return `Ends in ${minutes} min`;
+  }
+  return 'Poll active';
+};
 
 export default function CreatePostModal({
   visible,
@@ -114,6 +140,7 @@ export default function CreatePostModal({
   // Poll state
   const [pollData, setPollData] = useState(null);
   const [pollModalVisible, setPollModalVisible] = useState(false);
+  const pollPreviewMeta = useMemo(() => describePollPreviewMeta(pollData), [pollData]);
 
   useEffect(() => {
     if (visible) {
@@ -178,6 +205,7 @@ export default function CreatePostModal({
     initialMessage,
     initialTitle,
     initialHighlightDescription,
+    initialPoll,
     premiumSummaryLength
   ]);
 
@@ -844,6 +872,11 @@ export default function CreatePostModal({
                   <Text style={[styles.pollPreviewOptions, { color: previewMuted }]}>
                     {pollData.options.length} options
                   </Text>
+                  {pollPreviewMeta ? (
+                    <Text style={[styles.pollPreviewMeta, { color: previewMuted }]}>
+                      {pollPreviewMeta}
+                    </Text>
+                  ) : null}
                   <TouchableOpacity
                     onPress={() => setPollData(null)}
                     style={styles.removePollButton}
@@ -1303,6 +1336,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     pollPreviewOptions: {
       fontSize: 12,
+      marginTop: 4,
+    },
+    pollPreviewMeta: {
+      fontSize: 12,
+      marginTop: 2,
     },
     removePollButton: {
       position: 'absolute',

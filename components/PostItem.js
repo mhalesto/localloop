@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { accentPresets } from '../contexts/SettingsContext';
 import { getAvatarConfig } from '../constants/avatars';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 import RichText from './RichText';
+import PollDisplay from './PollDisplay';
 
 const presetMap = accentPresets.reduce((acc, p) => {
   acc[p.key] = p;
@@ -17,7 +19,9 @@ export default function PostItem({
   onViewOriginal,
   onReact,
   onShare,
+  onPollVote,
 }) {
+  const { user } = useAuth();
   const { themeColors } = useSettings();
   const preset = presetMap[post.colorKey ?? 'royal'] ?? accentPresets[0];
 
@@ -144,6 +148,27 @@ export default function PostItem({
             />
           </View>
         ) : null}
+
+        {/* Poll Display */}
+        {post.poll && (
+          <View style={styles.pollContainer}>
+            <PollDisplay
+              poll={post.poll}
+              onVote={(optionIndex) => onPollVote?.(post.id, optionIndex)}
+              currentUserId={user?.uid}
+              themeColors={{
+                surface: cardBackground,
+                background: preset.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                text: primaryTextColor,
+                textSecondary: metaColor,
+                border: preset.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                card: cardBackground,
+              }}
+              accentColor={linkColor}
+              postAuthorId={post.authorId || post.author?.id}
+            />
+          </View>
+        )}
 
         {/* Actions */}
         <View style={styles.actionsRow}>
@@ -295,6 +320,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     lineHeight: 22,
+  },
+
+  /* Poll Container */
+  pollContainer: {
+    marginBottom: 12,
   },
 
   /* Actions */

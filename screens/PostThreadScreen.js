@@ -45,6 +45,7 @@ import RichText from '../components/RichText';
 import { stripRichFormatting } from '../utils/textFormatting';
 import { TagList } from '../components/TagBadge';
 import { ContentWarningList, SentimentBadge } from '../components/ContentWarningBadge';
+import PollDisplay from '../components/PollDisplay';
 import { summarizeThread } from '../services/openai/threadSummarizationService';
 import { suggestComment, SUGGESTION_TYPES } from '../services/openai/commentSuggestionService';
 import { translatePost, LANGUAGES, COMMON_LANGUAGES } from '../services/openai/translationService';
@@ -438,7 +439,8 @@ export default function PostThreadScreen({ route, navigation }) {
     watchThread,
     setTypingStatus,
     observeTyping,
-    addFetchedPost
+    addFetchedPost,
+    votePoll
   } = usePosts();
   const {
     accentPreset,
@@ -2026,6 +2028,29 @@ export default function PostThreadScreen({ route, navigation }) {
     [city, closeShareModal, firebaseUser?.uid, postId, sharePost, userProfile, showAlert]
   );
 
+  const handlePollVote = useCallback(
+    async (optionIndex) => {
+      if (!firebaseUser?.uid || !post || !post.poll) {
+        return;
+      }
+
+      try {
+        // Call votePoll from PostsContext
+        await votePoll(city, postId, optionIndex, firebaseUser.uid);
+        console.log('[PostThread] Poll vote recorded:', { postId, optionIndex });
+      } catch (error) {
+        console.error('[PostThread] Error voting on poll:', error);
+        showAlert(
+          'Vote Failed',
+          'Unable to record your vote. Please try again.',
+          [{ text: 'OK' }],
+          { icon: 'alert-circle', iconColor: '#FF3B30' }
+        );
+      }
+    },
+    [city, firebaseUser?.uid, post, postId, votePoll, showAlert]
+  );
+
   const handleShareOutside = useCallback(async () => {
     if (isSharingOutside || !post || !sharePreviewRef.current?.capture) {
       return;
@@ -2533,6 +2558,27 @@ export default function PostThreadScreen({ route, navigation }) {
               </Animated.View>
             </>
           ) : null}
+
+          {/* Poll Display */}
+          {post.poll && (showDescriptionWhenScrolled || !isScrolledPastThreshold) && (
+            <View style={styles.pollContainerThread}>
+              <PollDisplay
+                poll={post.poll}
+                onVote={handlePollVote}
+                currentUserId={firebaseUser?.uid}
+                themeColors={{
+                  surface: postPreset.background,
+                  background: postPreset.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  text: headerTitleColor,
+                  textSecondary: headerMetaColor,
+                  border: postPreset.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                  card: postPreset.background,
+                }}
+                accentColor={linkColor}
+                postAuthorId={post.authorId || post.author?.id}
+              />
+            </View>
+          )}
 
           {/* Hide comment count and translate when description is collapsed */}
           {(showDescriptionWhenScrolled || !isScrolledPastThreshold) && (
@@ -3545,6 +3591,10 @@ const createStyles = (
     },
     postMessageExpandedContentIndicator: {
       paddingRight: 18,
+    },
+    pollContainerThread: {
+      marginTop: 16,
+      marginBottom: 16,
     },
     postMessageToggle: { alignSelf: 'flex-end', marginTop: 8 },
     postMessageToggleExpanded: { marginLeft: 0, marginTop: 8, alignSelf: 'flex-end' },

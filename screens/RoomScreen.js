@@ -24,7 +24,7 @@ import PollDisplay from '../components/PollDisplay';
 
 export default function RoomScreen({ navigation, route }) {
   const { city } = route.params;
-  const { addPost, getPostsForCity, sharePost, toggleVote } = usePosts();
+  const { addPost, getPostsForCity, sharePost, toggleVote, votePoll } = usePosts();
   const { accentPreset, accentKey, userProfile, themeColors, isDarkMode, themeDarkness = 0 } = useSettings();
   const { user: firebaseUser } = useAuth();
   const { showAlert } = useAlert();
@@ -384,7 +384,15 @@ export default function RoomScreen({ navigation, route }) {
             placeholderTextColor={previewMeta}
           />
           {pollData && (
-            <View style={styles.pollPreview}>
+            <View style={[styles.pollPreview, {
+              backgroundColor: selectedPreset.isDark
+                ? 'rgba(255,255,255,0.15)'
+                : 'rgba(0,0,0,0.15)',
+              borderWidth: 1,
+              borderColor: selectedPreset.isDark
+                ? 'rgba(255,255,255,0.2)'
+                : 'rgba(0,0,0,0.1)'
+            }]}>
               <Text style={[styles.pollPreviewTitle, { color: previewPrimary }]}>
                 Poll: {pollData.question}
               </Text>
@@ -441,6 +449,11 @@ export default function RoomScreen({ navigation, route }) {
         onPress={() => handleOpenPost(item.data.id)}
         roomName={city}
         onReact={(direction) => toggleVote(city, item.data.id, direction)}
+        onPollVote={(postId, optionIndex) => {
+          if (firebaseUser?.uid) {
+            votePoll(city, postId, optionIndex, firebaseUser.uid);
+          }
+        }}
         onShare={() => openShareModal(item.data)}
         onViewOriginal={
           item.data.sourcePostId && item.data.sourceCity &&
@@ -754,7 +767,6 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     pollPreview: {
       marginTop: 12,
       padding: 12,
-      backgroundColor: 'rgba(0,0,0,0.1)',
       borderRadius: 8,
       position: 'relative'
     },
