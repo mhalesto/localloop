@@ -1467,8 +1467,17 @@
 
                     // Check if user has admin claim
                     if (!idTokenResult.claims.admin) {
-                        alert('Access Denied: You do not have admin privileges.\n\nIf you just set up admin access:\n1. Log out\n2. Log back in\n3. Your admin access will be active');
+                        // Set flag to prevent redirect loop
+                        sessionStorage.setItem('redirecting', 'true');
+
+                        // Sign out completely
                         await signOut(auth);
+
+                        // Small delay to ensure signOut completes
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        alert('Access Denied: You do not have admin privileges.\n\nPlease:\n1. Visit https://mhalesto.github.io/localloop/admin-setup.html\n2. Grant yourself admin access\n3. Then log in again');
+
                         window.location.href = 'admin-firebase.html';
                         return;
                     }
@@ -1476,8 +1485,15 @@
                     loadDashboardData();
                 } catch (error) {
                     console.error('Token refresh error:', error);
-                    alert('Authentication error. Please log in again.');
+
+                    // Set flag to prevent redirect loop
+                    sessionStorage.setItem('redirecting', 'true');
+
+                    alert('Authentication error. Please log in again.\n\nError: ' + error.message);
+
                     await signOut(auth);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
                     window.location.href = 'admin-firebase.html';
                 }
             } else {

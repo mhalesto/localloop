@@ -80,6 +80,14 @@
 
         // Check auth state
         onAuthStateChanged(auth, async (user) => {
+            // Check if we're being redirected here due to auth error (prevent loop)
+            const isRedirecting = sessionStorage.getItem('redirecting');
+            if (isRedirecting) {
+                sessionStorage.removeItem('redirecting');
+                showLogin();
+                return;
+            }
+
             if (user) {
                 // Redirect authenticated users to the enhanced dashboard
                 window.location.href = 'admin-complete.html';
