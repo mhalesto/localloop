@@ -16,6 +16,7 @@ import Skeleton from '../components/Skeleton';
 import ExploreFilterModal from '../components/ExploreFilterModal';
 import FilteredPostCard from '../components/FilteredPostCard';
 import FilteredUserCard from '../components/FilteredUserCard';
+import ArtworkMasonryGrid from '../components/ArtworkMasonryGrid';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -23,7 +24,7 @@ import { useStatuses } from '../contexts/StatusesContext';
 import { useSensors } from '../contexts/SensorsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
-import { getPostsFromCity, getStatusesFromCity, getLocalUsers } from '../services/exploreContentService';
+import { getPostsFromCity, getAIArtworkFromCity, getLocalUsers } from '../services/exploreContentService';
 import { followUser, unfollowUser, isFollowing } from '../services/followService';
 
 const INITIAL_VISIBLE = 40;
@@ -37,7 +38,7 @@ const EXPLORE_FILTERS_KEY = '@localloop.exploreFilters';
 const DEFAULT_FILTERS = {
   showNearbyCities: true,
   showPostsFromCurrentCity: false,
-  showStatusesFromCurrentCity: false,
+  showAIArtGallery: false,
   showLocalUsers: false,
   showTrendingCities: true,
 };
@@ -91,7 +92,7 @@ export default function CountryScreen({ navigation }) {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [exploreFilters, setExploreFilters] = useState(DEFAULT_FILTERS);
   const [filteredPosts, setFilteredPosts] = useState([]);
-  const [filteredStatuses, setFilteredStatuses] = useState([]);
+  const [filteredArtwork, setFilteredArtwork] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loadingFilteredContent, setLoadingFilteredContent] = useState(false);
   const [followStates, setFollowStates] = useState({});
@@ -290,15 +291,15 @@ export default function CountryScreen({ navigation }) {
         setFilteredPosts([]);
       }
 
-      // Load statuses if filter is enabled
-      if (exploreFilters.showStatusesFromCurrentCity) {
+      // Load AI artwork if filter is enabled
+      if (exploreFilters.showAIArtGallery) {
         promises.push(
-          getStatusesFromCity(userProfile.city, 10).then((statuses) => {
-            if (isMounted.current) setFilteredStatuses(statuses);
+          getAIArtworkFromCity(userProfile.city, 20).then((artworks) => {
+            if (isMounted.current) setFilteredArtwork(artworks);
           })
         );
       } else {
-        setFilteredStatuses([]);
+        setFilteredArtwork([]);
       }
 
       // Load users if filter is enabled
@@ -554,11 +555,11 @@ export default function CountryScreen({ navigation }) {
     return Object.values(exploreFilters).filter(Boolean).length;
   }, [exploreFilters]);
 
-  // Check if any content filter is active (posts, statuses, users)
+  // Check if any content filter is active (posts, artwork, users)
   const hasActiveContentFilter = useMemo(() => {
     return (
       exploreFilters.showPostsFromCurrentCity ||
-      exploreFilters.showStatusesFromCurrentCity ||
+      exploreFilters.showAIArtGallery ||
       exploreFilters.showLocalUsers
     );
   }, [exploreFilters]);
@@ -568,7 +569,7 @@ export default function CountryScreen({ navigation }) {
     const names = [];
     if (exploreFilters.showNearbyCities) names.push('Nearby');
     if (exploreFilters.showPostsFromCurrentCity) names.push('Posts');
-    if (exploreFilters.showStatusesFromCurrentCity) names.push('Statuses');
+    if (exploreFilters.showAIArtGallery) names.push('AI Art');
     if (exploreFilters.showLocalUsers) names.push('Users');
     if (exploreFilters.showTrendingCities) names.push('Trending');
     return names;
@@ -735,52 +736,25 @@ export default function CountryScreen({ navigation }) {
                 </View>
               )}
 
-              {/* Filtered Statuses Section */}
-              {exploreFilters.showStatusesFromCurrentCity && userProfile?.city && (
+              {/* AI Art Gallery Section */}
+              {exploreFilters.showAIArtGallery && userProfile?.city && (
                 <View style={styles.filteredSection}>
                   <View style={styles.filteredHeader}>
                     <View>
-                      <Text style={styles.filteredTitle}>Status updates from {userProfile.city}</Text>
-                      <Text style={styles.filteredSubtitle}>See what's happening locally</Text>
+                      <Text style={styles.filteredTitle}>AI Art Gallery from {userProfile.city}</Text>
+                      <Text style={styles.filteredSubtitle}>Discover AI-generated artwork from local creators</Text>
                     </View>
-                    {filteredStatuses.length > 0 && (
-                      <TouchableOpacity
-                        style={styles.seeAllButton}
-                        onPress={() => navigation.navigate('TopStatuses')}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.seeAllText}>See all</Text>
-                        <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
-                      </TouchableOpacity>
-                    )}
                   </View>
                   {loadingFilteredContent ? (
                     <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
-                  ) : filteredStatuses.length > 0 ? (
-                    <FlatList
-                      data={filteredStatuses}
-                      horizontal
-                      keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <StatusStoryCard
-                          status={item}
-                          onPress={() => {
-                            const ids = filteredStatuses.map((s) => s.id);
-                            const index = filteredStatuses.findIndex((s) => s.id === item.id);
-                            navigation.navigate('StatusStoryViewer', {
-                              statusIds: ids,
-                              initialStatusId: item.id,
-                              initialIndex: index,
-                            });
-                          }}
-                        />
-                      )}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.horizontalList}
+                  ) : filteredArtwork.length > 0 ? (
+                    <ArtworkMasonryGrid
+                      artworks={filteredArtwork}
+                      onArtworkPress={(artwork) => navigation.navigate('PublicProfile', { userId: artwork.userId })}
                     />
                   ) : (
                     <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
-                      No status updates from {userProfile.city} yet
+                      No AI artwork from {userProfile.city} yet
                     </Text>
                   )}
                 </View>

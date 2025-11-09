@@ -46,61 +46,55 @@ export async function getPostsFromCity(city, maxResults = 10) {
 }
 
 /**
- * Get statuses from current city
+ * Get AI artwork (cartoon profile pictures) from current city
  * @param {string} city - City name
- * @param {number} maxResults - Maximum number of statuses to return
+ * @param {number} maxResults - Maximum number of artworks to return
  * @returns {Promise<Array>}
  */
-export async function getStatusesFromCity(city, maxResults = 10) {
+export async function getAIArtworkFromCity(city, maxResults = 20) {
   try {
     if (!city) return [];
 
-    const statusesQuery = query(
-      collection(db, 'statuses'),
+    // Get users from the city who have cartoon pictures
+    const usersQuery = query(
+      collection(db, 'users'),
       where('city', '==', city),
-      limit(maxResults)
+      where('isPublicProfile', '==', true),
+      limit(maxResults * 2) // Get more users to filter for artwork
     );
 
-    const snapshot = await getDocs(statusesQuery);
-    const statuses = [];
+    const snapshot = await getDocs(usersQuery);
+    const artworks = [];
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
 
-      // Get author details
-      let authorData = null;
-      if (data.authorId) {
-        try {
-          const userQuery = query(
-            collection(db, 'users'),
-            where('__name__', '==', data.authorId),
-            limit(1)
-          );
-          const userSnapshot = await getDocs(userQuery);
-          if (!userSnapshot.empty) {
-            authorData = userSnapshot.docs[0].data();
+      // Check if user has cartoon picture history
+      if (data.cartoonPictureHistory && Array.isArray(data.cartoonPictureHistory)) {
+        data.cartoonPictureHistory.forEach((cartoon) => {
+          if (cartoon.url) {
+            artworks.push({
+              id: cartoon.id || `${doc.id}-${cartoon.createdAt}`,
+              url: cartoon.url,
+              style: cartoon.style || 'Unknown',
+              createdAt: cartoon.createdAt || Date.now(),
+              userId: doc.id,
+              username: data.username,
+              displayName: data.displayName,
+              profilePhoto: data.profilePhoto,
+            });
           }
-        } catch (err) {
-          console.warn('[exploreContentService] Error fetching author:', err);
-        }
+        });
       }
-
-      statuses.push({
-        id: doc.id,
-        ...data,
-        author: authorData || {
-          username: 'Unknown',
-          displayName: 'Unknown User',
-        },
-      });
     }
 
-    // Sort by createdAt in memory to avoid index requirement
-    statuses.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // Sort by createdAt in memory (newest first)
+    artworks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    return statuses;
+    // Limit to maxResults
+    return artworks.slice(0, maxResults);
   } catch (error) {
-    console.error('[exploreContentService] Error getting statuses from city:', error);
+    console.error('[exploreContentService] Error getting AI artwork from city:', error);
     return [];
   }
 }

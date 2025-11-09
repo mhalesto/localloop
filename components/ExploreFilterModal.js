@@ -37,7 +37,7 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
     const defaultFilters = {
       showNearbyCities: true,
       showPostsFromCurrentCity: false,
-      showStatusesFromCurrentCity: false,
+      showAIArtGallery: false,
       showLocalUsers: false,
       showTrendingCities: true,
     };
@@ -60,10 +60,10 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
       color: '#3b82f6',
     },
     {
-      key: 'showStatusesFromCurrentCity',
-      label: 'Statuses from Current City',
-      description: 'Show status updates from your city',
-      icon: 'chatbubble-ellipses',
+      key: 'showAIArtGallery',
+      label: 'AI Art Gallery',
+      description: 'View AI-generated artwork from your city',
+      icon: 'color-palette',
       color: '#a855f7',
     },
     {
