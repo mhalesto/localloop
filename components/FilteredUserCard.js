@@ -33,42 +33,34 @@ export default function FilteredUserCard({ user, onPress, isFollowing, onFollowP
         </Text>
       )}
 
-      {/* Follow Button */}
-      <TouchableOpacity
-        style={[
-          styles.followButton,
-          {
-            backgroundColor: isFollowing ? themeColors.background : themeColors.primary,
-            borderColor: isFollowing ? themeColors.divider : themeColors.primary,
-          },
-        ]}
-        onPress={(e) => {
-          e.stopPropagation();
-          onFollowPress();
-        }}
-        activeOpacity={0.7}
-        disabled={isFollowLoading}
-      >
-        {isFollowLoading ? (
-          <ActivityIndicator size="small" color={isFollowing ? themeColors.primary : '#fff'} />
-        ) : (
-          <>
-            <Ionicons
-              name={isFollowing ? 'checkmark' : 'person-add'}
-              size={14}
-              color={isFollowing ? themeColors.textPrimary : '#fff'}
-            />
-            <Text
-              style={[
-                styles.followButtonText,
-                { color: isFollowing ? themeColors.textPrimary : '#fff' },
-              ]}
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
+      {/* Follow Button or Following Badge */}
+      {isFollowing ? (
+        <View style={[styles.followingBadge, { backgroundColor: themeColors.background }]}>
+          <Ionicons name="checkmark-circle" size={14} color="#10b981" />
+          <Text style={[styles.followingText, { color: themeColors.textSecondary }]}>
+            Following
+          </Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.followButton, { backgroundColor: themeColors.primary }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onFollowPress();
+          }}
+          activeOpacity={0.7}
+          disabled={isFollowLoading}
+        >
+          {isFollowLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="person-add" size={14} color="#fff" />
+              <Text style={styles.followButtonText}>Follow</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
 
       <View style={styles.meta}>
         <View style={styles.metaItem}>
@@ -153,7 +145,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
-    borderWidth: 1,
     marginTop: 10,
     marginBottom: 6,
     width: '100%',
@@ -161,5 +152,22 @@ const styles = StyleSheet.create({
   followButtonText: {
     fontSize: 13,
     fontWeight: '600',
+    color: '#fff',
+  },
+  followingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 6,
+    width: '100%',
+  },
+  followingText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
