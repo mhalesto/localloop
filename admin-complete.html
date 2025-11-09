@@ -2591,12 +2591,12 @@
                 const geometry = new THREE.ExtrudeGeometry(shape, {
                     depth,
                     bevelEnabled: true,
-                    bevelThickness: 0.12,
-                    bevelSize: 0.12,
+                    bevelThickness: 0.05,
+                    bevelSize: 0.05,
                     bevelOffset: 0,
-                    bevelSegments: 16,
+                    bevelSegments: 8,
                     curveSegments: 100,
-                    steps: 2
+                    steps: 1
                 });
                 // Only compute vertex normals for smooth shading
                 // Don't manually compute bounding box/sphere - Three.js handles this internally
