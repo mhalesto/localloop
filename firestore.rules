@@ -137,6 +137,16 @@ service cloud.firestore {
       allow create, delete: if isSignedIn() && request.auth.uid == followerId;
     }
 
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.followerId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.followerId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.followerId == request.auth.uid;
+    }
+
     match /publicPosts/{postId} {
       allow read: if true;
       allow create: if isSignedIn()
