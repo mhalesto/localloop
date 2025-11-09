@@ -6,6 +6,7 @@
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { app } from '../api/firebaseConfig';
+import { getHistoryLimit } from './openai/profileCartoonService';
 
 const db = getFirestore(app);
 const storage = getStorage(app);
@@ -201,12 +202,7 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin
     updatedHistory.unshift(historyEntry);
 
     // Determine max history based on plan
-    let maxHistory = 3; // Basic: 3
-    if (planId === 'premium') {
-      maxHistory = 5; // Premium: 5
-    } else if (planId === 'gold') {
-      maxHistory = 10; // Gold: 10
-    }
+    let maxHistory = getHistoryLimit(planId);
 
     // Admins get unlimited history
     if (isAdmin) {

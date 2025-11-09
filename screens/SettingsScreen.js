@@ -2259,7 +2259,7 @@ export default function SettingsScreen({ navigation }) {
         onDelete={handleDeleteCartoonPicture}
         onClearAll={handleClearCartoonHistory}
         isProcessing={isCartoonProcessing}
-        userPlan={userPlan}
+        subscriptionPlan={userProfile?.subscriptionPlan || 'basic'}
       />
 
       <CartoonSuccessModal

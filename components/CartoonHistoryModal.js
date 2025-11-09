@@ -20,7 +20,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
-import { CARTOON_STYLES } from '../services/openai/profileCartoonService';
+import { CARTOON_STYLES, getHistoryLimit } from '../services/openai/profileCartoonService';
 
 export default function CartoonHistoryModal({
   visible,
@@ -31,11 +31,13 @@ export default function CartoonHistoryModal({
   onDelete,
   onClearAll,
   isProcessing = false,
+  subscriptionPlan = 'basic',
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [processingId, setProcessingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+  const historyLimit = getHistoryLimit(subscriptionPlan);
 
   const handleSetAsProfile = async (pictureUrl, pictureId) => {
     setProcessingId(pictureId);
@@ -155,7 +157,7 @@ export default function CartoonHistoryModal({
                   Cartoon History
                 </Text>
                 <Text style={[localStyles.subtitle, { color: themeColors.textSecondary }]}>
-                  {Math.min(pictureHistory.length, 3)} of 3 saved
+                  {pictureHistory.length} of {historyLimit} saved
                 </Text>
               </View>
               <TouchableOpacity onPress={onClose}>

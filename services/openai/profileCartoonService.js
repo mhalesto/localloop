@@ -65,14 +65,17 @@ export const USAGE_LIMITS = {
   basic: {
     monthly: 0,
     lifetime: 5, // Free users get 5 lifetime generations
+    historyLimit: 3, // Basic users can save 3 cartoons in history
   },
   premium: {
     monthly: 10, // Premium users get 10 generations per month
     lifetime: null, // Unlimited lifetime
+    historyLimit: 10, // Premium users can save 10 cartoons in history
   },
   gold: {
     monthly: 20, // Gold users get 20 generations per month
     lifetime: null, // Unlimited lifetime
+    historyLimit: 20, // Gold users can save 20 cartoons in history
   },
 };
 
@@ -341,4 +344,14 @@ export function getUsageStatsText(subscriptionPlan = 'basic', currentMonthUsage 
   }
 
   return `${currentMonthUsage}/${limits.monthly} used this month`;
+}
+
+/**
+ * Get history limit based on subscription plan
+ * @param {string} subscriptionPlan - User's subscription plan
+ * @returns {number}
+ */
+export function getHistoryLimit(subscriptionPlan = 'basic') {
+  const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  return limits.historyLimit;
 }
