@@ -116,11 +116,13 @@ export const SUBSCRIPTION_PLANS = {
       'Everything in Premium',
       { text: '✨ GPT-4o AI Post Composer', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '🎨 Vision-Personalized Cartoons', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '🖼️ Upload Custom Images for Generation', badge: 'NEW', badgeColor: '#FF9500' },
+      { text: '🚀 Generate Anything (Beyond Cartoons)', badge: 'NEW', badgeColor: '#FF9500' },
       { text: '📝 GPT-4o Summaries (4 styles)', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '💬 Smart Comment Suggestions', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '🌍 Cultural Translation (11 SA languages)', badge: 'NEW', badgeColor: '#5E5CE6' },
-      '20 Vision-enhanced cartoon avatars/month (HD quality)',
-      'Custom cartoon prompts',
+      '20 Vision-enhanced generations/month (HD quality)',
+      'Custom prompts - unlimited creativity',
       'Gold Crown badge',
       '5 exclusive Gold themes',
       'Advanced color controls',
@@ -158,6 +160,8 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsMonthly: 20,
       cartoonAvatarsLifetime: null,
       customCartoonPrompts: true, // GOLD EXCLUSIVE
+      customImageUpload: true, // GOLD EXCLUSIVE - Upload custom images for generation
+      unlimitedGeneration: true, // GOLD EXCLUSIVE - Generate anything (not limited to cartoons)
       // GPT-4o Features (Gold Exclusive)
       gpt4oComposer: true, // AI Post Composer with GPT-4o
       gpt4oSummarization: true, // 4 summary styles

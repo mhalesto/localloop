@@ -112,6 +112,67 @@ export async function uploadCartoonToStorage(userId, imageUrl, styleId) {
 }
 
 /**
+ * Upload temporary custom image to Firebase Storage (Gold exclusive)
+ * This image is used for custom generation and deleted after use
+ * @param {string} userId - User ID
+ * @param {object} imageAsset - Image asset from expo-image-picker
+ * @returns {Promise<{url: string, storagePath: string}>} Public URL and storage path
+ */
+export async function uploadTemporaryCustomImage(userId, imageAsset) {
+  try {
+    console.log('[cartoonProfileService] Uploading temporary custom image');
+
+    // Fetch the local image file
+    const response = await fetch(imageAsset.uri);
+    const blob = await response.blob();
+
+    // Upload to temp folder in Firebase Storage
+    const timestamp = Date.now();
+    const filename = `temp-custom-images/${userId}/temp-${timestamp}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    await uploadBytes(storageRef, blob, {
+      contentType: 'image/jpeg',
+      customMetadata: {
+        temporary: 'true',
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    // Get public download URL for GPT Vision access
+    const downloadURL = await getDownloadURL(storageRef);
+    console.log('[cartoonProfileService] Temporary image uploaded:', downloadURL);
+
+    return {
+      url: downloadURL,
+      storagePath: filename,
+    };
+  } catch (error) {
+    console.error('[cartoonProfileService] Error uploading temporary image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete temporary custom image from Firebase Storage
+ * @param {string} storagePath - Storage path to delete
+ * @returns {Promise<void>}
+ */
+export async function deleteTemporaryCustomImage(storagePath) {
+  try {
+    if (!storagePath) return;
+
+    console.log('[cartoonProfileService] Deleting temporary image:', storagePath);
+    const storageRef = ref(storage, storagePath);
+    await deleteObject(storageRef);
+    console.log('[cartoonProfileService] Temporary image deleted successfully');
+  } catch (error) {
+    // Don't throw - just log the error as this is cleanup
+    console.error('[cartoonProfileService] Error deleting temporary image:', error);
+  }
+}
+
+/**
  * Record a cartoon generation and save to history
  * @param {string} userId - User ID
  * @param {string} imageUrl - Firebase Storage URL

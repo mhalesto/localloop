@@ -17,7 +17,9 @@ import {
   Platform,
   Alert,
   Switch,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import { CARTOON_STYLES, canGenerateCartoon, getUsageStatsText } from '../services/openai/profileCartoonService';
@@ -39,6 +41,8 @@ export default function CartoonStyleModal({
   const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo'); // GPT-3.5 or GPT-4
   const [notifyWhenDone, setNotifyWhenDone] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+  const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
+  const [useCustomImage, setUseCustomImage] = useState(false); // Toggle for using custom image vs profile pic
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   // Check notification permissions on mount
@@ -105,12 +109,49 @@ export default function CartoonStyleModal({
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Please enable photo library access in your device settings to upload a custom image.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCustomImage(result.assets[0]);
+        setUseCustomImage(true);
+      }
+    } catch (error) {
+      console.error('[CartoonStyleModal] Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.', [{ text: 'OK' }]);
+    }
+  };
+
+  const handleRemoveCustomImage = () => {
+    setCustomImage(null);
+    setUseCustomImage(false);
+  };
+
   const handleGenerate = () => {
     if (!canGenerate) return;
 
     const generationOptions = {
       model: isGoldUser ? selectedModel : 'gpt-3.5-turbo',
       notifyWhenDone,
+      customImage: useCustomImage && customImage ? customImage : null,
     };
 
     if (useCustomPrompt && customPrompt.trim()) {
@@ -234,6 +275,54 @@ export default function CartoonStyleModal({
                 <Text style={[localStyles.charCount, { color: themeColors.textSecondary }]}>
                   {customPrompt.length}/300 characters
                 </Text>
+              )}
+
+              {/* Custom Image Upload for Gold Users */}
+              {useCustomPrompt && (
+                <View style={localStyles.customImageSection}>
+                  <View style={localStyles.customImageHeader}>
+                    <Text style={[localStyles.customImageLabel, { color: themeColors.textPrimary }]}>
+                      Upload Custom Image (Optional)
+                    </Text>
+                    <Text style={[localStyles.customImageHint, { color: themeColors.textSecondary }]}>
+                      Use a different photo instead of your profile picture
+                    </Text>
+                  </View>
+
+                  {!customImage ? (
+                    <TouchableOpacity
+                      style={[localStyles.imagePickerButton, {
+                        backgroundColor: themeColors.background,
+                        borderColor: themeColors.divider,
+                      }]}
+                      onPress={handlePickImage}
+                      disabled={isGenerating}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="image-outline" size={32} color={themeColors.textSecondary} />
+                      <Text style={[localStyles.imagePickerText, { color: themeColors.textSecondary }]}>
+                        Tap to upload image
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={localStyles.imagePreviewContainer}>
+                      <Image
+                        source={{ uri: customImage.uri }}
+                        style={localStyles.imagePreview}
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        style={[localStyles.removeImageButton, { backgroundColor: '#FF3B30' }]}
+                        onPress={handleRemoveCustomImage}
+                        disabled={isGenerating}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#fff" />
+                        <Text style={localStyles.removeImageText}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               )}
             </View>
           )}
@@ -641,5 +730,68 @@ const localStyles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 30,
     fontStyle: 'italic',
+  },
+  customImageSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  customImageHeader: {
+    marginBottom: 12,
+  },
+  customImageLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  customImageHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  imagePickerButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 150,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  removeImageText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

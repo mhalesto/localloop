@@ -53,6 +53,8 @@ import {
   setAsProfilePicture,
   removePictureFromHistory,
   clearCartoonHistory,
+  uploadTemporaryCustomImage,
+  deleteTemporaryCustomImage,
 } from '../services/cartoonProfileService';
 import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
@@ -864,26 +866,40 @@ export default function SettingsScreen({ navigation }) {
 
   // Handle style selection and generation
   const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
-    if (!user?.uid || !userProfile?.profilePhoto) {
-      showAlert('Error', 'Please set a profile photo first before generating a cartoon.', [], { type: 'warning' });
+    // For custom prompts with custom images, we allow generation without profile photo
+    const { customImage } = generationOptions;
+    const needsProfilePhoto = !customImage;
+
+    if (!user?.uid || (needsProfilePhoto && !userProfile?.profilePhoto)) {
+      showAlert('Error', 'Please set a profile photo or upload a custom image before generating.', [], { type: 'warning' });
       return;
     }
 
     // Validate Gold users for custom prompts
-    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold') {
-      showAlert('Premium Feature', 'Custom cartoon prompts are exclusive to Gold members. Upgrade to Gold to unlock this feature!', [], { type: 'warning' });
+    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold' && !isAdmin) {
+      showAlert('Premium Feature', 'Custom prompts and custom images are exclusive to Gold members. Upgrade to Gold to unlock unlimited creative generation!', [], { type: 'warning' });
       return;
     }
 
     setIsGeneratingCartoon(true);
+    let tempImageData = null; // Store temp image info for cleanup
 
     try {
       // Extract options
       const { model = 'gpt-3.5-turbo', notifyWhenDone = false } = generationOptions;
 
+      // If custom image provided, upload it temporarily
+      let imageUrlToUse = userProfile.profilePhoto;
+      if (customImage) {
+        console.log('[SettingsScreen] Uploading custom image for Gold user');
+        tempImageData = await uploadTemporaryCustomImage(user.uid, customImage);
+        imageUrlToUse = tempImageData.url;
+        console.log('[SettingsScreen] Using custom image URL:', imageUrlToUse);
+      }
+
       // Generate cartoon using OpenAI with selected model
       const result = await generateCartoonProfile(
-        userProfile.profilePhoto,
+        imageUrlToUse,
         styleId,
         userProfile.gender || 'neutral',
         customPrompt, // Pass custom prompt for Gold users
@@ -896,6 +912,12 @@ export default function SettingsScreen({ navigation }) {
 
       // Record generation and update history (use 'custom' as style if custom prompt)
       await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin, userPlan);
+
+      // Delete temporary custom image if it was used
+      if (tempImageData) {
+        await deleteTemporaryCustomImage(tempImageData.storagePath);
+        tempImageData = null;
+      }
 
       // Reload data to update UI
       await loadCartoonData();
@@ -917,6 +939,12 @@ export default function SettingsScreen({ navigation }) {
       setCartoonSuccessModalVisible(true);
     } catch (error) {
       console.error('[SettingsScreen] Error generating cartoon:', error);
+
+      // Clean up temporary image on error
+      if (tempImageData) {
+        await deleteTemporaryCustomImage(tempImageData.storagePath);
+      }
+
       setIsGeneratingCartoon(false);
       setCartoonStyleModalVisible(false);
 
