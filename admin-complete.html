@@ -2602,19 +2602,19 @@
                 const startAngle = currentAngle + gap / 2;
                 const endAngle = startAngle + sweep;
 
-                // Use TorusGeometry for smooth rounded edges
-                const tubeRadius = (outerRadius - innerRadius) / 2;
-                const avgRadius = (outerRadius + innerRadius) / 2;
-                const geometry = new THREE.TorusGeometry(
-                    avgRadius,
-                    tubeRadius,
-                    32,  // tubular segments (roundness)
-                    100, // radial segments (smoothness)
-                    sweep
-                );
+                // Create clean donut segment shape
+                const shape = new THREE.Shape();
+                shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
+                const hole = new THREE.Path();
+                hole.absarc(0, 0, innerRadius, endAngle, startAngle, true);
+                shape.holes.push(hole);
 
-                // Rotate to position correctly
-                geometry.rotateY(startAngle + Math.PI / 2);
+                // Simple extrusion without bevels
+                const geometry = new THREE.ExtrudeGeometry(shape, {
+                    depth: depth,
+                    bevelEnabled: false,
+                    curveSegments: 80
+                });
                 geometry.computeVertexNormals();
 
                 // Convert color string to hex number
