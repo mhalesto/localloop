@@ -2531,42 +2531,36 @@
             wrapper.appendChild(renderer.domElement);
 
             const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf8f9fa);
 
-            // Better camera positioning for nicer angle
-            const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-            camera.position.set(0, 6, 8);
+            // Camera angled from top-front like reference
+            const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+            camera.position.set(-2, 8, 10);
             camera.lookAt(0, 0, 0);
 
-            // Enhanced lighting setup
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            // Lighting setup matching reference image
+            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
             scene.add(ambient);
 
-            // Main key light (top-front)
-            const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            keyLight.position.set(6, 12, 8);
+            // Main key light from top-left (like reference)
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
+            keyLight.position.set(-10, 15, 10);
             keyLight.castShadow = true;
             keyLight.shadow.mapSize.width = 2048;
             keyLight.shadow.mapSize.height = 2048;
+            keyLight.shadow.camera.near = 0.5;
+            keyLight.shadow.camera.far = 50;
             scene.add(keyLight);
 
-            // Fill light (softer, from side)
-            const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            fillLight.position.set(-8, 4, -6);
+            // Soft fill light from right
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+            fillLight.position.set(8, 5, 8);
             scene.add(fillLight);
 
-            // Rim light (back lighting for depth)
-            const rimLight = new THREE.DirectionalLight(0x6C4DF4, 0.6);
-            rimLight.position.set(-5, -8, -6);
+            // Subtle rim light for depth
+            const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            rimLight.position.set(0, -5, -8);
             scene.add(rimLight);
-
-            // Add subtle point lights for extra glow
-            const pointLight1 = new THREE.PointLight(0x10b981, 0.4, 15);
-            pointLight1.position.set(4, 2, 4);
-            scene.add(pointLight1);
-
-            const pointLight2 = new THREE.PointLight(0xfbbf24, 0.3, 15);
-            pointLight2.position.set(-4, 2, 4);
-            scene.add(pointLight2);
 
             const donutGroup = new THREE.Group();
             const rawValues = payload.threeData?.values || payload.datasets?.[0]?.data || [];
@@ -2607,20 +2601,20 @@
                 }
                 const startAngle = currentAngle + gap / 2;
                 const endAngle = startAngle + sweep;
-                const shape = new THREE.Shape();
-                shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
-                const hole = new THREE.Path();
-                hole.absarc(0, 0, innerRadius, endAngle, startAngle, true);
-                shape.holes.push(hole);
 
-                const geometry = new THREE.ExtrudeGeometry(shape, {
-                    depth,
-                    bevelEnabled: false,
-                    curveSegments: 100,
-                    steps: 1
-                });
-                // Only compute vertex normals for smooth shading
-                // Don't manually compute bounding box/sphere - Three.js handles this internally
+                // Use TorusGeometry for smooth rounded edges
+                const tubeRadius = (outerRadius - innerRadius) / 2;
+                const avgRadius = (outerRadius + innerRadius) / 2;
+                const geometry = new THREE.TorusGeometry(
+                    avgRadius,
+                    tubeRadius,
+                    32,  // tubular segments (roundness)
+                    100, // radial segments (smoothness)
+                    sweep
+                );
+
+                // Rotate to position correctly
+                geometry.rotateY(startAngle + Math.PI / 2);
                 geometry.computeVertexNormals();
 
                 // Convert color string to hex number
@@ -2631,13 +2625,13 @@
 
                 const material = new THREE.MeshPhysicalMaterial({
                     color: colorHex,
-                    roughness: 0.18,
-                    metalness: 0.25,
-                    clearcoat: 0.4,
-                    clearcoatRoughness: 0.2,
-                    reflectivity: 0.55,
-                    envMapIntensity: 1.2,
-                    emissive: new THREE.Color(colorHex).multiplyScalar(0.05),
+                    roughness: 0.2,
+                    metalness: 0.15,
+                    clearcoat: 0.5,
+                    clearcoatRoughness: 0.15,
+                    reflectivity: 0.6,
+                    envMapIntensity: 1.0,
+                    emissive: new THREE.Color(colorHex).multiplyScalar(0.02),
                     side: THREE.DoubleSide
                 });
 
@@ -2661,12 +2655,18 @@
             highlightRing.position.y = depth / 2 + 0.03;
             scene.add(highlightRing);
 
+            // Add shadow plane like reference image
             const shadow = new THREE.Mesh(
-                new THREE.CircleGeometry(outerRadius * 1.15, 64),
-                new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.08 })
+                new THREE.CircleGeometry(outerRadius * 1.4, 64),
+                new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.15,
+                    depthWrite: false
+                })
             );
             shadow.rotation.x = -Math.PI / 2;
-            shadow.position.y = -depth / 2 - 0.3;
+            shadow.position.y = -depth / 2 - 0.4;
             scene.add(shadow);
 
             modalState.three = {
