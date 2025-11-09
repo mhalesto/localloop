@@ -11,11 +11,11 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Image,
   ActivityIndicator,
   Alert,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
@@ -155,7 +155,7 @@ export default function CartoonHistoryModal({
                   Cartoon History
                 </Text>
                 <Text style={[localStyles.subtitle, { color: themeColors.textSecondary }]}>
-                  {pictureHistory.length} of 3 saved
+                  {Math.min(pictureHistory.length, 3)} of 3 saved
                 </Text>
               </View>
               <TouchableOpacity onPress={onClose}>
@@ -214,7 +214,11 @@ export default function CartoonHistoryModal({
                     <Image
                       source={{ uri: picture.url }}
                       style={localStyles.pictureImage}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      transition={200}
+                      placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+                      cachePolicy="memory-disk"
+                      priority="high"
                     />
 
                     {/* Current Badge */}
