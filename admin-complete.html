@@ -2612,7 +2612,7 @@
             }
         }
 
-        async function cleanupPosts() {
+        window.cleanupPosts = async function() {
             if (!confirm('⚠️ Are you sure you want to delete ALL posts and comments?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
                 return;
             }
@@ -2634,7 +2634,7 @@
             }
         }
 
-        async function cleanupStatuses() {
+        window.cleanupStatuses = async function() {
             if (!confirm('⚠️ Are you sure you want to delete ALL statuses?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
                 return;
             }
@@ -2656,7 +2656,7 @@
             }
         }
 
-        async function cleanupStorage() {
+        window.cleanupStorage = async function() {
             if (!confirm('⚠️ Are you sure you want to delete ALL storage files (posts & statuses images)?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
                 return;
             }
@@ -2681,7 +2681,7 @@
             }
         }
 
-        async function cleanupEverything() {
+        window.cleanupEverything = async function() {
             if (!confirm('⚠️⚠️⚠️ FINAL WARNING ⚠️⚠️⚠️\n\nThis will delete:\n- ALL posts and comments\n- ALL statuses\n- ALL storage files (images)\n\nUsers will remain intact.\n\nThis action CANNOT be undone!\n\nAre you ABSOLUTELY sure?')) {
                 return;
             }
