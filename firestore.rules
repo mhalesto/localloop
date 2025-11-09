@@ -5,6 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -52,13 +56,13 @@ service cloud.firestore {
         );
 
       allow delete: if isSignedIn()
-        && resource.data.author.uid == request.auth.uid;
+        && (resource.data.author.uid == request.auth.uid || isAdmin());
 
       match /comments/{commentId} {
         allow read: if true;
         allow create: if isSignedIn();
         allow update, delete: if isSignedIn()
-          && resource.data.authorId == request.auth.uid;
+          && (resource.data.authorId == request.auth.uid || isAdmin());
       }
 
       match /presence/{clientId} {
@@ -80,13 +84,14 @@ service cloud.firestore {
             .hasAny(['authorId', 'createdAt'])
         );
 
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn()
+        && (resource.data.authorId == request.auth.uid || isAdmin());
 
       match /replies/{replyId} {
         allow read: if true;
         allow create: if isSignedIn();
         allow update, delete: if isSignedIn()
-          && resource.data.authorId == request.auth.uid;
+          && (resource.data.authorId == request.auth.uid || isAdmin());
       }
     }
 
@@ -162,7 +167,7 @@ service cloud.firestore {
         );
 
       allow delete: if isSignedIn()
-        && resource.data.authorId == request.auth.uid;
+        && (resource.data.authorId == request.auth.uid || isAdmin());
     }
 
     match /directMessages/{conversationId} {
