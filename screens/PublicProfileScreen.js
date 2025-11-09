@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Modal
+  Modal,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ALL_INTERESTS } from '../constants/profileConstants';
 import ScreenLayout from '../components/ScreenLayout';
 import ProgressiveImage from '../components/ProgressiveImage';
 import ProfileSkeleton from '../components/ProfileSkeleton';
@@ -853,7 +855,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                     closePhotoPreview();
                     handleDeleteAlbumPhoto(currentPhotoObject);
                   }}
-                  activeOpacity={0.1}
+                  activeOpacity={0.7}
                 >
                   <Ionicons name="trash" size={28} color="#fff" />
                 </TouchableOpacity>
@@ -962,12 +964,35 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
 
           {/* Display Name & Username */}
-          <Text style={[styles.displayName, { color: themeColors.textPrimary }]}>
-            {profile.displayName || profile.username}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.displayName, { color: themeColors.textPrimary }]}>
+              {profile.displayName || profile.username}
+            </Text>
+            {profile.pronouns && (
+              <Text style={[styles.pronouns, { color: themeColors.textSecondary }]}>
+                {profile.pronouns}
+              </Text>
+            )}
+          </View>
           <Text style={[styles.username, { color: themeColors.textSecondary }]}>
             @{profile.username}
           </Text>
+
+          {/* Profession & Company */}
+          {(profile.profession || profile.company) && (
+            <View style={styles.professionRow}>
+              {profile.profession && (
+                <Text style={[styles.profession, { color: themeColors.textPrimary }]}>
+                  {profile.profession}
+                </Text>
+              )}
+              {profile.company && (
+                <Text style={[styles.company, { color: themeColors.textSecondary }]}>
+                  @ {profile.company}
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Bio */}
           {profile.bio && (
@@ -981,6 +1006,65 @@ export default function PublicProfileScreen({ navigation, route }) {
               <Text style={[styles.location, { color: themeColors.textSecondary }]}>
                 {[profile.city, profile.province, profile.country].filter(Boolean).join(', ')}
               </Text>
+            </View>
+          )}
+
+          {/* Links */}
+          {profile.links && profile.links.length > 0 && (
+            <View style={styles.linksContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.linksScroll}
+              >
+                {profile.links.map((link) => (
+                  <TouchableOpacity
+                    key={link.id}
+                    style={[styles.linkPill, { borderColor: themeColors.divider }]}
+                    onPress={() => Linking.openURL(link.url)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={link.icon || 'link'}
+                      size={14}
+                      color={primaryColor}
+                    />
+                    <Text style={[styles.linkText, { color: themeColors.textPrimary }]}>
+                      {link.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Interests */}
+          {profile.interests && profile.interests.length > 0 && (
+            <View style={styles.interestsContainer}>
+              <Text style={[styles.interestsLabel, { color: themeColors.textSecondary }]}>
+                Interests
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.interestsScroll}
+              >
+                {profile.interests.map((interestId) => {
+                  const interest = ALL_INTERESTS.find((i) => i.id === interestId);
+                  if (!interest) return null;
+                  return (
+                    <View
+                      key={interestId}
+                      style={[styles.interestPill, { backgroundColor: withAlpha(primaryColor, 0.12), borderColor: withAlpha(primaryColor, 0.3) }]}
+                    >
+                      <Ionicons name={interest.icon} size={14} color={primaryColor} />
+                      <Text style={[styles.interestText, { color: themeColors.textPrimary }]}>
+                        {interest.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
 
@@ -1299,14 +1383,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   displayName: {
     fontSize: 24,
     fontWeight: '700',
-    marginBottom: 4,
+  },
+  pronouns: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   username: {
     fontSize: 16,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  professionRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  profession: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  company: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   bio: {
     fontSize: 15,
@@ -1319,10 +1425,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   location: {
     fontSize: 14,
+  },
+  linksContainer: {
+    marginBottom: 12,
+  },
+  linksScroll: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  linkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  linkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  interestsContainer: {
+    marginBottom: 16,
+  },
+  interestsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    paddingHorizontal: 20,
+  },
+  interestsScroll: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  interestPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  interestText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
