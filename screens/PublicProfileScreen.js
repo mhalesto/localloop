@@ -75,6 +75,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [albumUploading, setAlbumUploading] = useState(false);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [photoPreviewSource, setPhotoPreviewSource] = useState(null);
+  const [currentPhotoObject, setCurrentPhotoObject] = useState(null); // Store the full photo object for deletion
   const [showAlbumSettings, setShowAlbumSettings] = useState(false);
 
   // Track original values for change detection
@@ -210,7 +211,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     }
   }, [photoModalVisible]);
 
-  const handlePreviewPhoto = useCallback(async (uri) => {
+  const handlePreviewPhoto = useCallback(async (uri, photoObject = null) => {
     if (!uri) return;
     try {
       await ScreenCapture.preventScreenCaptureAsync();
@@ -218,12 +219,14 @@ export default function PublicProfileScreen({ navigation, route }) {
       console.warn('[PublicProfile] prevent screen capture failed', error);
     }
     setPhotoPreviewSource({ uri });
+    setCurrentPhotoObject(photoObject); // Store the photo object for deletion
     setPhotoModalVisible(true);
   }, []);
 
   const closePhotoPreview = useCallback(async () => {
     setPhotoModalVisible(false);
     setPhotoPreviewSource(null);
+    setCurrentPhotoObject(null); // Clear the photo object
     try {
       await ScreenCapture.allowScreenCaptureAsync();
     } catch {}
@@ -608,7 +611,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                           key={photo.id}
                           style={styles.masonryItem}
                           activeOpacity={0.8}
-                          onPress={() => handlePreviewPhoto(photo.downloadUrl)}
+                          onPress={() => handlePreviewPhoto(photo.downloadUrl, photo)}
                           onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
                           delayLongPress={250}
                         >
@@ -634,7 +637,7 @@ export default function PublicProfileScreen({ navigation, route }) {
                   key={photo.id}
                   style={[styles.albumItem, { width: `${100 / albumColumns}%` }]}
                   activeOpacity={0.8}
-                  onPress={() => handlePreviewPhoto(photo.downloadUrl)}
+                  onPress={() => handlePreviewPhoto(photo.downloadUrl, photo)}
                   onLongPress={() => isOwnProfile && handleDeleteAlbumPhoto(photo)}
                   delayLongPress={250}
                 >
@@ -840,13 +843,32 @@ export default function PublicProfileScreen({ navigation, route }) {
             activeOpacity={1}
             onPress={closePhotoPreview}
           >
-            <TouchableOpacity
-              style={styles.photoModalClose}
-              onPress={closePhotoPreview}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close-circle" size={40} color="#fff" />
-            </TouchableOpacity>
+            {/* Action Buttons */}
+            <View style={styles.photoModalActions}>
+              {/* Delete Button (only for own profile and album photos) */}
+              {isOwnProfile && currentPhotoObject && (
+                <TouchableOpacity
+                  style={styles.photoModalDelete}
+                  onPress={() => {
+                    closePhotoPreview();
+                    handleDeleteAlbumPhoto(currentPhotoObject);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash" size={28} color="#FF3B30" />
+                </TouchableOpacity>
+              )}
+
+              {/* Close Button */}
+              <TouchableOpacity
+                style={styles.photoModalClose}
+                onPress={closePhotoPreview}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close-circle" size={40} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
             {photoPreviewSource ? (
               <ProgressiveImage
                 source={photoPreviewSource}
@@ -1549,14 +1571,39 @@ const styles = StyleSheet.create({
     padding: 16,
     overflow: 'hidden',
   },
-  photoModalClose: {
+  photoModalActions: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     right: 20,
+    flexDirection: 'row',
+    gap: 12,
     zIndex: 10,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 30,
+  },
+  photoModalDelete: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 59, 48, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  photoModalClose: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   photoModalImage: {
     width: '100%',
