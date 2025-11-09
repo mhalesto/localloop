@@ -538,10 +538,10 @@ export default function CountryScreen({ navigation }) {
     }
 
     const feed = [];
-    const ARTWORKS_PER_CHUNK = 4;
+    const ARTWORKS_PER_CHUNK = 6;
     const artworkChunks = [];
 
-    // Split artworks into chunks of 4
+    // Split artworks into chunks of 6
     for (let i = 0; i < searchFilteredArtwork.length; i += ARTWORKS_PER_CHUNK) {
       artworkChunks.push(searchFilteredArtwork.slice(i, i + ARTWORKS_PER_CHUNK));
     }
