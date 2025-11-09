@@ -59,7 +59,7 @@ const FALLBACK_COUNTRIES = [
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, showDiscoveryOnExplore, userProfile, themeColors, isDarkMode } = useSettings();
-  const { getRecentCityActivity, refreshPosts } = usePosts();
+  const { getRecentCityActivity, refreshPosts, addFetchedPost } = usePosts();
   const { currentUser } = useAuth();
   const haptics = useHaptics();
   const {
@@ -723,7 +723,15 @@ export default function CountryScreen({ navigation }) {
                       renderItem={({ item }) => (
                         <FilteredPostCard
                           post={item}
-                          onPress={() => navigation.navigate('PostThread', { postId: item.id })}
+                          onPress={() => {
+                            const postCity = item.city || userProfile?.city;
+                            // Add post to context so PostThreadScreen can find it
+                            addFetchedPost(postCity, item);
+                            navigation.navigate('PostThread', {
+                              postId: item.id,
+                              city: postCity
+                            });
+                          }}
                           showPostBackground={exploreFilters.showPostBackgrounds}
                         />
                       )}
