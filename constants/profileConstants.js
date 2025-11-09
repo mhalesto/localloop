@@ -130,6 +130,9 @@ export const PROFILE_LIMITS = {
   PROFESSION_MAX_LENGTH: 50,
   COMPANY_MAX_LENGTH: 50,
   EDUCATION_MAX_LENGTH: 100,
+  CATEGORY_MAX_LENGTH: 30,
+  CONTACT_EMAIL_MAX_LENGTH: 100,
+  CHANNEL_NAME_MAX_LENGTH: 50,
 };
 
 // Privacy settings for profile fields
@@ -139,6 +142,9 @@ export const PRIVACY_SETTINGS = {
   COMPANY: 'showCompany',
   INTERESTS: 'showInterests',
   LINKS: 'showLinks',
+  CATEGORY: 'showCategory',
+  CONTACT_EMAIL: 'showContactEmail',
+  CHANNEL: 'showChannel',
 };
 
 // Default privacy settings (all public by default)
@@ -148,4 +154,7 @@ export const DEFAULT_PRIVACY_SETTINGS = {
   showCompany: true,
   showInterests: true,
   showLinks: true,
+  showCategory: true,
+  showContactEmail: true,
+  showChannel: true,
 };
