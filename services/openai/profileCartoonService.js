@@ -190,7 +190,12 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     if (personalizedDescription) {
       prompt = `Create a portrait cartoon avatar: ${customPrompt}. Based on this person: ${personalizedDescription}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
       console.log('[profileCartoonService] Using CUSTOM prompt with Vision personalization (Gold)');
+    } else if (!imageUrl) {
+      // Text-only generation: Complete creative freedom
+      prompt = `${customPrompt}. High quality, detailed, creative, professional illustration.`;
+      console.log('[profileCartoonService] Using CUSTOM prompt for text-only generation (unlimited creativity)');
     } else {
+      // Custom image provided
       prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
       console.log('[profileCartoonService] Using CUSTOM prompt from Gold user');
     }

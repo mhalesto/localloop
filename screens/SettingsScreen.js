@@ -866,12 +866,12 @@ export default function SettingsScreen({ navigation }) {
 
   // Handle style selection and generation
   const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
-    // For custom prompts with custom images, we allow generation without profile photo
-    const { customImage } = generationOptions;
-    const needsProfilePhoto = !customImage;
+    // For custom prompts with custom images or ignoreProfilePicture flag, we allow generation without profile photo
+    const { customImage, ignoreProfilePicture } = generationOptions;
+    const needsProfilePhoto = !customImage && !ignoreProfilePicture;
 
     if (!user?.uid || (needsProfilePhoto && !userProfile?.profilePhoto)) {
-      showAlert('Error', 'Please set a profile photo or upload a custom image before generating.', [], { type: 'warning' });
+      showAlert('Error', 'Please set a profile photo, upload a custom image, or enable "Generate without profile picture" before generating.', [], { type: 'warning' });
       return;
     }
 
@@ -888,13 +888,22 @@ export default function SettingsScreen({ navigation }) {
       // Extract options
       const { model = 'gpt-3.5-turbo', notifyWhenDone = false } = generationOptions;
 
-      // If custom image provided, upload it temporarily
-      let imageUrlToUse = userProfile.profilePhoto;
+      // Determine which image to use
+      let imageUrlToUse = null;
       if (customImage) {
+        // Gold user uploaded a custom image
         console.log('[SettingsScreen] Uploading custom image for Gold user');
         tempImageData = await uploadTemporaryCustomImage(user.uid, customImage);
         imageUrlToUse = tempImageData.url;
         console.log('[SettingsScreen] Using custom image URL:', imageUrlToUse);
+      } else if (!ignoreProfilePicture && userProfile.profilePhoto) {
+        // Use profile photo (default behavior)
+        imageUrlToUse = userProfile.profilePhoto;
+        console.log('[SettingsScreen] Using profile photo');
+      } else if (ignoreProfilePicture) {
+        // Gold user wants to generate without any image reference (text-only)
+        imageUrlToUse = null;
+        console.log('[SettingsScreen] Text-only generation (ignoring profile picture)');
       }
 
       // Generate cartoon using OpenAI with selected model

@@ -43,6 +43,7 @@ export default function CartoonStyleModal({
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
   const [useCustomImage, setUseCustomImage] = useState(false); // Toggle for using custom image vs profile pic
+  const [ignoreProfilePicture, setIgnoreProfilePicture] = useState(false); // Gold feature: generate without profile pic
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   // Check notification permissions on mount
@@ -152,6 +153,7 @@ export default function CartoonStyleModal({
       model: isGoldUser ? selectedModel : 'gpt-3.5-turbo',
       notifyWhenDone,
       customImage: useCustomImage && customImage ? customImage : null,
+      ignoreProfilePicture: isGoldUser ? ignoreProfilePicture : false,
     };
 
     if (useCustomPrompt && customPrompt.trim()) {
@@ -436,6 +438,32 @@ export default function CartoonStyleModal({
               </Text>
             )}
           </View>
+
+          {/* Ignore Profile Picture Toggle (Gold Exclusive) */}
+          {isGoldUser && (
+            <View style={[localStyles.notificationSection, { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 0 }]}>
+              <View style={localStyles.notificationToggle}>
+                <View style={localStyles.notificationTextContainer}>
+                  <Ionicons name="sparkles" size={20} color="#FFD700" />
+                  <Text style={[localStyles.notificationLabel, { color: themeColors.textPrimary }]}>
+                    Generate without profile picture
+                  </Text>
+                </View>
+                <Switch
+                  value={ignoreProfilePicture}
+                  onValueChange={setIgnoreProfilePicture}
+                  trackColor={{ false: themeColors.divider, true: `${primaryColor}80` }}
+                  thumbColor={ignoreProfilePicture ? primaryColor : '#f4f3f4'}
+                  disabled={isGenerating}
+                />
+              </View>
+              {ignoreProfilePicture && (
+                <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary }]}>
+                  Create anything with text or custom image only
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Style Options */}
           <View style={localStyles.stylesContainer}>
