@@ -3,7 +3,7 @@
  * Helps users write thoughtful, relevant comments using OpenAI GPT-3.5-turbo
  */
 
-import { getOpenAIHeaders, OPENAI_ENDPOINTS } from './config';
+import { callOpenAI, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Suggestion types
@@ -37,34 +37,17 @@ export async function suggestComment(post, suggestionType = SUGGESTION_TYPES.THO
 
   const systemPrompt = systemPrompts[suggestionType] || systemPrompts.thoughtful;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
-
   try {
-    const response = await fetch(OPENAI_ENDPOINTS.CHAT, {
-      method: 'POST',
-      headers: getOpenAIHeaders(),
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Post:\n\n${postText}\n\nWrite a comment:` },
-        ],
-        temperature: 0.7, // Higher for more creative responses
-        max_tokens: 150,
-      }),
-      signal: controller.signal,
+    const data = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Post:\n\n${postText}\n\nWrite a comment:` },
+      ],
+      temperature: 0.7, // Higher for more creative responses
+      max_tokens: 150,
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn('[Comment Suggestion] API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
     const suggestion = data.choices?.[0]?.message?.content?.trim();
 
     if (!suggestion) {
@@ -79,12 +62,6 @@ export async function suggestComment(post, suggestionType = SUGGESTION_TYPES.THO
       timestamp: Date.now(),
     };
   } catch (error) {
-    clearTimeout(timeoutId);
-
-    if (error.name === 'AbortError') {
-      throw new Error('Suggestion timeout');
-    }
-
     console.warn('[Comment Suggestion] Failed:', error.message);
     throw error;
   }
