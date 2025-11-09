@@ -2598,10 +2598,9 @@
                     curveSegments: 100,
                     steps: 2
                 });
-                // Compute normals before bounding calculations
+                // Only compute vertex normals for smooth shading
+                // Don't manually compute bounding box/sphere - Three.js handles this internally
                 geometry.computeVertexNormals();
-                geometry.computeBoundingBox();
-                geometry.computeBoundingSphere();
 
                 // Convert color string to hex number
                 let colorHex = colors[index] || '#94a3b8';
