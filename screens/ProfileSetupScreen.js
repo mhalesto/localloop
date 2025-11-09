@@ -14,6 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import ScreenLayout from '../components/ScreenLayout';
+import InterestsSelectorModal from '../components/InterestsSelectorModal';
+import LinksManagerModal from '../components/LinksManagerModal';
+import PronounsPicker from '../components/PronounsPicker';
+import { ALL_INTERESTS, LINK_TYPES } from '../constants/profileConstants';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAlert } from '../contexts/AlertContext';
@@ -43,6 +47,18 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // New profile fields
+  const [pronouns, setPronouns] = useState(userProfile?.pronouns || '');
+  const [profession, setProfession] = useState(userProfile?.profession || '');
+  const [company, setCompany] = useState(userProfile?.company || '');
+  const [interests, setInterests] = useState(userProfile?.interests || []);
+  const [links, setLinks] = useState(userProfile?.links || []);
+
+  // Modal states
+  const [pronounsPickerVisible, setPronounsPickerVisible] = useState(false);
+  const [interestsModalVisible, setInterestsModalVisible] = useState(false);
+  const [linksModalVisible, setLinksModalVisible] = useState(false);
 
   // Location data
   const countries = {
@@ -205,6 +221,12 @@ export default function ProfileSetupScreen({ navigation, route }) {
         allowFollows: true,
         showFollowers: true,
         showFollowing: true,
+        // New professional profile fields
+        pronouns: pronouns || '',
+        profession: profession || '',
+        company: company || '',
+        interests: interests || [],
+        links: links || [],
       };
 
       await updateUserProfile(user.uid, profileData);
@@ -476,6 +498,178 @@ export default function ProfileSetupScreen({ navigation, route }) {
           )}
         </View>
 
+        {/* Professional Profile Section */}
+        <View style={styles.locationSection}>
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+            ✨ Professional Profile (Optional)
+          </Text>
+          <Text style={[styles.sectionHint, { color: themeColors.textSecondary }]}>
+            Showcase your interests, profession, and links
+          </Text>
+
+          {/* Pronouns */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Pronouns</Text>
+            <TouchableOpacity
+              style={[
+                styles.pickerButton,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              onPress={() => setPronounsPickerVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pickerButtonText, { color: pronouns ? themeColors.textPrimary : themeColors.textSecondary }]}>
+                {pronouns || 'Select pronouns...'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Profession */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Profession</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., Software Developer, Artist..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={profession}
+              onChangeText={setProfession}
+              maxLength={50}
+            />
+          </View>
+
+          {/* Company */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Company</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., Google, Self-employed..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={company}
+              onChangeText={setCompany}
+              maxLength={50}
+            />
+          </View>
+
+          {/* Interests */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: themeColors.textPrimary }]}>Interests</Text>
+              <Text style={[styles.charCount, { color: themeColors.textSecondary }]}>
+                {interests.length}/10
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.pickerButton,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              onPress={() => setInterestsModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pickerButtonText, { color: interests.length > 0 ? themeColors.textPrimary : themeColors.textSecondary }]}>
+                {interests.length > 0 ? `${interests.length} selected` : 'Select interests...'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+            {interests.length > 0 && (
+              <View style={styles.interestsPreview}>
+                {interests.slice(0, 3).map((interestId) => {
+                  const interest = ALL_INTERESTS.find((i) => i.id === interestId);
+                  if (!interest) return null;
+                  return (
+                    <View
+                      key={interestId}
+                      style={[
+                        styles.interestTag,
+                        {
+                          backgroundColor: `${primaryColor}20`,
+                          borderColor: `${primaryColor}40`,
+                        },
+                      ]}
+                    >
+                      <Ionicons name={interest.icon} size={12} color={primaryColor} />
+                      <Text style={[styles.interestTagText, { color: themeColors.textPrimary }]}>
+                        {interest.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+                {interests.length > 3 && (
+                  <Text style={[styles.moreText, { color: themeColors.textSecondary }]}>
+                    +{interests.length - 3} more
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Links */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: themeColors.textPrimary }]}>Links</Text>
+              <Text style={[styles.charCount, { color: themeColors.textSecondary }]}>
+                {links.length}/5
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.pickerButton,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              onPress={() => setLinksModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pickerButtonText, { color: links.length > 0 ? themeColors.textPrimary : themeColors.textSecondary }]}>
+                {links.length > 0 ? `${links.length} link${links.length > 1 ? 's' : ''} added` : 'Add links...'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+            {links.length > 0 && (
+              <View style={styles.linksPreview}>
+                {links.map((link) => {
+                  const linkType = LINK_TYPES.find((t) => t.id === link.type);
+                  return (
+                    <View key={link.id} style={styles.linkPreviewItem}>
+                      <Ionicons
+                        name={linkType?.icon || 'link'}
+                        size={14}
+                        color={linkType?.color || themeColors.textSecondary}
+                      />
+                      <Text style={[styles.linkPreviewText, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                        {link.label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Privacy Info */}
         <View style={[styles.infoCard, { backgroundColor: `${primaryColor}10` }]}>
           <Ionicons name="information-circle" size={20} color={primaryColor} />
@@ -522,6 +716,28 @@ export default function ProfileSetupScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Modals */}
+      <PronounsPicker
+        visible={pronounsPickerVisible}
+        onClose={() => setPronounsPickerVisible(false)}
+        selectedPronouns={pronouns}
+        onSelect={setPronouns}
+      />
+
+      <InterestsSelectorModal
+        visible={interestsModalVisible}
+        onClose={() => setInterestsModalVisible(false)}
+        selectedInterests={interests}
+        onSave={setInterests}
+      />
+
+      <LinksManagerModal
+        visible={linksModalVisible}
+        onClose={() => setLinksModalVisible(false)}
+        links={links}
+        onSave={setLinks}
+      />
     </ScreenLayout>
   );
 }
@@ -688,5 +904,57 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  pickerButtonText: {
+    fontSize: 15,
+    flex: 1,
+  },
+  interestsPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  interestTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  interestTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  moreText: {
+    fontSize: 12,
+    fontWeight: '500',
+    paddingVertical: 6,
+  },
+  linksPreview: {
+    marginTop: 12,
+    gap: 8,
+  },
+  linkPreviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linkPreviewText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
   },
 });
