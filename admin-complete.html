@@ -2559,9 +2559,10 @@
             progressEl.textContent = progress;
         }
 
-        async function deleteCollection(collectionName, batchSize = 100) {
+        async function deleteCollection(collectionName, batchSize = 50) {
             const collectionRef = collection(db, collectionName);
             let totalDeleted = 0;
+            let commentsDeleted = 0;
 
             while (true) {
                 const q = query(collectionRef, limit(batchSize));
@@ -2571,25 +2572,32 @@
                     break;
                 }
 
-                const batch = writeBatch(db);
-                let count = 0;
-
-                for (const docSnapshot of snapshot.docs) {
-                    // Delete subcollections (like comments) for posts and publicPosts
-                    if (collectionName === 'posts' || collectionName === 'publicPosts') {
+                // First, delete all comments for these documents
+                if (collectionName === 'posts' || collectionName === 'publicPosts') {
+                    for (const docSnapshot of snapshot.docs) {
                         const commentsRef = collection(db, collectionName, docSnapshot.id, 'comments');
                         const commentsSnapshot = await getDocs(commentsRef);
-                        commentsSnapshot.forEach(commentDoc => {
-                            batch.delete(commentDoc.ref);
-                        });
-                    }
 
-                    batch.delete(docSnapshot.ref);
-                    count++;
+                        if (!commentsSnapshot.empty) {
+                            const commentsBatch = writeBatch(db);
+                            commentsSnapshot.forEach(commentDoc => {
+                                commentsBatch.delete(commentDoc.ref);
+                                commentsDeleted++;
+                            });
+                            await commentsBatch.commit();
+                            updateCleanupProgress(`Deleted ${commentsDeleted} comments...`);
+                        }
+                    }
                 }
 
+                // Now delete the documents themselves
+                const batch = writeBatch(db);
+                snapshot.docs.forEach(docSnapshot => {
+                    batch.delete(docSnapshot.ref);
+                });
+
                 await batch.commit();
-                totalDeleted += count;
+                totalDeleted += snapshot.docs.length;
                 updateCleanupProgress(`Deleted ${totalDeleted} ${collectionName}...`);
             }
 
@@ -2630,11 +2638,24 @@
             try {
                 showCleanupStatus('Deleting posts and comments...');
 
-                updateCleanupProgress('Deleting posts collection...');
-                const postsDeleted = await deleteCollection('posts');
+                let postsDeleted = 0;
+                let publicPostsDeleted = 0;
 
-                updateCleanupProgress('Deleting public posts collection...');
-                const publicPostsDeleted = await deleteCollection('publicPosts');
+                try {
+                    updateCleanupProgress('Deleting posts collection...');
+                    postsDeleted = await deleteCollection('posts');
+                } catch (error) {
+                    console.error('Error deleting posts collection:', error);
+                    throw new Error(`Failed to delete posts: ${error.message}`);
+                }
+
+                try {
+                    updateCleanupProgress('Deleting public posts collection...');
+                    publicPostsDeleted = await deleteCollection('publicPosts');
+                } catch (error) {
+                    console.error('Error deleting publicPosts collection:', error);
+                    throw new Error(`Failed to delete public posts: ${error.message}`);
+                }
 
                 const totalDeleted = postsDeleted + publicPostsDeleted;
                 showCleanupStatus(`✅ Successfully deleted ${totalDeleted} posts (${postsDeleted} posts, ${publicPostsDeleted} public posts).`);
