@@ -968,65 +968,134 @@ export default function PublicProfileScreen({ navigation, route }) {
       >
         {/* Profile Header */}
         <View style={[styles.header, { backgroundColor: themeColors.card }]}>
-          {/* Profile Photo */}
-          <View style={[styles.photoContainer, { borderColor: primaryColor }]}>
-            {profile.profilePhoto ? (
-              <TouchableOpacity
-                style={styles.photoTouchable}
-                activeOpacity={0.85}
-                onPress={() => handlePreviewPhoto(profile.profilePhoto)}
-              >
+          {/* Top Row: Profile Photo + Stats (Instagram-style) */}
+          <View style={styles.topRow}>
+            {/* Profile Photo (Left) */}
+            <TouchableOpacity
+              style={[styles.photoContainerInstagram, { borderColor: primaryColor }]}
+              activeOpacity={0.85}
+              onPress={() => profile.profilePhoto && handlePreviewPhoto(profile.profilePhoto)}
+            >
+              {profile.profilePhoto ? (
                 <ProgressiveImage
                   source={profile.profilePhoto}
                   thumbnail={getThumbnailUrl(profile.profilePhoto, 100, 70)}
                   blurhash={profile.blurhash || getBlurhash(profile.profilePhoto)}
-                  style={styles.photo}
+                  style={styles.photoInstagram}
                   contentFit="cover"
                   transition={200}
                   priority="high"
                 />
+              ) : (
+                <View style={[styles.photoPlaceholder, { backgroundColor: withAlpha(primaryColor, 0.12) }]}>
+                  <Ionicons name="person" size={36} color={primaryColor} />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Stats (Right) - Instagram-style row */}
+            <View style={styles.statsRowInstagram}>
+              <TouchableOpacity
+                style={styles.statInstagram}
+                onPress={() => setActiveTab('posts')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statNumberInstagram, { color: themeColors.textPrimary }]}>
+                  {profile.publicPostsCount || posts.length}
+                </Text>
+                <Text style={[styles.statLabelInstagram, { color: themeColors.textPrimary }]}>
+                  posts
+                </Text>
               </TouchableOpacity>
-            ) : (
-              <View style={[styles.photoPlaceholder, { backgroundColor: withAlpha(primaryColor, 0.12) }]}>
-                <Ionicons name="person" size={50} color={primaryColor} />
-              </View>
-            )}
+
+              <TouchableOpacity
+                style={styles.statInstagram}
+                onPress={navigateToFollowers}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statNumberInstagram, { color: themeColors.textPrimary }]}>
+                  {profile.followersCount || 0}
+                </Text>
+                <Text style={[styles.statLabelInstagram, { color: themeColors.textPrimary }]}>
+                  followers
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.statInstagram}
+                onPress={navigateToFollowing}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statNumberInstagram, { color: themeColors.textPrimary }]}>
+                  {profile.followingCount || 0}
+                </Text>
+                <Text style={[styles.statLabelInstagram, { color: themeColors.textPrimary }]}>
+                  following
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Display Name & Username */}
-          <View style={styles.nameRow}>
-            <Text style={[styles.displayName, { color: themeColors.textPrimary }]}>
+          {/* Name + Pronouns (Same Line - Instagram-style) */}
+          <View style={styles.nameRowInstagram}>
+            <Text style={[styles.displayNameInstagram, { color: themeColors.textPrimary }]}>
               {profile.displayName || profile.username}
             </Text>
             {profile.pronouns && (profile.showPronouns !== false) && (
-              <Text style={[styles.pronouns, { color: themeColors.textSecondary }]}>
-                {profile.pronouns}
+              <Text style={[styles.pronounsInstagram, { color: themeColors.textSecondary }]}>
+                {' '}{profile.pronouns}
               </Text>
             )}
           </View>
-          <Text style={[styles.username, { color: themeColors.textSecondary }]}>
-            @{profile.username}
-          </Text>
+
+          {/* Category (Optional tagline like "autistic∞") */}
+          {profile.category && (profile.showCategory !== false) && (
+            <Text style={[styles.category, { color: themeColors.textPrimary }]}>
+              {profile.category}
+            </Text>
+          )}
 
           {/* Profession & Company */}
           {(profile.profession || profile.company) && (
-            <View style={styles.professionRow}>
-              {profile.profession && (profile.showProfession !== false) && (
-                <Text style={[styles.profession, { color: themeColors.textPrimary }]}>
-                  {profile.profession}
-                </Text>
-              )}
-              {profile.company && (profile.showCompany !== false) && (
-                <Text style={[styles.company, { color: themeColors.textSecondary }]}>
-                  @ {profile.company}
-                </Text>
-              )}
-            </View>
+            <Text style={[styles.professionCompany, { color: themeColors.textPrimary }]}>
+              {profile.profession && (profile.showProfession !== false) && profile.profession}
+              {profile.profession && profile.company && (profile.showProfession !== false) && (profile.showCompany !== false) && ' at '}
+              {profile.company && (profile.showCompany !== false) && profile.company}
+            </Text>
           )}
 
           {/* Bio */}
           {profile.bio && (
             <Text style={[styles.bio, { color: themeColors.textPrimary }]}>{profile.bio}</Text>
+          )}
+
+          {/* Contact Email */}
+          {profile.contactEmail && (profile.showContactEmail !== false) && (
+            <TouchableOpacity
+              style={styles.contactEmailRow}
+              onPress={() => Linking.openURL(`mailto:${profile.contactEmail}`)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="mail" size={14} color={primaryColor} />
+              <Text style={[styles.contactEmail, { color: primaryColor }]}>
+                {profile.contactEmail}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Channel/Group Info */}
+          {profile.channelName && (profile.showChannel !== false) && (
+            <View style={styles.channelRow}>
+              <Ionicons name="chatbubbles" size={14} color={themeColors.textSecondary} />
+              <Text style={[styles.channelText, { color: themeColors.textPrimary }]}>
+                {profile.channelName}
+              </Text>
+              {profile.channelMemberCount && (
+                <Text style={[styles.channelMembers, { color: themeColors.textSecondary }]}>
+                  {' '}{profile.channelMemberCount} members
+                </Text>
+              )}
+            </View>
           )}
 
           {/* Location */}
@@ -1150,70 +1219,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Local Connections Badge */}
-          {localConnectionsCount > 0 && profile.city && (
-            <View style={[styles.localBadge, { backgroundColor: `${primaryColor}15` }]}>
-              <Ionicons name="location" size={16} color={primaryColor} />
-              <Text style={[styles.localBadgeText, { color: primaryColor }]}>
-                {localConnectionsCount} local connection{localConnectionsCount > 1 ? 's' : ''} in {profile.city}
-              </Text>
-            </View>
-          )}
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <TouchableOpacity
-              style={styles.stat}
-              onPress={navigateToFollowers}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
-                {profile.followersCount || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>
-                Followers
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.stat}
-              onPress={navigateToFollowing}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
-                {profile.followingCount || 0}
-              </Text>
-              <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>
-                Following
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.stat}
-              onPress={() => setActiveTab('album')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
-                {profile.albumCount ?? albumPhotos.length}
-              </Text>
-              <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>
-                Album
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.stat}
-              onPress={() => setActiveTab('posts')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>
-                {profile.publicPostsCount || posts.length}
-              </Text>
-              <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Posts</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Action Buttons */}
+          {/* Action Buttons (Instagram-style) */}
           <View style={styles.actionsRow}>
             {isOwnProfile ? (
               <TouchableOpacity
@@ -1451,9 +1457,92 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 1,
   },
+  // Instagram-style layout components
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 20,
+  },
+  photoContainerInstagram: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2.5,
+    overflow: 'hidden',
+  },
+  photoInstagram: {
+    width: '100%',
+    height: '100%',
+  },
+  statsRowInstagram: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statInstagram: {
+    alignItems: 'center',
+  },
+  statNumberInstagram: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  statLabelInstagram: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  nameRowInstagram: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
+  displayNameInstagram: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pronounsInstagram: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  category: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginBottom: 6,
+  },
+  professionCompany: {
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  contactEmailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  contactEmail: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  channelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  channelText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  channelMembers: {
+    fontSize: 12,
+  },
+  // Old styles (keep for backward compatibility)
   photoContainer: {
     width: 100,
     height: 100,
@@ -1507,11 +1596,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   bio: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 20,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'left',
+    marginBottom: 8,
   },
   locationRow: {
     flexDirection: 'row',
