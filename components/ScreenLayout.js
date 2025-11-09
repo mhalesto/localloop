@@ -424,8 +424,10 @@ export default function ScreenLayout({
     () => (getNotifications ? getNotifications() : []),
     [getNotifications]
   );
-  const defaultRightIcon =
-    rightIcon ?? (headerNotificationCount > 0 ? 'notifications' : 'notifications-outline');
+
+  // When a custom rightIcon is provided (like 'options'), show notifications as the second icon
+  const notificationIcon = headerNotificationCount > 0 ? 'notifications' : 'notifications-outline';
+  const defaultRightIcon = rightIcon ?? notificationIcon;
 
   const handleHeaderRightPress =
     onRightPress ??
@@ -434,7 +436,14 @@ export default function ScreenLayout({
       markNotificationsRead?.();
     });
 
+  const handleNotificationsPress = () => {
+    setNotificationsVisible(true);
+    markNotificationsRead?.();
+  };
+
+  // Show notification badge when using second icon
   const headerBadgeCount = onRightPress ? undefined : headerNotificationCount;
+  const secondIconBadgeCount = rightIcon ? headerNotificationCount : undefined;
 
   const handleCloseNotifications = () => setNotificationsVisible(false);
 
@@ -477,6 +486,9 @@ export default function ScreenLayout({
           rightIcon={defaultRightIcon}
           onRightPress={handleHeaderRightPress}
           rightBadgeCount={headerBadgeCount}
+          secondRightIcon={rightIcon ? notificationIcon : undefined}
+          onSecondRightPress={rightIcon ? handleNotificationsPress : undefined}
+          secondRightBadgeCount={secondIconBadgeCount}
           showSearch={showSearch}
           searchPlaceholder={searchPlaceholder}
           searchValue={searchValue}

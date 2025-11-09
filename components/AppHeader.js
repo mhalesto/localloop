@@ -24,6 +24,9 @@ export default function AppHeader({
   onMenu,
   rightIcon,
   onRightPress,
+  secondRightIcon,           // NEW: second right icon
+  onSecondRightPress,        // NEW: second right icon press
+  secondRightBadgeCount = 0, // NEW: second right icon badge count
   showSearch,
   searchPlaceholder = 'Search',
   onSearchChange,
@@ -111,21 +114,40 @@ export default function AppHeader({
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
-          onPress={onRightPress}
-          disabled={!onRightPress}
-          activeOpacity={0.8}
-        >
-          <View style={styles.iconWithBadge}>
-            <Ionicons name={rightIcon ?? 'notifications-outline'} size={22} color={iconTint} />
-            {rightBadgeCount ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText} numberOfLines={1}>{rightBadgeCount > 99 ? '99+' : rightBadgeCount}</Text>
+        <View style={styles.rightIconsContainer}>
+          {secondRightIcon && onSecondRightPress ? (
+            <TouchableOpacity
+              style={[styles.iconButton, styles.iconButtonSpacing, { borderColor: iconBorder, backgroundColor: iconBackground }]}
+              onPress={onSecondRightPress}
+              activeOpacity={0.8}
+            >
+              <View style={styles.iconWithBadge}>
+                <Ionicons name={secondRightIcon} size={22} color={iconTint} />
+                {secondRightBadgeCount ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText} numberOfLines={1}>{secondRightBadgeCount > 99 ? '99+' : secondRightBadgeCount}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-        </TouchableOpacity>
+            </TouchableOpacity>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.iconButton, { borderColor: iconBorder, backgroundColor: iconBackground }]}
+            onPress={onRightPress}
+            disabled={!onRightPress}
+            activeOpacity={0.8}
+          >
+            <View style={styles.iconWithBadge}>
+              <Ionicons name={rightIcon ?? 'notifications-outline'} size={22} color={iconTint} />
+              {rightBadgeCount ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText} numberOfLines={1}>{rightBadgeCount > 99 ? '99+' : rightBadgeCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showSearch ? (
@@ -176,6 +198,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: Platform.OS === 'android' ? 56 : 44
   },
+  rightIconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   iconButton: {
     width: 44,
     height: 44,
@@ -190,6 +217,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2
+  },
+  iconButtonSpacing: {
+    marginRight: 0, // gap handles spacing
   },
   iconWithBadge: {
     position: 'relative',
