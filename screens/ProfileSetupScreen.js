@@ -55,6 +55,10 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [company, setCompany] = useState(userProfile?.company || '');
   const [interests, setInterests] = useState(userProfile?.interests || []);
   const [links, setLinks] = useState(userProfile?.links || []);
+  const [category, setCategory] = useState(userProfile?.category || '');
+  const [contactEmail, setContactEmail] = useState(userProfile?.contactEmail || '');
+  const [channelName, setChannelName] = useState(userProfile?.channelName || '');
+  const [channelMemberCount, setChannelMemberCount] = useState(userProfile?.channelMemberCount?.toString() || '');
 
   // Privacy settings
   const [showPronouns, setShowPronouns] = useState(userProfile?.showPronouns ?? DEFAULT_PRIVACY_SETTINGS.showPronouns);
@@ -62,6 +66,9 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [showCompany, setShowCompany] = useState(userProfile?.showCompany ?? DEFAULT_PRIVACY_SETTINGS.showCompany);
   const [showInterests, setShowInterests] = useState(userProfile?.showInterests ?? DEFAULT_PRIVACY_SETTINGS.showInterests);
   const [showLinks, setShowLinks] = useState(userProfile?.showLinks ?? DEFAULT_PRIVACY_SETTINGS.showLinks);
+  const [showCategory, setShowCategory] = useState(userProfile?.showCategory ?? DEFAULT_PRIVACY_SETTINGS.showCategory);
+  const [showContactEmail, setShowContactEmail] = useState(userProfile?.showContactEmail ?? DEFAULT_PRIVACY_SETTINGS.showContactEmail);
+  const [showChannel, setShowChannel] = useState(userProfile?.showChannel ?? DEFAULT_PRIVACY_SETTINGS.showChannel);
 
   // Modal states
   const [pronounsPickerVisible, setPronounsPickerVisible] = useState(false);
@@ -235,12 +242,19 @@ export default function ProfileSetupScreen({ navigation, route }) {
         company: company || '',
         interests: interests || [],
         links: links || [],
+        category: category || '',
+        contactEmail: contactEmail || '',
+        channelName: channelName || '',
+        channelMemberCount: channelMemberCount ? parseInt(channelMemberCount, 10) : 0,
         // Privacy settings
         showPronouns,
         showProfession,
         showCompany,
         showInterests,
         showLinks,
+        showCategory,
+        showContactEmail,
+        showChannel,
       };
 
       await updateUserProfile(user.uid, profileData);
@@ -581,6 +595,101 @@ export default function ProfileSetupScreen({ navigation, route }) {
             />
           </View>
 
+          {/* Category (Tagline) */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Category</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., autistic∞, artist, entrepreneur..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={category}
+              onChangeText={setCategory}
+              maxLength={30}
+            />
+            <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+              A short tagline or category
+            </Text>
+          </View>
+
+          {/* Contact Email */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Contact Email</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., business@example.com"
+              placeholderTextColor={themeColors.textSecondary}
+              value={contactEmail}
+              onChangeText={setContactEmail}
+              maxLength={100}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+              For collaborations and business inquiries
+            </Text>
+          </View>
+
+          {/* Channel/Group Name */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Channel/Group</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., My Community, Tech Talk..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={channelName}
+              onChangeText={setChannelName}
+              maxLength={50}
+            />
+          </View>
+
+          {/* Channel Member Count */}
+          {channelName && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: themeColors.textPrimary }]}>Member Count</Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: themeColors.background,
+                    color: themeColors.textPrimary,
+                    borderColor: themeColors.divider,
+                  },
+                ]}
+                placeholder="e.g., 1700"
+                placeholderTextColor={themeColors.textSecondary}
+                value={channelMemberCount}
+                onChangeText={(text) => setChannelMemberCount(text.replace(/[^0-9]/g, ''))}
+                keyboardType="number-pad"
+                maxLength={10}
+              />
+              <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+                Number of members in your channel/group
+              </Text>
+            </View>
+          )}
+
           {/* Interests */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
@@ -792,7 +901,67 @@ export default function ProfileSetupScreen({ navigation, route }) {
             </View>
           )}
 
-          {(pronouns || profession || company || interests.length > 0 || links.length > 0) && (
+          {/* Category Privacy */}
+          {category && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show category publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showCategory ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showCategory}
+                onValueChange={setShowCategory}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showCategory ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Contact Email Privacy */}
+          {contactEmail && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show contact email publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showContactEmail ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showContactEmail}
+                onValueChange={setShowContactEmail}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showContactEmail ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Channel Privacy */}
+          {channelName && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show channel publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showChannel ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showChannel}
+                onValueChange={setShowChannel}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showChannel ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {(pronouns || profession || company || interests.length > 0 || links.length > 0 || category || contactEmail || channelName) && (
             <Text style={[styles.privacyNote, { color: themeColors.textSecondary }]}>
               Hidden information won't appear on your public profile
             </Text>
