@@ -2575,9 +2575,9 @@
                 let count = 0;
 
                 for (const docSnapshot of snapshot.docs) {
-                    // Delete subcollections (like comments) for posts
-                    if (collectionName === 'posts') {
-                        const commentsRef = collection(db, 'posts', docSnapshot.id, 'comments');
+                    // Delete subcollections (like comments) for posts and publicPosts
+                    if (collectionName === 'posts' || collectionName === 'publicPosts') {
+                        const commentsRef = collection(db, collectionName, docSnapshot.id, 'comments');
                         const commentsSnapshot = await getDocs(commentsRef);
                         commentsSnapshot.forEach(commentDoc => {
                             batch.delete(commentDoc.ref);
@@ -2629,8 +2629,15 @@
 
             try {
                 showCleanupStatus('Deleting posts and comments...');
-                const deleted = await deleteCollection('posts');
-                showCleanupStatus(`✅ Successfully deleted ${deleted} posts and their comments.`);
+
+                updateCleanupProgress('Deleting posts collection...');
+                const postsDeleted = await deleteCollection('posts');
+
+                updateCleanupProgress('Deleting public posts collection...');
+                const publicPostsDeleted = await deleteCollection('publicPosts');
+
+                const totalDeleted = postsDeleted + publicPostsDeleted;
+                showCleanupStatus(`✅ Successfully deleted ${totalDeleted} posts (${postsDeleted} posts, ${publicPostsDeleted} public posts).`);
                 loadDashboardData(); // Refresh dashboard
             } catch (error) {
                 console.error('Error cleaning posts:', error);
@@ -2698,23 +2705,28 @@
 
             try {
                 showCleanupStatus('Starting complete database cleanup...');
-                
+
                 // Delete posts
-                updateCleanupProgress('Step 1/3: Deleting posts and comments...');
+                updateCleanupProgress('Step 1/4: Deleting posts and comments...');
                 const postsDeleted = await deleteCollection('posts');
-                
+
+                // Delete public posts
+                updateCleanupProgress('Step 2/4: Deleting public posts...');
+                const publicPostsDeleted = await deleteCollection('publicPosts');
+
                 // Delete statuses
-                updateCleanupProgress('Step 2/3: Deleting statuses...');
+                updateCleanupProgress('Step 3/4: Deleting statuses...');
                 const statusesDeleted = await deleteCollection('statuses');
-                
+
                 // Delete storage files
-                updateCleanupProgress('Step 3/3: Deleting storage files...');
+                updateCleanupProgress('Step 4/4: Deleting storage files...');
                 const postsFilesDeleted = await deleteStorageFolder('posts');
                 const statusesFilesDeleted = await deleteStorageFolder('statuses');
-                
+
+                const totalPosts = postsDeleted + publicPostsDeleted;
                 const totalFiles = postsFilesDeleted + statusesFilesDeleted;
-                showCleanupStatus(`✅ Complete cleanup finished!\n- ${postsDeleted} posts deleted\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted`);
-                
+                showCleanupStatus(`✅ Complete cleanup finished!\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted`);
+
                 loadDashboardData(); // Refresh dashboard
             } catch (error) {
                 console.error('Error during complete cleanup:', error);
