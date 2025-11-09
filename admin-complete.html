@@ -2569,23 +2569,48 @@
             scene.add(pointLight2);
 
             const donutGroup = new THREE.Group();
-            const values = payload.threeData?.values || payload.datasets?.[0]?.data || [];
+            const rawValues = payload.threeData?.values || payload.datasets?.[0]?.data || [];
             const colors = payload.threeData?.colors || payload.datasets?.[0]?.backgroundColor || [];
             const labels = payload.threeData?.labels || payload.labels || [];
-            const total = values.reduce((sum, value) => sum + value, 0) || 1;
+            const segments = rawValues
+                .map((value, index) => ({
+                    value: Number(value) || 0,
+                    color: colors[index] || '#94a3b8',
+                    label: labels[index] || `Segment ${index + 1}`
+                }))
+                .filter(segment => segment.value > 0);
+
+            if (!segments.length) {
+                modalState.style = 'doughnut';
+                if (modalElements.styleSelect) {
+                    modalElements.styleSelect.value = 'doughnut';
+                }
+                renderModalChart();
+                return;
+            }
+
+            const total = segments.reduce((sum, segment) => sum + segment.value, 0) || 1;
 
             let currentAngle = -Math.PI / 2;
             const outerRadius = 2.5;
-            const innerRadius = 1.2;
-            const depth = 0.65;
+            const innerRadius = 1.15;
+            const depth = 0.7;
+            const gap = 0.04;
 
-            values.forEach((value, index) => {
-                const proportion = value / total;
-                const sweep = proportion * Math.PI * 2;
+            segments.forEach((segment) => {
+                const proportion = segment.value / total;
+                const rawSweep = proportion * Math.PI * 2;
+                const sweep = Math.max(rawSweep - gap, 0);
+                if (sweep <= 0) {
+                    currentAngle += rawSweep;
+                    return;
+                }
+                const startAngle = currentAngle + gap / 2;
+                const endAngle = startAngle + sweep;
                 const shape = new THREE.Shape();
-                shape.absarc(0, 0, outerRadius, currentAngle, currentAngle + sweep, false);
+                shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
                 const hole = new THREE.Path();
-                hole.absarc(0, 0, innerRadius, currentAngle + sweep, currentAngle, true);
+                hole.absarc(0, 0, innerRadius, endAngle, startAngle, true);
                 shape.holes.push(hole);
 
                 const geometry = new THREE.ExtrudeGeometry(shape, {
@@ -2603,19 +2628,20 @@
                 geometry.computeVertexNormals();
 
                 // Convert color string to hex number
-                let colorHex = colors[index] || '#94a3b8';
+                let colorHex = segment.color;
                 if (typeof colorHex === 'string' && colorHex.startsWith('#')) {
                     colorHex = parseInt(colorHex.replace('#', '0x'));
                 }
 
                 const material = new THREE.MeshPhysicalMaterial({
                     color: colorHex,
-                    roughness: 0.25,
-                    metalness: 0.1,
-                    clearcoat: 0.3,
+                    roughness: 0.18,
+                    metalness: 0.25,
+                    clearcoat: 0.4,
                     clearcoatRoughness: 0.2,
-                    reflectivity: 0.5,
-                    envMapIntensity: 1.0,
+                    reflectivity: 0.55,
+                    envMapIntensity: 1.2,
+                    emissive: new THREE.Color(colorHex).multiplyScalar(0.05),
                     side: THREE.DoubleSide
                 });
 
@@ -2623,12 +2649,29 @@
                 mesh.rotation.x = -Math.PI / 2;
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
+                mesh.userData = { label: segment.label };
                 donutGroup.add(mesh);
 
-                currentAngle += sweep;
+                currentAngle += rawSweep;
             });
 
             scene.add(donutGroup);
+
+            const highlightRing = new THREE.Mesh(
+                new THREE.TorusGeometry(outerRadius - 0.08, 0.05, 24, 120),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 })
+            );
+            highlightRing.rotation.x = Math.PI / 2;
+            highlightRing.position.y = depth / 2 + 0.03;
+            scene.add(highlightRing);
+
+            const shadow = new THREE.Mesh(
+                new THREE.CircleGeometry(outerRadius * 1.15, 64),
+                new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.08 })
+            );
+            shadow.rotation.x = -Math.PI / 2;
+            shadow.position.y = -depth / 2 - 0.3;
+            scene.add(shadow);
 
             modalState.three = {
                 renderer,
