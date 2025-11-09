@@ -148,7 +148,7 @@ const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
  * @param {string} subscriptionPlan - User's subscription plan ('basic' | 'premium' | 'gold')
  * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean}>}
  */
-export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic') {
+export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic', model = 'gpt-3.5-turbo') {
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
@@ -173,8 +173,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
       if (!imageUrl.startsWith('https://')) {
         console.log('[profileCartoonService] Skipping Vision analysis - profile photo not yet uploaded to cloud storage (local file path)');
       } else {
-        console.log('[profileCartoonService] Gold user - analyzing photo with GPT-4o Vision');
-        personalizedDescription = await analyzePhotoForCartoon(imageUrl);
+        console.log(`[profileCartoonService] Gold user - analyzing photo with ${model} Vision`);
+        personalizedDescription = await analyzePhotoForCartoon(imageUrl, model);
         console.log('[profileCartoonService] Vision analysis complete');
       }
     } catch (visionError) {

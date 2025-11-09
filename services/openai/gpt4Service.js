@@ -74,17 +74,20 @@ export async function summarizeWithGPT4o(text, options = {}) {
  * @param {string} imageUrl - URL of the profile picture (must be publicly accessible https://)
  * @returns {Promise<string>} Detailed description of the person
  */
-export async function analyzePhotoForCartoon(imageUrl) {
+export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
   try {
     // Validate that we have a publicly accessible URL
     if (!imageUrl || !imageUrl.startsWith('https://')) {
       throw new Error('Vision analysis requires a publicly accessible HTTPS URL. Local file paths are not supported.');
     }
 
-    console.log('[GPT-4o Vision] Analyzing profile photo for personalized cartoon');
+    // Map user-friendly model names to vision-capable models
+    const visionModel = model === 'gpt-3.5-turbo' ? 'gpt-4o-mini' : model === 'gpt-4' ? 'gpt-4o' : 'gpt-4o';
+
+    console.log(`[GPT Vision] Analyzing profile photo using ${visionModel}`);
 
     const response = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
-      model: 'gpt-4o', // Use full GPT-4o for best Vision quality
+      model: visionModel,
       messages: [
         {
           role: 'user',

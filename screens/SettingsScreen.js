@@ -42,7 +42,9 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAlert } from '../contexts/AlertContext';
 import CartoonStyleModal from '../components/CartoonStyleModal';
 import CartoonHistoryModal from '../components/CartoonHistoryModal';
+import CartoonSuccessModal from '../components/CartoonSuccessModal';
 import { generateCartoonProfile } from '../services/openai/profileCartoonService';
+import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
   checkAndResetMonthlyUsage,
@@ -168,6 +170,7 @@ export default function SettingsScreen({ navigation }) {
   // Cartoon profile state
   const [cartoonStyleModalVisible, setCartoonStyleModalVisible] = useState(false);
   const [cartoonHistoryModalVisible, setCartoonHistoryModalVisible] = useState(false);
+  const [cartoonSuccessModalVisible, setCartoonSuccessModalVisible] = useState(false);
   const [cartoonUsageData, setCartoonUsageData] = useState(null);
   const [cartoonPictureHistory, setCartoonPictureHistory] = useState([]);
   const [isGeneratingCartoon, setIsGeneratingCartoon] = useState(false);
@@ -474,6 +477,12 @@ export default function SettingsScreen({ navigation }) {
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
     try {
+      // Clear all local state
+      setCartoonUsageData(null);
+      setCartoonPictureHistory([]);
+      setNicknameDraft('');
+
+      // Sign out
       await signOutAccount();
     } finally {
       setSigningOut(false);
@@ -820,8 +829,10 @@ export default function SettingsScreen({ navigation }) {
   };
 
   // Load cartoon usage data when screen mounts or user changes
+  // Reload profile when user changes (after sign out/sign in)
   useEffect(() => {
     if (user?.uid) {
+      reloadProfile();
       loadCartoonData();
     }
   }, [user?.uid]);
@@ -852,7 +863,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   // Handle style selection and generation
-  const handleGenerateCartoon = async (styleId, customPrompt = null) => {
+  const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
     if (!user?.uid || !userProfile?.profilePhoto) {
       showAlert('Error', 'Please set a profile photo first before generating a cartoon.', [], { type: 'warning' });
       return;
@@ -867,13 +878,17 @@ export default function SettingsScreen({ navigation }) {
     setIsGeneratingCartoon(true);
 
     try {
-      // Generate cartoon using OpenAI
+      // Extract options
+      const { model = 'gpt-3.5-turbo', notifyWhenDone = false } = generationOptions;
+
+      // Generate cartoon using OpenAI with selected model
       const result = await generateCartoonProfile(
         userProfile.profilePhoto,
         styleId,
         userProfile.gender || 'neutral',
         customPrompt, // Pass custom prompt for Gold users
-        userProfile?.subscriptionPlan || 'basic' // Pass subscription plan for Vision analysis
+        userProfile?.subscriptionPlan || 'basic', // Pass subscription plan for Vision analysis
+        model // Pass selected GPT model
       );
 
       // Upload to Firebase Storage
@@ -885,18 +900,21 @@ export default function SettingsScreen({ navigation }) {
       // Reload data to update UI
       await loadCartoonData();
 
-      // Close modal immediately
+      // Close style modal immediately
       setCartoonStyleModalVisible(false);
       setIsGeneratingCartoon(false);
 
       // Wait for modal to close completely
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Show success alert
-      const message = styleId === 'custom'
-        ? 'Your custom cartoon avatar has been generated and saved!'
-        : 'Your cartoon avatar has been generated and saved!';
-      showAlert('Success', message, [], { type: 'success' });
+      // Send notification if requested
+      if (notifyWhenDone) {
+        const styleName = styleId === 'custom' ? 'custom' : styleId;
+        await scheduleCartoonReadyNotification(styleName);
+      }
+
+      // Show success modal with quote
+      setCartoonSuccessModalVisible(true);
     } catch (error) {
       console.error('[SettingsScreen] Error generating cartoon:', error);
       setIsGeneratingCartoon(false);
@@ -2204,6 +2222,18 @@ export default function SettingsScreen({ navigation }) {
         onClearAll={handleClearCartoonHistory}
         isProcessing={isCartoonProcessing}
         userPlan={userPlan}
+      />
+
+      <CartoonSuccessModal
+        visible={cartoonSuccessModalVisible}
+        onClose={() => setCartoonSuccessModalVisible(false)}
+        onViewCartoon={() => {
+          setCartoonSuccessModalVisible(false);
+          // Wait for modal to close, then open history
+          setTimeout(() => {
+            setCartoonHistoryModalVisible(true);
+          }, 300);
+        }}
       />
     </ScreenLayout>
   );

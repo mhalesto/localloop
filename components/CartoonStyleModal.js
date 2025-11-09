@@ -3,7 +3,7 @@
  * Allows users to choose a cartoon style for profile picture generation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,13 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import { CARTOON_STYLES, canGenerateCartoon, getUsageStatsText } from '../services/openai/profileCartoonService';
+import { requestNotificationPermission, areNotificationsEnabled } from '../services/notificationService';
 
 export default function CartoonStyleModal({
   visible,
@@ -33,7 +36,23 @@ export default function CartoonStyleModal({
   const [selectedStyle, setSelectedStyle] = useState(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo'); // GPT-3.5 or GPT-4
+  const [notifyWhenDone, setNotifyWhenDone] = useState(false);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+
+  // Check notification permissions on mount
+  useEffect(() => {
+    checkNotificationPermissions();
+  }, []);
+
+  const checkNotificationPermissions = async () => {
+    const enabled = await areNotificationsEnabled();
+    setHasNotificationPermission(enabled);
+    if (!enabled) {
+      setNotifyWhenDone(false);
+    }
+  };
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
   const isGoldUser = subscriptionPlan === 'gold' || isAdmin; // Admin has Gold features
@@ -67,15 +86,39 @@ export default function CartoonStyleModal({
     }
   };
 
+  const handleNotificationToggle = async (value) => {
+    if (value && !hasNotificationPermission) {
+      // Request permission
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setHasNotificationPermission(true);
+        setNotifyWhenDone(true);
+      } else {
+        Alert.alert(
+          'Permission Denied',
+          'Please enable notifications in your device settings to be notified when your cartoon is ready.',
+          [{ text: 'OK' }]
+        );
+      }
+    } else {
+      setNotifyWhenDone(value);
+    }
+  };
+
   const handleGenerate = () => {
     if (!canGenerate) return;
 
+    const generationOptions = {
+      model: isGoldUser ? selectedModel : 'gpt-3.5-turbo',
+      notifyWhenDone,
+    };
+
     if (useCustomPrompt && customPrompt.trim()) {
       // Send custom prompt for Gold users
-      onStyleSelect('custom', customPrompt.trim());
+      onStyleSelect('custom', customPrompt.trim(), generationOptions);
     } else if (selectedStyle) {
       // Send predefined style
-      onStyleSelect(selectedStyle);
+      onStyleSelect(selectedStyle, null, generationOptions);
     }
   };
 
@@ -194,6 +237,108 @@ export default function CartoonStyleModal({
               )}
             </View>
           )}
+
+          {/* GPT Model Selection for Gold Users */}
+          {isGoldUser && (
+            <View style={[localStyles.modelSection, { paddingHorizontal: 20, paddingBottom: 16 }]}>
+              <Text style={[localStyles.sectionLabel, { color: themeColors.textSecondary }]}>
+                AI Model (Gold Exclusive)
+              </Text>
+              <View style={localStyles.modelButtons}>
+                <TouchableOpacity
+                  style={[
+                    localStyles.modelButton,
+                    {
+                      backgroundColor: selectedModel === 'gpt-3.5-turbo' ? primaryColor : themeColors.background,
+                      borderColor: selectedModel === 'gpt-3.5-turbo' ? primaryColor : themeColors.divider,
+                    },
+                  ]}
+                  onPress={() => setSelectedModel('gpt-3.5-turbo')}
+                  disabled={isGenerating}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      localStyles.modelButtonText,
+                      {
+                        color: selectedModel === 'gpt-3.5-turbo' ? '#fff' : themeColors.textPrimary,
+                      },
+                    ]}
+                  >
+                    GPT-3.5
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonSubtext,
+                      {
+                        color: selectedModel === 'gpt-3.5-turbo' ? '#fff' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    Fast
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    localStyles.modelButton,
+                    {
+                      backgroundColor: selectedModel === 'gpt-4' ? primaryColor : themeColors.background,
+                      borderColor: selectedModel === 'gpt-4' ? primaryColor : themeColors.divider,
+                    },
+                  ]}
+                  onPress={() => setSelectedModel('gpt-4')}
+                  disabled={isGenerating}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      localStyles.modelButtonText,
+                      {
+                        color: selectedModel === 'gpt-4' ? '#fff' : themeColors.textPrimary,
+                      },
+                    ]}
+                  >
+                    GPT-4
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonSubtext,
+                      {
+                        color: selectedModel === 'gpt-4' ? '#fff' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    Best Quality
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Notification Toggle */}
+          <View style={[localStyles.notificationSection, { paddingHorizontal: 20, paddingBottom: 16 }]}>
+            <View style={localStyles.notificationToggle}>
+              <View style={localStyles.notificationTextContainer}>
+                <Ionicons name="notifications-outline" size={20} color={themeColors.textPrimary} />
+                <Text style={[localStyles.notificationLabel, { color: themeColors.textPrimary }]}>
+                  Notify me when done
+                </Text>
+              </View>
+              <Switch
+                value={notifyWhenDone}
+                onValueChange={handleNotificationToggle}
+                trackColor={{ false: themeColors.divider, true: `${primaryColor}80` }}
+                thumbColor={notifyWhenDone ? primaryColor : '#f4f3f4'}
+                disabled={isGenerating}
+              />
+            </View>
+            {notifyWhenDone && (
+              <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary }]}>
+                You'll receive a notification when your cartoon is ready
+              </Text>
+            )}
+          </View>
 
           {/* Style Options */}
           <ScrollView
@@ -441,6 +586,60 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  modelSection: {
+    marginBottom: 4,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modelButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modelButton: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  modelButtonSubtext: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  notificationSection: {
+    marginBottom: 8,
+  },
+  notificationToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  notificationTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  notificationLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  notificationHint: {
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 30,
     fontStyle: 'italic',
   },
 });
