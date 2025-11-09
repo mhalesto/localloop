@@ -37,6 +37,7 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
     const defaultFilters = {
       showNearbyCities: true,
       showPostsFromCurrentCity: false,
+      showPostBackgrounds: false,
       showAIArtGallery: false,
       showLocalUsers: false,
       showTrendingCities: true,
@@ -58,6 +59,13 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
       description: 'Display posts from your current city',
       icon: 'document-text',
       color: '#3b82f6',
+    },
+    {
+      key: 'showPostBackgrounds',
+      label: 'Post Backgrounds',
+      description: 'Show original post colors on cards',
+      icon: 'color-fill',
+      color: '#ec4899',
     },
     {
       key: 'showAIArtGallery',

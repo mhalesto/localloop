@@ -29,9 +29,18 @@ export async function getPostsFromCity(city, maxResults = 10) {
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
+
+      // Ensure we have all post data including author info
       posts.push({
         id: doc.id,
+        postId: doc.id, // Some screens use postId
         ...data,
+        // Ensure author object exists
+        author: data.author || {
+          uid: data.authorId,
+          username: data.authorUsername || 'Unknown',
+          displayName: data.authorDisplayName || 'Unknown User',
+        },
       });
     }
 
