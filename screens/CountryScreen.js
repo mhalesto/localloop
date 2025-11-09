@@ -13,6 +13,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import NeighborhoodExplorer from '../components/NeighborhoodExplorer';
 import StatusStoryCard from '../components/StatusStoryCard';
 import Skeleton from '../components/Skeleton';
+import ExploreFilterModal from '../components/ExploreFilterModal';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -27,6 +28,14 @@ const CHIP_ROW_MAX = 4;
 const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 'RU', 'MX'];
 const COUNTRIES_CACHE_KEY = '@localloop.countriesCache';
 const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
+const EXPLORE_FILTERS_KEY = '@localloop.exploreFilters';
+const DEFAULT_FILTERS = {
+  showNearbyCities: true,
+  showPostsFromCurrentCity: false,
+  showStatusesFromCurrentCity: false,
+  showLocalUsers: false,
+  showTrendingCities: true,
+};
 const FALLBACK_COUNTRIES = [
   { name: 'United States', iso2: 'US', iso3: 'USA' },
   { name: 'China', iso2: 'CN', iso3: 'CHN' },
@@ -73,6 +82,8 @@ export default function CountryScreen({ navigation }) {
   const [personalLoading, setPersonalLoading] = useState(false);
   const [personalError, setPersonalError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [exploreFilters, setExploreFilters] = useState(DEFAULT_FILTERS);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -182,6 +193,33 @@ export default function CountryScreen({ navigation }) {
       }
     }
   }, [userProfile?.country, userProfile?.province]);
+
+  const loadExploreFilters = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(EXPLORE_FILTERS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setExploreFilters({ ...DEFAULT_FILTERS, ...parsed });
+      }
+    } catch (err) {
+      console.warn('[CountryScreen] Failed to load explore filters', err);
+    }
+  }, []);
+
+  const handleSaveFilters = useCallback(async (newFilters) => {
+    try {
+      await AsyncStorage.setItem(EXPLORE_FILTERS_KEY, JSON.stringify(newFilters));
+      setExploreFilters(newFilters);
+      haptics.light();
+    } catch (err) {
+      console.warn('[CountryScreen] Failed to save explore filters', err);
+    }
+  }, [haptics]);
+
+  const handleOpenFilterModal = useCallback(() => {
+    haptics.light();
+    setFilterModalVisible(true);
+  }, [haptics]);
 
   const handleRefresh = useCallback(async () => {
     haptics.light();
@@ -343,7 +381,8 @@ export default function CountryScreen({ navigation }) {
   }, [getRecentCityActivity, userProfile?.province, userProfile?.country]);
   const hasLocalActivity = trendingCities.length > 0 && Boolean(userProfile?.country || userProfile?.province);
   const topChipItems = useMemo(() => {
-    if (hasLocalActivity) {
+    // Only show trending cities if the filter is enabled
+    if (hasLocalActivity && exploreFilters.showTrendingCities) {
       return trendingCities.map((item) => ({
         type: 'city',
         city: item.city,
@@ -352,7 +391,7 @@ export default function CountryScreen({ navigation }) {
       }));
     }
     return topCountries.map((item) => ({ type: 'country', country: item }));
-  }, [hasLocalActivity, topCountries, trendingCities]);
+  }, [hasLocalActivity, topCountries, trendingCities, exploreFilters.showTrendingCities]);
 
   const paginated = useMemo(
     () => filtered.slice(0, visibleCount),
@@ -370,15 +409,35 @@ export default function CountryScreen({ navigation }) {
     loadPersonalCities();
   }, [loadPersonalCities]);
 
+  useEffect(() => {
+    loadExploreFilters();
+  }, [loadExploreFilters]);
+
   const personalFiltered = useMemo(() => {
     if (!query.trim()) return personalCities;
     const lower = query.trim().toLowerCase();
     return personalCities.filter((cityName) => cityName.toLowerCase().includes(lower));
   }, [personalCities, query]);
 
-  const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0;
+  const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0 && exploreFilters.showNearbyCities;
   const listData = showingPersonalized ? personalFiltered : paginated;
   const listIsEmpty = listData.length === 0;
+
+  // Count active filters for badge
+  const activeFiltersCount = useMemo(() => {
+    return Object.values(exploreFilters).filter(Boolean).length;
+  }, [exploreFilters]);
+
+  // Get active filter names for subtitle
+  const activeFilterNames = useMemo(() => {
+    const names = [];
+    if (exploreFilters.showNearbyCities) names.push('Nearby');
+    if (exploreFilters.showPostsFromCurrentCity) names.push('Posts');
+    if (exploreFilters.showStatusesFromCurrentCity) names.push('Statuses');
+    if (exploreFilters.showLocalUsers) names.push('Users');
+    if (exploreFilters.showTrendingCities) names.push('Trending');
+    return names;
+  }, [exploreFilters]);
 
   return (
     <ScreenLayout
@@ -390,6 +449,8 @@ export default function CountryScreen({ navigation }) {
       onSearchChange={setQuery}
       navigation={navigation}
       activeTab="home"
+      rightIcon="options"
+      onRightPress={handleOpenFilterModal}
     >
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -496,9 +557,21 @@ export default function CountryScreen({ navigation }) {
 
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Top picks</Text>
-                {hasLocalActivity ? (
-                  <Text style={styles.sectionHint}>Latest activity near you</Text>
+                <View>
+                  <Text style={styles.sectionTitle}>Top picks</Text>
+                  {activeFilterNames.length > 0 && (
+                    <Text style={styles.sectionHint}>
+                      {activeFilterNames.length === 1
+                        ? `${activeFilterNames[0]} content`
+                        : `${activeFilterNames.slice(0, 2).join(', ')}${activeFilterNames.length > 2 ? ` +${activeFilterNames.length - 2}` : ''}`}
+                    </Text>
+                  )}
+                </View>
+                {hasLocalActivity && exploreFilters.showTrendingCities ? (
+                  <View style={styles.filterBadge}>
+                    <Ionicons name="flame" size={14} color="#ef4444" />
+                    <Text style={styles.filterBadgeText}>Trending</Text>
+                  </View>
                 ) : null}
               </View>
 
@@ -569,6 +642,14 @@ export default function CountryScreen({ navigation }) {
           onRefresh={handleRefresh}
         />
       )}
+
+      {/* Explore Filter Modal */}
+      <ExploreFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={exploreFilters}
+        onSaveFilters={handleSaveFilters}
+      />
     </ScreenLayout>
   );
 }
@@ -733,7 +814,24 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      marginBottom: 4
+    },
+    filterBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: '#fef2f2',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#fee2e2'
+    },
+    filterBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#ef4444'
     },
     chipStaticRow: {
       flexDirection: 'row',
