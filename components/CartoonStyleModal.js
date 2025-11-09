@@ -533,12 +533,15 @@ const localStyles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    height: '90%',
     paddingBottom: 34,
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
     padding: 20,
     paddingBottom: 12,
+    flexShrink: 0,
   },
   headerTop: {
     flexDirection: 'row',
@@ -616,6 +619,7 @@ const localStyles = StyleSheet.create({
     padding: 20,
     paddingTop: 16,
     borderTopWidth: 1,
+    flexShrink: 0,
   },
   generateButton: {
     flexDirection: 'row',
