@@ -7,9 +7,6 @@
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-    <!-- Three.js for 3D charts -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
     
     <style>
         * {
@@ -1253,11 +1250,9 @@
                     <label id="modalStyleLabel">
                         Style
                         <select id="chartModalStyle">
-                            <option value="line" selected>Line</option>
+                            <option value="doughnut" selected>Donut</option>
                             <option value="bar">Bar</option>
-                            <option value="area">Area</option>
-                            <option value="doughnut">2D Donut</option>
-                            <option value="donut-3d">3D Donut</option>
+                            <option value="line">Line</option>
                         </select>
                     </label>
                 </div>
@@ -1365,11 +1360,12 @@
             subscription: {
                 title: 'Subscription Breakdown',
                 defaultRange: null,
-                defaultStyle: 'donut-3d',
+                defaultStyle: 'doughnut',
                 rangeOptions: [],
                 styleOptions: [
-                    { value: 'doughnut', label: '2D Donut' },
-                    { value: 'donut-3d', label: '3D Donut' }
+                    { value: 'doughnut', label: 'Donut' },
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'line', label: 'Line' }
                 ],
                 build: (analytics, state) => buildSubscriptionModal(analytics, state)
             },
@@ -1528,7 +1524,6 @@
                 modalState.chartInstance.destroy();
                 modalState.chartInstance = null;
             }
-            destroyThreeScene();
             modalState.chartKey = null;
         }
 
@@ -1586,17 +1581,6 @@
             if (modalState.chartInstance) {
                 modalState.chartInstance.destroy();
                 modalState.chartInstance = null;
-            }
-            destroyThreeScene();
-
-            const is3D = Boolean(payload.is3D);
-            if (modalElements.canvas) {
-                modalElements.canvas.style.display = is3D ? 'none' : 'block';
-            }
-
-            if (is3D) {
-                renderThreeDonut(payload);
-                return;
             }
 
             const ctx = modalElements.canvas.getContext('2d');
@@ -2282,32 +2266,42 @@
             const labels = ['Basic', 'Premium', 'Gold'];
             const dataPoints = [basicUsers, analytics.premiumUsers, analytics.goldUsers];
             const colors = ['#e5e7eb', '#a78bfa', '#fbbf24'];
-            const is3D = state.style === 'donut-3d';
 
-            return {
-                type: 'doughnut',
+            // Support doughnut, bar, and line chart types
+            const chartType = state.style || 'doughnut';
+
+            const config = {
+                type: chartType,
                 labels,
                 datasets: [{
+                    label: 'Users',
                     data: dataPoints,
                     backgroundColor: colors,
-                    borderWidth: 2,
-                    hoverOffset: 12
+                    borderWidth: 2
                 }],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom' }
-                    },
-                    cutout: '55%'
-                },
-                is3D,
-                threeData: {
-                    values: dataPoints,
-                    colors,
-                    labels
+                    }
                 }
             };
+
+            // Add specific options for doughnut
+            if (chartType === 'doughnut') {
+                config.datasets[0].hoverOffset = 12;
+                config.options.cutout = '55%';
+            }
+
+            // Add specific options for line charts
+            if (chartType === 'line') {
+                config.datasets[0].borderColor = colors;
+                config.datasets[0].tension = 0.4;
+                config.datasets[0].fill = false;
+            }
+
+            return config;
         }
 
         function buildActivityModal(analytics, state) {
@@ -2479,178 +2473,6 @@
             return `${String(normalized).padStart(2, '0')}:00`;
         }
 
-        function destroyThreeScene() {
-            const { renderer, animationId, container } = modalState.three;
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-            if (renderer) {
-                renderer.dispose();
-            }
-            if (container && container.parentNode) {
-                container.parentNode.removeChild(container);
-            }
-            modalState.three = {
-                renderer: null,
-                scene: null,
-                camera: null,
-                animationId: null,
-                container: null
-            };
-            if (modalElements.canvas) {
-                modalElements.canvas.style.display = 'block';
-            }
-        }
-
-        function renderThreeDonut(payload) {
-            if (!window.THREE || !modalElements.canvasWrapper) {
-                console.warn('Three.js not available, falling back to 2D chart.');
-                modalState.style = 'doughnut';
-                if (modalElements.styleSelect) {
-                    modalElements.styleSelect.value = 'doughnut';
-                }
-                renderModalChart();
-                return;
-            }
-
-            destroyThreeScene();
-
-            const wrapper = modalElements.canvasWrapper;
-            const width = wrapper.clientWidth || 800;
-            const height = Math.min(wrapper.clientHeight || 450, 520);
-
-            const renderer = new THREE.WebGLRenderer({
-                alpha: true,
-                antialias: true,
-                powerPreference: "high-performance"
-            });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-            renderer.setSize(width, height);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            wrapper.appendChild(renderer.domElement);
-
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xffffff); // Pure white like reference
-
-            // Front-facing camera like reference
-            const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100);
-            camera.position.set(0, 4, 12);
-            camera.lookAt(0, 0, 0);
-
-            // Soft, even lighting like reference
-            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
-            scene.add(ambient);
-
-            // Soft key light from front-top
-            const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            keyLight.position.set(2, 8, 12);
-            scene.add(keyLight);
-
-            // Gentle fill from left
-            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-            fillLight.position.set(-6, 3, 8);
-            scene.add(fillLight);
-
-            const donutGroup = new THREE.Group();
-            const rawValues = payload.threeData?.values || payload.datasets?.[0]?.data || [];
-            const colors = payload.threeData?.colors || payload.datasets?.[0]?.backgroundColor || [];
-            const labels = payload.threeData?.labels || payload.labels || [];
-            const segments = rawValues
-                .map((value, index) => ({
-                    value: Number(value) || 0,
-                    color: colors[index] || '#94a3b8',
-                    label: labels[index] || `Segment ${index + 1}`
-                }))
-                .filter(segment => segment.value > 0);
-
-            if (!segments.length) {
-                modalState.style = 'doughnut';
-                if (modalElements.styleSelect) {
-                    modalElements.styleSelect.value = 'doughnut';
-                }
-                renderModalChart();
-                return;
-            }
-
-            const total = segments.reduce((sum, segment) => sum + segment.value, 0) || 1;
-
-            let currentAngle = -Math.PI / 2;
-            const outerRadius = 2.5;
-            const innerRadius = 1.15;
-            const depth = 0.5; // Thinner like reference
-            const gap = 0.03;
-
-            segments.forEach((segment) => {
-                const proportion = segment.value / total;
-                const rawSweep = proportion * Math.PI * 2;
-                const sweep = Math.max(rawSweep - gap, 0);
-                if (sweep <= 0) {
-                    currentAngle += rawSweep;
-                    return;
-                }
-                const startAngle = currentAngle + gap / 2;
-                const endAngle = startAngle + sweep;
-
-                // Create clean donut segment shape
-                const shape = new THREE.Shape();
-                shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
-                const hole = new THREE.Path();
-                hole.absarc(0, 0, innerRadius, endAngle, startAngle, true);
-                shape.holes.push(hole);
-
-                // Extrusion with minimal bevels for smooth edges
-                const geometry = new THREE.ExtrudeGeometry(shape, {
-                    depth: depth,
-                    bevelEnabled: true,
-                    bevelThickness: 0.02,
-                    bevelSize: 0.02,
-                    bevelSegments: 3,
-                    curveSegments: 80
-                });
-                geometry.computeVertexNormals();
-
-                // Convert color string to hex number
-                let colorHex = segment.color;
-                if (typeof colorHex === 'string' && colorHex.startsWith('#')) {
-                    colorHex = parseInt(colorHex.replace('#', '0x'));
-                }
-
-                const material = new THREE.MeshStandardMaterial({
-                    color: colorHex,
-                    roughness: 0.3,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide
-                });
-
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.rotation.x = -Math.PI / 2;
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                mesh.userData = { label: segment.label };
-                donutGroup.add(mesh);
-
-                currentAngle += rawSweep;
-            });
-
-            scene.add(donutGroup);
-
-            modalState.three = {
-                renderer,
-                scene,
-                camera,
-                animationId: null,
-                container: renderer.domElement
-            };
-
-            const animate = () => {
-                const id = requestAnimationFrame(animate);
-                modalState.three.animationId = id;
-                donutGroup.rotation.y += 0.003;
-                renderer.render(scene, camera);
-            };
-            animate();
-        }
 
         function refreshData() {
             alert('Refreshing dashboard data...');
