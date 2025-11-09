@@ -202,12 +202,12 @@ export default function PublicProfileScreen({ navigation, route }) {
   }, [profile]);
 
   useEffect(() => () => {
-    ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+    ScreenCapture.allowScreenCaptureAsync().catch(() => { });
   }, []);
 
   useEffect(() => {
     if (!photoModalVisible) {
-      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      ScreenCapture.allowScreenCaptureAsync().catch(() => { });
     }
   }, [photoModalVisible]);
 
@@ -229,7 +229,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     setCurrentPhotoObject(null); // Clear the photo object
     try {
       await ScreenCapture.allowScreenCaptureAsync();
-    } catch {}
+    } catch { }
   }, []);
 
   const handleOpenInbox = useCallback(() => {
@@ -656,11 +656,11 @@ export default function PublicProfileScreen({ navigation, route }) {
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="images-outline" size={64} color={themeColors.textSecondary} />
-            <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
               {isOwnProfile ? 'Build your album' : 'No album photos yet'}
             </Text>
             {isOwnProfile && (
-              <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }] }>
+              <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
                 Add up to 10 photos that showcase your vibe. Touch and hold any photo to remove it later.
               </Text>
             )}
@@ -726,10 +726,10 @@ export default function PublicProfileScreen({ navigation, route }) {
     ) : (
       <View style={styles.emptyState}>
         <Ionicons name="document-text-outline" size={64} color={themeColors.textSecondary} />
-        <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+        <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
           {isOwnProfile ? 'No public posts yet' : 'No posts to show'}
         </Text>
-        <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }] }>
+        <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
           {isOwnProfile
             ? 'Posts you create in public mode will appear here.'
             : 'This user hasn\'t posted publicly yet.'}
@@ -741,7 +741,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const renderStatusesTab = useCallback(() => (
     <View style={styles.emptyState}>
       <Ionicons name="flash-outline" size={64} color={themeColors.textSecondary} />
-      <Text style={[styles.emptyText, { color: themeColors.textSecondary }] }>
+      <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
         {isOwnProfile ? 'No statuses yet' : 'No statuses to show'}
       </Text>
     </View>
@@ -853,9 +853,9 @@ export default function PublicProfileScreen({ navigation, route }) {
                     closePhotoPreview();
                     handleDeleteAlbumPhoto(currentPhotoObject);
                   }}
-                  activeOpacity={0.7}
+                  activeOpacity={0.1}
                 >
-                  <Ionicons name="trash" size={28} color="#FF3B30" />
+                  <Ionicons name="trash" size={28} color="#fff" />
                 </TouchableOpacity>
               )}
 
@@ -1143,8 +1143,8 @@ export default function PublicProfileScreen({ navigation, route }) {
           {activeTab === 'album'
             ? renderAlbumTab()
             : activeTab === 'posts'
-            ? renderPostsTab()
-            : renderStatusesTab()}
+              ? renderPostsTab()
+              : renderStatusesTab()}
         </View>
         {/* Account Overview Section - Only show for own profile */}
         {isOwnProfile && (
@@ -1157,8 +1157,8 @@ export default function PublicProfileScreen({ navigation, route }) {
                 {hasActivePremium
                   ? 'Premium access is active—enjoy the perks!'
                   : pointsToNextPremium > 0
-                  ? `${pointsToNextPremium} pts away from unlocking ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`
-                  : `Redeem ${premiumDayCost} pts at any time for ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`}
+                    ? `${pointsToNextPremium} pts away from unlocking ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`
+                    : `Redeem ${premiumDayCost} pts at any time for ${Math.max(Math.round(premiumAccessDurationMs / (60 * 60 * 1000)), 1)} hours of premium.`}
               </Text>
             </View>
 

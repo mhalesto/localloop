@@ -376,6 +376,16 @@ export default function CartoonStyleModal({
                   >
                     Fast
                   </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonUsage,
+                      {
+                        color: selectedModel === 'gpt-3.5-turbo' ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {20 - (usageData?.monthlyUsage || 0)} left
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -409,6 +419,16 @@ export default function CartoonStyleModal({
                     ]}
                   >
                     Best Quality
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonUsage,
+                      {
+                        color: selectedModel === 'gpt-4' ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {usageData?.gpt4VisionUsage || 0}/5 used
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -758,6 +778,12 @@ const localStyles = StyleSheet.create({
   modelButtonSubtext: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  modelButtonUsage: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 6,
+    opacity: 0.9,
   },
   gpt4UsageHint: {
     flexDirection: 'row',
