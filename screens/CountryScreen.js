@@ -491,6 +491,15 @@ export default function CountryScreen({ navigation }) {
     return Object.values(exploreFilters).filter(Boolean).length;
   }, [exploreFilters]);
 
+  // Check if any content filter is active (posts, statuses, users)
+  const hasActiveContentFilter = useMemo(() => {
+    return (
+      exploreFilters.showPostsFromCurrentCity ||
+      exploreFilters.showStatusesFromCurrentCity ||
+      exploreFilters.showLocalUsers
+    );
+  }, [exploreFilters]);
+
   // Get active filter names for subtitle
   const activeFilterNames = useMemo(() => {
     const names = [];
@@ -521,7 +530,7 @@ export default function CountryScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={listData}
+          data={hasActiveContentFilter ? [] : listData}
           keyExtractor={(item) =>
             showingPersonalized ? item : item.iso2 ?? item.name
           }
@@ -747,7 +756,10 @@ export default function CountryScreen({ navigation }) {
                 </View>
               )}
 
-              <View style={styles.sectionHeader}>
+              {/* Only show cities section if NO content filters are active */}
+              {!hasActiveContentFilter && (
+                <>
+                  <View style={styles.sectionHeader}>
                 <View>
                   <Text style={styles.sectionTitle}>Top picks</Text>
                   {activeFilterNames.length > 0 && (
@@ -796,29 +808,33 @@ export default function CountryScreen({ navigation }) {
                 })}
               </View>
 
-              <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
-                {showingPersonalized
-                  ? `${userProfile?.province || 'Your province'} cities`
-                  : 'All destinations'}
-              </Text>
-              {showingPersonalized && personalError ? (
-                <Text style={styles.personalError}>{personalError}</Text>
-              ) : null}
+                  <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
+                    {showingPersonalized
+                      ? `${userProfile?.province || 'Your province'} cities`
+                      : 'All destinations'}
+                  </Text>
+                  {showingPersonalized && personalError ? (
+                    <Text style={styles.personalError}>{personalError}</Text>
+                  ) : null}
+                </>
+              )}
             </View>
           }
           ListEmptyComponent={
-            showingPersonalized ? (
-              personalLoading ? (
-                <ActivityIndicator size="small" color={themeColors.primaryDark} />
+            hasActiveContentFilter ? null : (
+              showingPersonalized ? (
+                personalLoading ? (
+                  <ActivityIndicator size="small" color={themeColors.primaryDark} />
+                ) : (
+                  <Text style={styles.emptyState}>
+                    {personalError || 'No cities match your search yet.'}
+                  </Text>
+                )
+              ) : error ? (
+                <Text style={styles.emptyState}>{error}</Text>
               ) : (
-                <Text style={styles.emptyState}>
-                  {personalError || 'No cities match your search yet.'}
-                </Text>
+                <Text style={styles.emptyState}>No countries match your search yet.</Text>
               )
-            ) : error ? (
-              <Text style={styles.emptyState}>{error}</Text>
-            ) : (
-              <Text style={styles.emptyState}>No countries match your search yet.</Text>
             )
           }
           ListFooterComponent={<View style={{ height: showAddShortcut ? 160 : 60 }} />}

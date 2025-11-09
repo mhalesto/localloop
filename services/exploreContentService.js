@@ -21,7 +21,6 @@ export async function getPostsFromCity(city, maxResults = 10) {
     const postsQuery = query(
       collection(db, 'publicPosts'),
       where('city', '==', city),
-      orderBy('createdAt', 'desc'),
       limit(maxResults)
     );
 
@@ -35,6 +34,9 @@ export async function getPostsFromCity(city, maxResults = 10) {
         ...data,
       });
     }
+
+    // Sort by createdAt in memory to avoid index requirement
+    posts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
     return posts;
   } catch (error) {
@@ -56,7 +58,6 @@ export async function getStatusesFromCity(city, maxResults = 10) {
     const statusesQuery = query(
       collection(db, 'statuses'),
       where('city', '==', city),
-      orderBy('createdAt', 'desc'),
       limit(maxResults)
     );
 
@@ -93,6 +94,9 @@ export async function getStatusesFromCity(city, maxResults = 10) {
         },
       });
     }
+
+    // Sort by createdAt in memory to avoid index requirement
+    statuses.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
     return statuses;
   } catch (error) {
