@@ -581,6 +581,7 @@ const localStyles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   stylesContainer: {
     padding: 20,

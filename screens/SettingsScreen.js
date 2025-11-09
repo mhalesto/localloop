@@ -43,7 +43,7 @@ import { useAlert } from '../contexts/AlertContext';
 import CartoonStyleModal from '../components/CartoonStyleModal';
 import CartoonHistoryModal from '../components/CartoonHistoryModal';
 import CartoonSuccessModal from '../components/CartoonSuccessModal';
-import { generateCartoonProfile } from '../services/openai/profileCartoonService';
+import { generateCartoonProfile, getUsageStatsText } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
@@ -2129,10 +2129,11 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.itemTitle}>AI Cartoon Avatar</Text>
             <Text style={styles.profileSummary}>
               Transform your profile into a fun cartoon avatar using AI. {'\n'}
-              {userProfile?.subscriptionPlan === 'basic'
-                ? `Basic: 1 lifetime generation${cartoonUsageData?.lifetimeUsage > 0 ? ' (used)' : ' available'}`
-                : `${userProfile?.subscriptionPlan || 'Premium'}: ${cartoonUsageData?.monthlyUsage || 0}/2 used this month`
-              }
+              {getUsageStatsText(
+                userProfile?.subscriptionPlan || 'basic',
+                cartoonUsageData?.monthlyUsage || 0,
+                cartoonUsageData?.lifetimeUsage || 0
+              )}
             </Text>
 
             {/* Gold Enhancement Indicator */}
