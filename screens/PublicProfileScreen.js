@@ -96,6 +96,9 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [mutualFollowersCount, setMutualFollowersCount] = useState(0);
   const [localConnectionsCount, setLocalConnectionsCount] = useState(0);
 
+  // Profile menu (three dots)
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
 
@@ -859,8 +862,8 @@ export default function PublicProfileScreen({ navigation, route }) {
       navigation={navigation}
       onBack={() => navigation.goBack()}
       showFooter={false}
-      rightIcon={isOwnProfile ? "settings-outline" : null}
-      onRightPress={isOwnProfile ? () => navigation.navigate('Settings') : null}
+      rightIcon={isOwnProfile ? "ellipsis-horizontal" : null}
+      onRightPress={isOwnProfile ? () => setShowProfileMenu(true) : null}
     >
       <Modal
         visible={photoModalVisible}
@@ -1222,16 +1225,26 @@ export default function PublicProfileScreen({ navigation, route }) {
           {/* Action Buttons (Instagram-style) */}
           <View style={styles.actionsRow}>
             {isOwnProfile ? (
-              <TouchableOpacity
-                style={[styles.actionButton, { borderColor: primaryColor }]}
-                onPress={navigateToEdit}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={20} color={primaryColor} />
-                <Text style={[styles.actionButtonText, { color: primaryColor }]}>
-                  Edit Profile
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[styles.editProfileButton, { backgroundColor: themeColors.divider }]}
+                  onPress={navigateToEdit}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.editProfileButtonText, { color: themeColors.textPrimary }]}>
+                    Edit profile
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.shareProfileButton, { backgroundColor: themeColors.divider }]}
+                  onPress={() => setShowProfileMenu(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.shareProfileButtonText, { color: themeColors.textPrimary }]}>
+                    Share profile
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
               <>
                 <TouchableOpacity
@@ -1430,6 +1443,64 @@ export default function PublicProfileScreen({ navigation, route }) {
           </>
         )}
       </ScrollView>
+
+      {/* Profile Menu Modal (Three Dots) */}
+      <Modal
+        visible={showProfileMenu}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowProfileMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowProfileMenu(false)}
+        >
+          <View style={[styles.menuContainer, { backgroundColor: themeColors.card }]}>
+            <View style={styles.menuHandle} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowProfileMenu(false);
+                navigation.navigate('Settings');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={24} color={themeColors.textPrimary} />
+              <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
+                Settings
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowProfileMenu(false);
+                // Share functionality would go here
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="share-outline" size={24} color={themeColors.textPrimary} />
+              <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
+                Share Profile
+              </Text>
+            </TouchableOpacity>
+
+            <View style={[styles.menuDivider, { backgroundColor: themeColors.divider }]} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => setShowProfileMenu(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.menuItemTextCancel, { color: themeColors.textSecondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScreenLayout>
   );
 }
@@ -2220,5 +2291,74 @@ const styles = StyleSheet.create({
   saveModalButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Instagram-style action buttons
+  editProfileButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  editProfileButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  shareProfileButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  shareProfileButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Profile menu (three dots)
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  menuHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ccc',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  menuItemTextCancel: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    flex: 1,
+  },
+  menuDivider: {
+    height: 1,
+    marginVertical: 8,
+    marginHorizontal: 20,
   },
 });
