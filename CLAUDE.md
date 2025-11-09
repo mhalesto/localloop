@@ -93,6 +93,17 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
    - Examples: "superhero in cyberpunk city", "watercolor princess in fantasy setting"
    - Powered by DALL-E 3 with full creative control
 
+2a. **Gold Exclusive: Custom Image Upload**
+   - Upload any image temporarily for AI generation
+   - Image auto-deleted after cartoon is created
+   - Optional: Use custom image instead of profile picture
+
+2b. **Gold Exclusive: Generate Without Profile Picture**
+   - Toggle to enable text-only or text + custom image generation
+   - Complete creative freedom - generate anything imaginable
+   - Not limited to profile picture transformations
+   - Examples: landscapes, objects, characters, scenes, etc.
+
 3. **Usage Limits**
    - Basic Plan: 5 lifetime generations
    - Premium: 10 generations per month
@@ -102,13 +113,19 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 4. **History Management**
    - Saves last 3 generated cartoons
    - View, delete, or set as profile picture
+   - Download cartoons to device photo library
+   - iOS: Auto-creates "LocalLoop Cartoons" album
    - Automatic cleanup of old images
 
 5. **User Flow**
    - Settings � Profile � "AI Cartoon Avatar"
-   - Tap "Generate" � Choose style � AI generates
+   - Tap "Generate" � Choose style/custom prompt
+   - Gold: Optionally upload custom image or toggle "Generate without profile picture"
+   - Gold: Select AI model (GPT-3.5 or GPT-4)
+   - Optional: Enable notification when done
+   - AI generates cartoon (10-20 seconds)
    - View "History" to manage saved cartoons
-   - Set any cartoon as profile picture
+   - Set any cartoon as profile picture or download to device
 
 #### Technical Details
 
@@ -117,17 +134,22 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 - 10,000 generations = $400
 
 **Storage:**
-- Images saved to Firebase Storage at `cartoon-profiles/{userId}/{style}-{timestamp}.jpg`
+- Generated cartoons saved to Firebase Storage at `cartoon-profiles/{userId}/{style}-{timestamp}.jpg`
+- Temporary custom images saved to `temp-custom-images/{userId}/temp-{timestamp}.jpg`
+- Temporary images auto-deleted after generation completes
 - Automatic cleanup when history exceeds 3 items
 
 **API:**
 - OpenAI DALL-E 3 API for cartoon generation
-- Text-to-image generation based on style prompts
-- Generates generic cartoons in chosen artistic style
+- Text-to-image generation based on style prompts or custom descriptions
+- Supports three generation modes:
+  1. Profile photo transformation (Basic/Premium/Gold)
+  2. Custom image transformation (Gold only)
+  3. Text-only generation - unlimited creativity (Gold only)
 - Image size: 1024x1024
-- Quality: Standard (cost-efficient)
+- Quality: Standard (Basic/Premium), HD (Gold)
 - Style: Vivid (more dramatic colors)
-- Note: Creates stylized portraits, not personalized to user's photo
+- Gold: GPT-4o Vision analysis for personalized results
 
 **Database Schema (Firestore):**
 ```
