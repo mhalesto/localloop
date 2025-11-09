@@ -13,7 +13,11 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import { CARTOON_STYLES } from '../services/openai/profileCartoonService';
@@ -30,6 +34,7 @@ export default function CartoonHistoryModal({
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [processingId, setProcessingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   const handleSetAsProfile = async (pictureUrl, pictureId) => {
@@ -51,6 +56,66 @@ export default function CartoonHistoryModal({
   const handleClearAll = () => {
     // Just call onClearAll directly - let parent handle confirmation
     onClearAll();
+  };
+
+  const handleDownload = async (picture) => {
+    setDownloadingId(picture.id);
+
+    try {
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Please enable photo library access in your device settings to download images.',
+          [{ text: 'OK' }]
+        );
+        setDownloadingId(null);
+        return;
+      }
+
+      // Download the image to cache
+      const filename = `cartoon-${picture.style}-${Date.now()}.jpg`;
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      console.log('[CartoonHistoryModal] Downloading image from:', picture.url);
+      const downloadResult = await FileSystem.downloadAsync(picture.url, fileUri);
+
+      if (downloadResult.status !== 200) {
+        throw new Error('Failed to download image');
+      }
+
+      // Save to photo library
+      const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+
+      // Optional: Create album and add to it
+      if (Platform.OS === 'ios') {
+        const album = await MediaLibrary.getAlbumAsync('LocalLoop Cartoons');
+        if (album === null) {
+          await MediaLibrary.createAlbumAsync('LocalLoop Cartoons', asset, false);
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        }
+      }
+
+      Alert.alert(
+        'Success',
+        'Cartoon saved to your photo library!',
+        [{ text: 'OK' }]
+      );
+
+      console.log('[CartoonHistoryModal] Image saved successfully');
+    } catch (error) {
+      console.error('[CartoonHistoryModal] Error downloading image:', error);
+      Alert.alert(
+        'Download Failed',
+        'Unable to save the image. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const getStyleName = (styleId) => {
@@ -192,6 +257,18 @@ export default function CartoonHistoryModal({
                       )}
 
                       <TouchableOpacity
+                        style={[localStyles.downloadButton, { backgroundColor: '#34C75915' }]}
+                        onPress={() => handleDownload(picture)}
+                        disabled={downloadingId === picture.id}
+                      >
+                        {downloadingId === picture.id ? (
+                          <ActivityIndicator size="small" color="#34C759" />
+                        ) : (
+                          <Ionicons name="download-outline" size={20} color="#34C759" />
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
                         style={[localStyles.deleteButton, { backgroundColor: '#FF353515' }]}
                         onPress={() => handleDelete(picture)}
                         disabled={isProcessingThis}
@@ -331,6 +408,13 @@ const localStyles = StyleSheet.create({
   actionText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  downloadButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
   },
   deleteButton: {
     width: 44,
