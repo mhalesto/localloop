@@ -2531,36 +2531,26 @@
             wrapper.appendChild(renderer.domElement);
 
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf8f9fa);
+            scene.background = new THREE.Color(0xffffff); // Pure white like reference
 
-            // Camera angled from top-front like reference
-            const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-            camera.position.set(-2, 8, 10);
+            // Front-facing camera like reference
+            const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100);
+            camera.position.set(0, 4, 12);
             camera.lookAt(0, 0, 0);
 
-            // Lighting setup matching reference image
-            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+            // Soft, even lighting like reference
+            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
             scene.add(ambient);
 
-            // Main key light from top-left (like reference)
-            const keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
-            keyLight.position.set(-10, 15, 10);
-            keyLight.castShadow = true;
-            keyLight.shadow.mapSize.width = 2048;
-            keyLight.shadow.mapSize.height = 2048;
-            keyLight.shadow.camera.near = 0.5;
-            keyLight.shadow.camera.far = 50;
+            // Soft key light from front-top
+            const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            keyLight.position.set(2, 8, 12);
             scene.add(keyLight);
 
-            // Soft fill light from right
-            const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-            fillLight.position.set(8, 5, 8);
+            // Gentle fill from left
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-6, 3, 8);
             scene.add(fillLight);
-
-            // Subtle rim light for depth
-            const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-            rimLight.position.set(0, -5, -8);
-            scene.add(rimLight);
 
             const donutGroup = new THREE.Group();
             const rawValues = payload.threeData?.values || payload.datasets?.[0]?.data || [];
@@ -2588,8 +2578,8 @@
             let currentAngle = -Math.PI / 2;
             const outerRadius = 2.5;
             const innerRadius = 1.15;
-            const depth = 0.7;
-            const gap = 0.04;
+            const depth = 0.5; // Thinner like reference
+            const gap = 0.03;
 
             segments.forEach((segment) => {
                 const proportion = segment.value / total;
@@ -2609,10 +2599,13 @@
                 hole.absarc(0, 0, innerRadius, endAngle, startAngle, true);
                 shape.holes.push(hole);
 
-                // Simple extrusion without bevels
+                // Extrusion with minimal bevels for smooth edges
                 const geometry = new THREE.ExtrudeGeometry(shape, {
                     depth: depth,
-                    bevelEnabled: false,
+                    bevelEnabled: true,
+                    bevelThickness: 0.02,
+                    bevelSize: 0.02,
+                    bevelSegments: 3,
                     curveSegments: 80
                 });
                 geometry.computeVertexNormals();
@@ -2623,15 +2616,10 @@
                     colorHex = parseInt(colorHex.replace('#', '0x'));
                 }
 
-                const material = new THREE.MeshPhysicalMaterial({
+                const material = new THREE.MeshStandardMaterial({
                     color: colorHex,
-                    roughness: 0.2,
-                    metalness: 0.15,
-                    clearcoat: 0.5,
-                    clearcoatRoughness: 0.15,
-                    reflectivity: 0.6,
-                    envMapIntensity: 1.0,
-                    emissive: new THREE.Color(colorHex).multiplyScalar(0.02),
+                    roughness: 0.3,
+                    metalness: 0.05,
                     side: THREE.DoubleSide
                 });
 
@@ -2646,28 +2634,6 @@
             });
 
             scene.add(donutGroup);
-
-            const highlightRing = new THREE.Mesh(
-                new THREE.TorusGeometry(outerRadius - 0.08, 0.05, 24, 120),
-                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 })
-            );
-            highlightRing.rotation.x = Math.PI / 2;
-            highlightRing.position.y = depth / 2 + 0.03;
-            scene.add(highlightRing);
-
-            // Add shadow plane like reference image
-            const shadow = new THREE.Mesh(
-                new THREE.CircleGeometry(outerRadius * 1.4, 64),
-                new THREE.MeshBasicMaterial({
-                    color: 0x000000,
-                    transparent: true,
-                    opacity: 0.15,
-                    depthWrite: false
-                })
-            );
-            shadow.rotation.x = -Math.PI / 2;
-            shadow.position.y = -depth / 2 - 0.4;
-            scene.add(shadow);
 
             modalState.three = {
                 renderer,
