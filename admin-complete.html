@@ -2598,8 +2598,10 @@
                     curveSegments: 100,
                     steps: 2
                 });
-                geometry.center();
+                // Compute normals before bounding calculations
                 geometry.computeVertexNormals();
+                geometry.computeBoundingBox();
+                geometry.computeBoundingSphere();
 
                 // Convert color string to hex number
                 let colorHex = colors[index] || '#94a3b8';
