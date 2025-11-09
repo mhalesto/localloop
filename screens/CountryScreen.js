@@ -14,12 +14,16 @@ import NeighborhoodExplorer from '../components/NeighborhoodExplorer';
 import StatusStoryCard from '../components/StatusStoryCard';
 import Skeleton from '../components/Skeleton';
 import ExploreFilterModal from '../components/ExploreFilterModal';
+import FilteredPostCard from '../components/FilteredPostCard';
+import FilteredUserCard from '../components/FilteredUserCard';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSensors } from '../contexts/SensorsContext';
+import { useAuth } from '../contexts/AuthContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
+import { getPostsFromCity, getStatusesFromCity, getLocalUsers } from '../services/exploreContentService';
 
 const INITIAL_VISIBLE = 40;
 const PAGE_SIZE = 30;
@@ -53,6 +57,7 @@ export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, showDiscoveryOnExplore, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts } = usePosts();
+  const { currentUser } = useAuth();
   const haptics = useHaptics();
   const {
     statuses,
@@ -84,6 +89,10 @@ export default function CountryScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [exploreFilters, setExploreFilters] = useState(DEFAULT_FILTERS);
+  const [filteredPosts, setFilteredPosts] = useState([]);
+  const [filteredStatuses, setFilteredStatuses] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [loadingFilteredContent, setLoadingFilteredContent] = useState(false);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -220,6 +229,56 @@ export default function CountryScreen({ navigation }) {
     haptics.light();
     setFilterModalVisible(true);
   }, [haptics]);
+
+  const loadFilteredContent = useCallback(async () => {
+    if (!userProfile?.city) return;
+
+    setLoadingFilteredContent(true);
+    try {
+      const promises = [];
+
+      // Load posts if filter is enabled
+      if (exploreFilters.showPostsFromCurrentCity) {
+        promises.push(
+          getPostsFromCity(userProfile.city, 10).then((posts) => {
+            if (isMounted.current) setFilteredPosts(posts);
+          })
+        );
+      } else {
+        setFilteredPosts([]);
+      }
+
+      // Load statuses if filter is enabled
+      if (exploreFilters.showStatusesFromCurrentCity) {
+        promises.push(
+          getStatusesFromCity(userProfile.city, 10).then((statuses) => {
+            if (isMounted.current) setFilteredStatuses(statuses);
+          })
+        );
+      } else {
+        setFilteredStatuses([]);
+      }
+
+      // Load users if filter is enabled
+      if (exploreFilters.showLocalUsers) {
+        promises.push(
+          getLocalUsers(userProfile.city, currentUser?.uid, 20).then((users) => {
+            if (isMounted.current) setFilteredUsers(users);
+          })
+        );
+      } else {
+        setFilteredUsers([]);
+      }
+
+      await Promise.all(promises);
+    } catch (err) {
+      console.error('[CountryScreen] Error loading filtered content:', err);
+    } finally {
+      if (isMounted.current) {
+        setLoadingFilteredContent(false);
+      }
+    }
+  }, [userProfile?.city, exploreFilters, currentUser?.uid]);
 
   const handleRefresh = useCallback(async () => {
     haptics.light();
@@ -413,6 +472,10 @@ export default function CountryScreen({ navigation }) {
     loadExploreFilters();
   }, [loadExploreFilters]);
 
+  useEffect(() => {
+    loadFilteredContent();
+  }, [loadFilteredContent]);
+
   const personalFiltered = useMemo(() => {
     if (!query.trim()) return personalCities;
     const lower = query.trim().toLowerCase();
@@ -556,6 +619,134 @@ export default function CountryScreen({ navigation }) {
               </View>
 
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              {/* Filtered Posts Section */}
+              {exploreFilters.showPostsFromCurrentCity && userProfile?.city && (
+                <View style={styles.filteredSection}>
+                  <View style={styles.filteredHeader}>
+                    <View>
+                      <Text style={styles.filteredTitle}>Posts from {userProfile.city}</Text>
+                      <Text style={styles.filteredSubtitle}>Latest updates in your city</Text>
+                    </View>
+                    {filteredPosts.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.seeAllButton}
+                        onPress={() => navigation.navigate('Room', { city: userProfile.city })}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.seeAllText}>See all</Text>
+                        <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {loadingFilteredContent ? (
+                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
+                  ) : filteredPosts.length > 0 ? (
+                    <FlatList
+                      data={filteredPosts}
+                      horizontal
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <FilteredPostCard
+                          post={item}
+                          onPress={() => navigation.navigate('PostThread', { postId: item.id })}
+                        />
+                      )}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  ) : (
+                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
+                      No posts from {userProfile.city} yet
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Filtered Statuses Section */}
+              {exploreFilters.showStatusesFromCurrentCity && userProfile?.city && (
+                <View style={styles.filteredSection}>
+                  <View style={styles.filteredHeader}>
+                    <View>
+                      <Text style={styles.filteredTitle}>Status updates from {userProfile.city}</Text>
+                      <Text style={styles.filteredSubtitle}>See what's happening locally</Text>
+                    </View>
+                    {filteredStatuses.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.seeAllButton}
+                        onPress={() => navigation.navigate('TopStatuses')}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.seeAllText}>See all</Text>
+                        <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {loadingFilteredContent ? (
+                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
+                  ) : filteredStatuses.length > 0 ? (
+                    <FlatList
+                      data={filteredStatuses}
+                      horizontal
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <StatusStoryCard
+                          status={item}
+                          onPress={() => {
+                            const ids = filteredStatuses.map((s) => s.id);
+                            const index = filteredStatuses.findIndex((s) => s.id === item.id);
+                            navigation.navigate('StatusStoryViewer', {
+                              statusIds: ids,
+                              initialStatusId: item.id,
+                              initialIndex: index,
+                            });
+                          }}
+                        />
+                      )}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  ) : (
+                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
+                      No status updates from {userProfile.city} yet
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Filtered Users Section */}
+              {exploreFilters.showLocalUsers && userProfile?.city && (
+                <View style={styles.filteredSection}>
+                  <View style={styles.filteredHeader}>
+                    <View>
+                      <Text style={styles.filteredTitle}>Local users in {userProfile.city}</Text>
+                      <Text style={styles.filteredSubtitle}>Connect with people nearby</Text>
+                    </View>
+                  </View>
+                  {loadingFilteredContent ? (
+                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
+                  ) : filteredUsers.length > 0 ? (
+                    <FlatList
+                      data={filteredUsers}
+                      horizontal
+                      keyExtractor={(item) => item.uid}
+                      renderItem={({ item }) => (
+                        <FilteredUserCard
+                          user={item}
+                          onPress={() => navigation.navigate('PublicProfile', { userId: item.uid })}
+                        />
+                      )}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  ) : (
+                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
+                      No local users found in {userProfile.city}
+                    </Text>
+                  )}
+                </View>
+              )}
+
               <View style={styles.sectionHeader}>
                 <View>
                   <Text style={styles.sectionTitle}>Top picks</Text>
@@ -943,5 +1134,53 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 14,
       marginTop: 16,
       marginBottom: 12
+    },
+    filteredSection: {
+      marginBottom: 24
+    },
+    filteredHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 14
+    },
+    filteredTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: palette.textPrimary
+    },
+    filteredSubtitle: {
+      fontSize: 12,
+      color: palette.textSecondary,
+      marginTop: 3
+    },
+    seeAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.divider
+    },
+    seeAllText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: palette.primaryDark,
+      marginRight: 3
+    },
+    horizontalList: {
+      paddingBottom: 4,
+      paddingRight: 12,
+      paddingLeft: 2
+    },
+    loader: {
+      marginVertical: 16
+    },
+    emptyFilterText: {
+      fontSize: 13,
+      textAlign: 'center',
+      paddingVertical: 16
     }
   });
