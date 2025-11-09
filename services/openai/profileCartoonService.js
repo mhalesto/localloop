@@ -66,16 +66,19 @@ export const USAGE_LIMITS = {
     monthly: 0,
     lifetime: 5, // Free users get 5 lifetime generations
     historyLimit: 3, // Basic users can save 3 cartoons in history
+    gpt4VisionMonthly: 0, // No GPT-4 Vision for Basic
   },
   premium: {
     monthly: 10, // Premium users get 10 generations per month
     lifetime: null, // Unlimited lifetime
     historyLimit: 10, // Premium users can save 10 cartoons in history
+    gpt4VisionMonthly: 0, // No GPT-4 Vision for Premium
   },
   gold: {
     monthly: 20, // Gold users get 20 generations per month
     lifetime: null, // Unlimited lifetime
     historyLimit: 20, // Gold users can save 20 cartoons in history
+    gpt4VisionMonthly: 5, // Gold users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
   },
 };
 
@@ -149,9 +152,11 @@ const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
  * @param {string} gender - Optional gender hint (male/female/neutral)
  * @param {string} customPrompt - Optional custom prompt for Gold users (only used if styleId is 'custom')
  * @param {string} subscriptionPlan - User's subscription plan ('basic' | 'premium' | 'gold')
- * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean}>}
+ * @param {string} model - AI model to use ('gpt-3.5-turbo' | 'gpt-4')
+ * @param {number} gpt4VisionUsage - Current GPT-4 Vision usage this month
+ * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean, usedGpt4: boolean}>}
  */
-export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic', model = 'gpt-3.5-turbo') {
+export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic', model = 'gpt-3.5-turbo', gpt4VisionUsage = 0) {
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
@@ -165,20 +170,32 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     await new Promise(resolve => setTimeout(resolve, waitTime));
   }
 
+  // Check GPT-4 Vision limit for Gold users
+  let actualModel = model;
+  const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  const gpt4Limit = limits.gpt4VisionMonthly || 0;
+
+  if (subscriptionPlan === 'gold' && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
+    console.log(`[profileCartoonService] GPT-4 Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}), falling back to GPT-3.5`);
+    actualModel = 'gpt-3.5-turbo';
+  }
+
   let prompt;
   let styleName;
   let personalizedDescription = null;
+  let usedGpt4 = false;
 
-  // Gold users get GPT-4o Vision analysis for personalized cartoons
-  if (subscriptionPlan === 'gold' && imageUrl) {
+  // Gold users get GPT-4o Vision analysis for personalized cartoons (if within limit)
+  if (subscriptionPlan === 'gold' && imageUrl && actualModel === 'gpt-4') {
     try {
       // Check if we have a valid public URL
       if (!imageUrl.startsWith('https://')) {
         console.log('[profileCartoonService] Skipping Vision analysis - profile photo not yet uploaded to cloud storage (local file path)');
       } else {
-        console.log(`[profileCartoonService] Gold user - analyzing photo with ${model} Vision`);
-        personalizedDescription = await analyzePhotoForCartoon(imageUrl, model);
+        console.log(`[profileCartoonService] Gold user - analyzing photo with ${actualModel} Vision`);
+        personalizedDescription = await analyzePhotoForCartoon(imageUrl, actualModel);
         console.log('[profileCartoonService] Vision analysis complete');
+        usedGpt4 = true; // Track that we used GPT-4
       }
     } catch (visionError) {
       console.warn('[profileCartoonService] Vision analysis failed:', visionError.message);
@@ -267,6 +284,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
           enhanced: personalizedDescription !== null, // Indicates Vision analysis was used
           quality: imageQuality,
           subscriptionPlan,
+          usedGpt4, // Track if GPT-4 Vision was used
         };
 
       } catch (error) {

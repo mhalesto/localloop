@@ -847,6 +847,7 @@ export default function SettingsScreen({ navigation }) {
       setCartoonUsageData({
         monthlyUsage: data.monthlyUsage,
         lifetimeUsage: data.lifetimeUsage,
+        gpt4VisionUsage: data.gpt4VisionUsage || 0, // GPT-4 Vision usage
       });
       setCartoonPictureHistory(data.pictureHistory || []);
     } catch (error) {
@@ -913,14 +914,15 @@ export default function SettingsScreen({ navigation }) {
         userProfile.gender || 'neutral',
         customPrompt, // Pass custom prompt for Gold users
         userProfile?.subscriptionPlan || 'basic', // Pass subscription plan for Vision analysis
-        model // Pass selected GPT model
+        model, // Pass selected GPT model
+        cartoonUsageData?.gpt4VisionUsage || 0 // Pass current GPT-4 Vision usage
       );
 
       // Upload to Firebase Storage
       const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
 
       // Record generation and update history (use 'custom' as style if custom prompt)
-      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin, userPlan);
+      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin, userPlan, result.usedGpt4);
 
       // Delete temporary custom image if it was used
       if (tempImageData) {

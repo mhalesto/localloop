@@ -35,6 +35,7 @@ export async function getCartoonProfileData(userId) {
     return {
       monthlyUsage: data.cartoonMonthlyUsage || 0,
       lifetimeUsage: data.cartoonLifetimeUsage || 0,
+      gpt4VisionUsage: data.cartoonGpt4VisionUsage || 0, // GPT-4 Vision usage this month
       lastResetMonth: data.cartoonLastResetMonth || new Date().getMonth(),
       lastResetYear: data.cartoonLastResetYear || new Date().getFullYear(),
       pictureHistory: data.cartoonPictureHistory || [],
@@ -60,6 +61,7 @@ export async function checkAndResetMonthlyUsage(userId) {
     const docRef = doc(db, 'users', userId);
     await updateDoc(docRef, {
       cartoonMonthlyUsage: 0,
+      cartoonGpt4VisionUsage: 0, // Reset GPT-4 Vision usage
       cartoonLastResetMonth: currentMonth,
       cartoonLastResetYear: currentYear,
     });
@@ -67,6 +69,7 @@ export async function checkAndResetMonthlyUsage(userId) {
     return {
       ...data,
       monthlyUsage: 0,
+      gpt4VisionUsage: 0, // Reset GPT-4 Vision usage
       lastResetMonth: currentMonth,
       lastResetYear: currentYear,
     };
@@ -180,9 +183,10 @@ export async function deleteTemporaryCustomImage(storagePath) {
  * @param {string} styleId - Style used
  * @param {boolean} isAdmin - Whether the user is an admin
  * @param {string} planId - User's subscription plan ('basic', 'premium', 'gold')
+ * @param {boolean} usedGpt4 - Whether GPT-4 Vision was used for this generation
  * @returns {Promise<void>}
  */
-export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false, planId = 'basic') {
+export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false, planId = 'basic', usedGpt4 = false) {
   try {
     const data = await checkAndResetMonthlyUsage(userId);
     const docRef = doc(db, 'users', userId);
@@ -232,6 +236,11 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin
     if (!isAdmin) {
       updateData.cartoonMonthlyUsage = (data.monthlyUsage || 0) + 1;
       updateData.cartoonLifetimeUsage = (data.lifetimeUsage || 0) + 1;
+
+      // Track GPT-4 Vision usage separately
+      if (usedGpt4) {
+        updateData.cartoonGpt4VisionUsage = (data.gpt4VisionUsage || 0) + 1;
+      }
     }
 
     await updateDoc(docRef, updateData);
@@ -239,6 +248,7 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin
     console.log('[cartoonProfileService] Recorded generation, new usage:', {
       monthly: data.monthlyUsage + 1,
       lifetime: data.lifetimeUsage + 1,
+      gpt4Vision: usedGpt4 ? (data.gpt4VisionUsage || 0) + 1 : data.gpt4VisionUsage || 0,
     });
   } catch (error) {
     console.error('[cartoonProfileService] Error recording generation:', error);

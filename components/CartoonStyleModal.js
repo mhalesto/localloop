@@ -412,6 +412,16 @@ export default function CartoonStyleModal({
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* GPT-4 Usage Info */}
+              {selectedModel === 'gpt-4' && (
+                <View style={[localStyles.gpt4UsageHint, { backgroundColor: `${primaryColor}10` }]}>
+                  <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
+                  <Text style={[localStyles.gpt4UsageText, { color: themeColors.textSecondary }]}>
+                    GPT-4 Vision: {usageData?.gpt4VisionUsage || 0}/5 used this month
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -748,6 +758,20 @@ const localStyles = StyleSheet.create({
   modelButtonSubtext: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  gpt4UsageHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  gpt4UsageText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
   },
   notificationSection: {
     marginBottom: 8,
