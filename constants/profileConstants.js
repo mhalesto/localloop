@@ -131,3 +131,21 @@ export const PROFILE_LIMITS = {
   COMPANY_MAX_LENGTH: 50,
   EDUCATION_MAX_LENGTH: 100,
 };
+
+// Privacy settings for profile fields
+export const PRIVACY_SETTINGS = {
+  PRONOUNS: 'showPronouns',
+  PROFESSION: 'showProfession',
+  COMPANY: 'showCompany',
+  INTERESTS: 'showInterests',
+  LINKS: 'showLinks',
+};
+
+// Default privacy settings (all public by default)
+export const DEFAULT_PRIVACY_SETTINGS = {
+  showPronouns: true,
+  showProfession: true,
+  showCompany: true,
+  showInterests: true,
+  showLinks: true,
+};

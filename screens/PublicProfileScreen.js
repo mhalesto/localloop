@@ -11,7 +11,8 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ALL_INTERESTS } from '../constants/profileConstants';
+import { ALL_INTERESTS, DEFAULT_PRIVACY_SETTINGS } from '../constants/profileConstants';
+import { getMutualFollowers, getLocalConnectionsCount } from '../services/mutualFollowersService';
 import ScreenLayout from '../components/ScreenLayout';
 import ProgressiveImage from '../components/ProgressiveImage';
 import ProfileSkeleton from '../components/ProfileSkeleton';
@@ -89,6 +90,11 @@ export default function PublicProfileScreen({ navigation, route }) {
 
   // Store the pending navigation action when user tries to leave with unsaved changes
   const pendingNavigationRef = useRef(null);
+
+  // Mutual followers and local connections
+  const [mutualFollowers, setMutualFollowers] = useState([]);
+  const [mutualFollowersCount, setMutualFollowersCount] = useState(0);
+  const [localConnectionsCount, setLocalConnectionsCount] = useState(0);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
@@ -202,6 +208,30 @@ export default function PublicProfileScreen({ navigation, route }) {
       setOriginalMasonryColumns(masonryCols);
     }
   }, [profile]);
+
+  // Load mutual followers and local connections
+  useEffect(() => {
+    const loadMutualFollowers = async () => {
+      if (!user?.uid || !userId || !profile) return;
+
+      try {
+        // Get mutual followers
+        const { mutualFollowers: followers, totalCount } = await getMutualFollowers(user.uid, userId, 3);
+        setMutualFollowers(followers);
+        setMutualFollowersCount(totalCount);
+
+        // Get local connections count
+        if (profile.city) {
+          const localCount = await getLocalConnectionsCount(userId, profile.city);
+          setLocalConnectionsCount(localCount);
+        }
+      } catch (error) {
+        console.error('[PublicProfile] Error loading mutual followers:', error);
+      }
+    };
+
+    loadMutualFollowers();
+  }, [user?.uid, userId, profile]);
 
   useEffect(() => () => {
     ScreenCapture.allowScreenCaptureAsync().catch(() => { });
@@ -968,7 +998,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             <Text style={[styles.displayName, { color: themeColors.textPrimary }]}>
               {profile.displayName || profile.username}
             </Text>
-            {profile.pronouns && (
+            {profile.pronouns && (profile.showPronouns !== false) && (
               <Text style={[styles.pronouns, { color: themeColors.textSecondary }]}>
                 {profile.pronouns}
               </Text>
@@ -981,12 +1011,12 @@ export default function PublicProfileScreen({ navigation, route }) {
           {/* Profession & Company */}
           {(profile.profession || profile.company) && (
             <View style={styles.professionRow}>
-              {profile.profession && (
+              {profile.profession && (profile.showProfession !== false) && (
                 <Text style={[styles.profession, { color: themeColors.textPrimary }]}>
                   {profile.profession}
                 </Text>
               )}
-              {profile.company && (
+              {profile.company && (profile.showCompany !== false) && (
                 <Text style={[styles.company, { color: themeColors.textSecondary }]}>
                   @ {profile.company}
                 </Text>
@@ -1010,7 +1040,7 @@ export default function PublicProfileScreen({ navigation, route }) {
           )}
 
           {/* Links */}
-          {profile.links && profile.links.length > 0 && (
+          {profile.links && profile.links.length > 0 && (profile.showLinks !== false) && (
             <View style={styles.linksContainer}>
               <ScrollView
                 horizontal
@@ -1039,7 +1069,7 @@ export default function PublicProfileScreen({ navigation, route }) {
           )}
 
           {/* Interests */}
-          {profile.interests && profile.interests.length > 0 && (
+          {profile.interests && profile.interests.length > 0 && (profile.showInterests !== false) && (
             <View style={styles.interestsContainer}>
               <Text style={[styles.interestsLabel, { color: themeColors.textSecondary }]}>
                 Interests
@@ -1065,6 +1095,68 @@ export default function PublicProfileScreen({ navigation, route }) {
                   );
                 })}
               </ScrollView>
+            </View>
+          )}
+
+          {/* Mutual Followers */}
+          {!isOwnProfile && mutualFollowersCount > 0 && (
+            <View style={styles.mutualFollowersContainer}>
+              <View style={styles.mutualFollowersRow}>
+                {mutualFollowers.slice(0, 3).map((follower, index) => (
+                  <View
+                    key={follower.uid}
+                    style={[
+                      styles.mutualFollowerAvatar,
+                      { marginLeft: index > 0 ? -8 : 0, zIndex: 3 - index },
+                    ]}
+                  >
+                    {follower.profilePhoto ? (
+                      <ProgressiveImage
+                        source={follower.profilePhoto}
+                        style={styles.mutualFollowerImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={[styles.mutualFollowerPlaceholder, { backgroundColor: withAlpha(primaryColor, 0.2) }]}>
+                        <Ionicons name="person" size={12} color={primaryColor} />
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+              <Text style={[styles.mutualFollowersText, { color: themeColors.textSecondary }]}>
+                Followed by{' '}
+                <Text style={{ fontWeight: '600', color: themeColors.textPrimary }}>
+                  {mutualFollowers[0]?.username}
+                </Text>
+                {mutualFollowersCount > 1 && (
+                  <>
+                    {mutualFollowersCount === 2 ? ' and ' : ', '}
+                    <Text style={{ fontWeight: '600', color: themeColors.textPrimary }}>
+                      {mutualFollowers[1]?.username}
+                    </Text>
+                  </>
+                )}
+                {mutualFollowersCount > 2 && (
+                  <>
+                    {' and '}
+                    <Text style={{ fontWeight: '600', color: themeColors.textPrimary }}>
+                      {mutualFollowersCount - 2} other{mutualFollowersCount - 2 > 1 ? 's' : ''}
+                    </Text>
+                  </>
+                )}{' '}
+                you follow
+              </Text>
+            </View>
+          )}
+
+          {/* Local Connections Badge */}
+          {localConnectionsCount > 0 && profile.city && (
+            <View style={[styles.localBadge, { backgroundColor: `${primaryColor}15` }]}>
+              <Ionicons name="location" size={16} color={primaryColor} />
+              <Text style={[styles.localBadgeText, { color: primaryColor }]}>
+                {localConnectionsCount} local connection{localConnectionsCount > 1 ? 's' : ''} in {profile.city}
+              </Text>
             </View>
           )}
 
@@ -1476,6 +1568,53 @@ const styles = StyleSheet.create({
   },
   interestText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  mutualFollowersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    gap: 10,
+  },
+  mutualFollowersRow: {
+    flexDirection: 'row',
+  },
+  mutualFollowerAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden',
+  },
+  mutualFollowerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mutualFollowerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mutualFollowersText: {
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  localBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 6,
+  },
+  localBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   statsRow: {

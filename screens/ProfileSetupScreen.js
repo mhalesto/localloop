@@ -13,11 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import { Switch } from 'react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import InterestsSelectorModal from '../components/InterestsSelectorModal';
 import LinksManagerModal from '../components/LinksManagerModal';
 import PronounsPicker from '../components/PronounsPicker';
-import { ALL_INTERESTS, LINK_TYPES } from '../constants/profileConstants';
+import { ALL_INTERESTS, LINK_TYPES, DEFAULT_PRIVACY_SETTINGS } from '../constants/profileConstants';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAlert } from '../contexts/AlertContext';
@@ -54,6 +55,13 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [company, setCompany] = useState(userProfile?.company || '');
   const [interests, setInterests] = useState(userProfile?.interests || []);
   const [links, setLinks] = useState(userProfile?.links || []);
+
+  // Privacy settings
+  const [showPronouns, setShowPronouns] = useState(userProfile?.showPronouns ?? DEFAULT_PRIVACY_SETTINGS.showPronouns);
+  const [showProfession, setShowProfession] = useState(userProfile?.showProfession ?? DEFAULT_PRIVACY_SETTINGS.showProfession);
+  const [showCompany, setShowCompany] = useState(userProfile?.showCompany ?? DEFAULT_PRIVACY_SETTINGS.showCompany);
+  const [showInterests, setShowInterests] = useState(userProfile?.showInterests ?? DEFAULT_PRIVACY_SETTINGS.showInterests);
+  const [showLinks, setShowLinks] = useState(userProfile?.showLinks ?? DEFAULT_PRIVACY_SETTINGS.showLinks);
 
   // Modal states
   const [pronounsPickerVisible, setPronounsPickerVisible] = useState(false);
@@ -227,6 +235,12 @@ export default function ProfileSetupScreen({ navigation, route }) {
         company: company || '',
         interests: interests || [],
         links: links || [],
+        // Privacy settings
+        showPronouns,
+        showProfession,
+        showCompany,
+        showInterests,
+        showLinks,
       };
 
       await updateUserProfile(user.uid, profileData);
@@ -670,6 +684,122 @@ export default function ProfileSetupScreen({ navigation, route }) {
           </View>
         </View>
 
+        {/* Privacy Settings */}
+        <View style={styles.locationSection}>
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+            🔒 Privacy Settings
+          </Text>
+          <Text style={[styles.sectionHint, { color: themeColors.textSecondary }]}>
+            Control who can see your professional profile information
+          </Text>
+
+          {/* Pronouns Privacy */}
+          {pronouns && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show pronouns publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showPronouns ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showPronouns}
+                onValueChange={setShowPronouns}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showPronouns ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Profession Privacy */}
+          {profession && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show profession publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showProfession ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showProfession}
+                onValueChange={setShowProfession}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showProfession ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Company Privacy */}
+          {company && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show company publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showCompany ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showCompany}
+                onValueChange={setShowCompany}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showCompany ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Interests Privacy */}
+          {interests.length > 0 && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show interests publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showInterests ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showInterests}
+                onValueChange={setShowInterests}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showInterests ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {/* Links Privacy */}
+          {links.length > 0 && (
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Show links publicly
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {showLinks ? 'Everyone can see' : 'Hidden from profile'}
+                </Text>
+              </View>
+              <Switch
+                value={showLinks}
+                onValueChange={setShowLinks}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={showLinks ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+          )}
+
+          {(pronouns || profession || company || interests.length > 0 || links.length > 0) && (
+            <Text style={[styles.privacyNote, { color: themeColors.textSecondary }]}>
+              Hidden information won't appear on your public profile
+            </Text>
+          )}
+        </View>
+
         {/* Privacy Info */}
         <View style={[styles.infoCard, { backgroundColor: `${primaryColor}10` }]}>
           <Ionicons name="information-circle" size={20} color={primaryColor} />
@@ -956,5 +1086,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     flex: 1,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  privacyLabel: {
+    flex: 1,
+    marginRight: 16,
+  },
+  privacyHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  privacyNote: {
+    fontSize: 12,
+    marginTop: 16,
+    fontStyle: 'italic',
   },
 });
