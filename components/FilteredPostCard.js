@@ -44,7 +44,11 @@ export default function FilteredPostCard({ post, onPress, showPostBackground }) 
       onPress={onPress}
     >
       {post.imageUrl && (
-        <Image source={{ uri: post.imageUrl }} style={styles.image} />
+        <Image
+          source={{ uri: post.imageUrl }}
+          style={styles.image}
+          cache="force-cache"
+        />
       )}
       <View style={styles.content}>
         {/* Author info */}

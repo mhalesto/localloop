@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const COLUMN_WIDTH = (SCREEN_WIDTH - 60) / 2; // 2 columns with padding
+const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
 
 export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
   const { themeColors, userProfile } = useSettings();
@@ -99,7 +99,12 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
           activeOpacity={0.9}
           onPress={() => setFullScreenImage({ visible: true, url: artwork.url, style: artwork.style })}
         >
-          <Image source={{ uri: artwork.url }} style={styles.artworkImage} />
+          <Image
+            source={{ uri: artwork.url }}
+            style={styles.artworkImage}
+            resizeMode="cover"
+            cache="force-cache"
+          />
           {/* Info icon for prompt */}
           {artwork.prompt && (
             <TouchableOpacity
@@ -130,7 +135,11 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
           )}
           <View style={styles.artistInfo}>
             {artwork.profilePhoto && (
-              <Image source={{ uri: artwork.profilePhoto }} style={styles.artistPhoto} />
+              <Image
+                source={{ uri: artwork.profilePhoto }}
+                style={styles.artistPhoto}
+                cache="force-cache"
+              />
             )}
             <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
               {artwork.displayName || artwork.username}
@@ -241,6 +250,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
             source={{ uri: fullScreenImage.url }}
             style={styles.fullScreenImage}
             resizeMode="contain"
+            cache="force-cache"
           />
 
           {fullScreenImage.style && (
@@ -262,12 +272,12 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     paddingBottom: 20,
   },
   column: {
     flex: 1,
-    gap: 12,
+    gap: 8,
   },
   artworkContainer: {
     position: 'relative',

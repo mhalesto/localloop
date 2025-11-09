@@ -91,6 +91,8 @@ export default function SettingsScreen({ navigation }) {
     setShowAddShortcut,
     showDiscoveryOnExplore,
     setShowDiscoveryOnExplore,
+    showHeaderBar,
+    setShowHeaderBar,
     accentOptions,
     accentKey,
     setAccentKey,
@@ -1538,6 +1540,21 @@ export default function SettingsScreen({ navigation }) {
               onValueChange={setShowDiscoveryOnExplore}
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={showDiscoveryOnExplore ? activeThumbColor : inactiveThumbColor}
+              ios_backgroundColor={inactiveTrackColor}
+            />
+          </View>
+          <View style={styles.item}>
+            <View>
+              <Text style={styles.itemTitle}>Show status bar</Text>
+              <Text style={styles.itemSubtitle}>
+                Display the time and battery at the top of your screen.
+              </Text>
+            </View>
+            <Switch
+              value={showHeaderBar}
+              onValueChange={setShowHeaderBar}
+              trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
+              thumbColor={showHeaderBar ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
             />
           </View>

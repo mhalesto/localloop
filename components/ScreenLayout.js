@@ -47,6 +47,7 @@ export default function ScreenLayout({
 }) {
   const {
     showAddShortcut,
+    showHeaderBar,
     accentPreset,
     userProfile,
     updateUserProfile,
@@ -459,8 +460,8 @@ export default function ScreenLayout({
     // - We do NOT paint the safe area with the header color anymore.
     // - We let AppHeader handle the top inset and background so shapes can bleed into the status bar.
     <SafeAreaView style={[styles.safe, { backgroundColor: themeColors.background }]} edges={['bottom']}>
-      {/* Translucent status bar so the header’s background/shapes are visible underneath */}
-      <StatusBar style={statusStyle} translucent backgroundColor="transparent" />
+      {/* Translucent status bar so the header's background/shapes are visible underneath */}
+      <StatusBar style={statusStyle} translucent backgroundColor="transparent" hidden={!showHeaderBar} />
 
       <View style={styles.safeOverlay}>
         {/* Optional external header overlay (kept non-blocking & behind header) */}
@@ -519,7 +520,7 @@ export default function ScreenLayout({
           onRequestClose={() => setDrawerVisible(false)}
         >
           {/* Keep the status bar translucent in the drawer as well */}
-          <StatusBar translucent backgroundColor="transparent" style={statusStyle} />
+          <StatusBar translucent backgroundColor="transparent" style={statusStyle} hidden={!showHeaderBar} />
           <View style={styles.drawerContainer}>
 {Platform.OS === 'android' ? (
               <View style={[styles.drawerSheet, { backgroundColor: isDarkMode ? '#000000' : '#f5f5f5', paddingTop: 0 }]}>

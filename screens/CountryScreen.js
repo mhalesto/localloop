@@ -17,6 +17,10 @@ import ExploreFilterModal from '../components/ExploreFilterModal';
 import FilteredPostCard from '../components/FilteredPostCard';
 import FilteredUserCard from '../components/FilteredUserCard';
 import ArtworkMasonryGrid from '../components/ArtworkMasonryGrid';
+import SponsoredAdCard from '../components/SponsoredAdCard';
+import ArtworkSkeletonLoader from '../components/ArtworkSkeletonLoader';
+import AdSkeletonLoader from '../components/AdSkeletonLoader';
+import HorizontalListSkeletonLoader from '../components/HorizontalListSkeletonLoader';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -486,6 +490,104 @@ export default function CountryScreen({ navigation }) {
     return personalCities.filter((cityName) => cityName.toLowerCase().includes(lower));
   }, [personalCities, query]);
 
+  // Apply search query to filtered posts
+  const searchFilteredPosts = useMemo(() => {
+    if (!query.trim()) return filteredPosts;
+    const lower = query.trim().toLowerCase();
+    return filteredPosts.filter((post) => {
+      return (
+        post.title?.toLowerCase().includes(lower) ||
+        post.description?.toLowerCase().includes(lower) ||
+        post.username?.toLowerCase().includes(lower) ||
+        post.displayName?.toLowerCase().includes(lower)
+      );
+    });
+  }, [filteredPosts, query]);
+
+  // Apply search query to filtered artwork
+  const searchFilteredArtwork = useMemo(() => {
+    if (!query.trim()) return filteredArtwork;
+    const lower = query.trim().toLowerCase();
+    return filteredArtwork.filter((artwork) => {
+      return (
+        artwork.style?.toLowerCase().includes(lower) ||
+        artwork.prompt?.toLowerCase().includes(lower) ||
+        artwork.username?.toLowerCase().includes(lower) ||
+        artwork.displayName?.toLowerCase().includes(lower)
+      );
+    });
+  }, [filteredArtwork, query]);
+
+  // Apply search query to filtered users
+  const searchFilteredUsers = useMemo(() => {
+    if (!query.trim()) return filteredUsers;
+    const lower = query.trim().toLowerCase();
+    return filteredUsers.filter((user) => {
+      return (
+        user.username?.toLowerCase().includes(lower) ||
+        user.displayName?.toLowerCase().includes(lower) ||
+        user.bio?.toLowerCase().includes(lower)
+      );
+    });
+  }, [filteredUsers, query]);
+
+  // Create mixed feed with artworks, posts, users, and ads
+  const mixedFeed = useMemo(() => {
+    if (!exploreFilters.showAIArtGallery || !searchFilteredArtwork.length) {
+      return [];
+    }
+
+    const feed = [];
+    const ARTWORKS_PER_CHUNK = 4;
+    const artworkChunks = [];
+
+    // Split artworks into chunks of 4
+    for (let i = 0; i < searchFilteredArtwork.length; i += ARTWORKS_PER_CHUNK) {
+      artworkChunks.push(searchFilteredArtwork.slice(i, i + ARTWORKS_PER_CHUNK));
+    }
+
+    // Build the feed
+    artworkChunks.forEach((chunk, index) => {
+      // Add artwork chunk
+      feed.push({
+        type: 'artworkChunk',
+        key: `artwork-chunk-${index}`,
+        data: chunk,
+      });
+
+      // After each chunk, add a section (alternating between posts and users)
+      if (index < artworkChunks.length - 1 || (index === artworkChunks.length - 1 && chunk.length === ARTWORKS_PER_CHUNK)) {
+        const sections = [];
+
+        if (exploreFilters.showPostsFromCurrentCity && searchFilteredPosts.length > 0) {
+          sections.push('posts');
+        }
+        if (exploreFilters.showLocalUsers && searchFilteredUsers.length > 0) {
+          sections.push('users');
+        }
+
+        if (sections.length > 0) {
+          const sectionType = sections[index % sections.length];
+          feed.push({
+            type: sectionType,
+            key: `${sectionType}-${index}`,
+          });
+        }
+
+        // Randomly add an ad card (30% chance after each section)
+        if (Math.random() < 0.3) {
+          feed.push({
+            type: 'ad',
+            key: `ad-${index}-${Date.now()}`,
+            adIndex: index % 5, // Cycle through 5 ad templates
+          });
+        }
+      }
+    });
+
+    return feed;
+  }, [searchFilteredArtwork, searchFilteredPosts, searchFilteredUsers, exploreFilters]);
+
   const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0 && exploreFilters.showNearbyCities;
   const listData = showingPersonalized ? personalFiltered : paginated;
   const listIsEmpty = listData.length === 0;
@@ -633,112 +735,142 @@ export default function CountryScreen({ navigation }) {
 
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              {/* Filtered Posts Section */}
-              {exploreFilters.showPostsFromCurrentCity && userProfile?.city && (
-                <View style={styles.filteredSection}>
-                  <View style={styles.filteredHeader}>
-                    <View>
-                      <Text style={styles.filteredTitle}>Posts from {userProfile.city}</Text>
-                      <Text style={styles.filteredSubtitle}>Latest updates in your city</Text>
-                    </View>
-                    {filteredPosts.length > 0 && (
-                      <TouchableOpacity
-                        style={styles.seeAllButton}
-                        onPress={() => navigation.navigate('Room', { city: userProfile.city })}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.seeAllText}>See all</Text>
-                        <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {loadingFilteredContent ? (
-                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
-                  ) : filteredPosts.length > 0 ? (
-                    <FlatList
-                      data={filteredPosts}
-                      horizontal
-                      keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <FilteredPostCard
-                          post={item}
-                          onPress={() => {
-                            const postCity = item.city || userProfile?.city;
-                            // Add post to context so PostThreadScreen can find it
-                            addFetchedPost(postCity, item);
-                            navigation.navigate('PostThread', {
-                              postId: item.id,
-                              city: postCity
-                            });
-                          }}
-                          showPostBackground={exploreFilters.showPostBackgrounds}
-                        />
-                      )}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.horizontalList}
-                    />
-                  ) : (
-                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
-                      No posts from {userProfile.city} yet
-                    </Text>
-                  )}
-                </View>
-              )}
-
-              {/* AI Art Gallery Section */}
+              {/* Mixed Feed: Artworks, Posts, Users, and Ads */}
               {exploreFilters.showAIArtGallery && userProfile?.city && (
-                <View style={styles.filteredSection}>
-                  <View style={styles.filteredHeader}>
-                    <View>
-                      <Text style={styles.filteredTitle}>AI Art Gallery from {userProfile.city}</Text>
-                      <Text style={styles.filteredSubtitle}>Discover AI-generated artwork from local creators</Text>
-                    </View>
-                  </View>
+                <View style={styles.mixedFeedContainer}>
                   {loadingFilteredContent ? (
-                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
-                  ) : filteredArtwork.length > 0 ? (
-                    <ArtworkMasonryGrid
-                      artworks={filteredArtwork}
-                      onArtworkPress={(artwork) => navigation.navigate('PublicProfile', { userId: artwork.userId })}
-                    />
-                  ) : (
-                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
-                      No AI artwork from {userProfile.city} yet
-                    </Text>
-                  )}
-                </View>
-              )}
+                    <>
+                      {/* Artwork skeleton */}
+                      <ArtworkSkeletonLoader />
 
-              {/* Filtered Users Section */}
-              {exploreFilters.showLocalUsers && userProfile?.city && (
-                <View style={styles.filteredSection}>
-                  <View style={styles.filteredHeader}>
-                    <View>
-                      <Text style={styles.filteredTitle}>Local users in {userProfile.city}</Text>
-                      <Text style={styles.filteredSubtitle}>Connect with people nearby</Text>
-                    </View>
-                  </View>
-                  {loadingFilteredContent ? (
-                    <ActivityIndicator size="small" color={themeColors.primaryDark} style={styles.loader} />
-                  ) : filteredUsers.length > 0 ? (
-                    <FlatList
-                      data={filteredUsers}
-                      horizontal
-                      keyExtractor={(item) => item.uid}
-                      renderItem={({ item }) => (
-                        <FilteredUserCard
-                          user={item}
-                          onPress={() => navigation.navigate('PublicProfile', { userId: item.uid })}
-                        />
+                      {/* Posts skeleton */}
+                      {exploreFilters.showPostsFromCurrentCity && (
+                        <View style={styles.filteredSection}>
+                          <View style={styles.filteredHeader}>
+                            <View>
+                              <Skeleton variant="rounded" width={180} height={20} borderRadius={10} />
+                              <Skeleton variant="rounded" width={220} height={14} borderRadius={7} style={{ marginTop: 6 }} />
+                            </View>
+                          </View>
+                          <HorizontalListSkeletonLoader type="post" />
+                        </View>
                       )}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.horizontalList}
-                    />
-                  ) : (
-                    <Text style={[styles.emptyFilterText, { color: themeColors.textSecondary }]}>
-                      No local users found in {userProfile.city}
-                    </Text>
-                  )}
+
+                      {/* Ad skeleton */}
+                      <AdSkeletonLoader />
+
+                      {/* Users skeleton */}
+                      {exploreFilters.showLocalUsers && (
+                        <View style={styles.filteredSection}>
+                          <View style={styles.filteredHeader}>
+                            <View>
+                              <Skeleton variant="rounded" width={200} height={20} borderRadius={10} />
+                              <Skeleton variant="rounded" width={180} height={14} borderRadius={7} style={{ marginTop: 6 }} />
+                            </View>
+                          </View>
+                          <HorizontalListSkeletonLoader type="user" />
+                        </View>
+                      )}
+                    </>
+                  ) : mixedFeed.length > 0 ? (
+                    mixedFeed.map((feedItem) => {
+                      if (feedItem.type === 'artworkChunk') {
+                        return (
+                          <View key={feedItem.key} style={styles.artworkChunkContainer}>
+                            <ArtworkMasonryGrid
+                              artworks={feedItem.data}
+                              onArtworkPress={(artwork) => navigation.navigate('PublicProfile', { userId: artwork.userId })}
+                            />
+                          </View>
+                        );
+                      }
+
+                      if (feedItem.type === 'posts') {
+                        return (
+                          <View key={feedItem.key} style={styles.filteredSection}>
+                            <View style={styles.filteredHeader}>
+                              <View>
+                                <Text style={styles.filteredTitle}>Posts from {userProfile.city}</Text>
+                                <Text style={styles.filteredSubtitle}>Latest updates in your city</Text>
+                              </View>
+                              {searchFilteredPosts.length > 0 && (
+                                <TouchableOpacity
+                                  style={styles.seeAllButton}
+                                  onPress={() => navigation.navigate('Room', { city: userProfile.city })}
+                                  activeOpacity={0.85}
+                                >
+                                  <Text style={styles.seeAllText}>See all</Text>
+                                  <Ionicons name="chevron-forward" size={16} color={themeColors.primaryDark} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                            <FlatList
+                              data={searchFilteredPosts}
+                              horizontal
+                              keyExtractor={(item) => item.id}
+                              renderItem={({ item }) => (
+                                <FilteredPostCard
+                                  post={item}
+                                  onPress={() => {
+                                    const postCity = item.city || userProfile?.city;
+                                    addFetchedPost(postCity, item);
+                                    navigation.navigate('PostThread', {
+                                      postId: item.id,
+                                      city: postCity
+                                    });
+                                  }}
+                                  showPostBackground={exploreFilters.showPostBackgrounds}
+                                />
+                              )}
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={styles.horizontalList}
+                            />
+                          </View>
+                        );
+                      }
+
+                      if (feedItem.type === 'users') {
+                        return (
+                          <View key={feedItem.key} style={styles.filteredSection}>
+                            <View style={styles.filteredHeader}>
+                              <View>
+                                <Text style={styles.filteredTitle}>Local users in {userProfile.city}</Text>
+                                <Text style={styles.filteredSubtitle}>Connect with people nearby</Text>
+                              </View>
+                            </View>
+                            <FlatList
+                              data={searchFilteredUsers}
+                              horizontal
+                              keyExtractor={(item) => item.uid}
+                              renderItem={({ item }) => (
+                                <FilteredUserCard
+                                  user={item}
+                                  onPress={() => navigation.navigate('PublicProfile', { userId: item.uid })}
+                                />
+                              )}
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={styles.horizontalList}
+                            />
+                          </View>
+                        );
+                      }
+
+                      if (feedItem.type === 'ad') {
+                        return (
+                          <SponsoredAdCard
+                            key={feedItem.key}
+                            adIndex={feedItem.adIndex}
+                            onPress={() => {
+                              // TODO: Navigate to sponsored content or open external link
+                              console.log('Ad clicked:', feedItem.adIndex);
+                            }}
+                          />
+                        );
+                      }
+
+                      return null;
+                    })
+                  ) : null}
                 </View>
               )}
 
@@ -746,53 +878,53 @@ export default function CountryScreen({ navigation }) {
               {!hasActiveContentFilter && (
                 <>
                   <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Top picks</Text>
-                  {activeFilterNames.length > 0 && (
-                    <Text style={styles.sectionHint}>
-                      {activeFilterNames.length === 1
-                        ? `${activeFilterNames[0]} content`
-                        : `${activeFilterNames.slice(0, 2).join(', ')}${activeFilterNames.length > 2 ? ` +${activeFilterNames.length - 2}` : ''}`}
-                    </Text>
-                  )}
-                </View>
-                {hasLocalActivity && exploreFilters.showTrendingCities ? (
-                  <View style={styles.filterBadge}>
-                    <Ionicons name="flame" size={14} color="#ef4444" />
-                    <Text style={styles.filterBadgeText}>Trending</Text>
+                    <View>
+                      <Text style={styles.sectionTitle}>Top picks</Text>
+                      {activeFilterNames.length > 0 && (
+                        <Text style={styles.sectionHint}>
+                          {activeFilterNames.length === 1
+                            ? `${activeFilterNames[0]} content`
+                            : `${activeFilterNames.slice(0, 2).join(', ')}${activeFilterNames.length > 2 ? ` +${activeFilterNames.length - 2}` : ''}`}
+                        </Text>
+                      )}
+                    </View>
+                    {hasLocalActivity && exploreFilters.showTrendingCities ? (
+                      <View style={styles.filterBadge}>
+                        <Ionicons name="flame" size={14} color="#ef4444" />
+                        <Text style={styles.filterBadgeText}>Trending</Text>
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
 
-              <View style={styles.chipStaticRow}>
-                {chipItemsToShow.map((item, index) => {
-                  const backgroundStyle = styles[`chipColor${index % 3}`];
-                  const label = item.type === 'city' ? item.city : item.country.name;
-                  const isLast = index === chipItemsToShow.length - 1;
+                  <View style={styles.chipStaticRow}>
+                    {chipItemsToShow.map((item, index) => {
+                      const backgroundStyle = styles[`chipColor${index % 3}`];
+                      const label = item.type === 'city' ? item.city : item.country.name;
+                      const isLast = index === chipItemsToShow.length - 1;
 
-                  return (
-                    <TouchableOpacity
-                      key={`${item.type}-${label}`}
-                      style={[styles.chip, backgroundStyle, !isLast && styles.chipSpacing]}
-                      activeOpacity={0.85}
-                      onPress={() =>
-                        item.type === 'city'
-                          ? navigation.navigate('Room', { city: item.city })
-                          : navigation.navigate('Province', { country: item.country.name })
-                      }
-                    >
-                      {item.type === 'city' && index === 0 ? (
-                        <View style={styles.hotBadge}>
-                          <Text style={styles.hotBadgeText}>Hot</Text>
-                        </View>
-                      ) : null}
-                      <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                      return (
+                        <TouchableOpacity
+                          key={`${item.type}-${label}`}
+                          style={[styles.chip, backgroundStyle, !isLast && styles.chipSpacing]}
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            item.type === 'city'
+                              ? navigation.navigate('Room', { city: item.city })
+                              : navigation.navigate('Province', { country: item.country.name })
+                          }
+                        >
+                          {item.type === 'city' && index === 0 ? (
+                            <View style={styles.hotBadge}>
+                              <Text style={styles.hotBadgeText}>Hot</Text>
+                            </View>
+                          ) : null}
+                          <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
 
                   <Text style={[styles.sectionTitle, styles.secondaryTitle]}>
                     {showingPersonalized
@@ -1184,5 +1316,11 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       fontSize: 13,
       textAlign: 'center',
       paddingVertical: 16
+    },
+    mixedFeedContainer: {
+      paddingHorizontal: 4
+    },
+    artworkChunkContainer: {
+      marginBottom: 24
     }
   });

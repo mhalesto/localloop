@@ -14,7 +14,11 @@ export default function FilteredUserCard({ user, onPress }) {
     >
       <View style={styles.photoContainer}>
         {user.profilePhoto ? (
-          <Image source={{ uri: user.profilePhoto }} style={styles.photo} />
+          <Image
+            source={{ uri: user.profilePhoto }}
+            style={styles.photo}
+            cache="force-cache"
+          />
         ) : (
           <View style={[styles.photoPlaceholder, { backgroundColor: `${themeColors.primary}20` }]}>
             <Ionicons name="person" size={32} color={themeColors.primary} />
