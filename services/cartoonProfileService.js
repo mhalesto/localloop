@@ -184,9 +184,10 @@ export async function deleteTemporaryCustomImage(storagePath) {
  * @param {boolean} isAdmin - Whether the user is an admin
  * @param {string} planId - User's subscription plan ('basic', 'premium', 'gold')
  * @param {boolean} usedGpt4 - Whether GPT-4 Vision was used for this generation
+ * @param {string} prompt - Optional prompt used to generate the image
  * @returns {Promise<void>}
  */
-export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false, planId = 'basic', usedGpt4 = false) {
+export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin = false, planId = 'basic', usedGpt4 = false, prompt = null) {
   try {
     const data = await checkAndResetMonthlyUsage(userId);
     const docRef = doc(db, 'users', userId);
@@ -198,6 +199,11 @@ export async function recordCartoonGeneration(userId, imageUrl, styleId, isAdmin
       createdAt: Date.now(),
       id: `${Date.now()}-${styleId}`,
     };
+
+    // Add prompt if provided
+    if (prompt) {
+      historyEntry.prompt = prompt;
+    }
 
     // Get current history
     let updatedHistory = [...(data.pictureHistory || [])];

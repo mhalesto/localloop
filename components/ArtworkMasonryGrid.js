@@ -1,12 +1,83 @@
-import React from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
+import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 60) / 2; // 2 columns with padding
 
 export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
-  const { themeColors } = useSettings();
+  const { themeColors, userProfile } = useSettings();
+  const { currentUser, isAdmin } = useAuth();
+  const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
+  const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '' });
+  const [downloadLimits, setDownloadLimits] = useState({ allowed: true, remaining: -1, limit: -1 });
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Check download limits on mount and when modal opens
+  useEffect(() => {
+    checkDownloadLimits();
+  }, [fullScreenImage.visible, isAdmin, userProfile?.subscriptionPlan]);
+
+  const checkDownloadLimits = async () => {
+    const planId = userProfile?.subscriptionPlan || 'basic';
+    console.log('[ArtworkMasonryGrid] Checking download limits - planId:', planId, 'isAdmin:', isAdmin);
+    const limits = await canDownloadArtwork(planId, isAdmin);
+    console.log('[ArtworkMasonryGrid] Download limits:', limits);
+    setDownloadLimits(limits);
+  };
+
+  const handleDownload = async () => {
+    if (!downloadLimits.allowed) {
+      Alert.alert(
+        'Download Limit Reached',
+        `You've used all ${downloadLimits.limit} downloads today. Upgrade to get more!`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => { /* Navigate to subscription screen */ } },
+        ]
+      );
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to save images to your photo library.');
+        setIsDownloading(false);
+        return;
+      }
+
+      // Download the image
+      const filename = `artwork-${Date.now()}.jpg`;
+      const fileUri = documentDirectory + filename;
+
+      const downloadResult = await downloadAsync(fullScreenImage.url, fileUri);
+
+      // Save to media library
+      await MediaLibrary.createAssetAsync(downloadResult.uri);
+
+      // Record the download
+      await recordArtworkDownload();
+
+      // Update limits
+      await checkDownloadLimits();
+
+      Alert.alert('Success', 'Artwork saved to your photo library!');
+    } catch (error) {
+      console.error('[ArtworkMasonryGrid] Download error:', error);
+      Alert.alert('Download Failed', 'Unable to save the artwork. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Split artworks into two columns for masonry layout
   const leftColumn = [];
@@ -21,42 +92,170 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
   });
 
   const renderArtworkItem = (artwork) => (
-    <TouchableOpacity
-      key={artwork.id}
-      style={[styles.artworkCard, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}
-      activeOpacity={0.9}
-      onPress={() => onArtworkPress(artwork)}
-    >
-      <Image source={{ uri: artwork.url }} style={styles.artworkImage} />
-      <View style={styles.artworkInfo}>
-        {artwork.style && (
-          <View style={[styles.styleBadge, { backgroundColor: `${themeColors.primary}20` }]}>
-            <Text style={[styles.styleText, { color: themeColors.primary }]} numberOfLines={1}>
-              {artwork.style}
+    <View key={artwork.id} style={styles.artworkContainer}>
+      <View style={[styles.artworkCard, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
+        {/* Artwork Image - opens full screen */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setFullScreenImage({ visible: true, url: artwork.url, style: artwork.style })}
+        >
+          <Image source={{ uri: artwork.url }} style={styles.artworkImage} />
+          {/* Info icon for prompt */}
+          {artwork.prompt && (
+            <TouchableOpacity
+              style={[styles.infoIconContainer, { backgroundColor: themeColors.primary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                setPromptModal({ visible: true, prompt: artwork.prompt, style: artwork.style });
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="information" size={16} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+
+        {/* Artist Info - goes to profile */}
+        <TouchableOpacity
+          style={styles.artworkInfo}
+          activeOpacity={0.7}
+          onPress={() => onArtworkPress(artwork)}
+        >
+          {artwork.style && (
+            <View style={[styles.styleBadge, { backgroundColor: `${themeColors.primary}20` }]}>
+              <Text style={[styles.styleText, { color: themeColors.primary }]} numberOfLines={1}>
+                {artwork.style}
+              </Text>
+            </View>
+          )}
+          <View style={styles.artistInfo}>
+            {artwork.profilePhoto && (
+              <Image source={{ uri: artwork.profilePhoto }} style={styles.artistPhoto} />
+            )}
+            <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
+              {artwork.displayName || artwork.username}
             </Text>
           </View>
-        )}
-        <View style={styles.artistInfo}>
-          {artwork.profilePhoto && (
-            <Image source={{ uri: artwork.profilePhoto }} style={styles.artistPhoto} />
-          )}
-          <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
-            {artwork.displayName || artwork.username}
-          </Text>
-        </View>
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.column}>
-        {leftColumn.map(renderArtworkItem)}
+    <>
+      <View style={styles.container}>
+        <View style={styles.column}>
+          {leftColumn.map(renderArtworkItem)}
+        </View>
+        <View style={styles.column}>
+          {rightColumn.map(renderArtworkItem)}
+        </View>
       </View>
-      <View style={styles.column}>
-        {rightColumn.map(renderArtworkItem)}
-      </View>
-    </View>
+
+      {/* Prompt Modal */}
+      <Modal
+        visible={promptModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPromptModal({ visible: false, prompt: '', style: '' })}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setPromptModal({ visible: false, prompt: '', style: '' })}
+        >
+          <View style={[styles.promptCard, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
+            <View style={styles.promptHeader}>
+              <View style={[styles.promptIcon, { backgroundColor: `${themeColors.primary}20` }]}>
+                <Ionicons name="sparkles" size={20} color={themeColors.primary} />
+              </View>
+              <Text style={[styles.promptTitle, { color: themeColors.textPrimary }]}>
+                {promptModal.style} Style
+              </Text>
+              <TouchableOpacity
+                onPress={() => setPromptModal({ visible: false, prompt: '', style: '' })}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={20} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.promptText, { color: themeColors.textSecondary }]}>
+              {promptModal.prompt}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={fullScreenImage.visible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setFullScreenImage({ visible: false, url: '', style: '' })}
+      >
+        <StatusBar hidden />
+        <View style={styles.fullScreenContainer}>
+          {/* Top buttons */}
+          <View style={styles.topButtonsContainer}>
+            {/* Download button */}
+            <TouchableOpacity
+              style={styles.downloadButtonFullScreen}
+              onPress={handleDownload}
+              activeOpacity={0.7}
+              disabled={isDownloading}
+            >
+              <View style={styles.downloadIconContainer}>
+                {isDownloading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="download" size={24} color="#fff" />
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.closeButtonFullScreen}
+              onPress={() => setFullScreenImage({ visible: false, url: '', style: '' })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.closeIconContainer}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Download counter */}
+          {downloadLimits.limit !== -1 && (
+            <View style={styles.downloadCounterContainer}>
+              <View style={styles.downloadCounter}>
+                <Ionicons name="download-outline" size={14} color="#fff" />
+                <Text style={styles.downloadCounterText}>
+                  {downloadLimits.remaining}/{downloadLimits.limit} left today
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <Image
+            source={{ uri: fullScreenImage.url }}
+            style={styles.fullScreenImage}
+            resizeMode="contain"
+          />
+
+          {fullScreenImage.style && (
+            <View style={styles.fullScreenInfo}>
+              <View style={styles.fullScreenBadge}>
+                <Ionicons name="brush" size={16} color="#fff" />
+                <Text style={styles.fullScreenStyleText}>
+                  {fullScreenImage.style} Style
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -70,6 +269,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
   },
+  artworkContainer: {
+    position: 'relative',
+  },
   artworkCard: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -79,6 +281,23 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
+    position: 'relative',
+  },
+  infoIconContainer: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    zIndex: 1,
   },
   artworkImage: {
     width: '100%',
@@ -114,5 +333,133 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  promptCard: {
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+  },
+  promptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  promptIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  promptTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  promptText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  topButtonsContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  downloadButtonFullScreen: {
+    // Left side
+  },
+  downloadIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonFullScreen: {
+    // Right side
+  },
+  closeIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadCounterContainer: {
+    position: 'absolute',
+    top: 105,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  downloadCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  downloadCounterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  fullScreenImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  fullScreenInfo: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  fullScreenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  fullScreenStyleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

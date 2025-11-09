@@ -10,6 +10,7 @@ import { getPlanLimits } from '../config/subscriptionPlans';
 const STORAGE_KEYS = {
   POSTS_TODAY: '@posts_today',
   STATUSES_TODAY: '@statuses_today',
+  DOWNLOADS_TODAY: '@downloads_today',
   LAST_RESET_DATE: '@last_reset_date',
 };
 
@@ -44,6 +45,7 @@ async function resetDailyCounters() {
     await AsyncStorage.multiSet([
       [STORAGE_KEYS.POSTS_TODAY, '0'],
       [STORAGE_KEYS.STATUSES_TODAY, '0'],
+      [STORAGE_KEYS.DOWNLOADS_TODAY, '0'],
       [STORAGE_KEYS.LAST_RESET_DATE, today],
     ]);
   } catch (error) {
@@ -158,12 +160,49 @@ export async function recordStatusCreated() {
 }
 
 /**
+ * Check if user can download artwork today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
+ */
+export async function canDownloadArtwork(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const limits = getPlanLimits(userPlan);
+
+  // Unlimited downloads (Gold plan)
+  if (limits.artworkDownloadsPerDay === -1) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const count = await getCount(STORAGE_KEYS.DOWNLOADS_TODAY);
+  const allowed = count < limits.artworkDownloadsPerDay;
+
+  return {
+    allowed,
+    count,
+    limit: limits.artworkDownloadsPerDay,
+    remaining: Math.max(0, limits.artworkDownloadsPerDay - count),
+  };
+}
+
+/**
+ * Record that user downloaded artwork
+ */
+export async function recordArtworkDownload() {
+  return await incrementCount(STORAGE_KEYS.DOWNLOADS_TODAY);
+}
+
+/**
  * Get daily usage stats
  */
 export async function getDailyUsage(userPlan = 'basic') {
   const limits = getPlanLimits(userPlan);
   const postsCount = await getCount(STORAGE_KEYS.POSTS_TODAY);
   const statusesCount = await getCount(STORAGE_KEYS.STATUSES_TODAY);
+  const downloadsCount = await getCount(STORAGE_KEYS.DOWNLOADS_TODAY);
 
   return {
     posts: {
@@ -175,6 +214,11 @@ export async function getDailyUsage(userPlan = 'basic') {
       count: statusesCount,
       limit: limits.statusesPerDay,
       remaining: limits.statusesPerDay === -1 ? -1 : Math.max(0, limits.statusesPerDay - statusesCount),
+    },
+    downloads: {
+      count: downloadsCount,
+      limit: limits.artworkDownloadsPerDay,
+      remaining: limits.artworkDownloadsPerDay === -1 ? -1 : Math.max(0, limits.artworkDownloadsPerDay - downloadsCount),
     },
   };
 }

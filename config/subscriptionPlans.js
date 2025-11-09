@@ -47,6 +47,7 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsMonthly: 0,
       cartoonAvatarsLifetime: 5,
       customCartoonPrompts: false,
+      artworkDownloadsPerDay: 3,
     },
   },
   PREMIUM: {
@@ -99,6 +100,7 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsMonthly: 10,
       cartoonAvatarsLifetime: null,
       customCartoonPrompts: false,
+      artworkDownloadsPerDay: 20,
     },
     savings: null,
   },
@@ -168,6 +170,7 @@ export const SUBSCRIPTION_PLANS = {
       gpt4oVisionCartoons: true, // Vision-personalized cartoons
       gpt4oCommentSuggestions: true, // Enhanced comment suggestions
       gpt4oCulturalTranslation: true, // 11 SA languages with cultural context
+      artworkDownloadsPerDay: -1, // GOLD EXCLUSIVE - Unlimited downloads
     },
   },
 };

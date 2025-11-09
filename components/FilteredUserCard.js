@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 
-export default function FilteredUserCard({ user, onPress, isFollowing, onFollowPress, isFollowLoading }) {
+export default function FilteredUserCard({ user, onPress }) {
   const { themeColors } = useSettings();
 
   return (
@@ -31,35 +31,6 @@ export default function FilteredUserCard({ user, onPress, isFollowing, onFollowP
         <Text style={[styles.bio, { color: themeColors.textSecondary }]} numberOfLines={2}>
           {user.bio}
         </Text>
-      )}
-
-      {/* Follow Button or Following Badge */}
-      {isFollowing ? (
-        <View style={[styles.followingBadge, { backgroundColor: themeColors.background }]}>
-          <Ionicons name="checkmark-circle" size={14} color="#10b981" />
-          <Text style={[styles.followingText, { color: themeColors.textSecondary }]}>
-            Following
-          </Text>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={[styles.followButton, { backgroundColor: themeColors.primary }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onFollowPress();
-          }}
-          activeOpacity={0.7}
-          disabled={isFollowLoading}
-        >
-          {isFollowLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="person-add" size={14} color="#fff" />
-              <Text style={styles.followButtonText}>Follow</Text>
-            </>
-          )}
-        </TouchableOpacity>
       )}
 
       <View style={styles.meta}>
@@ -136,38 +107,5 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
-  },
-  followButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 10,
-    marginBottom: 6,
-    width: '100%',
-  },
-  followButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  followingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 10,
-    marginBottom: 6,
-    width: '100%',
-  },
-  followingText: {
-    fontSize: 13,
-    fontWeight: '500',
   },
 });

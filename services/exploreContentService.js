@@ -91,6 +91,7 @@ export async function getAIArtworkFromCity(city, maxResults = 20) {
               username: data.username,
               displayName: data.displayName,
               profilePhoto: data.profilePhoto,
+              prompt: cartoon.prompt || null, // Include prompt if available
             });
           }
         });

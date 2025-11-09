@@ -922,7 +922,15 @@ export default function SettingsScreen({ navigation }) {
       const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
 
       // Record generation and update history (use 'custom' as style if custom prompt)
-      await recordCartoonGeneration(user.uid, storageUrl, styleId === 'custom' ? 'custom' : styleId, isAdmin, userPlan, result.usedGpt4);
+      await recordCartoonGeneration(
+        user.uid,
+        storageUrl,
+        styleId === 'custom' ? 'custom' : styleId,
+        isAdmin,
+        userPlan,
+        result.usedGpt4,
+        customPrompt || null // Save the prompt if provided
+      );
 
       // Delete temporary custom image if it was used
       if (tempImageData) {
