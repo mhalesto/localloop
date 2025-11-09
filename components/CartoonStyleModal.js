@@ -217,6 +217,14 @@ export default function CartoonStyleModal({
               )}
             </View>
 
+          {/* Scrollable Content */}
+          <ScrollView
+            style={localStyles.scrollView}
+            contentContainerStyle={localStyles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
           {/* Gold Custom Prompt Option */}
           {isGoldUser && (
             <View style={[localStyles.customPromptSection, { paddingHorizontal: 20, paddingBottom: 8 }]}>
@@ -430,11 +438,7 @@ export default function CartoonStyleModal({
           </View>
 
           {/* Style Options */}
-          <ScrollView
-            style={localStyles.scrollView}
-            contentContainerStyle={localStyles.stylesContainer}
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={localStyles.stylesContainer}>
             {!useCustomPrompt && styles.map((style) => {
               const isSelected = selectedStyle === style.id;
               return (
@@ -477,6 +481,7 @@ export default function CartoonStyleModal({
                 </Text>
               </View>
             )}
+          </View>
           </ScrollView>
 
           {/* Generate Button */}
@@ -572,7 +577,10 @@ const localStyles = StyleSheet.create({
     flex: 1,
   },
   scrollView: {
-    maxHeight: 450,
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   stylesContainer: {
     padding: 20,
