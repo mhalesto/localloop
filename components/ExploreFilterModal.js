@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
+    height: '85%',
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 16,
