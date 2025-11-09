@@ -293,6 +293,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Profile Photo */}
         <View style={styles.photoSection}>
@@ -443,9 +444,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
                 style={[
                   styles.picker,
                   { color: themeColors.textPrimary },
-                  Platform.OS === 'ios' && { height: 150 },
                 ]}
-                itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary } : undefined}
+                itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary, height: 44 } : undefined}
               >
                 <Picker.Item label="Select your country..." value="" />
                 {Object.entries(countries).map(([code, name]) => (
@@ -476,9 +476,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
                   style={[
                     styles.picker,
                     { color: themeColors.textPrimary },
-                    Platform.OS === 'ios' && { height: 150 },
                   ]}
-                  itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary } : undefined}
+                  itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary, height: 44 } : undefined}
                 >
                   <Picker.Item label={`Select your ${country === 'US' ? 'state' : 'province'}...`} value="" />
                   {getAvailableProvinces().map((prov) => (
@@ -919,7 +918,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   labelRow: {
     flexDirection: 'row',
@@ -1014,23 +1013,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   locationSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   sectionHint: {
-    fontSize: 14,
-    marginBottom: 16,
-    lineHeight: 20,
+    fontSize: 12,
+    marginBottom: 12,
+    lineHeight: 16,
   },
   pickerContainer: {
     borderWidth: 1,
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 8,
   },
   picker: {
     height: 50,
@@ -1040,10 +1038,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderRadius: 12,
-    marginTop: 8,
   },
   pickerButtonText: {
     fontSize: 15,

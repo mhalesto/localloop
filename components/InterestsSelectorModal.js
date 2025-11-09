@@ -3,7 +3,7 @@
  * Allows users to select up to 10 interests from predefined categories
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,15 @@ export default function InterestsSelectorModal({
   const [activeCategory, setActiveCategory] = useState(Object.keys(INTEREST_CATEGORIES)[0]);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+
+  // Sync local state when modal opens or selectedInterests changes
+  useEffect(() => {
+    if (visible) {
+      setLocalSelectedInterests(selectedInterests);
+      setSearchQuery('');
+      setActiveCategory(Object.keys(INTEREST_CATEGORIES)[0]);
+    }
+  }, [visible, selectedInterests]);
 
   // Filter interests by search query
   const filteredInterests = useMemo(() => {
