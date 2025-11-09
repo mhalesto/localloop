@@ -73,7 +73,7 @@ export default function CartoonSuccessModal({ visible, onClose, onViewCartoon })
 
           {/* Quote of the Day */}
           <View style={[localStyles.quoteContainer, { backgroundColor: themeColors.background }]}>
-            <Ionicons name="quote" size={24} color={primaryColor} style={localStyles.quoteIcon} />
+            <Ionicons name="chatbox-ellipses-outline" size={24} color={primaryColor} style={localStyles.quoteIcon} />
             <Text style={[localStyles.quoteText, { color: themeColors.textPrimary }]}>
               {quote.text}
             </Text>
