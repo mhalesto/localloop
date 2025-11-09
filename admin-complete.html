@@ -2635,34 +2635,45 @@
                 return;
             }
 
+            showCleanupStatus('Deleting posts and comments...');
+
+            let postsDeleted = 0;
+            let publicPostsDeleted = 0;
+            let errors = [];
+
+            // Try deleting posts collection
             try {
-                showCleanupStatus('Deleting posts and comments...');
-
-                let postsDeleted = 0;
-                let publicPostsDeleted = 0;
-
-                try {
-                    updateCleanupProgress('Deleting posts collection...');
-                    postsDeleted = await deleteCollection('posts');
-                } catch (error) {
-                    console.error('Error deleting posts collection:', error);
-                    throw new Error(`Failed to delete posts: ${error.message}`);
-                }
-
-                try {
-                    updateCleanupProgress('Deleting public posts collection...');
-                    publicPostsDeleted = await deleteCollection('publicPosts');
-                } catch (error) {
-                    console.error('Error deleting publicPosts collection:', error);
-                    throw new Error(`Failed to delete public posts: ${error.message}`);
-                }
-
-                const totalDeleted = postsDeleted + publicPostsDeleted;
-                showCleanupStatus(`✅ Successfully deleted ${totalDeleted} posts (${postsDeleted} posts, ${publicPostsDeleted} public posts).`);
-                loadDashboardData(); // Refresh dashboard
+                updateCleanupProgress('Deleting posts collection...');
+                postsDeleted = await deleteCollection('posts');
             } catch (error) {
-                console.error('Error cleaning posts:', error);
-                showCleanupStatus(`❌ Error: ${error.message}`, true);
+                console.error('Error deleting posts collection:', error);
+                errors.push(`posts: ${error.message}`);
+            }
+
+            // Try deleting publicPosts collection (continue even if posts failed)
+            try {
+                updateCleanupProgress('Deleting public posts collection...');
+                publicPostsDeleted = await deleteCollection('publicPosts');
+            } catch (error) {
+                console.error('Error deleting publicPosts collection:', error);
+                errors.push(`publicPosts: ${error.message}`);
+            }
+
+            // Show results
+            const totalDeleted = postsDeleted + publicPostsDeleted;
+
+            if (errors.length > 0) {
+                if (totalDeleted > 0) {
+                    showCleanupStatus(`⚠️ Partially successful: Deleted ${totalDeleted} items (${postsDeleted} posts, ${publicPostsDeleted} public posts).\n\nErrors: ${errors.join('; ')}`, true);
+                } else {
+                    showCleanupStatus(`❌ Failed to delete posts:\n${errors.join('\n')}`, true);
+                }
+            } else {
+                showCleanupStatus(`✅ Successfully deleted ${totalDeleted} posts (${postsDeleted} posts, ${publicPostsDeleted} public posts).`);
+            }
+
+            if (totalDeleted > 0) {
+                loadDashboardData(); // Refresh dashboard if any deletions succeeded
             }
         }
 
@@ -2724,34 +2735,77 @@
                 return;
             }
 
+            showCleanupStatus('Starting complete database cleanup...');
+
+            let postsDeleted = 0;
+            let publicPostsDeleted = 0;
+            let statusesDeleted = 0;
+            let postsFilesDeleted = 0;
+            let statusesFilesDeleted = 0;
+            let errors = [];
+
+            // Try deleting posts
             try {
-                showCleanupStatus('Starting complete database cleanup...');
-
-                // Delete posts
-                updateCleanupProgress('Step 1/4: Deleting posts and comments...');
-                const postsDeleted = await deleteCollection('posts');
-
-                // Delete public posts
-                updateCleanupProgress('Step 2/4: Deleting public posts...');
-                const publicPostsDeleted = await deleteCollection('publicPosts');
-
-                // Delete statuses
-                updateCleanupProgress('Step 3/4: Deleting statuses...');
-                const statusesDeleted = await deleteCollection('statuses');
-
-                // Delete storage files
-                updateCleanupProgress('Step 4/4: Deleting storage files...');
-                const postsFilesDeleted = await deleteStorageFolder('posts');
-                const statusesFilesDeleted = await deleteStorageFolder('statuses');
-
-                const totalPosts = postsDeleted + publicPostsDeleted;
-                const totalFiles = postsFilesDeleted + statusesFilesDeleted;
-                showCleanupStatus(`✅ Complete cleanup finished!\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted`);
-
-                loadDashboardData(); // Refresh dashboard
+                updateCleanupProgress('Step 1/5: Deleting posts and comments...');
+                postsDeleted = await deleteCollection('posts');
             } catch (error) {
-                console.error('Error during complete cleanup:', error);
-                showCleanupStatus(`❌ Error: ${error.message}`, true);
+                console.error('Error deleting posts:', error);
+                errors.push(`posts: ${error.message}`);
+            }
+
+            // Try deleting public posts
+            try {
+                updateCleanupProgress('Step 2/5: Deleting public posts...');
+                publicPostsDeleted = await deleteCollection('publicPosts');
+            } catch (error) {
+                console.error('Error deleting publicPosts:', error);
+                errors.push(`publicPosts: ${error.message}`);
+            }
+
+            // Try deleting statuses
+            try {
+                updateCleanupProgress('Step 3/5: Deleting statuses...');
+                statusesDeleted = await deleteCollection('statuses');
+            } catch (error) {
+                console.error('Error deleting statuses:', error);
+                errors.push(`statuses: ${error.message}`);
+            }
+
+            // Try deleting post storage files
+            try {
+                updateCleanupProgress('Step 4/5: Deleting post storage files...');
+                postsFilesDeleted = await deleteStorageFolder('posts');
+            } catch (error) {
+                console.error('Error deleting post files:', error);
+                errors.push(`post files: ${error.message}`);
+            }
+
+            // Try deleting status storage files
+            try {
+                updateCleanupProgress('Step 5/5: Deleting status storage files...');
+                statusesFilesDeleted = await deleteStorageFolder('statuses');
+            } catch (error) {
+                console.error('Error deleting status files:', error);
+                errors.push(`status files: ${error.message}`);
+            }
+
+            // Show results
+            const totalPosts = postsDeleted + publicPostsDeleted;
+            const totalFiles = postsFilesDeleted + statusesFilesDeleted;
+            const totalDeleted = totalPosts + statusesDeleted + totalFiles;
+
+            if (errors.length > 0) {
+                if (totalDeleted > 0) {
+                    showCleanupStatus(`⚠️ Partially successful:\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted\n\nErrors: ${errors.join('; ')}`, true);
+                } else {
+                    showCleanupStatus(`❌ Cleanup failed:\n${errors.join('\n')}`, true);
+                }
+            } else {
+                showCleanupStatus(`✅ Complete cleanup finished!\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted`);
+            }
+
+            if (totalDeleted > 0) {
+                loadDashboardData(); // Refresh dashboard if any deletions succeeded
             }
         }
 
