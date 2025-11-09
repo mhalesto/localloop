@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 
-export default function FilteredUserCard({ user, onPress }) {
+export default function FilteredUserCard({ user, onPress, isFollowing, onFollowPress, isFollowLoading }) {
   const { themeColors } = useSettings();
 
   return (
@@ -32,6 +32,44 @@ export default function FilteredUserCard({ user, onPress }) {
           {user.bio}
         </Text>
       )}
+
+      {/* Follow Button */}
+      <TouchableOpacity
+        style={[
+          styles.followButton,
+          {
+            backgroundColor: isFollowing ? themeColors.background : themeColors.primary,
+            borderColor: isFollowing ? themeColors.divider : themeColors.primary,
+          },
+        ]}
+        onPress={(e) => {
+          e.stopPropagation();
+          onFollowPress();
+        }}
+        activeOpacity={0.7}
+        disabled={isFollowLoading}
+      >
+        {isFollowLoading ? (
+          <ActivityIndicator size="small" color={isFollowing ? themeColors.primary : '#fff'} />
+        ) : (
+          <>
+            <Ionicons
+              name={isFollowing ? 'checkmark' : 'person-add'}
+              size={14}
+              color={isFollowing ? themeColors.textPrimary : '#fff'}
+            />
+            <Text
+              style={[
+                styles.followButtonText,
+                { color: isFollowing ? themeColors.textPrimary : '#fff' },
+              ]}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+
       <View style={styles.meta}>
         <View style={styles.metaItem}>
           <Ionicons name="location" size={12} color={themeColors.primary} />
@@ -106,5 +144,22 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
+  },
+  followButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 6,
+    width: '100%',
+  },
+  followButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

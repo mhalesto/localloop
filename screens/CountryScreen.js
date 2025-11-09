@@ -24,6 +24,7 @@ import { useSensors } from '../contexts/SensorsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
 import { getPostsFromCity, getStatusesFromCity, getLocalUsers } from '../services/exploreContentService';
+import { followUser, unfollowUser, isFollowing } from '../services/followService';
 
 const INITIAL_VISIBLE = 40;
 const PAGE_SIZE = 30;
@@ -93,6 +94,8 @@ export default function CountryScreen({ navigation }) {
   const [filteredStatuses, setFilteredStatuses] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loadingFilteredContent, setLoadingFilteredContent] = useState(false);
+  const [followStates, setFollowStates] = useState({});
+  const [followLoadingStates, setFollowLoadingStates] = useState({});
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -230,6 +233,45 @@ export default function CountryScreen({ navigation }) {
     setFilterModalVisible(true);
   }, [haptics]);
 
+  const handleFollowUser = useCallback(async (userId) => {
+    if (!currentUser?.uid) return;
+
+    haptics.light();
+    setFollowLoadingStates((prev) => ({ ...prev, [userId]: true }));
+
+    try {
+      const isCurrentlyFollowing = followStates[userId];
+
+      if (isCurrentlyFollowing) {
+        await unfollowUser(currentUser.uid, userId);
+        setFollowStates((prev) => ({ ...prev, [userId]: false }));
+        // Update follower count in the user card
+        setFilteredUsers((prev) =>
+          prev.map((user) =>
+            user.uid === userId
+              ? { ...user, followersCount: Math.max((user.followersCount || 0) - 1, 0) }
+              : user
+          )
+        );
+      } else {
+        await followUser(currentUser.uid, userId);
+        setFollowStates((prev) => ({ ...prev, [userId]: true }));
+        // Update follower count in the user card
+        setFilteredUsers((prev) =>
+          prev.map((user) =>
+            user.uid === userId
+              ? { ...user, followersCount: (user.followersCount || 0) + 1 }
+              : user
+          )
+        );
+      }
+    } catch (error) {
+      console.error('[CountryScreen] Error following/unfollowing user:', error);
+    } finally {
+      setFollowLoadingStates((prev) => ({ ...prev, [userId]: false }));
+    }
+  }, [currentUser?.uid, followStates, haptics]);
+
   const loadFilteredContent = useCallback(async () => {
     if (!userProfile?.city) return;
 
@@ -262,12 +304,33 @@ export default function CountryScreen({ navigation }) {
       // Load users if filter is enabled
       if (exploreFilters.showLocalUsers) {
         promises.push(
-          getLocalUsers(userProfile.city, currentUser?.uid, 20).then((users) => {
-            if (isMounted.current) setFilteredUsers(users);
+          getLocalUsers(userProfile.city, currentUser?.uid, 20).then(async (users) => {
+            if (isMounted.current) {
+              setFilteredUsers(users);
+              // Check follow status for each user
+              if (currentUser?.uid) {
+                const followChecks = {};
+                await Promise.all(
+                  users.map(async (user) => {
+                    try {
+                      const following = await isFollowing(currentUser.uid, user.uid);
+                      followChecks[user.uid] = following;
+                    } catch (err) {
+                      console.warn('[CountryScreen] Error checking follow status:', err);
+                      followChecks[user.uid] = false;
+                    }
+                  })
+                );
+                if (isMounted.current) {
+                  setFollowStates(followChecks);
+                }
+              }
+            }
           })
         );
       } else {
         setFilteredUsers([]);
+        setFollowStates({});
       }
 
       await Promise.all(promises);
@@ -743,6 +806,9 @@ export default function CountryScreen({ navigation }) {
                         <FilteredUserCard
                           user={item}
                           onPress={() => navigation.navigate('PublicProfile', { userId: item.uid })}
+                          isFollowing={followStates[item.uid] || false}
+                          onFollowPress={() => handleFollowUser(item.uid)}
+                          isFollowLoading={followLoadingStates[item.uid] || false}
                         />
                       )}
                       showsHorizontalScrollIndicator={false}
