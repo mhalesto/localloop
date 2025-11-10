@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import ScreenLayout from '../components/ScreenLayout';
 import NeighborhoodExplorer from '../components/NeighborhoodExplorer';
 import StatusStoryCard from '../components/StatusStoryCard';
@@ -21,14 +22,27 @@ import SponsoredAdCard from '../components/SponsoredAdCard';
 import ArtworkSkeletonLoader from '../components/ArtworkSkeletonLoader';
 import AdSkeletonLoader from '../components/AdSkeletonLoader';
 import HorizontalListSkeletonLoader from '../components/HorizontalListSkeletonLoader';
+import CartoonStyleModal from '../components/CartoonStyleModal';
+import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSensors } from '../contexts/SensorsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
 import { getPostsFromCity, getAIArtworkFromCity, getLocalUsers } from '../services/exploreContentService';
+import { generateCartoonProfile } from '../services/openai/profileCartoonService';
+import { scheduleCartoonReadyNotification } from '../services/notificationService';
+import {
+  getCartoonProfileData,
+  checkAndResetMonthlyUsage,
+  uploadCartoonToStorage,
+  recordCartoonGeneration,
+  uploadTemporaryCustomImage,
+  deleteTemporaryCustomImage,
+} from '../services/cartoonProfileService';
 
 const INITIAL_VISIBLE = 40;
 const PAGE_SIZE = 30;
@@ -63,7 +77,8 @@ export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, showDiscoveryOnExplore, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts, addFetchedPost } = usePosts();
-  const { currentUser } = useAuth();
+  const { currentUser, user, isAdmin } = useAuth();
+  const { showAlert } = useAlert();
   const haptics = useHaptics();
   const {
     statuses,
@@ -94,11 +109,19 @@ export default function CountryScreen({ navigation }) {
   const [personalError, setPersonalError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [cartoonModalVisible, setCartoonModalVisible] = useState(false);
   const [exploreFilters, setExploreFilters] = useState(DEFAULT_FILTERS);
   const [filteredPosts, setFilteredPosts] = useState([]);
   const [filteredArtwork, setFilteredArtwork] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loadingFilteredContent, setLoadingFilteredContent] = useState(false);
+
+  // Cartoon generation state
+  const [cartoonUsageData, setCartoonUsageData] = useState(null);
+  const [isGeneratingCartoon, setIsGeneratingCartoon] = useState(false);
+  const [showGenerationProgress, setShowGenerationProgress] = useState(false);
+  const [currentGenerationStyle, setCurrentGenerationStyle] = useState('AI Avatar');
+  const [currentGenerationNotify, setCurrentGenerationNotify] = useState(false);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -300,6 +323,121 @@ export default function CountryScreen({ navigation }) {
       }
     }
   }, [loadCountries, loadPersonalCities, refreshPosts, haptics]);
+
+  // Load cartoon usage data
+  const loadCartoonData = useCallback(async () => {
+    if (!user?.uid) return;
+
+    try {
+      await checkAndResetMonthlyUsage(user.uid);
+      const data = await getCartoonProfileData(user.uid);
+      setCartoonUsageData(data);
+    } catch (error) {
+      console.error('[CountryScreen] Error loading cartoon data:', error);
+    }
+  }, [user?.uid]);
+
+  // Handle cartoon generation
+  const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
+    const { customImage, ignoreProfilePicture } = generationOptions;
+    const needsProfilePhoto = !customImage && !ignoreProfilePicture;
+
+    if (!user?.uid || (needsProfilePhoto && !userProfile?.profilePhoto)) {
+      showAlert('Error', 'Please set a profile photo, upload a custom image, or enable "Generate without profile picture" before generating.', [], { type: 'warning' });
+      return;
+    }
+
+    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold' && !isAdmin) {
+      showAlert('Premium Feature', 'Custom prompts and custom images are exclusive to Gold members. Upgrade to Gold to unlock unlimited creative generation!', [], { type: 'warning' });
+      return;
+    }
+
+    // Close modal and show progress
+    setCartoonModalVisible(false);
+    setIsGeneratingCartoon(true);
+
+    const { notifyWhenDone = false } = generationOptions;
+    const styleName = styleId === 'custom' ? 'Custom Avatar' : (styleId.charAt(0).toUpperCase() + styleId.slice(1));
+    setCurrentGenerationStyle(styleName);
+    setCurrentGenerationNotify(notifyWhenDone);
+    setShowGenerationProgress(true);
+
+    let tempImageData = null;
+
+    try {
+      const { model = 'gpt-3.5-turbo' } = generationOptions;
+      const userPlan = userProfile?.subscriptionPlan || 'basic';
+
+      let imageUrlToUse = null;
+      if (customImage) {
+        tempImageData = await uploadTemporaryCustomImage(user.uid, customImage);
+        imageUrlToUse = tempImageData.url;
+      } else if (!ignoreProfilePicture && userProfile.profilePhoto) {
+        imageUrlToUse = userProfile.profilePhoto;
+      }
+
+      const result = await generateCartoonProfile(
+        imageUrlToUse,
+        styleId,
+        userProfile.gender || 'neutral',
+        customPrompt,
+        userPlan,
+        model,
+        cartoonUsageData?.gpt4VisionUsage || 0
+      );
+
+      const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+
+      await recordCartoonGeneration(
+        user.uid,
+        storageUrl,
+        styleId === 'custom' ? 'custom' : styleId,
+        isAdmin,
+        userPlan,
+        result.usedGpt4,
+        customPrompt || null
+      );
+
+      if (tempImageData) {
+        await deleteTemporaryCustomImage(tempImageData.storagePath);
+        tempImageData = null;
+      }
+
+      await loadCartoonData();
+
+      setShowGenerationProgress(false);
+      setIsGeneratingCartoon(false);
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      if (notifyWhenDone) {
+        const notifyStyleName = styleId === 'custom' ? 'custom' : styleId;
+        await scheduleCartoonReadyNotification(notifyStyleName);
+      }
+
+      showAlert('Success', 'Your AI avatar has been generated! Check your profile to view it.', [], { type: 'success' });
+    } catch (error) {
+      console.error('[CountryScreen] Error generating cartoon:', error);
+
+      if (tempImageData) {
+        await deleteTemporaryCustomImage(tempImageData.storagePath);
+      }
+
+      setShowGenerationProgress(false);
+      setIsGeneratingCartoon(false);
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.', [], { type: 'error' });
+    }
+  };
+
+  // Load cartoon data on mount
+  useEffect(() => {
+    if (user?.uid) {
+      loadCartoonData();
+    }
+  }, [user?.uid, loadCartoonData]);
 
   const statusList = useMemo(
     () =>
@@ -735,6 +873,35 @@ export default function CountryScreen({ navigation }) {
 
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
 
+              {/* AI Avatar Generator Button */}
+              {exploreFilters.showAIArtGallery && userProfile?.city && (
+                <TouchableOpacity
+                  style={styles.aiAvatarButton}
+                  onPress={() => {
+                    haptics.light();
+                    setCartoonModalVisible(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#6C4DF4', '#8B5CF6', '#A78BFA']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.aiAvatarGradient}
+                  >
+                    <View style={styles.aiAvatarContent}>
+                      <View style={styles.aiAvatarTextContainer}>
+                        <Text style={styles.aiAvatarTitle}>✨ Generate Your AI Avatar</Text>
+                        <Text style={styles.aiAvatarSubtitle}>Create cartoon avatars & AI art instantly</Text>
+                      </View>
+                      <View style={styles.aiAvatarIconContainer}>
+                        <Ionicons name="sparkles" size={24} color="#fff" />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
               {/* Mixed Feed: Artworks, Posts, Users, and Ads */}
               {exploreFilters.showAIArtGallery && userProfile?.city && (
                 <View style={styles.mixedFeedContainer}>
@@ -974,6 +1141,31 @@ export default function CountryScreen({ navigation }) {
         onClose={() => setFilterModalVisible(false)}
         filters={exploreFilters}
         onSaveFilters={handleSaveFilters}
+      />
+
+      {/* Cartoon Style Modal */}
+      <CartoonStyleModal
+        visible={cartoonModalVisible}
+        onClose={() => setCartoonModalVisible(false)}
+        onStyleSelect={handleGenerateCartoon}
+        userProfile={userProfile}
+        usageData={cartoonUsageData}
+        isGenerating={isGeneratingCartoon}
+        isAdmin={isAdmin}
+      />
+
+      {/* Cartoon Generation Progress */}
+      <CartoonGenerationProgress
+        visible={showGenerationProgress}
+        onClose={() => {
+          setShowGenerationProgress(false);
+          setIsGeneratingCartoon(false);
+        }}
+        onComplete={() => {
+          // Handled in handleGenerateCartoon
+        }}
+        styleName={currentGenerationStyle}
+        notifyWhenDone={currentGenerationNotify}
       />
     </ScreenLayout>
   );
@@ -1322,5 +1514,49 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     artworkChunkContainer: {
       marginBottom: 24
-    }
+    },
+    aiAvatarButton: {
+      marginHorizontal: 12,
+      marginBottom: 24,
+      marginTop: 12,
+      borderRadius: 20,
+      overflow: 'hidden',
+      shadowColor: '#6C4DF4',
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 8,
+    },
+    aiAvatarGradient: {
+      borderRadius: 20,
+      padding: 20,
+    },
+    aiAvatarContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    aiAvatarTextContainer: {
+      flex: 1,
+      marginRight: 16,
+    },
+    aiAvatarTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      marginBottom: 4,
+    },
+    aiAvatarSubtitle: {
+      fontSize: 13,
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '500',
+    },
+    aiAvatarIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });

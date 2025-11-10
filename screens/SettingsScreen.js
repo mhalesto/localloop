@@ -43,6 +43,7 @@ import { useAlert } from '../contexts/AlertContext';
 import CartoonStyleModal from '../components/CartoonStyleModal';
 import CartoonHistoryModal from '../components/CartoonHistoryModal';
 import CartoonSuccessModal from '../components/CartoonSuccessModal';
+import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
 import { generateCartoonProfile, getUsageStatsText } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
@@ -179,6 +180,9 @@ export default function SettingsScreen({ navigation }) {
   const [cartoonPictureHistory, setCartoonPictureHistory] = useState([]);
   const [isGeneratingCartoon, setIsGeneratingCartoon] = useState(false);
   const [isCartoonProcessing, setIsCartoonProcessing] = useState(false);
+  const [showGenerationProgress, setShowGenerationProgress] = useState(false);
+  const [currentGenerationStyle, setCurrentGenerationStyle] = useState('AI Avatar');
+  const [currentGenerationNotify, setCurrentGenerationNotify] = useState(false);
 
   // Upgrade modal state
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
@@ -884,12 +888,24 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
 
+    // Close style modal and show progress indicator
+    setCartoonStyleModalVisible(false);
     setIsGeneratingCartoon(true);
+
+    // Extract options
+    const { notifyWhenDone = false } = generationOptions;
+
+    // Store generation info for progress indicator
+    const styleName = styleId === 'custom' ? 'Custom Avatar' : (styleId.charAt(0).toUpperCase() + styleId.slice(1));
+    setCurrentGenerationStyle(styleName);
+    setCurrentGenerationNotify(notifyWhenDone);
+    setShowGenerationProgress(true);
+
     let tempImageData = null; // Store temp image info for cleanup
 
     try {
-      // Extract options
-      const { model = 'gpt-3.5-turbo', notifyWhenDone = false } = generationOptions;
+      // Extract model option
+      const { model = 'gpt-3.5-turbo' } = generationOptions;
 
       // Determine which image to use
       let imageUrlToUse = null;
@@ -943,11 +959,11 @@ export default function SettingsScreen({ navigation }) {
       // Reload data to update UI
       await loadCartoonData();
 
-      // Close style modal immediately
-      setCartoonStyleModalVisible(false);
+      // Close progress indicator
+      setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
 
-      // Wait for modal to close completely
+      // Wait for progress to close
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Send notification if requested
@@ -966,10 +982,11 @@ export default function SettingsScreen({ navigation }) {
         await deleteTemporaryCustomImage(tempImageData.storagePath);
       }
 
+      // Close progress indicator
+      setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
-      setCartoonStyleModalVisible(false);
 
-      // Wait for modal to close
+      // Wait for progress to close
       await new Promise(resolve => setTimeout(resolve, 300));
 
       showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.', [], { type: 'error' });
@@ -2299,6 +2316,20 @@ export default function SettingsScreen({ navigation }) {
             setCartoonHistoryModalVisible(true);
           }, 300);
         }}
+      />
+
+      <CartoonGenerationProgress
+        visible={showGenerationProgress}
+        onClose={() => {
+          setShowGenerationProgress(false);
+          setIsGeneratingCartoon(false);
+        }}
+        onComplete={() => {
+          // Called when generation completes
+          // Note: We handle completion in handleGenerateCartoon
+        }}
+        styleName={currentGenerationStyle}
+        notifyWhenDone={currentGenerationNotify}
       />
     </ScreenLayout>
   );
