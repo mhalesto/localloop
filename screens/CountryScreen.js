@@ -54,10 +54,10 @@ const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
 const EXPLORE_FILTERS_KEY = '@localloop.exploreFilters';
 const DEFAULT_FILTERS = {
   showNearbyCities: true,
-  showPostsFromCurrentCity: false,
-  showPostBackgrounds: false,
-  showAIArtGallery: false,
-  showLocalUsers: false,
+  showPostsFromCurrentCity: true,
+  showPostBackgrounds: true,
+  showAIArtGallery: true,
+  showLocalUsers: true,
   showTrendingCities: true,
 };
 const FALLBACK_COUNTRIES = [
@@ -1168,6 +1168,8 @@ export default function CountryScreen({ navigation }) {
         onClose={() => setFilterModalVisible(false)}
         filters={exploreFilters}
         onSaveFilters={handleSaveFilters}
+        userProfile={userProfile}
+        navigation={navigation}
       />
 
       {/* Cartoon Style Modal */}

@@ -7,13 +7,19 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 
-export default function ExploreFilterModal({ visible, onClose, filters, onSaveFilters }) {
+export default function ExploreFilterModal({ visible, onClose, filters, onSaveFilters, userProfile, navigation }) {
   const { themeColors, isDarkMode } = useSettings();
   const [localFilters, setLocalFilters] = useState(filters);
+
+  // Check if user is on Basic plan
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
+  const isBasicUser = userPlan === 'basic';
+  const canCustomize = !isBasicUser; // Premium and Gold can customize
 
   useEffect(() => {
     if (visible) {
@@ -22,6 +28,25 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
   }, [visible, filters]);
 
   const handleToggle = (key) => {
+    // Basic users cannot customize filters
+    if (isBasicUser) {
+      Alert.alert(
+        'Premium Feature',
+        'Customize your Explore filters with Premium or Gold! Basic users enjoy our recommended settings for the best experience.',
+        [
+          { text: 'Maybe Later', style: 'cancel' },
+          {
+            text: 'Upgrade Now',
+            onPress: () => {
+              onClose();
+              navigation?.navigate('Subscription');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     setLocalFilters((prev) => ({
       ...prev,
       [key]: !prev[key],
@@ -34,12 +59,13 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
   };
 
   const handleReset = () => {
+    // Default filters for all users (especially Basic users who can't customize)
     const defaultFilters = {
       showNearbyCities: true,
-      showPostsFromCurrentCity: false,
-      showPostBackgrounds: false,
-      showAIArtGallery: false,
-      showLocalUsers: false,
+      showPostsFromCurrentCity: true,
+      showPostBackgrounds: true,
+      showAIArtGallery: true,
+      showLocalUsers: true,
       showTrendingCities: true,
     };
     setLocalFilters(defaultFilters);
@@ -123,8 +149,35 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
             showsVerticalScrollIndicator={false}
           >
             <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-              Customize what you see on the Explore screen. Your preferences will be saved automatically.
+              {isBasicUser
+                ? 'These are the recommended filters for Basic users. Upgrade to Premium or Gold to customize your Explore experience!'
+                : 'Customize what you see on the Explore screen. Your preferences will be saved automatically.'}
             </Text>
+
+            {/* Premium Feature Banner for Basic Users */}
+            {isBasicUser && (
+              <View style={[styles.premiumBanner, { backgroundColor: `${themeColors.primary}15`, borderColor: themeColors.primary }]}>
+                <Ionicons name="lock-closed" size={20} color={themeColors.primary} />
+                <View style={styles.premiumBannerText}>
+                  <Text style={[styles.premiumBannerTitle, { color: themeColors.primary }]}>
+                    Premium Feature
+                  </Text>
+                  <Text style={[styles.premiumBannerDescription, { color: themeColors.textSecondary }]}>
+                    Upgrade to customize your filters
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.upgradeBadge, { backgroundColor: themeColors.primary }]}
+                  onPress={() => {
+                    onClose();
+                    navigation?.navigate('Subscription');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.upgradeBadgeText}>Upgrade</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {filterOptions.map((option) => (
               <View
@@ -147,9 +200,16 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
                     <Ionicons name={option.icon} size={20} color={option.color} />
                   </View>
                   <View style={styles.filterText}>
-                    <Text style={[styles.filterLabel, { color: themeColors.textPrimary }]}>
-                      {option.label}
-                    </Text>
+                    <View style={styles.labelRow}>
+                      <Text style={[styles.filterLabel, { color: themeColors.textPrimary }]}>
+                        {option.label}
+                      </Text>
+                      {isBasicUser && (
+                        <View style={styles.lockBadge}>
+                          <Ionicons name="lock-closed" size={10} color={themeColors.textSecondary} />
+                        </View>
+                      )}
+                    </View>
                     <Text style={[styles.filterDescription, { color: themeColors.textSecondary }]}>
                       {option.description}
                     </Text>
@@ -160,6 +220,8 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
                   onValueChange={() => handleToggle(option.key)}
                   trackColor={{ false: themeColors.divider, true: option.color }}
                   thumbColor={localFilters[option.key] ? '#fff' : '#f4f3f4'}
+                  disabled={isBasicUser}
+                  style={isBasicUser ? styles.disabledSwitch : null}
                 />
               </View>
             ))}
@@ -167,30 +229,37 @@ export default function ExploreFilterModal({ visible, onClose, filters, onSaveFi
 
           {/* Footer actions */}
           <View style={[styles.footer, { borderTopColor: themeColors.divider }]}>
-            <TouchableOpacity
-              style={[
-                styles.resetButton,
-                {
-                  backgroundColor: isDarkMode ? themeColors.background : '#f3f4f6',
-                  borderColor: themeColors.divider,
-                },
-              ]}
-              onPress={handleReset}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="refresh" size={18} color={themeColors.textPrimary} />
-              <Text style={[styles.resetButtonText, { color: themeColors.textPrimary }]}>
-                Reset
-              </Text>
-            </TouchableOpacity>
+            {!isBasicUser && (
+              <TouchableOpacity
+                style={[
+                  styles.resetButton,
+                  {
+                    backgroundColor: isDarkMode ? themeColors.background : '#f3f4f6',
+                    borderColor: themeColors.divider,
+                  },
+                ]}
+                onPress={handleReset}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="refresh" size={18} color={themeColors.textPrimary} />
+                <Text style={[styles.resetButtonText, { color: themeColors.textPrimary }]}>
+                  Reset
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: themeColors.primary }]}
-              onPress={handleSave}
+              style={[
+                isBasicUser ? styles.closeButtonFull : styles.saveButton,
+                { backgroundColor: themeColors.primary }
+              ]}
+              onPress={isBasicUser ? onClose : handleSave}
               activeOpacity={0.85}
             >
-              <Ionicons name="checkmark" size={18} color="#fff" />
-              <Text style={styles.saveButtonText}>Apply Filters</Text>
+              <Ionicons name={isBasicUser ? "close" : "checkmark"} size={18} color="#fff" />
+              <Text style={styles.saveButtonText}>
+                {isBasicUser ? 'Close' : 'Apply Filters'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -246,6 +315,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  premiumBannerText: {
+    flex: 1,
+  },
+  premiumBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  premiumBannerDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  upgradeBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  upgradeBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
   filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -272,10 +372,20 @@ const styles = StyleSheet.create({
   filterText: {
     flex: 1,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
   filterLabel: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+  },
+  lockBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+    padding: 4,
   },
   filterDescription: {
     fontSize: 13,
@@ -315,5 +425,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  closeButtonFull: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  disabledSwitch: {
+    opacity: 0.6,
   },
 });
