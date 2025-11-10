@@ -122,6 +122,7 @@ export default function CountryScreen({ navigation }) {
   const [showGenerationProgress, setShowGenerationProgress] = useState(false);
   const [currentGenerationStyle, setCurrentGenerationStyle] = useState('AI Avatar');
   const [currentGenerationNotify, setCurrentGenerationNotify] = useState(false);
+  const [aiAvatarBannerDismissed, setAiAvatarBannerDismissed] = useState(false);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -874,7 +875,7 @@ export default function CountryScreen({ navigation }) {
               {error && !listIsEmpty ? <Text style={styles.errorText}>{error}</Text> : null}
 
               {/* AI Avatar Generator Button */}
-              {exploreFilters.showAIArtGallery && userProfile?.city && (
+              {exploreFilters.showAIArtGallery && userProfile?.city && !aiAvatarBannerDismissed && (
                 <TouchableOpacity
                   style={styles.aiAvatarButton}
                   onPress={() => {
@@ -898,6 +899,22 @@ export default function CountryScreen({ navigation }) {
                         <Ionicons name="sparkles" size={24} color="#fff" />
                       </View>
                     </View>
+
+                    {/* Close Button */}
+                    <TouchableOpacity
+                      style={styles.aiAvatarCloseButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        haptics.light();
+                        setAiAvatarBannerDismissed(true);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.aiAvatarCloseCircle}>
+                        <Ionicons name="close" size={16} color="#fff" />
+                      </View>
+                    </TouchableOpacity>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -1530,6 +1547,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     aiAvatarGradient: {
       borderRadius: 20,
       padding: 20,
+      position: 'relative',
     },
     aiAvatarContent: {
       flexDirection: 'row',
@@ -1558,5 +1576,21 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    aiAvatarCloseButton: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      zIndex: 10,
+    },
+    aiAvatarCloseCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
     },
   });
