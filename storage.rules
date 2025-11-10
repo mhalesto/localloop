@@ -26,29 +26,21 @@ service firebase.storage {
     match /cartoon-profiles/{userId}/{filename} {
       allow read: if true; // Public read so profile pictures can be displayed
       allow write: if isSignedIn()
-        && request.auth.uid == userId // Only write to own folder
-        && request.resource.size < 2 * 1024 * 1024 // Max 2MB
-        && request.resource.contentType.matches('image/.*'); // Only images
+        && request.auth.uid == userId; // Only write to own folder
       allow delete: if isSignedIn() && request.auth.uid == userId; // Only delete own files
     }
 
     // Temporary custom images for AI cartoon generation (Gold exclusive)
     match /temp-custom-images/{userId}/{filename} {
       allow read: if isSignedIn() && request.auth.uid == userId; // Only user can read their temp images
-      allow write: if isSignedIn()
-        && request.auth.uid == userId // Only write to own folder
-        && request.resource.size < 10 * 1024 * 1024 // Max 10MB
-        && request.resource.contentType.matches('image/.*'); // Only images
+      allow write: if isSignedIn() && request.auth.uid == userId; // Only write to own folder
       allow delete: if isSignedIn() && request.auth.uid == userId; // Only delete own files
     }
 
     // Profile photos uploaded by users
     match /profile-photos/{userId}/{filename} {
       allow read: if true; // Public read so profile pictures can be displayed
-      allow write: if isSignedIn()
-        && request.auth.uid == userId // Only write to own folder
-        && request.resource.size < 5 * 1024 * 1024 // Max 5MB
-        && request.resource.contentType.matches('image/.*'); // Only images
+      allow write: if isSignedIn() && request.auth.uid == userId; // Only write to own folder
       allow delete: if isSignedIn() && request.auth.uid == userId; // Only delete own files
     }
 
