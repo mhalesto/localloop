@@ -369,6 +369,11 @@ export default function ScreenLayout({
       if (navigation.getCurrentRoute?.()?.name !== 'Feed') {
         navigation.navigate('Feed');
       }
+    } else if (tab === 'events') {
+      // Navigate to Events screen
+      if (navigation.getCurrentRoute?.()?.name !== 'Events') {
+        navigation.navigate('Events');
+      }
     } else if (tab === 'discover') {
       // [PUBLIC-MODE] Navigate to Discover screen
       if (navigation.getCurrentRoute?.()?.name !== 'Discover') {

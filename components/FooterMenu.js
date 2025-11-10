@@ -17,6 +17,7 @@ import { useSettings } from '../contexts/SettingsContext';
 const getTabsConfig = (isLoggedIn) => [
   { key: 'home', label: 'Explore', icon: 'home-outline' },
   { key: 'feed', label: 'Feed', icon: 'people-outline' },
+  { key: 'events', label: 'Events', icon: 'calendar-outline' },
   { key: 'discover', label: 'Discover', icon: 'compass-outline' },
   { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' },
   isLoggedIn
@@ -69,10 +70,10 @@ export default function FooterMenu({
   const OFFSET_Y = NOTCH_R;
   const SVG_H = BAR_HEIGHT + OFFSET_Y;
 
-  // Equal tab widths (5 tabs) with spacer width for the notch
+  // Equal tab widths (6 tabs) with spacer width for the notch
   const spacerW = NOTCH_R * 2 + SPACER_EXTRA * 2;
   const contentW = Math.max(0, barW - TAB_ROW_PADDING_H * 2 - (showShortcut ? spacerW : 0));
-  const tabItemW = contentW > 0 ? contentW / 5 : 70;
+  const tabItemW = contentW > 0 ? contentW / 6 : 60;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { paddingBottom: bottomPad }]}>
@@ -140,6 +141,16 @@ export default function FooterMenu({
             inactiveColor={accentInactiveColor}
           />
 
+          {/* Tab 2: Events */}
+          <TabItem
+            width={tabItemW}
+            tab={tabs[2]}
+            active={activeTab === tabs[2].key}
+            onPress={() => onPressTab?.(tabs[2].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
+          />
+
           {/* FAB Spacer */}
           {showShortcut ? (
             <View
@@ -152,17 +163,7 @@ export default function FooterMenu({
             />
           ) : null}
 
-          {/* Tab 2: Discover */}
-          <TabItem
-            width={tabItemW}
-            tab={tabs[2]}
-            active={activeTab === tabs[2].key}
-            onPress={() => onPressTab?.(tabs[2].key)}
-            activeColor={accentActiveColor}
-            inactiveColor={accentInactiveColor}
-          />
-
-          {/* Tab 3: Replies */}
+          {/* Tab 3: Discover */}
           <TabItem
             width={tabItemW}
             tab={tabs[3]}
@@ -170,15 +171,25 @@ export default function FooterMenu({
             onPress={() => onPressTab?.(tabs[3].key)}
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
-            badgeCount={myRepliesBadge}
           />
 
-          {/* Tab 4: Profile */}
+          {/* Tab 4: Replies */}
           <TabItem
             width={tabItemW}
             tab={tabs[4]}
             active={activeTab === tabs[4].key}
             onPress={() => onPressTab?.(tabs[4].key)}
+            activeColor={accentActiveColor}
+            inactiveColor={accentInactiveColor}
+            badgeCount={myRepliesBadge}
+          />
+
+          {/* Tab 5: Profile/Settings */}
+          <TabItem
+            width={tabItemW}
+            tab={tabs[5]}
+            active={activeTab === tabs[5].key}
+            onPress={() => onPressTab?.(tabs[5].key)}
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
           />

@@ -231,6 +231,26 @@ service cloud.firestore {
         && request.auth.uid == resource.data.userId;
     }
 
+    match /events/{eventId} {
+      // Anyone can read public events
+      allow read: if resource.data.isPublic == true;
+
+      // Authenticated users can create events
+      allow create: if isSignedIn()
+        && request.resource.data.organizerId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200;
+
+      // Organizers can update their events
+      allow update: if isSignedIn()
+        && resource.data.organizerId == request.auth.uid;
+
+      // Organizers and admins can delete events
+      allow delete: if isSignedIn()
+        && (resource.data.organizerId == request.auth.uid || isAdmin());
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
