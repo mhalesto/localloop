@@ -19,7 +19,7 @@ const getTabsConfig = (isLoggedIn) => [
   { key: 'feed', label: 'Feed', icon: 'people-outline' },
   { key: 'events', label: 'Events', icon: 'calendar-outline' },
   { key: 'discover', label: 'Discover', icon: 'compass-outline' },
-  { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' },
+  // { key: 'myComments', label: 'Replies', icon: 'chatbubble-ellipses-outline' }, // Moved to Notifications modal
   isLoggedIn
     ? { key: 'profile', label: 'Profile', icon: 'person-outline' }
     : { key: 'settings', label: 'Settings', icon: 'settings-outline' },
@@ -70,10 +70,10 @@ export default function FooterMenu({
   const OFFSET_Y = NOTCH_R;
   const SVG_H = BAR_HEIGHT + OFFSET_Y;
 
-  // Equal tab widths (6 tabs) with spacer width for the notch
+  // Equal tab widths (5 tabs - Replies moved to Notifications modal) with spacer width for the notch
   const spacerW = NOTCH_R * 2 + SPACER_EXTRA * 2;
   const contentW = Math.max(0, barW - TAB_ROW_PADDING_H * 2 - (showShortcut ? spacerW : 0));
-  const tabItemW = contentW > 0 ? contentW / 6 : 60;
+  const tabItemW = contentW > 0 ? contentW / 5 : 60;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrapper, { paddingBottom: bottomPad }]}>
@@ -173,8 +173,8 @@ export default function FooterMenu({
             inactiveColor={accentInactiveColor}
           />
 
-          {/* Tab 4: Replies */}
-          <TabItem
+          {/* Tab 4: Replies - COMMENTED OUT - Moved to Notifications modal */}
+          {/* <TabItem
             width={tabItemW}
             tab={tabs[4]}
             active={activeTab === tabs[4].key}
@@ -182,14 +182,14 @@ export default function FooterMenu({
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
             badgeCount={myRepliesBadge}
-          />
+          /> */}
 
-          {/* Tab 5: Profile/Settings */}
+          {/* Tab 4 (was 5): Profile/Settings */}
           <TabItem
             width={tabItemW}
-            tab={tabs[5]}
-            active={activeTab === tabs[5].key}
-            onPress={() => onPressTab?.(tabs[5].key)}
+            tab={tabs[4]}
+            active={activeTab === tabs[4].key}
+            onPress={() => onPressTab?.(tabs[4].key)}
             activeColor={accentActiveColor}
             inactiveColor={accentInactiveColor}
           />

@@ -32,6 +32,7 @@ import {
   getEventsByLocation,
   getUpcomingEvents,
   createEvent,
+  updateEvent,
   deleteEvent,
   EVENT_CATEGORIES,
   CATEGORY_EMOJIS,
@@ -41,6 +42,20 @@ import { canCreateEvent, recordEventCreated } from '../utils/subscriptionUtils';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.69;
 const CARD_SPACING = 0;
+
+// Optional event fields for Premium/Gold users
+const OPTIONAL_EVENT_FIELDS = [
+  { id: 'dressCode', label: 'Dress Code', icon: 'shirt-outline', placeholder: 'e.g., Casual, Formal, Costume' },
+  { id: 'ticketPrice', label: 'Ticket Price', icon: 'cash-outline', placeholder: 'e.g., Free, R50, R100-R200' },
+  { id: 'rsvpLink', label: 'RSVP Link', icon: 'link-outline', placeholder: 'https://...' },
+  { id: 'contactNumber', label: 'Contact Number', icon: 'call-outline', placeholder: '+27 XX XXX XXXX' },
+  { id: 'ageRestriction', label: 'Age Restriction', icon: 'person-outline', placeholder: 'e.g., 18+, All ages, 21+' },
+  { id: 'parking', label: 'Parking Info', icon: 'car-outline', placeholder: 'e.g., Free parking, Street parking' },
+  { id: 'accessibility', label: 'Accessibility', icon: 'accessibility-outline', placeholder: 'e.g., Wheelchair accessible' },
+  { id: 'foodBeverage', label: 'Food & Beverage', icon: 'restaurant-outline', placeholder: 'e.g., Food available, BYOB' },
+  { id: 'duration', label: 'Duration', icon: 'time-outline', placeholder: 'Select days, hours, and minutes' },
+  { id: 'maxCapacity', label: 'Max Capacity', icon: 'people-outline', placeholder: 'Select number of people' },
+];
 
 export default function EventsScreenRedesign({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
@@ -52,6 +67,7 @@ export default function EventsScreenRedesign({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -112,6 +128,13 @@ export default function EventsScreenRedesign({ navigation }) {
 
   const handleAddEvent = () => {
     haptics.light();
+    setEditingEvent(null);
+    setShowAddModal(true);
+  };
+
+  const handleEditEvent = (event) => {
+    haptics.light();
+    setEditingEvent(event);
     setShowAddModal(true);
   };
 
@@ -431,6 +454,7 @@ export default function EventsScreenRedesign({ navigation }) {
                   themeColors={themeColors}
                   primaryColor={primaryColor}
                   isMyEvent={event.organizerId === user?.uid}
+                  onEdit={() => handleEditEvent(event)}
                   onDelete={() => handleDeleteEvent(event.id)}
                   onViewProfile={() => handleViewProfile(event)}
                 />
@@ -480,11 +504,16 @@ export default function EventsScreenRedesign({ navigation }) {
       {/* Add Event Modal */}
       <AddEventModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingEvent(null);
+        }}
         onEventCreated={() => {
           setShowAddModal(false);
+          setEditingEvent(null);
           loadEvents();
         }}
+        editingEvent={editingEvent}
         themeColors={themeColors}
         primaryColor={primaryColor}
         userProfile={userProfile}
@@ -502,6 +531,7 @@ function EventCard({
   themeColors,
   primaryColor,
   isMyEvent,
+  onEdit,
   onDelete,
   onViewProfile,
 }) {
@@ -616,6 +646,30 @@ function EventCard({
               </View>
             )}
 
+            {/* Custom Fields - Show when expanded */}
+            {expanded && event.customFields && Object.keys(event.customFields).length > 0 && (
+              <View style={styles.customFieldsDisplay}>
+                {Object.entries(event.customFields).map(([fieldId, value]) => {
+                  const field = OPTIONAL_EVENT_FIELDS.find(f => f.id === fieldId);
+                  if (!field || !value) return null;
+
+                  return (
+                    <View key={fieldId} style={[styles.customFieldItem, { backgroundColor: `${cardColors.borderColor}40` }]}>
+                      <View style={styles.customFieldItemHeader}>
+                        <Ionicons name={field.icon} size={14} color={cardColors.metaColor} />
+                        <Text style={[styles.customFieldItemLabel, { color: cardColors.metaColor }]}>
+                          {field.label}
+                        </Text>
+                      </View>
+                      <Text style={[styles.customFieldItemValue, { color: cardColors.titleColor }]}>
+                        {value}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             {/* Organizer */}
             {event.organizerName && (
               <TouchableOpacity
@@ -631,21 +685,48 @@ function EventCard({
               </TouchableOpacity>
             )}
 
-            {/* Delete Button for Own Events */}
+            {/* Timestamp - Show created/edited date */}
+            {expanded && event.timestamp && (
+              <View style={[styles.timestampContainer, { backgroundColor: `${cardColors.borderColor}30` }]}>
+                <Ionicons name="time-outline" size={14} color={cardColors.metaColor} />
+                <Text style={[styles.timestampText, { color: cardColors.metaColor }]}>
+                  {event.updatedAt ? 'Edited' : 'Created'} {new Date(event.updatedAt || event.timestamp).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
+              </View>
+            )}
+
+            {/* Edit & Delete Buttons for Own Events */}
             {expanded && isMyEvent && (
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={onDelete}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-                <Text style={styles.deleteText}>Delete Event</Text>
-              </TouchableOpacity>
+              <View style={styles.eventActionsContainer}>
+                <TouchableOpacity
+                  style={[styles.editButton, { backgroundColor: `${cardColors.titleColor}10` }]}
+                  onPress={onEdit}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="pencil-outline" size={16} color={cardColors.titleColor} />
+                  <Text style={[styles.editText, { color: cardColors.titleColor }]}>Edit Event</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={onDelete}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                  <Text style={styles.deleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
-          {/* Expand Indicator - Only show if there's a description */}
-          {event.description && (
+          {/* Expand Indicator - Show if there's a description or custom fields */}
+          {(event.description || (event.customFields && Object.keys(event.customFields).length > 0)) && (
             <View style={styles.expandIndicator}>
               <Text style={[styles.expandText, { color: cardColors.organizerColor }]}>
                 {expanded ? 'Show less' : 'Read more'}
@@ -663,8 +744,229 @@ function EventCard({
   );
 }
 
+// Duration Picker Component
+function DurationPicker({ value, onChange, primaryColor, themeColors }) {
+  const [days, setDays] = useState(0);
+  const [hours, setHours] = useState(0);
+  const [minutes, setMinutes] = useState(0);
+
+  useEffect(() => {
+    // Parse existing value
+    if (value) {
+      const match = value.match(/(\d+)\s*days?|(\d+)\s*hours?|(\d+)\s*minutes?/gi);
+      if (match) {
+        match.forEach(part => {
+          if (part.includes('day')) setDays(parseInt(part) || 0);
+          if (part.includes('hour')) setHours(parseInt(part) || 0);
+          if (part.includes('minute')) setMinutes(parseInt(part) || 0);
+        });
+      }
+    }
+  }, [value]);
+
+  const updateDuration = (newDays, newHours, newMinutes) => {
+    const parts = [];
+    if (newDays > 0) parts.push(`${newDays} day${newDays !== 1 ? 's' : ''}`);
+    if (newHours > 0) parts.push(`${newHours} hour${newHours !== 1 ? 's' : ''}`);
+    if (newMinutes > 0) parts.push(`${newMinutes} minute${newMinutes !== 1 ? 's' : ''}`);
+    onChange(parts.join(', ') || '0 minutes');
+  };
+
+  const adjustValue = (type, increment) => {
+    const newDays = type === 'days' ? Math.max(0, days + increment) : days;
+    const newHours = type === 'hours' ? Math.max(0, Math.min(23, hours + increment)) : hours;
+    const newMinutes = type === 'minutes' ? Math.max(0, Math.min(59, minutes + increment)) : minutes;
+
+    setDays(newDays);
+    setHours(newHours);
+    setMinutes(newMinutes);
+    updateDuration(newDays, newHours, newMinutes);
+  };
+
+  return (
+    <View style={styles.durationPickerContainer}>
+      {/* Days */}
+      <View style={[styles.durationUnit, { backgroundColor: themeColors.background }]}>
+        <TouchableOpacity onPress={() => adjustValue('days', 1)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-up" size={20} color={primaryColor} />
+        </TouchableOpacity>
+        <View style={styles.durationValueContainer}>
+          <Text style={[styles.durationValue, { color: themeColors.textPrimary }]}>{days}</Text>
+          <Text style={[styles.durationLabel, { color: themeColors.textSecondary }]}>days</Text>
+        </View>
+        <TouchableOpacity onPress={() => adjustValue('days', -1)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-down" size={20} color={primaryColor} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Hours */}
+      <View style={[styles.durationUnit, { backgroundColor: themeColors.background }]}>
+        <TouchableOpacity onPress={() => adjustValue('hours', 1)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-up" size={20} color={primaryColor} />
+        </TouchableOpacity>
+        <View style={styles.durationValueContainer}>
+          <Text style={[styles.durationValue, { color: themeColors.textPrimary }]}>{hours}</Text>
+          <Text style={[styles.durationLabel, { color: themeColors.textSecondary }]}>hours</Text>
+        </View>
+        <TouchableOpacity onPress={() => adjustValue('hours', -1)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-down" size={20} color={primaryColor} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Minutes */}
+      <View style={[styles.durationUnit, { backgroundColor: themeColors.background }]}>
+        <TouchableOpacity onPress={() => adjustValue('minutes', 15)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-up" size={20} color={primaryColor} />
+        </TouchableOpacity>
+        <View style={styles.durationValueContainer}>
+          <Text style={[styles.durationValue, { color: themeColors.textPrimary }]}>{minutes}</Text>
+          <Text style={[styles.durationLabel, { color: themeColors.textSecondary }]}>mins</Text>
+        </View>
+        <TouchableOpacity onPress={() => adjustValue('minutes', -15)} style={[styles.durationButton, { borderColor: primaryColor }]}>
+          <Ionicons name="chevron-down" size={20} color={primaryColor} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// Capacity Counter Component
+function CapacityCounter({ value, onChange, primaryColor, themeColors }) {
+  const numValue = parseInt(value) || 0;
+
+  const adjustCapacity = (increment) => {
+    const newValue = Math.max(0, numValue + increment);
+    onChange(`${newValue} ${newValue === 1 ? 'person' : 'people'}`);
+  };
+
+  return (
+    <View style={[styles.capacityContainer, { backgroundColor: themeColors.background }]}>
+      <TouchableOpacity
+        onPress={() => adjustCapacity(-10)}
+        style={[styles.capacityButton, styles.capacityButtonLarge, { backgroundColor: `${primaryColor}15` }]}
+      >
+        <Ionicons name="remove" size={24} color={primaryColor} />
+        <Ionicons name="remove" size={24} color={primaryColor} style={{ marginLeft: -16 }} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => adjustCapacity(-1)}
+        style={[styles.capacityButton, { backgroundColor: `${primaryColor}10` }]}
+      >
+        <Ionicons name="remove" size={20} color={primaryColor} />
+      </TouchableOpacity>
+
+      <View style={styles.capacityValueContainer}>
+        <Ionicons name="people" size={32} color={primaryColor} />
+        <Text style={[styles.capacityValue, { color: themeColors.textPrimary }]}>{numValue}</Text>
+        <Text style={[styles.capacityLabel, { color: themeColors.textSecondary }]}>
+          {numValue === 1 ? 'person' : 'people'}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        onPress={() => adjustCapacity(1)}
+        style={[styles.capacityButton, { backgroundColor: `${primaryColor}10` }]}
+      >
+        <Ionicons name="add" size={20} color={primaryColor} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => adjustCapacity(10)}
+        style={[styles.capacityButton, styles.capacityButtonLarge, { backgroundColor: `${primaryColor}15` }]}
+      >
+        <Ionicons name="add" size={24} color={primaryColor} />
+        <Ionicons name="add" size={24} color={primaryColor} style={{ marginLeft: -16 }} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// Ticket Price Picker Component
+function TicketPricePicker({ value, onChange, primaryColor, themeColors }) {
+  const presetPrices = ['Free', 'R50', 'R100', 'R150', 'R200', 'R250', 'R300', 'R500'];
+  const [customPrice, setCustomPrice] = useState('');
+
+  return (
+    <View>
+      <View style={styles.pricePresetsGrid}>
+        {presetPrices.map(price => (
+          <TouchableOpacity
+            key={price}
+            style={[
+              styles.pricePreset,
+              {
+                backgroundColor: value === price ? primaryColor : themeColors.background,
+                borderColor: value === price ? primaryColor : themeColors.divider,
+              }
+            ]}
+            onPress={() => onChange(price)}
+          >
+            <Text style={[
+              styles.pricePresetText,
+              { color: value === price ? '#FFFFFF' : themeColors.textPrimary }
+            ]}>
+              {price}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TextInput
+        style={[styles.input, {
+          backgroundColor: themeColors.background,
+          borderColor: themeColors.divider,
+          color: themeColors.textPrimary,
+          marginTop: 12,
+        }]}
+        placeholder="Or enter custom price (e.g., R50-R100)"
+        placeholderTextColor={themeColors.textSecondary}
+        value={customPrice}
+        onChangeText={(text) => {
+          setCustomPrice(text);
+          onChange(text);
+        }}
+      />
+    </View>
+  );
+}
+
+// Age Restriction Picker Component
+function AgeRestrictionPicker({ value, onChange, primaryColor, themeColors }) {
+  const ageOptions = ['All ages', '13+', '16+', '18+', '21+'];
+
+  return (
+    <View style={styles.ageOptionsContainer}>
+      {ageOptions.map(age => (
+        <TouchableOpacity
+          key={age}
+          style={[
+            styles.ageOption,
+            {
+              backgroundColor: value === age ? primaryColor : themeColors.background,
+              borderColor: value === age ? primaryColor : themeColors.divider,
+            }
+          ]}
+          onPress={() => onChange(age)}
+        >
+          <Ionicons
+            name={value === age ? "checkmark-circle" : "person-outline"}
+            size={20}
+            color={value === age ? '#FFFFFF' : themeColors.textSecondary}
+          />
+          <Text style={[
+            styles.ageOptionText,
+            { color: value === age ? '#FFFFFF' : themeColors.textPrimary }
+          ]}>
+            {age}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 // Add Event Modal (keeping the original implementation)
-function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryColor, userProfile, user }) {
+function AddEventModal({ visible, onClose, onEventCreated, editingEvent, themeColors, primaryColor, userProfile, user }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
@@ -672,9 +974,18 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
   const [submitting, setSubmitting] = useState(false);
   const [eventsRemaining, setEventsRemaining] = useState(null);
 
-  // Check remaining events when modal opens
+  // Premium/Gold: Optional fields
+  const [selectedFields, setSelectedFields] = useState([]);
+  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+
+  const userPlan = userProfile?.subscriptionPlan || 'basic';
+  const isPremiumOrGold = userPlan === 'premium' || userPlan === 'gold';
+  const isEditing = !!editingEvent;
+
+  // Check remaining events when modal opens (skip for editing)
   useEffect(() => {
-    if (visible) {
+    if (visible && !isEditing) {
       const checkLimits = async () => {
         const userPlan = userProfile?.subscriptionPlan || 'basic';
         const isAdmin = userProfile?.isAdmin || false;
@@ -683,7 +994,48 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
       };
       checkLimits();
     }
-  }, [visible, userProfile]);
+  }, [visible, userProfile, isEditing]);
+
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (editingEvent && visible) {
+      setTitle(editingEvent.title || '');
+      setDescription(editingEvent.description || '');
+      setDate(editingEvent.date || '');
+      setCategory(editingEvent.category || 'community');
+
+      // Pre-populate custom fields if they exist
+      if (editingEvent.customFields && Object.keys(editingEvent.customFields).length > 0) {
+        const fieldIds = Object.keys(editingEvent.customFields);
+        setSelectedFields(fieldIds);
+        setCustomFieldValues(editingEvent.customFields);
+      }
+    }
+  }, [editingEvent, visible]);
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setTitle('');
+      setDescription('');
+      setDate('');
+      setCategory('community');
+      setSelectedFields([]);
+      setCustomFieldValues({});
+      setShowFieldSelector(false);
+    }
+  }, [visible]);
+
+  const toggleField = (fieldId) => {
+    if (selectedFields.includes(fieldId)) {
+      setSelectedFields(selectedFields.filter(id => id !== fieldId));
+      const newValues = { ...customFieldValues };
+      delete newValues[fieldId];
+      setCustomFieldValues(newValues);
+    } else {
+      setSelectedFields([...selectedFields, fieldId]);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -696,66 +1048,111 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
       return;
     }
 
-    // Check subscription limits
-    const userPlan = userProfile?.subscriptionPlan || 'basic';
-    const isAdmin = userProfile?.isAdmin || false;
-    const eventLimits = await canCreateEvent(userPlan, isAdmin);
+    // Check subscription limits (skip for editing)
+    if (!isEditing) {
+      const userPlan = userProfile?.subscriptionPlan || 'basic';
+      const isAdmin = userProfile?.isAdmin || false;
+      const eventLimits = await canCreateEvent(userPlan, isAdmin);
 
-    if (!eventLimits.allowed) {
-      const planLimits = {
-        basic: { limit: 2, upgrade: 'Premium', price: 'R49.99' },
-        premium: { limit: 5, upgrade: 'Gold', price: 'R149.99' },
-        gold: { limit: 15, upgrade: null },
-      };
+      if (!eventLimits.allowed) {
+        const planLimits = {
+          basic: { limit: 2, upgrade: 'Premium', price: 'R49.99' },
+          premium: { limit: 5, upgrade: 'Gold', price: 'R149.99' },
+          gold: { limit: 15, upgrade: null },
+        };
 
-      const currentPlan = planLimits[userPlan];
-      const upgradeMessage = currentPlan.upgrade
-        ? `\n\nUpgrade to ${currentPlan.upgrade} (${currentPlan.price}/month) for ${planLimits[currentPlan.upgrade.toLowerCase()].limit} events per month!`
-        : '';
+        const currentPlan = planLimits[userPlan];
+        const upgradeMessage = currentPlan.upgrade
+          ? `\n\nUpgrade to ${currentPlan.upgrade} (${currentPlan.price}/month) for ${planLimits[currentPlan.upgrade.toLowerCase()].limit} events per month!`
+          : '';
 
-      Alert.alert(
-        'Event Limit Reached',
-        `You've reached your monthly limit of ${currentPlan.limit} events.${upgradeMessage}`,
-        [{ text: 'OK' }]
-      );
-      return;
+        Alert.alert(
+          'Event Limit Reached',
+          `You've reached your monthly limit of ${currentPlan.limit} events.${upgradeMessage}`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
 
     try {
-      await createEvent({
-        title: title.trim(),
-        description: description.trim(),
-        date: date.trim() || new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-        timestamp: Date.now(),
-        category,
-        emoji: CATEGORY_EMOJIS[category],
-        country: userProfile?.country || 'Unknown',
-        province: userProfile?.province || '',
-        city: userProfile?.city || '',
-        location: {
-          city: userProfile?.city || '',
-          province: userProfile?.province || '',
-          country: userProfile?.country || 'Unknown',
-        },
-        isPublic: true,
-        organizerId: user.uid,
-        organizerName: userProfile?.displayName || userProfile?.username || 'Anonymous',
-        organizerPhoto: userProfile?.profilePhoto || null,
-      });
+      if (isEditing) {
+        // Update existing event
+        const updates = {
+          title: title.trim(),
+          description: description.trim(),
+          date: date.trim() || editingEvent.date,
+          category,
+          emoji: CATEGORY_EMOJIS[category],
+        };
 
-      // Record event creation for limit tracking
-      await recordEventCreated();
+        // Add custom fields if any were filled out
+        if (selectedFields.length > 0) {
+          updates.customFields = {};
+          selectedFields.forEach(fieldId => {
+            const value = customFieldValues[fieldId];
+            if (value && value.trim()) {
+              updates.customFields[fieldId] = value.trim();
+            }
+          });
+        } else {
+          // Clear custom fields if none selected
+          updates.customFields = {};
+        }
+
+        await updateEvent(editingEvent.id, updates);
+      } else {
+        // Create new event
+        const eventData = {
+          title: title.trim(),
+          description: description.trim(),
+          date: date.trim() || new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          timestamp: Date.now(),
+          category,
+          emoji: CATEGORY_EMOJIS[category],
+          country: userProfile?.country || 'Unknown',
+          province: userProfile?.province || '',
+          city: userProfile?.city || '',
+          location: {
+            city: userProfile?.city || '',
+            province: userProfile?.province || '',
+            country: userProfile?.country || 'Unknown',
+          },
+          isPublic: true,
+          organizerId: user.uid,
+          organizerName: userProfile?.displayName || userProfile?.username || 'Anonymous',
+          organizerPhoto: userProfile?.profilePhoto || null,
+        };
+
+        // Add custom fields if any were filled out
+        if (selectedFields.length > 0) {
+          eventData.customFields = {};
+          selectedFields.forEach(fieldId => {
+            const value = customFieldValues[fieldId];
+            if (value && value.trim()) {
+              eventData.customFields[fieldId] = value.trim();
+            }
+          });
+        }
+
+        await createEvent(eventData);
+
+        // Record event creation for limit tracking
+        await recordEventCreated();
+      }
 
       setTitle('');
       setDescription('');
       setDate('');
       setCategory('community');
+      setSelectedFields([]);
+      setCustomFieldValues({});
       onEventCreated();
     } catch (error) {
-      console.error('[AddEvent] Error:', error);
-      Alert.alert('Error', 'Failed to create event. Please try again.');
+      console.error(`[${isEditing ? 'Edit' : 'Add'}Event] Error:`, error);
+      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'create'} event. Please try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -776,9 +1173,9 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
           <View style={styles.modalHeader}>
             <View>
               <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
-                Create Event
+                {isEditing ? 'Edit Event' : 'Create Event'}
               </Text>
-              {eventsRemaining !== null && eventsRemaining >= 0 && (
+              {!isEditing && eventsRemaining !== null && eventsRemaining >= 0 && (
                 <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
                   {eventsRemaining} {eventsRemaining === 1 ? 'event' : 'events'} remaining this month
                 </Text>
@@ -860,6 +1257,202 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Premium/Gold: Custom Fields Section */}
+            {isPremiumOrGold && (
+              <>
+                <View style={styles.customFieldsSection}>
+                  <View style={styles.customFieldsHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="sparkles" size={18} color={primaryColor} />
+                      <Text style={[styles.label, { color: themeColors.textPrimary, marginTop: 0, marginBottom: 0 }]}>
+                        Custom Fields
+                      </Text>
+                      <View style={[styles.premiumBadge, { backgroundColor: `${primaryColor}20` }]}>
+                        <Text style={[styles.premiumBadgeText, { color: primaryColor }]}>
+                          {userPlan === 'gold' ? 'GOLD' : 'PREMIUM'}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={() => setShowFieldSelector(!showFieldSelector)}>
+                      <Ionicons
+                        name={showFieldSelector ? 'chevron-up' : 'add-circle'}
+                        size={24}
+                        color={primaryColor}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.customFieldsSubtitle, { color: themeColors.textSecondary }]}>
+                    Add extra details to your event
+                  </Text>
+                </View>
+
+                {/* Field Selector */}
+                {showFieldSelector && (
+                  <View style={[styles.fieldSelectorContainer, { backgroundColor: themeColors.background }]}>
+                    {OPTIONAL_EVENT_FIELDS.map(field => (
+                      <TouchableOpacity
+                        key={field.id}
+                        style={[
+                          styles.fieldOption,
+                          {
+                            backgroundColor: selectedFields.includes(field.id)
+                              ? `${primaryColor}15`
+                              : 'transparent',
+                            borderColor: selectedFields.includes(field.id)
+                              ? primaryColor
+                              : themeColors.divider,
+                          }
+                        ]}
+                        onPress={() => toggleField(field.id)}
+                      >
+                        <View style={styles.fieldOptionLeft}>
+                          <Ionicons
+                            name={field.icon}
+                            size={20}
+                            color={selectedFields.includes(field.id) ? primaryColor : themeColors.textSecondary}
+                          />
+                          <Text style={[
+                            styles.fieldOptionLabel,
+                            {
+                              color: selectedFields.includes(field.id)
+                                ? primaryColor
+                                : themeColors.textPrimary
+                            }
+                          ]}>
+                            {field.label}
+                          </Text>
+                        </View>
+                        {selectedFields.includes(field.id) && (
+                          <Ionicons name="checkmark-circle" size={20} color={primaryColor} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Dynamic Input Fields for Selected Fields */}
+                {selectedFields.map(fieldId => {
+                  const field = OPTIONAL_EVENT_FIELDS.find(f => f.id === fieldId);
+                  if (!field) return null;
+
+                  // Special UI for specific fields
+                  if (fieldId === 'duration') {
+                    return (
+                      <View key={fieldId} style={styles.customFieldInput}>
+                        <View style={styles.customFieldLabel}>
+                          <Ionicons name={field.icon} size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.label, { color: themeColors.textSecondary, marginTop: 0, marginBottom: 0 }]}>
+                            {field.label}
+                          </Text>
+                          <TouchableOpacity onPress={() => toggleField(fieldId)}>
+                            <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        <DurationPicker
+                          value={customFieldValues[fieldId] || ''}
+                          onChange={(value) => setCustomFieldValues({ ...customFieldValues, [fieldId]: value })}
+                          primaryColor={primaryColor}
+                          themeColors={themeColors}
+                        />
+                      </View>
+                    );
+                  }
+
+                  if (fieldId === 'maxCapacity') {
+                    return (
+                      <View key={fieldId} style={styles.customFieldInput}>
+                        <View style={styles.customFieldLabel}>
+                          <Ionicons name={field.icon} size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.label, { color: themeColors.textSecondary, marginTop: 0, marginBottom: 0 }]}>
+                            {field.label}
+                          </Text>
+                          <TouchableOpacity onPress={() => toggleField(fieldId)}>
+                            <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        <CapacityCounter
+                          value={customFieldValues[fieldId] || '0'}
+                          onChange={(value) => setCustomFieldValues({ ...customFieldValues, [fieldId]: value })}
+                          primaryColor={primaryColor}
+                          themeColors={themeColors}
+                        />
+                      </View>
+                    );
+                  }
+
+                  if (fieldId === 'ticketPrice') {
+                    return (
+                      <View key={fieldId} style={styles.customFieldInput}>
+                        <View style={styles.customFieldLabel}>
+                          <Ionicons name={field.icon} size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.label, { color: themeColors.textSecondary, marginTop: 0, marginBottom: 0 }]}>
+                            {field.label}
+                          </Text>
+                          <TouchableOpacity onPress={() => toggleField(fieldId)}>
+                            <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        <TicketPricePicker
+                          value={customFieldValues[fieldId] || ''}
+                          onChange={(value) => setCustomFieldValues({ ...customFieldValues, [fieldId]: value })}
+                          primaryColor={primaryColor}
+                          themeColors={themeColors}
+                        />
+                      </View>
+                    );
+                  }
+
+                  if (fieldId === 'ageRestriction') {
+                    return (
+                      <View key={fieldId} style={styles.customFieldInput}>
+                        <View style={styles.customFieldLabel}>
+                          <Ionicons name={field.icon} size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.label, { color: themeColors.textSecondary, marginTop: 0, marginBottom: 0 }]}>
+                            {field.label}
+                          </Text>
+                          <TouchableOpacity onPress={() => toggleField(fieldId)}>
+                            <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        <AgeRestrictionPicker
+                          value={customFieldValues[fieldId] || ''}
+                          onChange={(value) => setCustomFieldValues({ ...customFieldValues, [fieldId]: value })}
+                          primaryColor={primaryColor}
+                          themeColors={themeColors}
+                        />
+                      </View>
+                    );
+                  }
+
+                  // Default text input for other fields
+                  return (
+                    <View key={fieldId} style={styles.customFieldInput}>
+                      <View style={styles.customFieldLabel}>
+                        <Ionicons name={field.icon} size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.label, { color: themeColors.textSecondary, marginTop: 0, marginBottom: 0 }]}>
+                          {field.label}
+                        </Text>
+                        <TouchableOpacity onPress={() => toggleField(fieldId)}>
+                          <Ionicons name="close-circle" size={18} color={themeColors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <TextInput
+                        style={[styles.input, {
+                          backgroundColor: themeColors.background,
+                          borderColor: themeColors.divider,
+                          color: themeColors.textPrimary,
+                        }]}
+                        placeholder={field.placeholder}
+                        placeholderTextColor={themeColors.textSecondary}
+                        value={customFieldValues[fieldId] || ''}
+                        onChangeText={(text) => setCustomFieldValues({ ...customFieldValues, [fieldId]: text })}
+                      />
+                    </View>
+                  );
+                })}
+              </>
+            )}
           </ScrollView>
 
           <TouchableOpacity
@@ -869,7 +1462,10 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
             activeOpacity={0.8}
           >
             <Text style={styles.submitButtonText}>
-              {submitting ? 'Creating...' : 'Create Event'}
+              {submitting
+                ? (isEditing ? 'Updating...' : 'Creating...')
+                : (isEditing ? 'Update Event' : 'Create Event')
+              }
             </Text>
           </TouchableOpacity>
         </View>
@@ -1203,6 +1799,38 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.1,
   },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  timestampText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  eventActionsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    flex: 1,
+  },
+  editText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1211,8 +1839,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: '#FF3B3015',
-    marginTop: 12,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   deleteText: {
     fontSize: 14,
@@ -1350,6 +1977,205 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: 17,
+    fontWeight: '600',
+  },
+  // Custom Fields Styles
+  customFieldsSection: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  customFieldsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  customFieldsSubtitle: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  premiumBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  premiumBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  fieldSelectorContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 8,
+    gap: 6,
+  },
+  fieldOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  fieldOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  fieldOptionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  customFieldInput: {
+    marginTop: 16,
+  },
+  customFieldLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  // Custom Fields Display (in event cards)
+  customFieldsDisplay: {
+    marginTop: 12,
+    gap: 8,
+  },
+  customFieldItem: {
+    padding: 10,
+    borderRadius: 10,
+  },
+  customFieldItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  customFieldItemLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  customFieldItemValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  // Duration Picker Styles
+  durationPickerContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  durationUnit: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  durationButton: {
+    width: '100%',
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  durationValueContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  durationValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  durationLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Capacity Counter Styles
+  capacityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  capacityButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  capacityButtonLarge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+  },
+  capacityValueContainer: {
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  capacityValue: {
+    fontSize: 36,
+    fontWeight: '800',
+    marginVertical: 4,
+  },
+  capacityLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Ticket Price Styles
+  pricePresetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  pricePreset: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  pricePresetText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  // Age Restriction Styles
+  ageOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+  },
+  ageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  ageOptionText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });

@@ -571,6 +571,7 @@ export default function ScreenLayout({
           accent={accentPreset}
           themeColors={themeColors}
           onSelectNotification={handleSelectNotification}
+          navigation={navigation}
         />
 
         <LoadingOverlay
