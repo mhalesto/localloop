@@ -14,7 +14,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
   const { themeColors, userProfile } = useSettings();
   const { currentUser, isAdmin } = useAuth();
   const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
-  const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '' });
+  const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '', prompt: '' });
   const [downloadLimits, setDownloadLimits] = useState({ allowed: true, remaining: -1, limit: -1 });
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -97,7 +97,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
         {/* Artwork Image - opens full screen */}
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => setFullScreenImage({ visible: true, url: artwork.url, style: artwork.style })}
+          onPress={() => setFullScreenImage({ visible: true, url: artwork.url, style: artwork.style, prompt: artwork.prompt })}
         >
           <Image
             source={{ uri: artwork.url }}
@@ -200,32 +200,47 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
         visible={fullScreenImage.visible}
         transparent={false}
         animationType="fade"
-        onRequestClose={() => setFullScreenImage({ visible: false, url: '', style: '' })}
+        onRequestClose={() => setFullScreenImage({ visible: false, url: '', style: '', prompt: '' })}
       >
         <StatusBar hidden />
         <View style={styles.fullScreenContainer}>
           {/* Top buttons */}
           <View style={styles.topButtonsContainer}>
-            {/* Download button */}
-            <TouchableOpacity
-              style={styles.downloadButtonFullScreen}
-              onPress={handleDownload}
-              activeOpacity={0.7}
-              disabled={isDownloading}
-            >
-              <View style={styles.downloadIconContainer}>
-                {isDownloading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="download" size={24} color="#fff" />
-                )}
-              </View>
-            </TouchableOpacity>
+            <View style={styles.leftButtonsContainer}>
+              {/* Download button */}
+              <TouchableOpacity
+                style={styles.downloadButtonFullScreen}
+                onPress={handleDownload}
+                activeOpacity={0.7}
+                disabled={isDownloading}
+              >
+                <View style={styles.downloadIconContainer}>
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="download" size={24} color="#fff" />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {/* Info button */}
+              {fullScreenImage.prompt && (
+                <TouchableOpacity
+                  style={styles.infoButtonFullScreen}
+                  onPress={() => setPromptModal({ visible: true, prompt: fullScreenImage.prompt, style: fullScreenImage.style })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.infoIconContainerFullScreen}>
+                    <Ionicons name="information" size={24} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Close button */}
             <TouchableOpacity
               style={styles.closeButtonFullScreen}
-              onPress={() => setFullScreenImage({ visible: false, url: '', style: '' })}
+              onPress={() => setFullScreenImage({ visible: false, url: '', style: '', prompt: '' })}
               activeOpacity={0.7}
             >
               <View style={styles.closeIconContainer}>
@@ -403,10 +418,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 10,
   },
+  leftButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   downloadButtonFullScreen: {
     // Left side
   },
   downloadIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoButtonFullScreen: {
+    // Left side, next to download
+  },
+  infoIconContainerFullScreen: {
     width: 44,
     height: 44,
     borderRadius: 22,
