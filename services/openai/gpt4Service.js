@@ -353,14 +353,14 @@ Translation:`,
 }
 
 /**
- * Improve Post - Generate 2 better versions of existing post (Premium/Gold tier)
- * AI-assisted post improvement with multiple versions to choose from
+ * Improve Post - Generate 1 better version of existing post (Premium/Gold tier)
+ * AI-assisted post improvement - users can regenerate if not satisfied
  *
  * @param {string} title - Post title
  * @param {string} description - Post description/content
  * @param {object} options - Improvement options
  * @param {string} options.style - 'engaging' | 'professional' | 'friendly' | 'enthusiastic'
- * @returns {Promise<{version1: string, version2: string, model: string}>}
+ * @returns {Promise<{improvedVersion: string, model: string}>}
  */
 export async function improvePost(title, description, options = {}) {
   const { style = 'engaging' } = options;
@@ -378,63 +378,33 @@ export async function improvePost(title, description, options = {}) {
       messages: [
         {
           role: 'system',
-          content: `You are a writing assistant that helps improve neighborhood community posts. ${styleInstructions[style]} Always keep the core message intact. Generate exactly 2 different improved versions.`,
+          content: `You are a writing assistant that helps improve neighborhood community posts. ${styleInstructions[style]} Always keep the core message intact.`,
         },
         {
           role: 'user',
-          content: `Improve this post by creating 2 better versions. Keep the same essential meaning but make it more impactful.
+          content: `Improve this post to make it better. Keep the same essential meaning but make it more impactful.
 
 Title: ${title || '(No title)'}
 Description: ${description}
 
 Instructions:
-- Create 2 distinct improved versions
 - Maintain the original length (don't make it much longer or shorter)
 - Keep the core message and key details
 - ${styleInstructions[style]}
-- Return ONLY the improved text, no labels or numbering
-
-Format your response EXACTLY like this:
-VERSION 1:
-[improved version 1 text here]
-
-VERSION 2:
-[improved version 2 text here]`,
+- Return ONLY the improved text, no labels or explanations`,
         },
       ],
-      max_tokens: 600,
+      max_tokens: 400,
       temperature: 0.8, // Higher creativity for variations
     });
 
-    let content = response.choices[0]?.message?.content?.trim();
-    if (!content) {
-      throw new Error('No improvements generated');
-    }
-
-    // Parse the two versions
-    const version1Match = content.match(/VERSION 1:\s*([\s\S]*?)(?=VERSION 2:|$)/i);
-    const version2Match = content.match(/VERSION 2:\s*([\s\S]*?)$/i);
-
-    const version1 = version1Match ? version1Match[1].trim() : null;
-    const version2 = version2Match ? version2Match[1].trim() : null;
-
-    if (!version1 || !version2) {
-      // Fallback: try to split by double newlines
-      const parts = content.split(/\n\n+/);
-      if (parts.length >= 2) {
-        return {
-          version1: parts[0].replace(/^VERSION 1:\s*/i, '').trim(),
-          version2: parts[1].replace(/^VERSION 2:\s*/i, '').trim(),
-          model: 'gpt-4o-mini',
-          style,
-        };
-      }
-      throw new Error('Could not parse improved versions');
+    const improvedVersion = response.choices[0]?.message?.content?.trim();
+    if (!improvedVersion) {
+      throw new Error('No improvement generated');
     }
 
     return {
-      version1,
-      version2,
+      improvedVersion,
       model: 'gpt-4o-mini',
       style,
     };

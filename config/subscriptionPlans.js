@@ -50,6 +50,10 @@ export const SUBSCRIPTION_PLANS = {
       customCartoonPrompts: false,
       artworkDownloadsPerDay: 3,
       eventsPerMonth: 2,
+      // AI Feature Daily Limits (Basic - Very Limited)
+      aiSummarizationsPerDay: 0, // No AI summaries for Basic
+      aiPostImprovementsPerDay: 0, // No AI improvements for Basic
+      aiTitleGenerationsPerDay: 0, // No AI title generation for Basic
     },
   },
   PREMIUM: {
@@ -105,6 +109,10 @@ export const SUBSCRIPTION_PLANS = {
       customCartoonPrompts: false,
       artworkDownloadsPerDay: 20,
       eventsPerMonth: 5,
+      // AI Feature Daily Limits (Premium - Good limits)
+      aiSummarizationsPerDay: 15, // 15 summaries per day
+      aiPostImprovementsPerDay: 10, // 10 post improvements per day
+      aiTitleGenerationsPerDay: 20, // 20 title generations per day
     },
     savings: null,
   },
@@ -177,6 +185,10 @@ export const SUBSCRIPTION_PLANS = {
       gpt4oCulturalTranslation: true, // 11 SA languages with cultural context
       artworkDownloadsPerDay: -1, // GOLD EXCLUSIVE - Unlimited downloads
       eventsPerMonth: 15,
+      // AI Feature Daily Limits (Gold - Generous limits)
+      aiSummarizationsPerDay: 50, // 50 summaries per day with GPT-4o
+      aiPostImprovementsPerDay: 30, // 30 post improvements per day with GPT-4o
+      aiTitleGenerationsPerDay: 50, // 50 title generations per day
     },
   },
 };

@@ -33,6 +33,14 @@ import { smartSummarize } from '../services/openai/summarizationService';
 import { generateTitle, TITLE_STYLES, generateFallbackTitle } from '../services/openai/titleGenerationService';
 import { checkDuplicate } from '../services/openai/embeddingsService';
 import { isFeatureEnabled } from '../config/aiFeatures';
+import {
+  canUseSummarization,
+  recordSummarizationUsed,
+  canUsePostImprovement,
+  recordPostImprovementUsed,
+  canUseTitleGeneration,
+  recordTitleGenerationUsed,
+} from '../utils/subscriptionUtils';
 import MentionTextInput from './MentionTextInput';
 import MentionText from './MentionText';
 
@@ -133,8 +141,7 @@ export default function CreatePostModal({
   // [AI-IMPROVE] Post improvement state
   const [isImproving, setIsImproving] = useState(false);
   const [improveError, setImproveError] = useState('');
-  const [improvedVersion1, setImprovedVersion1] = useState('');
-  const [improvedVersion2, setImprovedVersion2] = useState('');
+  const [improvedVersion, setImprovedVersion] = useState('');
   const [improveVisible, setImproveVisible] = useState(false);
   const [improveCardY, setImproveCardY] = useState(0);
 
@@ -464,6 +471,7 @@ export default function CreatePostModal({
       return;
     }
 
+    // Check if cached result exists
     const cached = summaryCacheRef.current;
     if (
       cached.text === sanitized &&
@@ -476,6 +484,20 @@ export default function CreatePostModal({
       setSummaryMeta(cached.meta);
       setSummaryVisible(true);
       scrollSummaryIntoView();
+      return;
+    }
+
+    // Check usage limits before making API call
+    const userPlan = userProfile?.subscriptionPlan || 'basic';
+    const isAdmin = userProfile?.isAdmin || false;
+    const limitCheck = await canUseSummarization(userPlan, isAdmin);
+
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === 'upgrade_required') {
+        setSummaryError('AI summarization requires Premium or Gold subscription. Upgrade to unlock this feature.');
+      } else {
+        setSummaryError(`Daily limit reached (${limitCheck.limit}/${limitCheck.limit} used). Try again tomorrow or upgrade for more.`);
+      }
       return;
     }
 
@@ -505,6 +527,9 @@ export default function CreatePostModal({
         fallback: result.method !== 'openai',
         quality: result.quality || qualityLevel
       };
+
+      // Record successful usage
+      await recordSummarizationUsed();
 
       setSummaryText(nextSummary);
       setSummaryVisible(true);
@@ -542,9 +567,22 @@ export default function CreatePostModal({
       return;
     }
 
+    // Check usage limits before making API call
+    const userPlan = userProfile?.subscriptionPlan || 'basic';
+    const isAdmin = userProfile?.isAdmin || false;
+    const limitCheck = await canUsePostImprovement(userPlan, isAdmin);
+
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === 'upgrade_required') {
+        setImproveError('AI post improvement requires Premium or Gold subscription. Upgrade to unlock this feature.');
+      } else {
+        setImproveError(`Daily limit reached (${limitCheck.limit}/${limitCheck.limit} used). Try again tomorrow or upgrade for more.`);
+      }
+      return;
+    }
+
     setImproveError('');
     setIsImproving(true);
-    setImproveVisible(false);
 
     try {
       const { improvePost } = require('../services/openai/gpt4Service');
@@ -552,8 +590,10 @@ export default function CreatePostModal({
         style: 'engaging' // Can be made configurable later
       });
 
-      setImprovedVersion1(result.version1);
-      setImprovedVersion2(result.version2);
+      // Record successful usage
+      await recordPostImprovementUsed();
+
+      setImprovedVersion(result.improvedVersion);
       setImproveVisible(true);
     } catch (error) {
       console.error('[CreatePostModal] Post improvement failed', error);
@@ -563,16 +603,15 @@ export default function CreatePostModal({
     }
   };
 
-  const handleUseImprovedVersion = (version) => {
-    setMessage(version);
+  const handleUseImprovedVersion = () => {
+    setMessage(improvedVersion);
     setImproveVisible(false);
-    setImprovedVersion1('');
-    setImprovedVersion2('');
+    setImprovedVersion('');
   };
 
-  const handleCopyImprovedVersion = async (version) => {
+  const handleCopyImprovedVersion = async () => {
     try {
-      await Clipboard.setStringAsync(version);
+      await Clipboard.setStringAsync(improvedVersion);
       showAlert('Copied!', 'Improved version copied to clipboard.', [{ text: 'OK' }]);
     } catch (error) {
       console.error('[CreatePostModal] Copy failed', error);
@@ -580,10 +619,9 @@ export default function CreatePostModal({
     }
   };
 
-  const handleDiscardImprovedVersions = () => {
+  const handleDiscardImprovedVersion = () => {
     setImproveVisible(false);
-    setImprovedVersion1('');
-    setImprovedVersion2('');
+    setImprovedVersion('');
   };
 
   const expandOnce = () => {
@@ -615,16 +653,34 @@ export default function CreatePostModal({
       return;
     }
 
+    // Check usage limits before making API call
+    const userPlan = userProfile?.subscriptionPlan || 'basic';
+    const isAdmin = userProfile?.isAdmin || false;
+    const limitCheck = await canUseTitleGeneration(userPlan, isAdmin);
+
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === 'upgrade_required') {
+        setTitleError('AI title generation requires Premium or Gold subscription. Upgrade to unlock this feature.');
+      } else {
+        setTitleError(`Daily limit reached (${limitCheck.limit}/${limitCheck.limit} used). Try again tomorrow or upgrade for more.`);
+      }
+      return;
+    }
+
     setIsGeneratingTitle(true);
     setTitleError('');
 
     try {
       const result = await generateTitle(message, TITLE_STYLES.CATCHY);
+
+      // Record successful usage
+      await recordTitleGenerationUsed();
+
       setTitle(result.title);
     } catch (error) {
       console.warn('[CreatePostModal] Title generation failed', error);
 
-      // Fallback to simple title extraction
+      // Fallback to simple title extraction (no usage recorded for fallback)
       try {
         const fallbackTitle = generateFallbackTitle(message);
         setTitle(fallbackTitle);
@@ -1089,7 +1145,7 @@ export default function CreatePostModal({
                     )}
                     <View style={styles.aiActionTextBlock}>
                       <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Improve Post</Text>
-                      <Text style={styles.summarizeSubtitle}>Premium</Text>
+                      <Text style={styles.summarizeSubtitle}>Premium · AI rewrite</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -1163,73 +1219,56 @@ export default function CreatePostModal({
                   </View>
                 ) : null}
 
-                {/* Improved versions preview card */}
+                {/* Improved version preview card */}
                 {improveVisible ? (
                   <View
                     onLayout={(e) => setImproveCardY(e.nativeEvent.layout.y)}
                     style={styles.aiSummaryCard}
                   >
-                    <Text style={styles.aiSummaryTitle}>Improved Versions</Text>
+                    <Text style={styles.aiSummaryTitle}>Improved Version</Text>
                     <Text style={styles.aiSummaryHelper}>
-                      Choose the version you prefer, or copy to edit further
+                      Use it, copy to edit, or try again for a different version
                     </Text>
 
-                    {/* Version 1 */}
+                    {/* Improved Version */}
                     <View style={[styles.improvedVersionCard, { backgroundColor: themeColors.background }]}>
-                      <View style={styles.versionHeader}>
-                        <Text style={[styles.versionLabel, { color: summaryAccentColor }]}>Version 1</Text>
-                      </View>
                       <Text style={[styles.versionText, { color: themeColors.textPrimary }]}>
-                        {improvedVersion1}
+                        {improvedVersion}
                       </Text>
-                      <View style={styles.versionButtonsRow}>
-                        <TouchableOpacity
-                          style={[styles.versionButton, { backgroundColor: summaryAccentColor }]}
-                          onPress={() => handleUseImprovedVersion(improvedVersion1)}
-                        >
-                          <Ionicons name="checkmark" size={16} color="#fff" />
-                          <Text style={[styles.versionButtonText, { color: '#fff' }]}>Use</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
-                          onPress={() => handleCopyImprovedVersion(improvedVersion1)}
-                        >
-                          <Ionicons name="copy-outline" size={16} color={themeColors.textSecondary} />
-                          <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Copy</Text>
-                        </TouchableOpacity>
-                      </View>
                     </View>
 
-                    {/* Version 2 */}
-                    <View style={[styles.improvedVersionCard, { backgroundColor: themeColors.background }]}>
-                      <View style={styles.versionHeader}>
-                        <Text style={[styles.versionLabel, { color: summaryAccentColor }]}>Version 2</Text>
-                      </View>
-                      <Text style={[styles.versionText, { color: themeColors.textPrimary }]}>
-                        {improvedVersion2}
-                      </Text>
-                      <View style={styles.versionButtonsRow}>
-                        <TouchableOpacity
-                          style={[styles.versionButton, { backgroundColor: summaryAccentColor }]}
-                          onPress={() => handleUseImprovedVersion(improvedVersion2)}
-                        >
-                          <Ionicons name="checkmark" size={16} color="#fff" />
-                          <Text style={[styles.versionButtonText, { color: '#fff' }]}>Use</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
-                          onPress={() => handleCopyImprovedVersion(improvedVersion2)}
-                        >
-                          <Ionicons name="copy-outline" size={16} color={themeColors.textSecondary} />
-                          <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Copy</Text>
-                        </TouchableOpacity>
-                      </View>
+                    {/* Action buttons */}
+                    <View style={styles.improveActionsRow}>
+                      <TouchableOpacity
+                        style={[styles.versionButton, { backgroundColor: summaryAccentColor }]}
+                        onPress={handleUseImprovedVersion}
+                      >
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Text style={[styles.versionButtonText, { color: '#fff' }]}>Use</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
+                        onPress={handleCopyImprovedVersion}
+                      >
+                        <Ionicons name="copy-outline" size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Copy</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
+                        onPress={handleImprovePost}
+                        disabled={isImproving}
+                      >
+                        <Ionicons name="refresh-outline" size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Try Again</Text>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Discard button */}
                     <TouchableOpacity
                       style={styles.discardButton}
-                      onPress={handleDiscardImprovedVersions}
+                      onPress={handleDiscardImprovedVersion}
                     >
                       <Text style={[styles.discardButtonText, { color: themeColors.textSecondary }]}>Discard</Text>
                     </TouchableOpacity>
@@ -1536,23 +1575,14 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       borderWidth: 1,
       borderColor: palette.divider,
     },
-    versionHeader: {
-      marginBottom: 10,
-    },
-    versionLabel: {
-      fontSize: 13,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
     versionText: {
       fontSize: 15,
       lineHeight: 22,
-      marginBottom: 12,
     },
-    versionButtonsRow: {
+    improveActionsRow: {
       flexDirection: 'row',
       gap: 8,
+      marginTop: 16,
     },
     versionButton: {
       flexDirection: 'row',

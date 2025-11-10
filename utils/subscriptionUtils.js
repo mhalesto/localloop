@@ -14,6 +14,9 @@ const STORAGE_KEYS = {
   LAST_RESET_DATE: '@last_reset_date',
   EVENTS_THIS_MONTH: '@events_this_month',
   LAST_EVENT_RESET_MONTH: '@last_event_reset_month',
+  AI_SUMMARIZATIONS_TODAY: '@ai_summarizations_today',
+  AI_IMPROVEMENTS_TODAY: '@ai_improvements_today',
+  AI_TITLES_TODAY: '@ai_titles_today',
 };
 
 /**
@@ -87,6 +90,9 @@ async function resetDailyCounters() {
       [STORAGE_KEYS.POSTS_TODAY, '0'],
       [STORAGE_KEYS.STATUSES_TODAY, '0'],
       [STORAGE_KEYS.DOWNLOADS_TODAY, '0'],
+      [STORAGE_KEYS.AI_SUMMARIZATIONS_TODAY, '0'],
+      [STORAGE_KEYS.AI_IMPROVEMENTS_TODAY, '0'],
+      [STORAGE_KEYS.AI_TITLES_TODAY, '0'],
       [STORAGE_KEYS.LAST_RESET_DATE, today],
     ]);
   } catch (error) {
@@ -323,6 +329,157 @@ export async function getDailyUsage(userPlan = 'basic') {
       count: downloadsCount,
       limit: limits.artworkDownloadsPerDay,
       remaining: limits.artworkDownloadsPerDay === -1 ? -1 : Math.max(0, limits.artworkDownloadsPerDay - downloadsCount),
+    },
+  };
+}
+
+/**
+ * Check if user can use AI summarization today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
+ */
+export async function canUseSummarization(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const limits = getPlanLimits(userPlan);
+
+  // No access (Basic plan)
+  if (limits.aiSummarizationsPerDay === 0) {
+    return { allowed: false, count: 0, limit: 0, remaining: 0, reason: 'upgrade_required' };
+  }
+
+  // Unlimited (if ever added)
+  if (limits.aiSummarizationsPerDay === -1) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const count = await getCount(STORAGE_KEYS.AI_SUMMARIZATIONS_TODAY);
+  const allowed = count < limits.aiSummarizationsPerDay;
+
+  return {
+    allowed,
+    count,
+    limit: limits.aiSummarizationsPerDay,
+    remaining: Math.max(0, limits.aiSummarizationsPerDay - count),
+  };
+}
+
+/**
+ * Record that user used AI summarization
+ */
+export async function recordSummarizationUsed() {
+  return await incrementCount(STORAGE_KEYS.AI_SUMMARIZATIONS_TODAY);
+}
+
+/**
+ * Check if user can use AI post improvement today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
+ */
+export async function canUsePostImprovement(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const limits = getPlanLimits(userPlan);
+
+  // No access (Basic plan)
+  if (limits.aiPostImprovementsPerDay === 0) {
+    return { allowed: false, count: 0, limit: 0, remaining: 0, reason: 'upgrade_required' };
+  }
+
+  // Unlimited (if ever added)
+  if (limits.aiPostImprovementsPerDay === -1) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const count = await getCount(STORAGE_KEYS.AI_IMPROVEMENTS_TODAY);
+  const allowed = count < limits.aiPostImprovementsPerDay;
+
+  return {
+    allowed,
+    count,
+    limit: limits.aiPostImprovementsPerDay,
+    remaining: Math.max(0, limits.aiPostImprovementsPerDay - count),
+  };
+}
+
+/**
+ * Record that user used AI post improvement
+ */
+export async function recordPostImprovementUsed() {
+  return await incrementCount(STORAGE_KEYS.AI_IMPROVEMENTS_TODAY);
+}
+
+/**
+ * Check if user can use AI title generation today
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
+ */
+export async function canUseTitleGeneration(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const limits = getPlanLimits(userPlan);
+
+  // No access (Basic plan)
+  if (limits.aiTitleGenerationsPerDay === 0) {
+    return { allowed: false, count: 0, limit: 0, remaining: 0, reason: 'upgrade_required' };
+  }
+
+  // Unlimited (if ever added)
+  if (limits.aiTitleGenerationsPerDay === -1) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const count = await getCount(STORAGE_KEYS.AI_TITLES_TODAY);
+  const allowed = count < limits.aiTitleGenerationsPerDay;
+
+  return {
+    allowed,
+    count,
+    limit: limits.aiTitleGenerationsPerDay,
+    remaining: Math.max(0, limits.aiTitleGenerationsPerDay - count),
+  };
+}
+
+/**
+ * Record that user used AI title generation
+ */
+export async function recordTitleGenerationUsed() {
+  return await incrementCount(STORAGE_KEYS.AI_TITLES_TODAY);
+}
+
+/**
+ * Get AI usage stats for today
+ */
+export async function getAIUsageStats(userPlan = 'basic') {
+  const limits = getPlanLimits(userPlan);
+  const summarizationsCount = await getCount(STORAGE_KEYS.AI_SUMMARIZATIONS_TODAY);
+  const improvementsCount = await getCount(STORAGE_KEYS.AI_IMPROVEMENTS_TODAY);
+  const titlesCount = await getCount(STORAGE_KEYS.AI_TITLES_TODAY);
+
+  return {
+    summarizations: {
+      count: summarizationsCount,
+      limit: limits.aiSummarizationsPerDay,
+      remaining: limits.aiSummarizationsPerDay === -1 ? -1 : Math.max(0, limits.aiSummarizationsPerDay - summarizationsCount),
+    },
+    improvements: {
+      count: improvementsCount,
+      limit: limits.aiPostImprovementsPerDay,
+      remaining: limits.aiPostImprovementsPerDay === -1 ? -1 : Math.max(0, limits.aiPostImprovementsPerDay - improvementsCount),
+    },
+    titles: {
+      count: titlesCount,
+      limit: limits.aiTitleGenerationsPerDay,
+      remaining: limits.aiTitleGenerationsPerDay === -1 ? -1 : Math.max(0, limits.aiTitleGenerationsPerDay - titlesCount),
     },
   };
 }
