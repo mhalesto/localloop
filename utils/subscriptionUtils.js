@@ -6,12 +6,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getPlanLimits } from '../config/subscriptionPlans';
 
-// Storage keys for daily limits
+// Storage keys for daily and monthly limits
 const STORAGE_KEYS = {
   POSTS_TODAY: '@posts_today',
   STATUSES_TODAY: '@statuses_today',
   DOWNLOADS_TODAY: '@downloads_today',
   LAST_RESET_DATE: '@last_reset_date',
+  EVENTS_THIS_MONTH: '@events_this_month',
+  LAST_EVENT_RESET_MONTH: '@last_event_reset_month',
 };
 
 /**
@@ -20,6 +22,16 @@ const STORAGE_KEYS = {
 function getTodayString() {
   const today = new Date();
   return today.toISOString().split('T')[0];
+}
+
+/**
+ * Get current month string (YYYY-MM)
+ */
+function getCurrentMonthString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
 }
 
 /**
@@ -33,6 +45,35 @@ async function shouldResetCounters() {
   } catch (error) {
     console.error('[subscriptionUtils] Error checking reset:', error);
     return false;
+  }
+}
+
+/**
+ * Check if we need to reset monthly event counters
+ */
+async function shouldResetMonthlyCounters() {
+  try {
+    const lastReset = await AsyncStorage.getItem(STORAGE_KEYS.LAST_EVENT_RESET_MONTH);
+    const currentMonth = getCurrentMonthString();
+    return lastReset !== currentMonth;
+  } catch (error) {
+    console.error('[subscriptionUtils] Error checking monthly reset:', error);
+    return false;
+  }
+}
+
+/**
+ * Reset monthly event counters
+ */
+async function resetMonthlyCounters() {
+  try {
+    const currentMonth = getCurrentMonthString();
+    await AsyncStorage.multiSet([
+      [STORAGE_KEYS.EVENTS_THIS_MONTH, '0'],
+      [STORAGE_KEYS.LAST_EVENT_RESET_MONTH, currentMonth],
+    ]);
+  } catch (error) {
+    console.error('[subscriptionUtils] Error resetting monthly counters:', error);
   }
 }
 
@@ -193,6 +234,69 @@ export async function canDownloadArtwork(userPlan = 'basic', isAdmin = false) {
  */
 export async function recordArtworkDownload() {
   return await incrementCount(STORAGE_KEYS.DOWNLOADS_TODAY);
+}
+
+/**
+ * Get current event count for the month
+ */
+async function getMonthlyEventCount() {
+  try {
+    // Check if we need to reset first
+    if (await shouldResetMonthlyCounters()) {
+      await resetMonthlyCounters();
+      return 0;
+    }
+
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.EVENTS_THIS_MONTH);
+    return value ? parseInt(value, 10) : 0;
+  } catch (error) {
+    console.error('[subscriptionUtils] Error getting monthly event count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Check if user can create an event this month
+ * @param {string} userPlan - User's subscription plan
+ * @param {boolean} isAdmin - Whether the user is an admin
+ */
+export async function canCreateEvent(userPlan = 'basic', isAdmin = false) {
+  // Admin users have unlimited access for testing
+  if (isAdmin) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const limits = getPlanLimits(userPlan);
+
+  // Unlimited events (if ever added for a plan)
+  if (limits.eventsPerMonth === -1) {
+    return { allowed: true, count: 0, limit: -1, remaining: -1 };
+  }
+
+  const count = await getMonthlyEventCount();
+  const allowed = count < limits.eventsPerMonth;
+
+  return {
+    allowed,
+    count,
+    limit: limits.eventsPerMonth,
+    remaining: Math.max(0, limits.eventsPerMonth - count),
+  };
+}
+
+/**
+ * Record that user created an event
+ */
+export async function recordEventCreated() {
+  try {
+    const current = await getMonthlyEventCount();
+    const newCount = current + 1;
+    await AsyncStorage.setItem(STORAGE_KEYS.EVENTS_THIS_MONTH, String(newCount));
+    return newCount;
+  } catch (error) {
+    console.error('[subscriptionUtils] Error recording event:', error);
+    return current;
+  }
 }
 
 /**

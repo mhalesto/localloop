@@ -36,6 +36,7 @@ import {
   EVENT_CATEGORIES,
   CATEGORY_EMOJIS,
 } from '../services/eventsService';
+import { canCreateEvent, recordEventCreated } from '../utils/subscriptionUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.69;
@@ -669,6 +670,20 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
   const [date, setDate] = useState('');
   const [category, setCategory] = useState('community');
   const [submitting, setSubmitting] = useState(false);
+  const [eventsRemaining, setEventsRemaining] = useState(null);
+
+  // Check remaining events when modal opens
+  useEffect(() => {
+    if (visible) {
+      const checkLimits = async () => {
+        const userPlan = userProfile?.subscriptionPlan || 'basic';
+        const isAdmin = userProfile?.isAdmin || false;
+        const limits = await canCreateEvent(userPlan, isAdmin);
+        setEventsRemaining(limits.remaining);
+      };
+      checkLimits();
+    }
+  }, [visible, userProfile]);
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -678,6 +693,31 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
 
     if (!user?.uid) {
       Alert.alert('Error', 'You must be logged in to create events');
+      return;
+    }
+
+    // Check subscription limits
+    const userPlan = userProfile?.subscriptionPlan || 'basic';
+    const isAdmin = userProfile?.isAdmin || false;
+    const eventLimits = await canCreateEvent(userPlan, isAdmin);
+
+    if (!eventLimits.allowed) {
+      const planLimits = {
+        basic: { limit: 2, upgrade: 'Premium', price: 'R49.99' },
+        premium: { limit: 5, upgrade: 'Gold', price: 'R149.99' },
+        gold: { limit: 15, upgrade: null },
+      };
+
+      const currentPlan = planLimits[userPlan];
+      const upgradeMessage = currentPlan.upgrade
+        ? `\n\nUpgrade to ${currentPlan.upgrade} (${currentPlan.price}/month) for ${planLimits[currentPlan.upgrade.toLowerCase()].limit} events per month!`
+        : '';
+
+      Alert.alert(
+        'Event Limit Reached',
+        `You've reached your monthly limit of ${currentPlan.limit} events.${upgradeMessage}`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -705,6 +745,9 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
         organizerPhoto: userProfile?.profilePhoto || null,
       });
 
+      // Record event creation for limit tracking
+      await recordEventCreated();
+
       setTitle('');
       setDescription('');
       setDate('');
@@ -731,9 +774,16 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
       >
         <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
-              Create Event
-            </Text>
+            <View>
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                Create Event
+              </Text>
+              {eventsRemaining !== null && eventsRemaining >= 0 && (
+                <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
+                  {eventsRemaining} {eventsRemaining === 1 ? 'event' : 'events'} remaining this month
+                </Text>
+              )}
+            </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={28} color={themeColors.textSecondary} />
             </TouchableOpacity>
@@ -1236,6 +1286,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+    opacity: 0.8,
   },
   modalForm: {
     flex: 1,

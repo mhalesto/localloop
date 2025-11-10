@@ -14,6 +14,7 @@ export const SUBSCRIPTION_PLANS = {
     features: [
       '5 posts per day',
       '5 statuses per day',
+      '2 events per month',
       'Unlimited comments & replies',
       '5 basic accent themes',
       { text: '5 AI cartoon avatars (lifetime)', badge: 'NEW', badgeColor: '#FF9500' },
@@ -48,6 +49,7 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsLifetime: 5,
       customCartoonPrompts: false,
       artworkDownloadsPerDay: 3,
+      eventsPerMonth: 2,
     },
   },
   PREMIUM: {
@@ -62,6 +64,7 @@ export const SUBSCRIPTION_PLANS = {
     description: 'Perfect for active community members',
     features: [
       'Unlimited posts & statuses',
+      '5 events per month',
       '15+ premium gradient themes',
       'Custom typography controls',
       { text: '10 AI cartoon avatars/month', badge: 'NEW', badgeColor: '#FF9500' },
@@ -101,6 +104,7 @@ export const SUBSCRIPTION_PLANS = {
       cartoonAvatarsLifetime: null,
       customCartoonPrompts: false,
       artworkDownloadsPerDay: 20,
+      eventsPerMonth: 5,
     },
     savings: null,
   },
@@ -116,6 +120,7 @@ export const SUBSCRIPTION_PLANS = {
     popular: true,
     features: [
       'Everything in Premium',
+      '15 events per month',
       { text: '✨ GPT-4o AI Post Composer', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '🎨 Vision-Personalized Cartoons', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '🖼️ Upload Custom Images for Generation', badge: 'NEW', badgeColor: '#FF9500' },
@@ -171,6 +176,7 @@ export const SUBSCRIPTION_PLANS = {
       gpt4oCommentSuggestions: true, // Enhanced comment suggestions
       gpt4oCulturalTranslation: true, // 11 SA languages with cultural context
       artworkDownloadsPerDay: -1, // GOLD EXCLUSIVE - Unlimited downloads
+      eventsPerMonth: 15,
     },
   },
 };
