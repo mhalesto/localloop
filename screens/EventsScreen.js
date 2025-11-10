@@ -1,9 +1,9 @@
 /**
- * Events Screen
- * Discover local events in your community
+ * Events Screen - Redesigned with Week Calendar View
+ * Stunning artistic layout with better event visibility
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,16 @@ import {
   TextInput,
   Modal,
   Alert,
+  Dimensions,
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,7 +37,11 @@ import {
   CATEGORY_EMOJIS,
 } from '../services/eventsService';
 
-export default function EventsScreen({ navigation }) {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = SCREEN_WIDTH * 0.69;
+const CARD_SPACING = 0;
+
+export default function EventsScreenRedesign({ navigation }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
@@ -40,9 +51,27 @@ export default function EventsScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'my'
+  const [activeTab, setActiveTab] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  // Generate week days
+  const getWeekDays = () => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const diff = today.getDate() - currentDay;
+    const sunday = new Date(today.setDate(diff));
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(sunday);
+      date.setDate(sunday.getDate() + i);
+      return date;
+    });
+  };
+
+  const weekDays = getWeekDays();
 
   // Load events
   const loadEvents = useCallback(async () => {
@@ -50,18 +79,15 @@ export default function EventsScreen({ navigation }) {
       let fetchedEvents = [];
 
       if (activeTab === 'my' && user?.uid) {
-        // Load my events
         const { getMyEvents } = require('../services/eventsService');
         fetchedEvents = await getMyEvents(user.uid);
       } else if (userProfile?.country) {
-        // Load events by location
         fetchedEvents = await getEventsByLocation(
           userProfile.country,
           userProfile.province,
           userProfile.city
         );
       } else {
-        // Load all upcoming events
         fetchedEvents = await getUpcomingEvents();
       }
 
@@ -110,11 +136,40 @@ export default function EventsScreen({ navigation }) {
     );
   };
 
-  // Filter events by search
-  const filteredEvents = events.filter(event =>
-    event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleViewProfile = (event) => {
+    if (!event.organizerId || !navigation) return;
+
+    if (event.organizerId === user?.uid) {
+      navigation.navigate('Profile');
+    } else {
+      navigation.navigate('PublicProfile', { userId: event.organizerId });
+    }
+  };
+
+  // Count events for a specific date
+  const getEventsCountForDate = (date) => {
+    const dateString = date.toDateString();
+    return events.filter(event => {
+      if (!event.timestamp) return false;
+      const eventDate = new Date(event.timestamp);
+      return eventDate.toDateString() === dateString;
+    }).length;
+  };
+
+  // Filter events by search and selected date
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Filter by selected date
+    const matchesDate = (() => {
+      if (!event.timestamp) return true; // Show events without timestamp
+      const eventDate = new Date(event.timestamp);
+      return eventDate.toDateString() === selectedDate.toDateString();
+    })();
+
+    return matchesSearch && matchesDate;
+  });
 
   return (
     <ScreenLayout
@@ -124,37 +179,154 @@ export default function EventsScreen({ navigation }) {
       showFooter={true}
       activeTab="events"
     >
-      <View style={styles.container}>
-        {/* Header Section with Gradient */}
-        <LinearGradient
-          colors={['#6C4DF4', '#8B5CF6', '#A78BFA']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Discover local events</Text>
-            <Text style={styles.headerSubtitle}>Connect with your community</Text>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={primaryColor}
+          />
+        }
+      >
+        {/* Artistic Hero Section */}
+        <View style={styles.heroSection}>
+          <LinearGradient
+            colors={['#6C4DF4', '#8B5CF6', '#A78BFA']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            {/* Floating circles background */}
+            <View style={styles.floatingCircles}>
+              <View style={[styles.circle, styles.circle1]} />
+              <View style={[styles.circle, styles.circle2]} />
+              <View style={[styles.circle, styles.circle3]} />
+            </View>
 
-            {/* Add Event Button */}
+            <Text style={styles.heroTitle}>Discover Events</Text>
+            <Text style={styles.heroSubtitle}>Connect with your community</Text>
+
+            {/* Create Event Button */}
             <TouchableOpacity
-              style={styles.addButton}
+              style={styles.createButton}
               onPress={handleAddEvent}
-              activeOpacity={0.8}
+              activeOpacity={0.9}
             >
-              <Ionicons name="add" size={20} color="#6C4DF4" />
-              <Text style={styles.addButtonText}>Create Event</Text>
+              <LinearGradient
+                colors={['#FFFFFF', '#F5F1FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.createButtonGradient}
+              >
+                <Ionicons name="add-circle" size={24} color="#6C4DF4" />
+                <Text style={styles.createButtonText}>Create Event</Text>
+              </LinearGradient>
             </TouchableOpacity>
+          </LinearGradient>
+        </View>
+
+        {/* Week Calendar View */}
+        <View style={[styles.calendarSection, { backgroundColor: themeColors.card }]}>
+          <View style={styles.calendarHeader}>
+            <Ionicons name="calendar" size={20} color={primaryColor} />
+            <Text style={[styles.calendarTitle, { color: themeColors.textPrimary }]}>
+              This Week
+            </Text>
           </View>
-        </LinearGradient>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.weekDaysContainer}
+          >
+            {weekDays.map((date, index) => {
+              const isToday = date.toDateString() === new Date().toDateString();
+              const isSelected = date.toDateString() === selectedDate.toDateString();
+              const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+              const dayNumber = date.getDate();
+
+              // Count actual events for this day
+              const eventsCount = getEventsCountForDate(date);
+
+              // 3-color rotation pattern for beautiful variety
+              const colorPatterns = [
+                { bg: '#F0F3FF', text: '#4A5568', number: '#2D3748' }, // Soft Blue
+                { bg: '#FFF5F0', text: '#ED8936', number: '#DD6B20' }, // Soft Orange
+                { bg: '#F0FFF4', text: '#38A169', number: '#2F855A' }, // Soft Green
+              ];
+              const colorPattern = colorPatterns[index % 3];
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dayCard,
+                    !isSelected && { backgroundColor: colorPattern.bg },
+                    isSelected && { backgroundColor: primaryColor },
+                    isToday && !isSelected && {
+                      borderColor: primaryColor,
+                      borderWidth: 2.5,
+                      shadowColor: primaryColor,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      elevation: 6,
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedDate(date);
+                    haptics.light();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.dayName,
+                      { color: isSelected ? '#FFFFFF' : colorPattern.text },
+                    ]}
+                  >
+                    {dayName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.dayNumber,
+                      { color: isSelected ? '#FFFFFF' : colorPattern.number },
+                    ]}
+                  >
+                    {dayNumber}
+                  </Text>
+                  {eventsCount > 0 && (
+                    <View
+                      style={[
+                        styles.eventDot,
+                        { backgroundColor: isSelected ? '#FFFFFF' : primaryColor },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.eventDotText,
+                          { color: isSelected ? primaryColor : '#FFFFFF' },
+                        ]}
+                      >
+                        {eventsCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={styles.searchSection}>
           <View
             style={[
               styles.searchBar,
               {
-                backgroundColor: themeColors.background,
+                backgroundColor: themeColors.card,
                 borderColor: themeColors.divider,
               },
             ]}
@@ -177,17 +349,20 @@ export default function EventsScreen({ navigation }) {
 
         {/* Tabs */}
         {user?.uid && (
-          <View style={[styles.tabsContainer, { borderBottomColor: themeColors.divider }]}>
+          <View style={styles.tabsSection}>
             <TouchableOpacity
               style={[
                 styles.tab,
-                activeTab === 'all' && {
-                  borderBottomColor: primaryColor,
-                  borderBottomWidth: 2,
-                },
+                activeTab === 'all' && [styles.tabActive, { backgroundColor: `${primaryColor}15` }],
               ]}
               onPress={() => setActiveTab('all')}
+              activeOpacity={0.7}
             >
+              <Ionicons
+                name="globe-outline"
+                size={18}
+                color={activeTab === 'all' ? primaryColor : themeColors.textSecondary}
+              />
               <Text
                 style={[
                   styles.tabText,
@@ -201,13 +376,16 @@ export default function EventsScreen({ navigation }) {
             <TouchableOpacity
               style={[
                 styles.tab,
-                activeTab === 'my' && {
-                  borderBottomColor: primaryColor,
-                  borderBottomWidth: 2,
-                },
+                activeTab === 'my' && [styles.tabActive, { backgroundColor: `${primaryColor}15` }],
               ]}
               onPress={() => setActiveTab('my')}
+              activeOpacity={0.7}
             >
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={activeTab === 'my' ? primaryColor : themeColors.textSecondary}
+              />
               <Text
                 style={[
                   styles.tabText,
@@ -220,135 +398,271 @@ export default function EventsScreen({ navigation }) {
           </View>
         )}
 
-        {/* Events List */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={primaryColor}
-            />
-          }
-        >
-          <Text style={[styles.resultsCount, { color: themeColors.textSecondary }]}>
-            {filteredEvents.length} {filteredEvents.length === 1 ? 'Result' : 'Results'}
+        {/* Events Count */}
+        <View style={styles.countSection}>
+          <Text style={[styles.countText, { color: themeColors.textSecondary }]}>
+            {filteredEvents.length} {filteredEvents.length === 1 ? 'event' : 'events'} on{' '}
+            {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </Text>
+        </View>
 
-          {filteredEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              themeColors={themeColors}
-              primaryColor={primaryColor}
-              isMyEvent={event.organizerId === user?.uid}
-              onDelete={() => handleDeleteEvent(event.id)}
+        {/* Horizontal Scrollable Event Cards */}
+        {filteredEvents.length > 0 ? (
+          <View style={styles.carouselContainer}>
+            <Animated.ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CARD_WIDTH + CARD_SPACING}
+              decelerationRate="fast"
+              contentContainerStyle={styles.eventsCarousel}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                { useNativeDriver: true }
+              )}
+              scrollEventThrottle={16}
+            >
+              {filteredEvents.map((event, index) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  index={index}
+                  scrollX={scrollX}
+                  themeColors={themeColors}
+                  primaryColor={primaryColor}
+                  isMyEvent={event.organizerId === user?.uid}
+                  onDelete={() => handleDeleteEvent(event.id)}
+                  onViewProfile={() => handleViewProfile(event)}
+                />
+              ))}
+            </Animated.ScrollView>
+
+            {/* Swipe indicator gradient - only show if there are 2+ events */}
+            {filteredEvents.length >= 2 && (
+              <View style={styles.swipeIndicatorContainer} pointerEvents="none">
+                <LinearGradient
+                  colors={['transparent', 'rgba(31, 24, 69, 0.3)', 'rgba(31, 24, 69, 0.6)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.swipeIndicator}
+                >
+                  <View style={styles.swipeIconContainer}>
+                    <Ionicons name="chevron-forward" size={28} color="#FFFFFF" style={styles.swipeIcon} />
+                    <Ionicons name="chevron-forward" size={28} color="#FFFFFF" style={[styles.swipeIcon, { marginLeft: -12 }]} />
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <LottieView
+              source={require('../assets/Error 404.json')}
+              autoPlay
+              loop
+              style={styles.emptyAnimation}
             />
-          ))}
+            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
+              {searchQuery ? 'No events found' : 'No events on this day'}
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
+              {searchQuery
+                ? 'Try a different search'
+                : `Select another day or create an event for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+            </Text>
+          </View>
+        )}
 
-          {filteredEvents.length === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={64} color={themeColors.textSecondary} />
-              <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                {searchQuery ? 'No events found' : 'No events yet'}
-              </Text>
-              <Text style={[styles.emptySubtext, { color: themeColors.textSecondary }]}>
-                {searchQuery ? 'Try a different search' : 'Be the first to create an event!'}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+        {/* Spacing for footer */}
+        <View style={{ height: 120 }} />
+      </ScrollView>
 
-        {/* Add Event Modal */}
-        <AddEventModal
-          visible={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onEventCreated={() => {
-            setShowAddModal(false);
-            loadEvents();
-          }}
-          themeColors={themeColors}
-          primaryColor={primaryColor}
-          userProfile={userProfile}
-          user={user}
-        />
-      </View>
+      {/* Add Event Modal */}
+      <AddEventModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onEventCreated={() => {
+          setShowAddModal(false);
+          loadEvents();
+        }}
+        themeColors={themeColors}
+        primaryColor={primaryColor}
+        userProfile={userProfile}
+        user={user}
+      />
     </ScreenLayout>
   );
 }
 
-// Event Card Component
-function EventCard({ event, themeColors, primaryColor, isMyEvent, onDelete }) {
+// Stunning Event Card Component
+function EventCard({
+  event,
+  index,
+  scrollX,
+  themeColors,
+  primaryColor,
+  isMyEvent,
+  onDelete,
+  onViewProfile,
+}) {
   const [expanded, setExpanded] = useState(false);
 
+  // 3-color rotation pattern for beautiful variety
+  const cardColorPatterns = [
+    {
+      gradient: ['#F0F3FF', '#E8EEFF'],
+      titleColor: '#1A202C',
+      metaColor: '#4A5568',
+      organizerBg: '#4A556820',
+      organizerColor: '#2D3748',
+      borderColor: '#C3D4FF',
+    }, // Soft Blue
+    {
+      gradient: ['#FFF5F0', '#FFE8DC'],
+      titleColor: '#1A202C',
+      metaColor: '#C05621',
+      organizerBg: '#ED893620',
+      organizerColor: '#C05621',
+      borderColor: '#FFD4B8',
+    }, // Soft Orange
+    {
+      gradient: ['#F0FFF4', '#E6FFED'],
+      titleColor: '#1A202C',
+      metaColor: '#2F855A',
+      organizerBg: '#38A16920',
+      organizerColor: '#2F855A',
+      borderColor: '#B8EFC8',
+    }, // Soft Green
+  ];
+  const cardColors = cardColorPatterns[index % 3];
+
+  const inputRange = [
+    (index - 1) * (CARD_WIDTH + CARD_SPACING),
+    index * (CARD_WIDTH + CARD_SPACING),
+    (index + 1) * (CARD_WIDTH + CARD_SPACING),
+  ];
+
+  const scale = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.9, 1, 0.9],
+    extrapolate: 'clamp',
+  });
+
+  const opacity = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.6, 1, 0.6],
+    extrapolate: 'clamp',
+  });
+
   return (
-    <TouchableOpacity
-      style={[styles.eventCard, { backgroundColor: themeColors.card }]}
-      onPress={() => setExpanded(!expanded)}
-      activeOpacity={0.7}
+    <Animated.View
+      style={[
+        styles.eventCard,
+        {
+          transform: [{ scale }],
+          opacity,
+        },
+      ]}
     >
-      <View style={styles.eventHeader}>
-        <View style={styles.eventIconContainer}>
-          <Text style={styles.eventEmoji}>{event.emoji || '📅'}</Text>
-        </View>
-        <View style={styles.eventInfo}>
-          <Text style={[styles.eventTitle, { color: themeColors.textPrimary }]}>
-            {event.title}
-          </Text>
-          {event.date && (
-            <Text style={[styles.eventDate, { color: themeColors.textSecondary }]}>
-              {event.date}
-            </Text>
-          )}
-          {event.location?.city && (
-            <Text style={[styles.eventLocation, { color: themeColors.textSecondary }]}>
-              <Ionicons name="location" size={12} /> {event.location.city}
-              {event.location.province && `, ${event.location.province}`}
-            </Text>
-          )}
-        </View>
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color={themeColors.textSecondary}
-        />
-      </View>
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onPress={() => setExpanded(!expanded)}
+      >
+        <LinearGradient
+          colors={cardColors.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.cardGradient, { borderColor: cardColors.borderColor }]}
+        >
+          {/* Category Badge */}
+          <View style={[styles.categoryBadge, { backgroundColor: `${cardColors.organizerColor}15` }]}>
+            <Text style={styles.categoryEmoji}>{event.emoji || '📅'}</Text>
+          </View>
 
-      {expanded && (
-        <View style={styles.eventDetails}>
+          {/* Event Content */}
+          <View style={styles.cardContent}>
+            <Text style={[styles.eventTitle, { color: cardColors.titleColor }]} numberOfLines={2}>
+              {event.title}
+            </Text>
+
+            {event.date && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="time-outline" size={16} color={cardColors.metaColor} />
+                <Text style={[styles.metaText, { color: cardColors.metaColor }]}>
+                  {event.date}
+                </Text>
+              </View>
+            )}
+
+            {event.location?.city && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="location-outline" size={16} color={cardColors.metaColor} />
+                <Text style={[styles.metaText, { color: cardColors.metaColor }]}>
+                  {event.location.city}
+                  {event.location.province && `, ${event.location.province}`}
+                </Text>
+              </View>
+            )}
+
+            {/* Description Preview - Always show 3 lines if exists */}
+            {event.description && (
+              <View style={styles.descriptionPreview}>
+                <Text
+                  style={[styles.descriptionPreviewText, { color: cardColors.metaColor }]}
+                  numberOfLines={expanded ? undefined : 3}
+                >
+                  {event.description}
+                </Text>
+              </View>
+            )}
+
+            {/* Organizer */}
+            {event.organizerName && (
+              <TouchableOpacity
+                style={[styles.organizerBadge, { backgroundColor: cardColors.organizerBg }]}
+                onPress={onViewProfile}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="person-circle-outline" size={18} color={cardColors.organizerColor} />
+                <Text style={[styles.organizerName, { color: cardColors.organizerColor }]} numberOfLines={1}>
+                  {event.organizerName}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={cardColors.organizerColor} />
+              </TouchableOpacity>
+            )}
+
+            {/* Delete Button for Own Events */}
+            {expanded && isMyEvent && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={onDelete}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                <Text style={styles.deleteText}>Delete Event</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Expand Indicator - Only show if there's a description */}
           {event.description && (
-            <Text style={[styles.eventDescription, { color: themeColors.textSecondary }]}>
-              {event.description}
-            </Text>
-          )}
-
-          {event.organizerName && (
-            <View style={styles.organizerInfo}>
-              <Ionicons name="person" size={14} color={themeColors.textSecondary} />
-              <Text style={[styles.organizerText, { color: themeColors.textSecondary }]}>
-                Organized by {event.organizerName}
+            <View style={styles.expandIndicator}>
+              <Text style={[styles.expandText, { color: cardColors.organizerColor }]}>
+                {expanded ? 'Show less' : 'Read more'}
               </Text>
+              <Ionicons
+                name={expanded ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={cardColors.organizerColor}
+              />
             </View>
           )}
-
-          {isMyEvent && (
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: '#FF3B3020' }]}
-              onPress={onDelete}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="trash-outline" size={16} color="#FF3B30" />
-              <Text style={styles.deleteButtonText}>Delete Event</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-    </TouchableOpacity>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
-// Add Event Modal Component
+// Add Event Modal (keeping the original implementation)
 function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryColor, userProfile, user }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -380,17 +694,21 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
         country: userProfile?.country || 'Unknown',
         province: userProfile?.province || '',
         city: userProfile?.city || '',
+        location: {
+          city: userProfile?.city || '',
+          province: userProfile?.province || '',
+          country: userProfile?.country || 'Unknown',
+        },
+        isPublic: true,
         organizerId: user.uid,
         organizerName: userProfile?.displayName || userProfile?.username || 'Anonymous',
         organizerPhoto: userProfile?.profilePhoto || null,
       });
 
-      // Reset form
       setTitle('');
       setDescription('');
       setDate('');
       setCategory('community');
-
       onEventCreated();
     } catch (error) {
       console.error('[AddEvent] Error:', error);
@@ -407,7 +725,10 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
         <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
@@ -418,7 +739,12 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalForm}>
+          <ScrollView
+            style={styles.modalForm}
+            contentContainerStyle={styles.modalFormContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Event Title *</Text>
             <TextInput
               style={[styles.input, {
@@ -474,7 +800,7 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
                   ]}
                   onPress={() => setCategory(value)}
                 >
-                  <Text style={styles.categoryEmoji}>{CATEGORY_EMOJIS[value]}</Text>
+                  <Text style={styles.categoryEmojiSmall}>{CATEGORY_EMOJIS[value]}</Text>
                   <Text style={[
                     styles.categoryText,
                     { color: category === value ? primaryColor : themeColors.textSecondary },
@@ -497,7 +823,7 @@ function AddEventModal({ visible, onClose, onEventCreated, themeColors, primaryC
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -506,168 +832,389 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerGradient: {
+  // Hero Section
+  heroSection: {
+    height: 240,
+    overflow: 'hidden',
+  },
+  heroGradient: {
+    flex: 1,
     padding: 24,
-    paddingTop: 16,
-  },
-  headerContent: {
+    justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#fff',
+  floatingCircles: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  circle: {
+    position: 'absolute',
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  circle1: {
+    width: 120,
+    height: 120,
+    top: -40,
+    right: -20,
+  },
+  circle2: {
+    width: 80,
+    height: 80,
+    bottom: 40,
+    left: -10,
+  },
+  circle3: {
+    width: 60,
+    height: 60,
+    top: 80,
+    left: 40,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  headerSubtitle: {
+  heroSubtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
   },
-  addButton: {
+  createButton: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  createButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
   },
-  addButtonText: {
-    color: '#6C4DF4',
+  createButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#6C4DF4',
   },
-  searchContainer: {
+  // Calendar Section
+  calendarSection: {
+    marginTop: -40,
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  weekDaysContainer: {
+    gap: 12,
+    paddingVertical: 4,
+  },
+  dayCard: {
+    width: 60,
+    height: 80,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  dayName: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  dayNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  eventDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  eventDotText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  // Search Section
+  searchSection: {
     padding: 16,
     paddingBottom: 8,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    gap: 8,
+    height: 48,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    gap: 10,
     borderWidth: 1,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
   },
-  tabsContainer: {
+  // Tabs Section
+  tabsSection: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    marginBottom: 8,
+    gap: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   tab: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 8,
-    paddingBottom: 120,
-  },
-  resultsCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  eventCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  eventHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#F5F3FF',
   },
-  eventIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#F3F0FF',
+  tabActive: {
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Count Section
+  countSection: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  countText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Events Carousel
+  carouselContainer: {
+    position: 'relative',
+  },
+  eventsCarousel: {
+    paddingLeft: 10,
+    paddingRight: SCREEN_WIDTH - CARD_WIDTH - 16 + 60, // Show peek of next card
+    paddingVertical: 8,
+    gap: CARD_SPACING,
+  },
+  swipeIndicatorContainer: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    bottom: 8,
+    width: 80,
+    zIndex: 10,
+  },
+  swipeIndicator: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 10,
+  },
+  swipeIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(31, 24, 69, 0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  swipeIcon: {
+    opacity: 0.5,
+  },
+  eventCard: {
+    width: CARD_WIDTH,
+    marginRight: CARD_SPACING,
+  },
+  cardGradient: {
+    borderRadius: 24,
+    padding: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    minHeight: 280,
+    borderWidth: 2,
+  },
+  categoryBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  eventEmoji: {
-    fontSize: 28,
+  categoryEmoji: {
+    fontSize: 32,
   },
-  eventInfo: {
+  cardContent: {
     flex: 1,
   },
   eventTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 23,
+    fontWeight: '800',
+    marginBottom: 16,
+    lineHeight: 29,
+    letterSpacing: -0.3,
   },
-  eventDate: {
+  eventMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  metaText: {
     fontSize: 14,
-    marginBottom: 2,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
-  eventLocation: {
-    fontSize: 13,
-  },
-  eventDetails: {
+  organizerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     marginTop: 12,
-    paddingTop: 12,
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  organizerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    letterSpacing: 0.2,
+  },
+  descriptionContainer: {
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
   },
-  eventDescription: {
+  description: {
     fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  organizerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  organizerText: {
-    fontSize: 13,
+    lineHeight: 21,
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#FF3B3015',
+    marginTop: 12,
+    alignSelf: 'flex-start',
   },
-  deleteButtonText: {
-    color: '#FF3B30',
+  deleteText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#FF3B30',
   },
+  descriptionPreview: {
+    marginTop: 12,
+  },
+  descriptionPreviewText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+  },
+  expandIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+  },
+  expandText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingTop: 60,
-    gap: 12,
+    paddingVertical: 30,
+    paddingHorizontal: 32,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
+  emptyAnimation: {
+    width: 270,
+    height: 270,
   },
-  emptySubtext: {
-    fontSize: 14,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  // Modal styles
+  emptySubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -678,6 +1225,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: '90%',
+    minHeight: '60%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -690,7 +1238,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalForm: {
-    maxHeight: 400,
+    flex: 1,
+    marginBottom: 16,
+  },
+  modalFormContent: {
+    paddingBottom: 40,
   },
   label: {
     fontSize: 14,
@@ -726,7 +1278,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  categoryEmoji: {
+  categoryEmojiSmall: {
     fontSize: 16,
   },
   categoryText: {

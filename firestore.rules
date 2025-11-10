@@ -232,8 +232,9 @@ service cloud.firestore {
     }
 
     match /events/{eventId} {
-      // Anyone can read public events
-      allow read: if resource.data.isPublic == true;
+      // Anyone can read public events, organizers can read their own events
+      allow read: if resource.data.isPublic == true
+        || (isSignedIn() && resource.data.organizerId == request.auth.uid);
 
       // Authenticated users can create events
       allow create: if isSignedIn()
