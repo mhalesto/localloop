@@ -84,7 +84,6 @@ export default function CountryScreen({ navigation }) {
     statuses,
     isLoading: statusesLoading,
     statusesError,
-    createStatus,
   } = useStatuses();
   const {
     stepCounterEnabled,
@@ -407,19 +406,14 @@ export default function CountryScreen({ navigation }) {
 
       await loadCartoonData();
 
-      // Create a status to showcase the artwork in Explore
-      try {
-        const statusMessage = customPrompt
-          ? `✨ ${customPrompt.slice(0, 100)}${customPrompt.length > 100 ? '...' : ''}`
-          : `✨ Generated ${styleName} style avatar`;
-
-        await createStatus({
-          message: statusMessage,
-          image: { uri: storageUrl },
-        });
-      } catch (statusError) {
-        console.warn('[CountryScreen] Failed to create status for cartoon:', statusError);
-        // Don't fail the whole operation if status creation fails
+      // Reload artwork gallery to show the new cartoon
+      if (exploreFilters.showAIArtGallery) {
+        try {
+          const artworks = await getAIArtworkFromCity(userProfile.city, 20);
+          setFilteredArtwork(artworks);
+        } catch (artworkError) {
+          console.warn('[CountryScreen] Failed to reload artwork:', artworkError);
+        }
       }
 
       setShowGenerationProgress(false);
