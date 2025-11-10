@@ -18,7 +18,7 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../api/firebaseClient';
 
 const EVENTS_COLLECTION = 'events';
 
