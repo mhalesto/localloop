@@ -37,6 +37,8 @@ import FollowingScreen from './screens/FollowingScreen';
 import FeedScreen from './screens/FeedScreen';
 import DiscoverScreen from './screens/DiscoverScreen';
 import EventsScreen from './screens/EventsScreen';
+import ManageAttendeesScreen from './screens/ManageAttendeesScreen';
+import EventChatScreen from './screens/EventChatScreen';
 import NeighborhoodExplorerScreen from './screens/NeighborhoodExplorerScreen';
 import PostComposerScreen from './screens/PostComposerScreen';
 import LocalLoopMarketsScreen from './screens/LocalLoopMarketsScreen';
@@ -145,6 +147,8 @@ function RootNavigator() {
       <Stack.Screen name="Feed" component={FeedScreen} />
       <Stack.Screen name="Discover" component={DiscoverScreen} />
       <Stack.Screen name="Events" component={EventsScreen} />
+      <Stack.Screen name="ManageAttendees" component={ManageAttendeesScreen} />
+      <Stack.Screen name="EventChat" component={EventChatScreen} />
       <Stack.Screen name="NeighborhoodExplorer" component={NeighborhoodExplorerScreen} />
       <Stack.Screen name="PostComposer" component={PostComposerScreen} />
       <Stack.Screen name="LocalLoopMarkets" component={LocalLoopMarketsScreen} />

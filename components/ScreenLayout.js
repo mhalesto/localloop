@@ -44,6 +44,7 @@ export default function ScreenLayout({
   headerBackgroundStyle,
   enableHeaderOverlap = false,
   profilePhoto,
+  onFabPress, // Custom FAB action (e.g., for Events screen)
 }) {
   const {
     showAddShortcut,
@@ -348,7 +349,12 @@ export default function ScreenLayout({
   };
 
   const handleFooterShortcut = () => {
-    // Show loading overlay first
+    // If custom FAB action provided (e.g., for Events screen), use it
+    if (onFabPress) {
+      onFabPress();
+      return;
+    }
+    // Otherwise show loading overlay for post creation
     setLoadingVisible(true);
   };
 

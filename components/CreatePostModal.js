@@ -130,6 +130,14 @@ export default function CreatePostModal({
   const [summaryCardY, setSummaryCardY] = useState(0);              // y-pos to scroll to
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // [AI-IMPROVE] Post improvement state
+  const [isImproving, setIsImproving] = useState(false);
+  const [improveError, setImproveError] = useState('');
+  const [improvedVersion1, setImprovedVersion1] = useState('');
+  const [improvedVersion2, setImprovedVersion2] = useState('');
+  const [improveVisible, setImproveVisible] = useState(false);
+  const [improveCardY, setImproveCardY] = useState(0);
+
   // [AI-TITLE] Title generation state
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [titleError, setTitleError] = useState('');
@@ -421,12 +429,31 @@ export default function CreatePostModal({
     });
   };
 
+  const scrollImproveIntoView = () => {
+    // Wait for layout to complete before scrolling
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (scrollRef.current?.scrollTo && improveCardY > 0) {
+          // Scroll to position the improve card near the top with some padding
+          scrollRef.current.scrollTo({ y: Math.max(improveCardY - 80, 0), animated: true });
+        }
+      }, 200); // Increased delay to ensure layout is complete
+    });
+  };
+
   // Auto-scroll when summary becomes visible
   useEffect(() => {
     if (summaryVisible && summaryCardY > 0) {
       scrollSummaryIntoView();
     }
   }, [summaryVisible, summaryCardY]);
+
+  // Auto-scroll when improved versions become visible
+  useEffect(() => {
+    if (improveVisible && improveCardY > 0) {
+      scrollImproveIntoView();
+    }
+  }, [improveVisible, improveCardY]);
 
   // --------- Summarize + Expand ----------
   const runSummarize = async (lengthPref, quality) => {
@@ -504,6 +531,60 @@ export default function CreatePostModal({
   };
 
   const handleSummarizeDescription = () => runSummarize(summaryLength, summaryQuality);
+
+  // [AI-IMPROVE] Post improvement handler
+  const handleImprovePost = async () => {
+    if (isImproving) return;
+
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      setImproveError('Add a description before requesting improvements.');
+      return;
+    }
+
+    setImproveError('');
+    setIsImproving(true);
+    setImproveVisible(false);
+
+    try {
+      const { improvePost } = require('../services/openai/gpt4Service');
+      const result = await improvePost(title, trimmedMessage, {
+        style: 'engaging' // Can be made configurable later
+      });
+
+      setImprovedVersion1(result.version1);
+      setImprovedVersion2(result.version2);
+      setImproveVisible(true);
+    } catch (error) {
+      console.error('[CreatePostModal] Post improvement failed', error);
+      setImproveError(error instanceof Error ? error.message : 'Unable to improve post right now.');
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
+  const handleUseImprovedVersion = (version) => {
+    setMessage(version);
+    setImproveVisible(false);
+    setImprovedVersion1('');
+    setImprovedVersion2('');
+  };
+
+  const handleCopyImprovedVersion = async (version) => {
+    try {
+      await Clipboard.setStringAsync(version);
+      showAlert('Copied!', 'Improved version copied to clipboard.', [{ text: 'OK' }]);
+    } catch (error) {
+      console.error('[CreatePostModal] Copy failed', error);
+      showAlert('Error', 'Failed to copy to clipboard.', [{ text: 'OK' }]);
+    }
+  };
+
+  const handleDiscardImprovedVersions = () => {
+    setImproveVisible(false);
+    setImprovedVersion1('');
+    setImprovedVersion2('');
+  };
 
   const expandOnce = () => {
     const idx = LENGTH_STEPS.indexOf(summaryLength);
@@ -964,11 +1045,11 @@ export default function CreatePostModal({
                   </View>
                 </View>
 
-                {/* Summarize button */}
-                <View style={styles.summarizeBlock}>
+                {/* AI Buttons Row - Summarize & Improve */}
+                <View style={styles.aiButtonsRow}>
                   <TouchableOpacity
                     style={[
-                      styles.summarizeButton,
+                      styles.aiActionButton,
                       { backgroundColor: summaryButtonBackground },
                       (isSummarizing || !trimmedMessage) && styles.summarizeButtonDisabled
                     ]}
@@ -983,15 +1064,38 @@ export default function CreatePostModal({
                     ) : (
                       <Ionicons name="sparkles-outline" size={18} color={summaryAccentColor} />
                     )}
-                    <View style={styles.summarizeTextBlock}>
-                      <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Summarize description</Text>
-                      <Text style={styles.summarizeSubtitle}>
-                        Premium · {summaryQuality === 'best' ? 'Best quality' : 'Fast mode'}
-                      </Text>
+                    <View style={styles.aiActionTextBlock}>
+                      <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Summarize</Text>
+                      <Text style={styles.summarizeSubtitle}>Premium</Text>
                     </View>
                   </TouchableOpacity>
-                  {summaryError ? <Text style={styles.summarizeErrorText}>{summaryError}</Text> : null}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.aiActionButton,
+                      { backgroundColor: summaryButtonBackground },
+                      (isImproving || !trimmedMessage) && styles.summarizeButtonDisabled
+                    ]}
+                    onPress={handleImprovePost}
+                    disabled={isImproving || !trimmedMessage}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Improve post"
+                  >
+                    {isImproving ? (
+                      <ActivityIndicator size="small" color={summaryAccentColor} />
+                    ) : (
+                      <Ionicons name="create-outline" size={18} color={summaryAccentColor} />
+                    )}
+                    <View style={styles.aiActionTextBlock}>
+                      <Text style={[styles.summarizeTitle, { color: summaryAccentColor }]}>Improve Post</Text>
+                      <Text style={styles.summarizeSubtitle}>Premium</Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
+                {summaryError || improveError ? (
+                  <Text style={styles.summarizeErrorText}>{summaryError || improveError}</Text>
+                ) : null}
 
                 {/* Summary preview card */}
                 {summaryVisible ? (
@@ -1056,6 +1160,79 @@ export default function CreatePostModal({
                         </Text>
                       </TouchableOpacity>
                     ) : null}
+                  </View>
+                ) : null}
+
+                {/* Improved versions preview card */}
+                {improveVisible ? (
+                  <View
+                    onLayout={(e) => setImproveCardY(e.nativeEvent.layout.y)}
+                    style={styles.aiSummaryCard}
+                  >
+                    <Text style={styles.aiSummaryTitle}>Improved Versions</Text>
+                    <Text style={styles.aiSummaryHelper}>
+                      Choose the version you prefer, or copy to edit further
+                    </Text>
+
+                    {/* Version 1 */}
+                    <View style={[styles.improvedVersionCard, { backgroundColor: themeColors.background }]}>
+                      <View style={styles.versionHeader}>
+                        <Text style={[styles.versionLabel, { color: summaryAccentColor }]}>Version 1</Text>
+                      </View>
+                      <Text style={[styles.versionText, { color: themeColors.textPrimary }]}>
+                        {improvedVersion1}
+                      </Text>
+                      <View style={styles.versionButtonsRow}>
+                        <TouchableOpacity
+                          style={[styles.versionButton, { backgroundColor: summaryAccentColor }]}
+                          onPress={() => handleUseImprovedVersion(improvedVersion1)}
+                        >
+                          <Ionicons name="checkmark" size={16} color="#fff" />
+                          <Text style={[styles.versionButtonText, { color: '#fff' }]}>Use</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
+                          onPress={() => handleCopyImprovedVersion(improvedVersion1)}
+                        >
+                          <Ionicons name="copy-outline" size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Version 2 */}
+                    <View style={[styles.improvedVersionCard, { backgroundColor: themeColors.background }]}>
+                      <View style={styles.versionHeader}>
+                        <Text style={[styles.versionLabel, { color: summaryAccentColor }]}>Version 2</Text>
+                      </View>
+                      <Text style={[styles.versionText, { color: themeColors.textPrimary }]}>
+                        {improvedVersion2}
+                      </Text>
+                      <View style={styles.versionButtonsRow}>
+                        <TouchableOpacity
+                          style={[styles.versionButton, { backgroundColor: summaryAccentColor }]}
+                          onPress={() => handleUseImprovedVersion(improvedVersion2)}
+                        >
+                          <Ionicons name="checkmark" size={16} color="#fff" />
+                          <Text style={[styles.versionButtonText, { color: '#fff' }]}>Use</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.versionButtonGhost, { borderColor: themeColors.divider }]}
+                          onPress={() => handleCopyImprovedVersion(improvedVersion2)}
+                        >
+                          <Ionicons name="copy-outline" size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.versionButtonText, { color: themeColors.textSecondary }]}>Copy</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Discard button */}
+                    <TouchableOpacity
+                      style={styles.discardButton}
+                      onPress={handleDiscardImprovedVersions}
+                    >
+                      <Text style={[styles.discardButtonText, { color: themeColors.textSecondary }]}>Discard</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : null}
               </>
@@ -1176,6 +1353,10 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     summarizeTitle: { fontSize: 14, fontWeight: '700' },
     summarizeSubtitle: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
     summarizeErrorText: { marginTop: 8, fontSize: 12, color: '#D64545' },
+    // AI Buttons Row (Summarize & Improve)
+    aiButtonsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+    aiActionButton: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 12, justifyContent: 'center' },
+    aiActionTextBlock: { marginLeft: 8, flex: 1 },
 
     swatchScrollView: {
       marginVertical: 4,
@@ -1346,5 +1527,65 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       position: 'absolute',
       top: 8,
       right: 8,
+    },
+    // [AI-IMPROVE] Improved Post Styles
+    improvedVersionCard: {
+      marginTop: 16,
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.divider,
+    },
+    versionHeader: {
+      marginBottom: 10,
+    },
+    versionLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    versionText: {
+      fontSize: 15,
+      lineHeight: 22,
+      marginBottom: 12,
+    },
+    versionButtonsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    versionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      flex: 1,
+      justifyContent: 'center',
+    },
+    versionButtonGhost: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      borderWidth: 1,
+      flex: 1,
+      justifyContent: 'center',
+    },
+    versionButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    discardButton: {
+      marginTop: 12,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    discardButtonText: {
+      fontSize: 14,
+      fontWeight: '500',
     },
   });

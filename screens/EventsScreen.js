@@ -38,6 +38,19 @@ import {
   CATEGORY_EMOJIS,
 } from '../services/eventsService';
 import { canCreateEvent, recordEventCreated } from '../utils/subscriptionUtils';
+import {
+  requestEventRSVP,
+  getUserRSVPStatus,
+  cancelRSVP,
+  getPendingRSVPCount,
+  getAcceptedAttendees,
+} from '../services/eventRsvpService';
+import {
+  createEventChat,
+  isParticipant,
+  removeParticipant,
+  deleteEventChat,
+} from '../services/eventChatService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.69;
@@ -71,8 +84,24 @@ export default function EventsScreenRedesign({ navigation }) {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  // RSVP related state
+  const [rsvpStatuses, setRsvpStatuses] = useState({}); // eventId -> RSVP status
+  const [pendingCounts, setPendingCounts] = useState({}); // eventId -> pending count (for organizers)
+  const [chatAccess, setChatAccess] = useState({}); // eventId -> boolean (if user has chat access)
+
+  // Test mode - view specific events as another user
+  const [testModeEvents, setTestModeEvents] = useState({}); // eventId -> boolean
+  const testUserId = 'test-user-123'; // Simulated different user ID
+
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  const toggleTestMode = (eventId) => {
+    setTestModeEvents(prev => ({
+      ...prev,
+      [eventId]: !prev[eventId]
+    }));
+  };
 
   // Generate week days
   const getWeekDays = () => {
@@ -121,6 +150,43 @@ export default function EventsScreenRedesign({ navigation }) {
     loadEvents();
   }, [loadEvents]);
 
+  // Load RSVP statuses for all events
+  useEffect(() => {
+    const loadRSVPData = async () => {
+      if (!user?.uid || events.length === 0) return;
+
+      const statuses = {};
+      const pending = {};
+      const access = {};
+
+      for (const event of events) {
+        // Get user's RSVP status
+        const rsvp = await getUserRSVPStatus(event.id, user.uid);
+        if (rsvp) {
+          statuses[event.id] = rsvp;
+        }
+
+        // If user is organizer, get pending count
+        if (event.organizerId === user.uid) {
+          const count = await getPendingRSVPCount(event.id);
+          pending[event.id] = count;
+        }
+
+        // Check if user has chat access (accepted or organizer)
+        if (rsvp?.status === 'accepted' || event.organizerId === user.uid) {
+          const hasAccess = await isParticipant(event.id, user.uid);
+          access[event.id] = hasAccess;
+        }
+      }
+
+      setRsvpStatuses(statuses);
+      setPendingCounts(pending);
+      setChatAccess(access);
+    };
+
+    loadRSVPData();
+  }, [events, user?.uid]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadEvents();
@@ -141,7 +207,7 @@ export default function EventsScreenRedesign({ navigation }) {
   const handleDeleteEvent = async (eventId) => {
     Alert.alert(
       'Delete Event',
-      'Are you sure you want to delete this event?',
+      'Are you sure you want to delete this event? This will also delete the event chat and all messages.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -149,9 +215,15 @@ export default function EventsScreenRedesign({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Delete event chat first (includes all messages and participant cleanup)
+              await deleteEventChat(eventId);
+
+              // Then delete the event
               await deleteEvent(eventId);
+
               loadEvents();
             } catch (error) {
+              console.error('[Events] Error deleting event:', error);
               Alert.alert('Error', 'Failed to delete event');
             }
           },
@@ -168,6 +240,93 @@ export default function EventsScreenRedesign({ navigation }) {
     } else {
       navigation.navigate('PublicProfile', { userId: event.organizerId });
     }
+  };
+
+  // RSVP Handlers
+  const handleRSVP = async (event) => {
+    if (!user?.uid) {
+      Alert.alert('Login Required', 'Please login to RSVP to events');
+      return;
+    }
+
+    haptics.light();
+
+    try {
+      await requestEventRSVP(
+        event.id,
+        user.uid,
+        userProfile?.displayName || 'Anonymous',
+        userProfile?.photoURL || null
+      );
+
+      // Update local state
+      setRsvpStatuses(prev => ({
+        ...prev,
+        [event.id]: {
+          status: 'pending',
+          requestedAt: Date.now(),
+        },
+      }));
+
+      Alert.alert('Request Sent', 'Your attendance request has been sent to the organizer');
+    } catch (error) {
+      console.error('[Events] Error requesting RSVP:', error);
+      Alert.alert('Error', 'Failed to send attendance request');
+    }
+  };
+
+  const handleCancelRSVP = async (event) => {
+    haptics.light();
+
+    Alert.alert(
+      'Cancel Request',
+      'Are you sure you want to cancel your attendance request?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await cancelRSVP(event.id, user.uid);
+
+              // Remove from local state
+              setRsvpStatuses(prev => {
+                const updated = { ...prev };
+                delete updated[event.id];
+                return updated;
+              });
+
+              // Remove chat access if was accepted
+              if (result.wasAccepted) {
+                setChatAccess(prev => {
+                  const updated = { ...prev };
+                  delete updated[event.id];
+                  return updated;
+                });
+              }
+
+              Alert.alert('Cancelled', 'Your attendance request has been cancelled');
+            } catch (error) {
+              console.error('[Events] Error canceling RSVP:', error);
+              Alert.alert('Error', 'Failed to cancel request');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleManageAttendees = (event) => {
+    haptics.light();
+    // Navigate to attendee management modal
+    navigation.navigate('ManageAttendees', { eventId: event.id, event });
+  };
+
+  const handleOpenChat = (event) => {
+    haptics.light();
+    // Navigate to event chat screen
+    navigation.navigate('EventChat', { eventId: event.id, event });
   };
 
   // Count events for a specific date
@@ -202,6 +361,7 @@ export default function EventsScreenRedesign({ navigation }) {
       navigation={navigation}
       showFooter={true}
       activeTab="events"
+      onFabPress={handleAddEvent}
     >
       <ScrollView
         style={styles.container}
@@ -231,23 +391,6 @@ export default function EventsScreenRedesign({ navigation }) {
 
             <Text style={styles.heroTitle}>Discover Events</Text>
             <Text style={styles.heroSubtitle}>Connect with your community</Text>
-
-            {/* Create Event Button */}
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={handleAddEvent}
-              activeOpacity={0.9}
-            >
-              <LinearGradient
-                colors={['#FFFFFF', '#F5F1FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.createButtonGradient}
-              >
-                <Ionicons name="add-circle" size={24} color="#6C4DF4" />
-                <Text style={styles.createButtonText}>Create Event</Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </LinearGradient>
         </View>
 
@@ -445,20 +588,38 @@ export default function EventsScreenRedesign({ navigation }) {
               )}
               scrollEventThrottle={16}
             >
-              {filteredEvents.map((event, index) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  index={index}
-                  scrollX={scrollX}
-                  themeColors={themeColors}
-                  primaryColor={primaryColor}
-                  isMyEvent={event.organizerId === user?.uid}
-                  onEdit={() => handleEditEvent(event)}
-                  onDelete={() => handleDeleteEvent(event.id)}
-                  onViewProfile={() => handleViewProfile(event)}
-                />
-              ))}
+              {filteredEvents.map((event, index) => {
+                // Use test user ID if this specific event is in test mode
+                const isTestMode = testModeEvents[event.id] || false;
+                const effectiveUserId = isTestMode ? testUserId : user?.uid;
+                const actuallyMyEvent = event.organizerId === user?.uid;
+
+                return (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    index={index}
+                    scrollX={scrollX}
+                    themeColors={themeColors}
+                    primaryColor={primaryColor}
+                    isMyEvent={event.organizerId === effectiveUserId}
+                    actuallyMyEvent={actuallyMyEvent}
+                    isTestMode={isTestMode}
+                    onToggleTestMode={() => toggleTestMode(event.id)}
+                    onEdit={() => handleEditEvent(event)}
+                    onDelete={() => handleDeleteEvent(event.id)}
+                    onViewProfile={() => handleViewProfile(event)}
+                    rsvpStatus={rsvpStatuses[event.id]}
+                    pendingCount={pendingCounts[event.id]}
+                    hasChatAccess={chatAccess[event.id]}
+                    onRSVP={() => handleRSVP(event)}
+                    onCancelRSVP={() => handleCancelRSVP(event)}
+                    onManageAttendees={() => handleManageAttendees(event)}
+                    onOpenChat={() => handleOpenChat(event)}
+                    currentUserId={effectiveUserId}
+                  />
+                );
+              })}
             </Animated.ScrollView>
 
             {/* Swipe indicator gradient - only show if there are 2+ events */}
@@ -531,9 +692,20 @@ function EventCard({
   themeColors,
   primaryColor,
   isMyEvent,
+  actuallyMyEvent,
+  isTestMode,
+  onToggleTestMode,
   onEdit,
   onDelete,
   onViewProfile,
+  rsvpStatus,
+  pendingCount,
+  hasChatAccess,
+  onRSVP,
+  onCancelRSVP,
+  onManageAttendees,
+  onOpenChat,
+  currentUserId,
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -608,6 +780,30 @@ function EventCard({
           <View style={[styles.categoryBadge, { backgroundColor: `${cardColors.organizerColor}15` }]}>
             <Text style={styles.categoryEmoji}>{event.emoji || '📅'}</Text>
           </View>
+
+          {/* Test Mode Toggle - Only for user's own events */}
+          {actuallyMyEvent && (
+            <TouchableOpacity
+              style={[
+                styles.testModeToggle,
+                {
+                  backgroundColor: isTestMode ? '#10b98115' : `${cardColors.organizerColor}10`,
+                  borderColor: isTestMode ? '#10b981' : cardColors.borderColor,
+                }
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onToggleTestMode();
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isTestMode ? "eye" : "eye-off"}
+                size={18}
+                color={isTestMode ? '#10b981' : cardColors.organizerColor}
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Event Content */}
           <View style={styles.cardContent}>
@@ -690,13 +886,20 @@ function EventCard({
               <View style={[styles.timestampContainer, { backgroundColor: `${cardColors.borderColor}30` }]}>
                 <Ionicons name="time-outline" size={14} color={cardColors.metaColor} />
                 <Text style={[styles.timestampText, { color: cardColors.metaColor }]}>
-                  {event.updatedAt ? 'Edited' : 'Created'} {new Date(event.updatedAt || event.timestamp).toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+                  {event.updatedAt ? 'Edited' : 'Created'} {(() => {
+                    const timestampValue = event.updatedAt || event.timestamp;
+                    // Handle Firestore Timestamp objects
+                    const date = timestampValue?.toDate ? timestampValue.toDate() :
+                      timestampValue?.seconds ? new Date(timestampValue.seconds * 1000) :
+                        new Date(timestampValue);
+                    return date.toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                  })()}
                 </Text>
               </View>
             )}
@@ -721,6 +924,124 @@ function EventCard({
                   <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                   <Text style={styles.deleteText}>Delete</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Organizer: Manage Attendees & Chat Access */}
+            {expanded && isMyEvent && (
+              <View style={styles.eventActionsContainer}>
+                <TouchableOpacity
+                  style={[styles.manageAttendeesButton, { backgroundColor: `${cardColors.organizerColor}15` }]}
+                  onPress={onManageAttendees}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="people-outline" size={16} color={cardColors.organizerColor} />
+                  <Text style={[styles.manageAttendeesText, { color: cardColors.organizerColor }]}>
+                    Manage Attendees
+                  </Text>
+                  {pendingCount > 0 && (
+                    <View style={[styles.pendingBadge, { backgroundColor: '#FF3B30' }]}>
+                      <Text style={styles.pendingBadgeText}>{pendingCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {hasChatAccess && (
+                  <TouchableOpacity
+                    style={[styles.chatIconButton, { backgroundColor: `${cardColors.organizerColor}15` }]}
+                    onPress={onOpenChat}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={18} color={cardColors.organizerColor} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Non-Organizer: RSVP Button and Status */}
+            {expanded && !isMyEvent && currentUserId && (
+              <View style={styles.rsvpContainer}>
+                {!rsvpStatus ? (
+                  // Show RSVP button if no request exists
+                  <TouchableOpacity
+                    style={[styles.rsvpButton, { backgroundColor: cardColors.organizerColor }]}
+                    onPress={onRSVP}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                    <Text style={styles.rsvpButtonText}>Request to Attend</Text>
+                  </TouchableOpacity>
+                ) : (
+                  // Show status and actions based on RSVP state
+                  <View style={styles.rsvpStatusContainer}>
+                    <View style={[
+                      styles.rsvpStatusBadge,
+                      {
+                        backgroundColor: rsvpStatus.status === 'accepted'
+                          ? '#10b98130'
+                          : rsvpStatus.status === 'pending'
+                            ? '#f59e0b30'
+                            : '#ef444430',
+                      },
+                    ]}>
+                      <Ionicons
+                        name={
+                          rsvpStatus.status === 'accepted'
+                            ? 'checkmark-circle'
+                            : rsvpStatus.status === 'pending'
+                              ? 'time'
+                              : 'close-circle'
+                        }
+                        size={16}
+                        color={
+                          rsvpStatus.status === 'accepted'
+                            ? '#10b981'
+                            : rsvpStatus.status === 'pending'
+                              ? '#f59e0b'
+                              : '#ef4444'
+                        }
+                      />
+                      <Text style={[
+                        styles.rsvpStatusText,
+                        {
+                          color: rsvpStatus.status === 'accepted'
+                            ? '#10b981'
+                            : rsvpStatus.status === 'pending'
+                              ? '#f59e0b'
+                              : '#ef4444',
+                        },
+                      ]}>
+                        {rsvpStatus.status === 'accepted'
+                          ? 'Attending'
+                          : rsvpStatus.status === 'pending'
+                            ? 'Request Pending'
+                            : 'Request Declined'}
+                      </Text>
+                    </View>
+
+                    {/* Chat icon for accepted attendees */}
+                    {rsvpStatus.status === 'accepted' && hasChatAccess && (
+                      <TouchableOpacity
+                        style={[styles.chatIconButton, { backgroundColor: `${cardColors.organizerColor}15` }]}
+                        onPress={onOpenChat}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chatbubbles-outline" size={18} color={cardColors.organizerColor} />
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Cancel button (except for rejected) */}
+                    {rsvpStatus.status !== 'rejected' && (
+                      <TouchableOpacity
+                        style={[styles.cancelRsvpButton, { borderColor: cardColors.metaColor }]}
+                        onPress={onCancelRSVP}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.cancelRsvpText, { color: cardColors.metaColor }]}>Cancel</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1009,6 +1330,10 @@ function AddEventModal({ visible, onClose, onEventCreated, editingEvent, themeCo
         const fieldIds = Object.keys(editingEvent.customFields);
         setSelectedFields(fieldIds);
         setCustomFieldValues(editingEvent.customFields);
+      } else {
+        // Clear custom fields if editing event has none
+        setSelectedFields([]);
+        setCustomFieldValues({});
       }
     }
   }, [editingEvent, visible]);
@@ -1137,7 +1462,17 @@ function AddEventModal({ visible, onClose, onEventCreated, editingEvent, themeCo
           });
         }
 
-        await createEvent(eventData);
+        const newEvent = await createEvent(eventData);
+
+        // Create event chat for the organizer
+        if (newEvent?.id) {
+          await createEventChat(
+            newEvent.id,
+            eventData.title,
+            user.uid,
+            userProfile?.displayName || userProfile?.username || 'Anonymous'
+          );
+        }
 
         // Record event creation for limit tracking
         await recordEventCreated();
@@ -1534,27 +1869,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: 'center',
   },
-  createButton: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  createButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#6C4DF4',
-  },
   // Calendar Section
   calendarSection: {
     marginTop: -40,
@@ -1745,6 +2059,22 @@ const styles = StyleSheet.create({
   categoryEmoji: {
     fontSize: 32,
   },
+  testModeToggle: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   cardContent: {
     flex: 1,
   },
@@ -1845,6 +2175,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FF3B30',
+  },
+  // RSVP Styles
+  manageAttendeesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    flex: 1,
+    position: 'relative',
+  },
+  manageAttendeesText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  pendingBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chatIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rsvpContainer: {
+    marginTop: 12,
+  },
+  rsvpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  rsvpButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  rsvpStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rsvpStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    flex: 1,
+  },
+  rsvpStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelRsvpButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  cancelRsvpText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   descriptionPreview: {
     marginTop: 12,

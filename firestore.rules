@@ -250,6 +250,65 @@ service cloud.firestore {
       // Organizers and admins can delete events
       allow delete: if isSignedIn()
         && (resource.data.organizerId == request.auth.uid || isAdmin());
+
+      // Event RSVPs (Subcollection)
+      match /rsvps/{userId} {
+        // Anyone authenticated can read RSVPs
+        allow read: if isSignedIn();
+
+        // User can create their own RSVP
+        allow create: if isSignedIn() && request.auth.uid == userId;
+
+        // User can delete their own RSVP
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+
+        // Organizer can update RSVPs (accept/reject)
+        allow update: if isSignedIn() &&
+          get(/databases/$(database)/documents/events/$(eventId)).data.organizerId == request.auth.uid;
+      }
+    }
+
+    // Event Chats
+    match /eventChats/{eventId} {
+      // Participants and organizer can read
+      // Also allow reading non-existent documents (returns null anyway)
+      allow read: if isSignedIn() && (
+        resource == null ||
+        request.auth.uid == resource.data.organizerId ||
+        request.auth.uid in resource.data.participants
+      );
+
+      // Organizer can create chat
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.organizerId;
+
+      // Organizer and participants can update
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.organizerId ||
+        request.auth.uid in resource.data.participants
+      );
+
+      // Organizer can delete chat
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.organizerId;
+
+      // Chat Messages (Subcollection)
+      match /messages/{messageId} {
+        // Participants can read messages
+        allow read: if isSignedIn() && (
+          request.auth.uid == get(/databases/$(database)/documents/eventChats/$(eventId)).data.organizerId ||
+          request.auth.uid in get(/databases/$(database)/documents/eventChats/$(eventId)).data.participants
+        );
+
+        // Participants can create messages
+        allow create: if isSignedIn() && (
+          request.auth.uid == get(/databases/$(database)/documents/eventChats/$(eventId)).data.organizerId ||
+          request.auth.uid in get(/databases/$(database)/documents/eventChats/$(eventId)).data.participants
+        );
+
+        // No one can update or delete messages
+        allow update, delete: if false;
+      }
     }
 
     match /{document=**} {
