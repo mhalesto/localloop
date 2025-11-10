@@ -1579,7 +1579,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
     },
     aiAvatarCloseButton: {
       position: 'absolute',
-      top: 12,
+      top: 8,
       right: 12,
       zIndex: 10,
     },
