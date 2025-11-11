@@ -1339,12 +1339,12 @@ export default function SettingsScreen({ navigation }) {
                   <>
                     <View style={styles.rewardsHeader}>
                       <Text style={styles.rewardsLabel}>
-                        {userPlan === 'gold' || userPlan === 'ultimate' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
+                        {userPlan === 'ultimate' ? '💎 Gold Subscriber' : userPlan === 'gold' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
                       </Text>
                       <View style={styles.rewardsPointsRow}>
                         {userPlan === 'gold' || userPlan === 'ultimate' ? (
                           <Text style={[styles.rewardsPoints, { color: '#FFD700' }]}>
-                            {userPlan === 'ultimate' ? 'Ultimate' : 'Gold'}
+                            {userPlan === 'ultimate' ? 'Ultimate' : 'Premium'}
                           </Text>
                         ) : (
                           <Text style={[styles.rewardsPoints, { color: themeColors.primary }]}>Go</Text>
@@ -1352,8 +1352,10 @@ export default function SettingsScreen({ navigation }) {
                       </View>
                     </View>
                     <Text style={styles.rewardsMeta}>
-                      {userPlan === 'gold' || userPlan === 'ultimate'
-                        ? 'Thank you for being a Premium subscriber! Enjoy unlimited AI features, custom prompts, and VIP support.'
+                      {userPlan === 'ultimate'
+                        ? 'Thank you for being a Gold subscriber! Enjoy 3x AI limits, unlimited events, and ultimate power user features.'
+                        : userPlan === 'gold'
+                        ? 'Thank you for being a Premium subscriber! Enjoy GPT-4o AI features, custom prompts, and VIP support.'
                         : 'Thank you for being a Go subscriber! Enjoy unlimited posts, AI features, and ad-free experience.'}
                     </Text>
 
