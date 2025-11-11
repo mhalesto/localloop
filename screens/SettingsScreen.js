@@ -1321,58 +1321,97 @@ export default function SettingsScreen({ navigation }) {
                 </TouchableOpacity>
               ) : null}
               <View style={styles.rewardsCard}>
-                <View style={styles.rewardsHeader}>
-                  <Text style={styles.rewardsLabel}>Point balance</Text>
-                  <View style={styles.rewardsPointsRow}>
-                    <Text style={styles.rewardsPoints}>{pointsBalance} pts</Text>
-                    {premiumUnlocked && <PremiumBadge size={32} style={styles.premiumBadge} />}
-                  </View>
-                </View>
-                <Text style={styles.rewardsMeta}>
-                  {premiumUnlocked
-                    ? premiumExpiryLabel
-                      ? `Premium active | expires ${premiumExpiryLabel}`
-                      : 'Premium active - enjoy the perks!'
-                    : `Collect ${premiumDayCost} points to unlock a day of premium access.`}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.redeemButton,
-                    redeemDisabled && styles.redeemButtonDisabled
-                  ]}
-                  onPress={handleRedeemPremium}
-                  activeOpacity={0.85}
-                  disabled={redeemDisabled}
-                >
-                  <Text
-                    style={[
-                      styles.redeemButtonLabel,
-                      redeemDisabled && styles.redeemButtonLabelDisabled
-                    ]}
-                  >
-                    {isRedeeming
-                      ? 'Activating...'
-                      : premiumUnlocked
-                        ? `Extend premium (${premiumDayCost} pts)`
-                        : `Unlock premium (${premiumDayCost} pts)`}
-                  </Text>
-                </TouchableOpacity>
-                {!premiumUnlocked && pointsGap > 0 ? (
-                  <Text style={styles.rewardsProgress}>{`${pointsGap} pts to go`}</Text>
-                ) : null}
+                {/* Show paid subscription card for Go/Premium subscribers */}
+                {userPlan === 'premium' || userPlan === 'gold' ? (
+                  <>
+                    <View style={styles.rewardsHeader}>
+                      <Text style={styles.rewardsLabel}>
+                        {userPlan === 'gold' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
+                      </Text>
+                      <View style={styles.rewardsPointsRow}>
+                        {userPlan === 'gold' ? (
+                          <Text style={[styles.rewardsPoints, { color: '#FFD700' }]}>Gold</Text>
+                        ) : (
+                          <Text style={[styles.rewardsPoints, { color: themeColors.primary }]}>Go</Text>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={styles.rewardsMeta}>
+                      {userPlan === 'gold'
+                        ? 'Thank you for being a Premium subscriber! Enjoy unlimited AI features, custom prompts, and VIP support.'
+                        : 'Thank you for being a Go subscriber! Enjoy unlimited posts, AI features, and ad-free experience.'}
+                    </Text>
 
-                {/* Subscription Plans Button */}
-                <TouchableOpacity
-                  style={styles.subscriptionButton}
-                  onPress={() => navigation.navigate('Subscription')}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="star-outline" size={20} color={themeColors.primary} />
-                  <Text style={[styles.subscriptionButtonText, { color: themeColors.primary }]}>
-                    {premiumUnlocked ? 'Manage Subscription' : 'View Subscription Plans'}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
-                </TouchableOpacity>
+                    {/* Manage Subscription Button */}
+                    <TouchableOpacity
+                      style={styles.subscriptionButton}
+                      onPress={() => navigation.navigate('Subscription')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="star-outline" size={20} color={themeColors.primary} />
+                      <Text style={[styles.subscriptionButtonText, { color: themeColors.primary }]}>
+                        Manage Subscription
+                      </Text>
+                      <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {/* Show point-based premium card for Basic users */}
+                    <View style={styles.rewardsHeader}>
+                      <Text style={styles.rewardsLabel}>Point balance</Text>
+                      <View style={styles.rewardsPointsRow}>
+                        <Text style={styles.rewardsPoints}>{pointsBalance} pts</Text>
+                        {premiumUnlocked && <PremiumBadge size={32} style={styles.premiumBadge} />}
+                      </View>
+                    </View>
+                    <Text style={styles.rewardsMeta}>
+                      {premiumUnlocked
+                        ? premiumExpiryLabel
+                          ? `Premium active | expires ${premiumExpiryLabel}`
+                          : 'Premium active - enjoy the perks!'
+                        : `Collect ${premiumDayCost} points to unlock a day of premium access.`}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.redeemButton,
+                        redeemDisabled && styles.redeemButtonDisabled
+                      ]}
+                      onPress={handleRedeemPremium}
+                      activeOpacity={0.85}
+                      disabled={redeemDisabled}
+                    >
+                      <Text
+                        style={[
+                          styles.redeemButtonLabel,
+                          redeemDisabled && styles.redeemButtonLabelDisabled
+                        ]}
+                      >
+                        {isRedeeming
+                          ? 'Activating...'
+                          : premiumUnlocked
+                            ? `Extend premium (${premiumDayCost} pts)`
+                            : `Unlock premium (${premiumDayCost} pts)`}
+                      </Text>
+                    </TouchableOpacity>
+                    {!premiumUnlocked && pointsGap > 0 ? (
+                      <Text style={styles.rewardsProgress}>{`${pointsGap} pts to go`}</Text>
+                    ) : null}
+
+                    {/* Subscription Plans Button */}
+                    <TouchableOpacity
+                      style={styles.subscriptionButton}
+                      onPress={() => navigation.navigate('Subscription')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="star-outline" size={20} color={themeColors.primary} />
+                      <Text style={[styles.subscriptionButtonText, { color: themeColors.primary }]}>
+                        View Subscription Plans
+                      </Text>
+                      <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+                    </TouchableOpacity>
+                  </>
+                )}
 
                 {/* Reset Subscription Button (Testing Only) - COMMENTED OUT FOR PRODUCTION */}
                 {/* <TouchableOpacity
