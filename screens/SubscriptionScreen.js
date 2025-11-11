@@ -47,8 +47,29 @@ export default function SubscriptionScreen({ navigation }) {
   }, [user]);
 
   const handleSelectPlan = async (planId) => {
-    if (planId === userProfile?.subscriptionPlan) {
+    // Handle ultimate/gold equivalence
+    const currentPlanId = userProfile?.subscriptionPlan;
+    const normalizedCurrentPlan = (currentPlanId === 'ultimate' || currentPlanId === 'gold') ? 'gold' : currentPlanId;
+    const normalizedSelectedPlan = (planId === 'ultimate' || planId === 'gold') ? 'gold' : planId;
+
+    if (normalizedSelectedPlan === normalizedCurrentPlan) {
       showAlert('Already Subscribed', 'You are already on this plan.', [{ text: 'OK' }]);
+      return;
+    }
+
+    // Define plan hierarchy (higher index = higher tier)
+    const planHierarchy = ['basic', 'go', 'premium', 'gold'];
+    const currentPlanIndex = planHierarchy.indexOf(normalizedCurrentPlan || 'basic');
+    const selectedPlanIndex = planHierarchy.indexOf(normalizedSelectedPlan);
+
+    // Check if trying to downgrade
+    if (currentPlanIndex > selectedPlanIndex) {
+      showAlert(
+        'Already on Higher Tier',
+        `You're currently on the ${getPlanById(currentPlanId)?.name} plan, which includes all features of ${getPlanById(planId)?.name}.`,
+        [{ text: 'OK' }],
+        { icon: 'information-circle', iconColor: accentPreset?.buttonBackground || themeColors.primary }
+      );
       return;
     }
 
@@ -153,9 +174,20 @@ export default function SubscriptionScreen({ navigation }) {
 
         {/* Plan Cards */}
         {!isLoading && plans.map((plan, index) => {
-          const isCurrentPlan = userProfile?.subscriptionPlan === plan.id;
+          // Handle ultimate/gold equivalence
+          const currentPlanId = userProfile?.subscriptionPlan;
+          const normalizedCurrentPlan = (currentPlanId === 'ultimate' || currentPlanId === 'gold') ? 'gold' : currentPlanId;
+          const normalizedPlanId = (plan.id === 'ultimate' || plan.id === 'gold') ? 'gold' : plan.id;
+
+          const isCurrentPlan = normalizedPlanId === normalizedCurrentPlan;
           const isSelected = selectedPlan === plan.id;
           const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+
+          // Check if this is a downgrade
+          const planHierarchy = ['basic', 'go', 'premium', 'gold'];
+          const currentPlanIndex = planHierarchy.indexOf(normalizedCurrentPlan || 'basic');
+          const thisPlanIndex = planHierarchy.indexOf(normalizedPlanId);
+          const isDowngrade = currentPlanIndex > thisPlanIndex;
 
           return (
             <TouchableOpacity
@@ -166,12 +198,13 @@ export default function SubscriptionScreen({ navigation }) {
                   backgroundColor: themeColors.card,
                   borderColor: isSelected ? primaryColor : themeColors.divider,
                   borderWidth: isSelected ? 2 : 1,
+                  opacity: isDowngrade ? 0.6 : 1,
                 },
                 plan.popular && styles.popularCard,
               ]}
               onPress={() => handleSelectPlan(plan.id)}
               activeOpacity={0.7}
-              disabled={isProcessing}
+              disabled={isProcessing || isDowngrade}
             >
               {/* Popular Badge */}
               {plan.popular && (
@@ -189,6 +222,11 @@ export default function SubscriptionScreen({ navigation }) {
                   {isCurrentPlan && (
                     <View style={[styles.currentBadge, { backgroundColor: `${primaryColor}20` }]}>
                       <Text style={[styles.currentText, { color: primaryColor }]}>Current</Text>
+                    </View>
+                  )}
+                  {isDowngrade && !isCurrentPlan && (
+                    <View style={[styles.currentBadge, { backgroundColor: `${themeColors.textTertiary}20` }]}>
+                      <Text style={[styles.currentText, { color: themeColors.textTertiary }]}>Included</Text>
                     </View>
                   )}
                 </View>
@@ -259,13 +297,13 @@ export default function SubscriptionScreen({ navigation }) {
                   style={[
                     styles.selectButton,
                     {
-                      backgroundColor: isSelected ? primaryColor : 'transparent',
-                      borderColor: primaryColor,
-                      borderWidth: isSelected ? 0 : 1,
+                      backgroundColor: isSelected ? primaryColor : isDowngrade ? themeColors.divider : 'transparent',
+                      borderColor: isDowngrade ? themeColors.divider : primaryColor,
+                      borderWidth: isSelected || isDowngrade ? 0 : 1,
                     },
                   ]}
                   onPress={() => handleSelectPlan(plan.id)}
-                  disabled={isProcessing}
+                  disabled={isProcessing || isDowngrade}
                 >
                   {isProcessing && isSelected ? (
                     <ActivityIndicator color="#fff" />
@@ -273,10 +311,10 @@ export default function SubscriptionScreen({ navigation }) {
                     <Text
                       style={[
                         styles.selectButtonText,
-                        { color: isSelected ? '#fff' : primaryColor },
+                        { color: isSelected ? '#fff' : isDowngrade ? themeColors.textTertiary : primaryColor },
                       ]}
                     >
-                      {plan.price === 0 ? 'Select Plan' : 'Subscribe Now'}
+                      {isCurrentPlan ? 'Current Plan' : isDowngrade ? 'Included in Your Plan' : plan.price === 0 ? 'Select Plan' : 'Subscribe Now'}
                     </Text>
                   )}
                 </TouchableOpacity>
