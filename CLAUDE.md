@@ -24,8 +24,8 @@ Gold subscribers now get access to premium GPT-4o powered AI features that provi
 
 1. **GPT-4o Enhanced Summarization**
    - Gold: GPT-4o with 4 style options (Professional, Casual, Emoji, Formal)
-   - Basic/Premium: Hugging Face BART
-   - Cost: ~$0.002 per summary
+   - Basic/Premium: Local extractive summarizer (on-device)
+   - Cost: ~$0.002 per summary for Gold only
 
 2. **Vision-Personalized Cartoon Avatars**
    - Gold: GPT-4o Vision analyzes photo + HD DALL-E 3
@@ -63,7 +63,7 @@ Active Gold user monthly costs:
 - All Gold features proxy through `services/openai/gpt4Service.js`
 - Security: API key server-side only via Firebase Function proxy
 - Detection: `subscriptionPlan === 'gold'` checks throughout codebase
-- Fallback: If GPT-4o fails, falls back to Hugging Face/basic services
+- Fallback: If GPT-4o fails, fall back to the local extractive summarizer
 
 ---
 

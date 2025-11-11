@@ -45,6 +45,7 @@
     },
     "plugins": [],
     "extra": {
+      "EXPO_PUBLIC_GIPHY_API_KEY": "2eF22uKdxxVrcEW57D0K8N1NRUHbzsyr",
       "eas": {
         "projectId": "b7176364-6956-455a-8d9b-231e7877ba5a"
       }

@@ -359,21 +359,22 @@ describe('Summarization Service Integration', () => {
     expect(result.model).toBe('gpt-4o-mini');
   });
 
-  test('Basic users get Hugging Face summaries', async () => {
+  test('Basic users get local summaries', async () => {
     const result = await summarizePostDescription(testDescription, {
       subscriptionPlan: 'basic',
     });
 
     expect(result.goldFeature).toBeUndefined();
-    expect(result.model).not.toBe('gpt-4o-mini');
+    expect(result.model).toBe('local-extractive');
   });
 
-  test('Premium users get Hugging Face summaries', async () => {
+  test('Premium users get local summaries', async () => {
     const result = await summarizePostDescription(testDescription, {
       subscriptionPlan: 'premium',
     });
 
     expect(result.goldFeature).toBeUndefined();
+    expect(result.model).toBe('local-extractive');
   });
 });
 

@@ -1930,7 +1930,7 @@ export default function SettingsScreen({ navigation }) {
             <View>
               <Text style={styles.itemTitle}>AI description summaries</Text>
               <Text style={styles.itemSubtitle}>
-                Let BART condense long descriptions while composing posts.
+                Let the built-in AI condense long descriptions while composing posts.
               </Text>
             </View>
             <Switch

@@ -3,10 +3,8 @@
  * Handles uploading profile photos to Firebase Storage
  */
 
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { app } from '../api/firebaseConfig';
-
-const storage = getStorage(app);
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { storage } from '../api/firebaseClient';
 
 /**
  * Upload profile photo to Firebase Storage

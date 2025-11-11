@@ -37,13 +37,13 @@ export const AI_FEATURES_CONFIG = {
   /**
    * AI Summarization
    * Summarizes long post descriptions
-   * Basic/Premium: Hugging Face BART (FREE)
+   * Basic/Premium: On-device extractive summarizer (FREE)
    * Gold: GPT-4o with style options (~$0.002 per summary)
    */
   summarization: {
     enabled: true,
     requiresPremium: false, // Available to all users
-    goldEnhancement: true, // Gold users get GPT-4o instead of BART
+    goldEnhancement: true, // Gold users get GPT-4o instead of the local summarizer
     userCanToggle: true, // Users can disable in settings
   },
 

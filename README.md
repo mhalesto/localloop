@@ -17,33 +17,14 @@ npm run generate:icons
 
 ---
 
-## Premium summarization backend
+## AI summarization (no backend required)
 
-The premium composer now supports AI-assisted summaries backed by a lightweight Express service that wraps the `facebook/bart-large-cnn` model.
+LocalLoop now ships with a fully client/serverless summarization pipeline:
 
-### Running the server
+- **Gold** subscribers continue to use GPT‑4o via the Firebase `openAIProxy` function (style + tone aware).
+- **Basic & Premium** users fall back to a fast on-device extractive summarizer—no separate Node/Express service or Hugging Face hosting is required.
 
-1. Install Expo app dependencies: `npm install`
-2. Start the summarization service (the script installs backend dependencies on first run): `npm run server`
-   - If you prefer working from the backend folder directly, run `npm run server` after `cd backend`.
-3. The server defaults to `http://localhost:4000` and exposes `POST /summaries`
-
-If you prefer to prime the backend ahead of time, run `npm run server:install` before starting it.
-
-### Expo client configuration
-
-The mobile client reads the backend URL from `EXPO_PUBLIC_SUMMARY_API_URL`. When this variable is not set the app now inspects the Expo host information and automatically points native builds to the Metro server's LAN IP (e.g. `http://192.168.0.42:4000`). This means the summarizer works out of the box on physical devices without any additional setup. The web build still defaults to `http://localhost:4000`.
-
-You can always override the detection logic explicitly:
-
-```bash
-EXPO_PUBLIC_SUMMARY_API_URL="http://localhost:4000" npm run web
-```
-
-With the service running, premium users can tap **Summarize description** in the composer to generate condensed copy via BART.
-When model downloads are unavailable the backend falls back to an on-device extractive summarizer that respects the same
-length preferences. Premium members can choose between *Shorter*, *Balanced*, or *Longer* summaries from the **AI description
-summaries** section in Settings to control how much detail the assistant retains.
+The **AI description summaries** setting still lets everyone pick *Shorter*, *Balanced*, or *Longer* outputs, but setup is now as simple as keeping your OpenAI key configured in Firebase Functions; there is no `npm run server` step anymore.
 
 ## Hugging Face moderation
 

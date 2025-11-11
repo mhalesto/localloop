@@ -192,7 +192,7 @@
 ✅ **Custom typography controls**
 ✅ **10 AI cartoon avatars per month**
 ✅ **8 cartoon styles** (Pixar, Anime, Comic, Watercolor, Disney, Classic, Ghibli, Simple)
-✅ **AI thread summaries** (Hugging Face BART)
+✅ **AI thread summaries** (Local extractive engine)
 ✅ **Smart comment suggestions**
 ✅ **Translation** (11 South African languages)
 ✅ **Premium badge** (⭐ visible on profile)
@@ -245,7 +245,7 @@
 
 📝 **GPT-4o Enhanced Summaries**
 - 4 summary styles (Professional, Casual, Emoji, Formal)
-- Better quality than BART
+- Better quality than the local summarizer
 - Context-aware summarization
 
 💬 **GPT-4o Comment Suggestions**
@@ -368,7 +368,7 @@
 
 **Powered by**:
 - **Basic**: Not available
-- **Premium**: Hugging Face BART (facebook/bart-large-cnn)
+- **Premium**: Local extractive summarizer (on-device)
 - **Gold**: GPT-4o (4 summary styles)
 
 #### Features
@@ -713,7 +713,7 @@
 
 #### Third-Party APIs
 - **OpenAI**: GPT-4o, GPT-4, GPT-3.5, DALL-E 3
-- **Hugging Face**: Content moderation, BART summarization
+- **Hugging Face**: Content moderation (zero-shot classifiers)
 - **Stripe**: Payment processing (optional)
 
 ---
@@ -1085,7 +1085,6 @@ Mobile App → Firebase Function → OpenAI API → Response
 **AI**: Artificial Intelligence - Computer systems that perform tasks requiring human intelligence
 **GPT-4o**: OpenAI's latest and most advanced language model (Omni model)
 **DALL-E 3**: OpenAI's image generation AI
-**BART**: Bidirectional and Auto-Regressive Transformers - Facebook's summarization model
 **Firestore**: Google's NoSQL cloud database
 **Cloud Function**: Serverless backend code that runs on demand
 **React Native**: Framework for building mobile apps using JavaScript

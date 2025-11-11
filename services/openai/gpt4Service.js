@@ -7,7 +7,7 @@ import { callOpenAI, OPENAI_ENDPOINTS } from './config';
 
 /**
  * Summarize text using GPT-4o (Gold tier only)
- * Much higher quality than Hugging Face BART
+ * Much higher quality than the local extractive summarizer
  *
  * @param {string} text - Text to summarize
  * @param {object} options - Summarization options

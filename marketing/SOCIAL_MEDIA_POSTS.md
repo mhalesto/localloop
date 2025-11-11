@@ -402,7 +402,7 @@ As CTO/Founder, I'm excited to share some insights into our Gold tier launch:
 Architecture Decisions:
 • Server-side API proxy via Firebase Cloud Functions (security first)
 • Strategic model selection: gpt-4o-mini for most features (87% cost savings), full gpt-4o only for Vision
-• Graceful fallback to Hugging Face BART if OpenAI fails
+• Graceful fallback to our built-in extractive summarizer if OpenAI fails
 • Real-time usage tracking in Firestore
 • Client-side caching for repeated requests
 

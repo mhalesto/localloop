@@ -82,7 +82,7 @@
 ### 2. GPT-4o Summarization 📝
 - **What:** 4 summary styles (Professional, Casual, Emoji, Formal)
 - **Models:** gpt-4o-mini (cost: ~$0.002/summary)
-- **Upgrade:** Basic users get Hugging Face BART
+- **Upgrade:** Basic users get the built-in extractive summarizer (no backend required)
 - **UI:** Style picker in Settings
 - **Location:** Long post summarization
 

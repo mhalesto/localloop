@@ -3,10 +3,8 @@
  * Find users who follow both the current user and the profile being viewed
  */
 
-import { getFirestore, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { app } from '../api/firebaseConfig';
-
-const db = getFirestore(app);
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../api/firebaseClient';
 
 /**
  * Get mutual followers between current user and profile user

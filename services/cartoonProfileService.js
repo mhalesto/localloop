@@ -3,13 +3,10 @@
  * Manages cartoon profile picture generation, usage tracking, and history
  */
 
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { app } from '../api/firebaseConfig';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '../api/firebaseClient';
 import { getHistoryLimit } from './openai/profileCartoonService';
-
-const db = getFirestore(app);
-const storage = getStorage(app);
 
 /**
  * Get user's cartoon profile data

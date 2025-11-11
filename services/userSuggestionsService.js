@@ -3,10 +3,8 @@
  * Suggest users based on shared interests, location, and mutual connections
  */
 
-import { getFirestore, collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { app } from '../api/firebaseConfig';
-
-const db = getFirestore(app);
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { db } from '../api/firebaseClient';
 
 /**
  * Calculate similarity score between two users

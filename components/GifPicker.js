@@ -12,12 +12,18 @@ import {
   ActivityIndicator,
   Dimensions
 } from 'react-native';
+import Constants from 'expo-constants';
 
 const { width } = Dimensions.get('window');
 const COLUMN_WIDTH = (width - 48) / 2; // 2 columns with padding
 
-// Get free API key from: https://developers.giphy.com/
-const GIPHY_API_KEY = 'YOUR_GIPHY_API_KEY'; // Replace with actual API key
+const resolveGiphyApiKey = () =>
+  process.env.EXPO_PUBLIC_GIPHY_API_KEY ||
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_GIPHY_API_KEY ||
+  '';
+
+const GIPHY_API_KEY = resolveGiphyApiKey();
+const IS_GIPHY_CONFIGURED = Boolean(GIPHY_API_KEY);
 
 export default function GifPicker({ visible, onClose, onSelectGif, themeColors }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,8 +32,8 @@ export default function GifPicker({ visible, onClose, onSelectGif, themeColors }
   const [page, setPage] = useState(0);
 
   const searchGifs = useCallback(async (query, pageNum = 0) => {
-    if (!GIPHY_API_KEY || GIPHY_API_KEY === 'YOUR_GIPHY_API_KEY') {
-      console.warn('[GifPicker] Please add a GIPHY API key');
+    if (!IS_GIPHY_CONFIGURED) {
+      console.warn('[GifPicker] Missing GIPHY API key. Set EXPO_PUBLIC_GIPHY_API_KEY.');
       return;
     }
 
@@ -76,7 +82,7 @@ export default function GifPicker({ visible, onClose, onSelectGif, themeColors }
     onClose();
   };
 
-  if (!GIPHY_API_KEY || GIPHY_API_KEY === 'YOUR_GIPHY_API_KEY') {
+  if (!IS_GIPHY_CONFIGURED) {
     return (
       <Modal
         visible={visible}
@@ -88,13 +94,10 @@ export default function GifPicker({ visible, onClose, onSelectGif, themeColors }
           <View style={[styles.container, { backgroundColor: themeColors.surface }]}>
             <View style={styles.setupMessage}>
               <Text style={[styles.setupText, { color: themeColors.textPrimary }]}>
-                To use GIFs, get a free API key from:
-              </Text>
-              <Text style={[styles.setupLink, { color: themeColors.primary }]}>
-                https://developers.giphy.com/
+                To use GIFs, set the EXPO_PUBLIC_GIPHY_API_KEY environment variable.
               </Text>
               <Text style={[styles.setupText, { color: themeColors.textSecondary }]}>
-                Then add it to components/GifPicker.js
+                You can request a free key at https://developers.giphy.com/ and add it to app config or your build environment.
               </Text>
               <TouchableOpacity
                 style={[styles.closeSetupButton, { backgroundColor: themeColors.primary }]}

@@ -8,7 +8,7 @@ Gold tier subscribers get access to premium GPT-4o powered features that provide
 
 | Feature | Basic (Free) | Premium ($5/mo) | Gold ($10/mo) |
 |---------|--------------|-----------------|---------------|
-| **AI Summarization** | Hugging Face BART | Hugging Face BART | **GPT-4o** ⭐ |
+| **AI Summarization** | Local extractive summarizer | Local extractive summarizer | **GPT-4o** ⭐ |
 | **Summary Styles** | 1 (Standard) | 1 (Standard) | **4 Styles** (Professional, Casual, Emoji, Formal) ⭐ |
 | **Cartoon Generations** | 5 lifetime | 10/month | 20/month |
 | **Cartoon Quality** | Generic DALL-E 3 | Generic DALL-E 3 | **GPT-4o Vision + HD Quality** ⭐ |
@@ -23,7 +23,7 @@ Gold tier subscribers get access to premium GPT-4o powered features that provide
 ## 1. GPT-4o Enhanced Summarization
 
 ### What's Different?
-- **Basic/Premium**: Uses Hugging Face BART (free tier) - basic abstractive summarization
+- **Basic/Premium**: Uses the built-in extractive summarizer (fast, offline)
 - **Gold**: Uses GPT-4o - significantly more natural, context-aware summaries
 
 ### Features

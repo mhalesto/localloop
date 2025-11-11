@@ -3,10 +3,8 @@
  * Fetch filtered content for the Explore screen
  */
 
-import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { app } from '../api/firebaseConfig';
-
-const db = getFirestore(app);
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../api/firebaseClient';
 
 /**
  * Get posts from current city
