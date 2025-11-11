@@ -194,7 +194,7 @@ export const SUBSCRIPTION_PLANS = {
   GOLD: {
     id: 'ultimate',
     name: 'Gold',
-    price: 15.00, // 🧪 TEST PRICE - PRODUCTION: 249.99
+    price: 249.99,
     currency: 'ZAR',
     interval: 'month',
     yearlyPrice: 2499,
