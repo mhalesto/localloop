@@ -100,7 +100,7 @@ const pricingTiers = [
     name: 'Basic',
     price: 'R0',
     cadence: '/month',
-    description: 'Essential features for casual neighbors getting started.',
+    description: 'Essential features for casual users getting started.',
     features: [
       '5 posts per day',
       '5 statuses per day',
@@ -109,7 +109,8 @@ const pricingTiers = [
       '5 basic accent themes',
       '5 AI cartoon avatars (lifetime)',
       'Free AI features',
-      'Standard email support (48h)'
+      'Standard support (48h)',
+      'Ads + watermark on uploads until you upgrade'
     ],
     cta: 'Get started'
   },
@@ -118,8 +119,8 @@ const pricingTiers = [
     price: 'R79.99',
     cadence: '/month',
     secondaryPrice: 'R799/year',
-    secondaryLabel: 'save 17%',
-    description: 'Perfect for active community members who want full creative control.',
+    secondaryLabel: 'save 17% (2 months free)',
+    description: 'Perfect for active community members who want premium creative control.',
     features: [
       'Unlimited posts & statuses',
       '5 events per month',
@@ -127,64 +128,71 @@ const pricingTiers = [
       'Custom typography controls',
       '10 AI cartoon avatars / month',
       '8 cartoon styles (Pixar, Anime, etc.)',
-      'AI thread summaries & smart suggestions',
-      'Translation in 11 languages',
-      'Go Star badge ⭐ & ad-free experience',
-      'Priority email support (24h)'
+      'AI thread summaries',
+      'Smart comment suggestions',
+      'Translation (11 languages)',
+      'Premium badge',
+      'Ad-free experience',
+      'Priority support (12h)',
+      'Monthly marketplace boost credit'
     ],
-    cta: 'Subscribe now'
+    cta: 'Upgrade to Go',
+    recommended: true
   },
   {
     name: 'Premium',
     price: 'R149.99',
     cadence: '/month',
     secondaryPrice: 'R1499/year',
-    secondaryLabel: 'save 17%',
-    description: 'GPT-4o powered AI features + premium experience. Same AI as ChatGPT Plus for less!',
+    secondaryLabel: 'save 17% (2 months free)',
+    description: 'GPT-4o powered AI features plus a VIP experience for Power Loop leaders.',
     features: [
       'Everything in Go',
       '15 events per month',
       '✨ GPT-4o AI Post Composer',
       '🎨 Vision-Personalized Cartoons',
-      '📝 GPT-4o Thread Summaries (4 styles)',
+      '🖼️ Upload Custom Images for Generation',
+      '🚀 Generate Anything (Beyond Cartoons)',
+      '📝 GPT-4o Summaries (4 styles)',
       '💬 Smart Comment Suggestions',
       '🌍 Cultural Translation (11 SA languages)',
-      '20 Vision-enhanced HD cartoon avatars/month',
-      'Custom cartoon prompts',
-      'Premium Crown badge 👑',
+      '20 Vision-enhanced generations/month (HD)',
+      'Custom prompts for unlimited creativity',
+      'Premium Crown badge',
       '5 exclusive Premium themes',
       'Advanced color controls',
+      'Early access to features',
+      'Market listing priority',
       'Profile analytics dashboard',
-      'Early access to new features'
+      'Priority email support (24h)'
     ],
-    cta: 'Try Premium',
-    recommended: false
+    cta: 'Try Premium'
   },
   {
     name: 'Gold',
     price: 'R249.99',
     cadence: '/month',
     secondaryPrice: 'R2499/year',
-    secondaryLabel: 'save 17%',
+    secondaryLabel: 'save 17% (2 months free)',
     description: 'Ultimate power user experience with 3x AI limits for serious community leaders.',
     features: [
       'Everything in Premium',
       'Unlimited events',
-      '🚀 3x All AI Limits',
-      '⚡ 60 Vision Cartoons/month (vs 20)',
-      '🎯 150 GPT-4o Summaries/day (vs 50)',
-      '✍️ 90 Post Improvements/day (vs 30)',
+      '🚀 3x all AI limits',
+      '⚡ 60 Vision Cartoons/month',
+      '🎯 150 GPT-4o Summaries/day',
+      '✍️ 90 Post Improvements/day',
       '📊 Advanced Analytics Dashboard',
       '💎 Exclusive Gold Crown Badge',
-      '🎨 Unlimited Custom Themes',
+      '🎨 Unlimited custom themes',
       '100 avatar choices',
       '90-day market listing duration',
+      '20 images per market listing',
       'Priority marketplace positioning',
       'Early beta feature access',
-      'Priority email support (faster response)'
+      'Email support (faster priority)'
     ],
-    cta: 'Get Gold',
-    recommended: true
+    cta: 'Explore Gold'
   }
 ];
 
