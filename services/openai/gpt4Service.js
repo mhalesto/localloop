@@ -420,7 +420,7 @@ Instructions:
  * Helper function to verify Gold tier access
  */
 export function isGoldUser(userProfile) {
-  return userProfile?.subscriptionPlan === 'gold';
+  return userProfile?.subscriptionPlan === 'gold' || userProfile?.subscriptionPlan === 'ultimate';
 }
 
 /**

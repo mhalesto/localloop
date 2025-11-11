@@ -80,6 +80,12 @@ export const USAGE_LIMITS = {
     historyLimit: 20, // Gold users can save 20 cartoons in history
     gpt4VisionMonthly: 5, // Gold users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
   },
+  ultimate: {
+    monthly: 20, // Ultimate (Gold) users get 20 generations per month
+    lifetime: null, // Unlimited lifetime
+    historyLimit: 20, // Ultimate users can save 20 cartoons in history
+    gpt4VisionMonthly: 5, // Ultimate users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
+  },
 };
 
 /**
@@ -175,7 +181,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
   const gpt4Limit = limits.gpt4VisionMonthly || 0;
 
-  if (subscriptionPlan === 'gold' && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
+  if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
     console.log(`[profileCartoonService] GPT-4 Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}), falling back to GPT-3.5`);
     actualModel = 'gpt-3.5-turbo';
   }
@@ -185,8 +191,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   let personalizedDescription = null;
   let usedGpt4 = false;
 
-  // Gold users get GPT-4o Vision analysis for personalized cartoons (if within limit)
-  if (subscriptionPlan === 'gold' && imageUrl && actualModel === 'gpt-4') {
+  // Gold/Ultimate users get GPT-4o Vision analysis for personalized cartoons (if within limit)
+  if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && imageUrl && actualModel === 'gpt-4') {
     try {
       // Check if we have a valid public URL
       if (!imageUrl.startsWith('https://')) {
@@ -248,7 +254,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
         // Gold users get HD quality for better results
-        const imageQuality = subscriptionPlan === 'gold' ? 'hd' : 'standard';
+        const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
         console.log(`[profileCartoonService] Using ${imageQuality} quality (${subscriptionPlan} plan)`);
 
         const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {

@@ -60,7 +60,7 @@ export default function CartoonStyleModal({
   };
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
-  const isGoldUser = subscriptionPlan === 'gold' || isAdmin; // Admin has Gold features
+  const isGoldUser = subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate' || isAdmin; // Admin and Ultimate/Gold have Gold features
 
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,

@@ -112,8 +112,8 @@ export async function summarizePostDescription(
     throw new Error('Add a description before requesting a summary.');
   }
 
-  // Gold users get GPT-4o summaries with style options
-  if (subscriptionPlan === 'gold') {
+  // Gold/Ultimate users get GPT-4o summaries with style options
+  if (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') {
     try {
       console.log('[SummaryService] Gold user detected - using GPT-4o summarization');
       const gpt4Result = await summarizeWithGPT4o(text, {
