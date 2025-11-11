@@ -104,62 +104,86 @@ const pricingTiers = [
     features: [
       '5 posts per day',
       '5 statuses per day',
+      '2 events per month',
       'Unlimited comments & replies',
       '5 basic accent themes',
       '5 AI cartoon avatars (lifetime)',
       'Free AI features',
-      'Standard support (48h)',
-      'Ads + watermark on uploads until you upgrade'
+      'Standard email support (48h)'
     ],
     cta: 'Get started'
   },
   {
-    name: 'Premium',
-    price: 'R49.99',
+    name: 'Go',
+    price: 'R79.99',
     cadence: '/month',
-    secondaryPrice: 'R499/year',
-    secondaryLabel: 'save almost 20%',
+    secondaryPrice: 'R799/year',
+    secondaryLabel: 'save 17%',
     description: 'Perfect for active community members who want full creative control.',
     features: [
       'Unlimited posts & statuses',
+      '5 events per month',
       '15+ premium gradient themes',
       'Custom typography controls',
       '10 AI cartoon avatars / month',
       '8 cartoon styles (Pixar, Anime, etc.)',
       'AI thread summaries & smart suggestions',
       'Translation in 11 languages',
-      'Premium badge & ad-free experience',
-      'Priority support (12h)',
-      'Monthly marketplace boost credit'
+      'Go Star badge ⭐ & ad-free experience',
+      'Priority email support (24h)'
     ],
     cta: 'Subscribe now'
   },
   {
-    name: 'Gold',
+    name: 'Premium',
     price: 'R149.99',
     cadence: '/month',
     secondaryPrice: 'R1499/year',
-    secondaryLabel: 'save 20% (2 months)',
-    description: 'GPT-4o powered AI features + VIP experience. Same AI as ChatGPT Plus for 60% less!',
+    secondaryLabel: 'save 17%',
+    description: 'GPT-4o powered AI features + premium experience. Same AI as ChatGPT Plus for less!',
     features: [
-      'Everything in Premium',
+      'Everything in Go',
+      '15 events per month',
       '✨ GPT-4o AI Post Composer',
       '🎨 Vision-Personalized Cartoons',
       '📝 GPT-4o Thread Summaries (4 styles)',
       '💬 Smart Comment Suggestions',
       '🌍 Cultural Translation (11 SA languages)',
-      '20 Vision-enhanced cartoon avatars/month',
-      'HD quality cartoons (1024x1024)',
+      '20 Vision-enhanced HD cartoon avatars/month',
       'Custom cartoon prompts',
-      'Gold Crown badge',
-      '5 exclusive Gold themes',
+      'Premium Crown badge 👑',
+      '5 exclusive Premium themes',
       'Advanced color controls',
-      'Market listing priority',
       'Profile analytics dashboard',
-      'Early access to features',
-      'VIP support (2h)'
+      'Early access to new features'
     ],
-    cta: 'Try Gold Free',
+    cta: 'Try Premium',
+    recommended: false
+  },
+  {
+    name: 'Gold',
+    price: 'R249.99',
+    cadence: '/month',
+    secondaryPrice: 'R2499/year',
+    secondaryLabel: 'save 17%',
+    description: 'Ultimate power user experience with 3x AI limits for serious community leaders.',
+    features: [
+      'Everything in Premium',
+      'Unlimited events',
+      '🚀 3x All AI Limits',
+      '⚡ 60 Vision Cartoons/month (vs 20)',
+      '🎯 150 GPT-4o Summaries/day (vs 50)',
+      '✍️ 90 Post Improvements/day (vs 30)',
+      '📊 Advanced Analytics Dashboard',
+      '💎 Exclusive Gold Crown Badge',
+      '🎨 Unlimited Custom Themes',
+      '100 avatar choices',
+      '90-day market listing duration',
+      'Priority marketplace positioning',
+      'Early beta feature access',
+      'Priority email support (faster response)'
+    ],
+    cta: 'Get Gold',
     recommended: true
   }
 ];
