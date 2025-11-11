@@ -38,6 +38,34 @@ service cloud.firestore {
         && resource.data.senderId == request.auth.uid;
     }
 
+    function isRestrictedUserFieldChange() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'subscriptionPlan',
+        'premiumUnlocked',
+        'premiumExpiresAt',
+        'payFastPaymentId',
+        'payFastToken',
+        'subscriptionStartDate',
+        'subscriptionEndDate',
+        'lastPaymentDate',
+        'admin',
+        'isAdmin'
+      ]);
+    }
+
+    function isInvalidRestrictedUserCreate(data) {
+      return (data.subscriptionPlan != null && data.subscriptionPlan != 'basic')
+        || (data.premiumUnlocked == true)
+        || (data.premiumExpiresAt != null)
+        || (data.payFastPaymentId != null)
+        || (data.payFastToken != null)
+        || (data.subscriptionStartDate != null)
+        || (data.subscriptionEndDate != null)
+        || (data.lastPaymentDate != null)
+        || (data.admin == true)
+        || (data.isAdmin == true);
+    }
+
     match /posts/{postId} {
       allow read: if true;
 
@@ -97,10 +125,12 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && !isInvalidRestrictedUserCreate(request.resource.data);
 
       // Allow users to update their own profile
-      allow update: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && !isRestrictedUserFieldChange();
 
       // Allow updating follower/following counts when following/unfollowing
       allow update: if isSignedIn()

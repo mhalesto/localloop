@@ -622,7 +622,7 @@ const crypto = require('crypto');
 
 // PayFast configuration
 const getPayFastConfig = () => {
-  const config = functions.config().payfast || {};
+  const config = PAYFAST_ENV;
 
   // PRODUCTION MODE - Using live PayFast
   // Credentials should be set via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY"
@@ -634,6 +634,138 @@ const getPayFastConfig = () => {
     // For testing, use: 'https://sandbox.payfast.co.za/eng/process'
   };
 };
+
+const PAYFAST_PLAN_CONFIG = Object.freeze({
+  premium: {
+    name: 'Go',
+    monthly: 79.99,
+    yearly: 799.0
+  },
+  gold: {
+    name: 'Premium',
+    monthly: 149.99,
+    yearly: 1499.0
+  },
+  ultimate: {
+    name: 'Gold',
+    monthly: 249.99,
+    yearly: 2499.0
+  }
+});
+
+const PLAN_RANK = Object.freeze({
+  basic: 0,
+  premium: 1,
+  gold: 2,
+  ultimate: 3
+});
+
+const PREMIUM_PLAN_IDS = new Set(['premium', 'gold', 'ultimate']);
+const GOLD_PLAN_IDS = new Set(['gold', 'ultimate']);
+
+const getRuntimeConfig = () => {
+  try {
+    return functions.config();
+  } catch (error) {
+    console.warn('[config] functions.config() unavailable – using empty config object');
+    return {};
+  }
+};
+
+const runtimeConfig = getRuntimeConfig();
+const PAYFAST_ENV = runtimeConfig.payfast || {};
+const ADMIN_ENV = runtimeConfig.admin || {};
+const MAINTENANCE_ENV = runtimeConfig.maintenance || {};
+
+const parseConfigList = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+  return String(value)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const PAYFAST_DEFAULT_TRUSTED_CIDRS = [
+  '196.33.227.0/24',
+  '196.33.228.0/24',
+  '156.38.140.0/24',
+  '41.74.179.0/24'
+];
+
+const PAYFAST_TRUSTED_IPS = parseConfigList(PAYFAST_ENV.trusted_ips);
+const PAYFAST_TRUSTED_CIDRS_FROM_CONFIG = parseConfigList(PAYFAST_ENV.trusted_cidrs);
+const PAYFAST_TRUSTED_CIDRS = PAYFAST_TRUSTED_CIDRS_FROM_CONFIG.length
+  ? PAYFAST_TRUSTED_CIDRS_FROM_CONFIG
+  : PAYFAST_DEFAULT_TRUSTED_CIDRS;
+
+const sanitizeIp = (value) => {
+  if (!value) return '';
+  return value.startsWith('::ffff:') ? value.slice(7) : value;
+};
+
+const resolveRequestIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length) {
+    const ip = forwarded.split(',')[0].trim();
+    if (ip) return sanitizeIp(ip);
+  }
+  if (req.headers['x-real-ip']) {
+    return sanitizeIp(req.headers['x-real-ip']);
+  }
+  if (req.ip) {
+    return sanitizeIp(req.ip);
+  }
+  if (req.connection?.remoteAddress) {
+    return sanitizeIp(req.connection.remoteAddress);
+  }
+  if (req.socket?.remoteAddress) {
+    return sanitizeIp(req.socket.remoteAddress);
+  }
+  return '';
+};
+
+const ipv4ToLong = (ip) => {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  let result = 0;
+  for (const part of parts) {
+    const octet = Number(part);
+    if (!Number.isInteger(octet) || octet < 0 || octet > 255) {
+      return null;
+    }
+    result = (result << 8) + octet;
+  }
+  return result >>> 0;
+};
+
+const ipInCidr = (ip, cidr) => {
+  const [range, bitsStr] = cidr.split('/');
+  const bits = Number(bitsStr ?? '32');
+  if (!range || Number.isNaN(bits) || bits < 0 || bits > 32) {
+    return false;
+  }
+  const ipLong = ipv4ToLong(ip);
+  const rangeLong = ipv4ToLong(range);
+  if (ipLong == null || rangeLong == null) {
+    return false;
+  }
+  const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits)) >>> 0;
+  return (ipLong & mask) === (rangeLong & mask);
+};
+
+const isTrustedPayFastIp = (ip) => {
+  if (!ip) return false;
+  if (PAYFAST_TRUSTED_IPS.includes(ip)) {
+    return true;
+  }
+  return PAYFAST_TRUSTED_CIDRS.some((cidr) => ipInCidr(ip, cidr));
+};
+
+const ADMIN_SETUP_SECRET = ADMIN_ENV.setup_secret || '';
+const CLEANUP_CONFIRMATION_CODE = MAINTENANCE_ENV.cleanup_code || null;
 
 // Encode values like PHP's urlencode: uppercase hex and space => +
 const payFastEncode = (value) => {
@@ -724,9 +856,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const {planId, planName, amount, interval, userId, userEmail} = data;
-
-  if (!planId || !amount || !interval) {
+  const {planId, interval, userId, userEmail} = data;
+  if (!planId || !interval) {
     throw new functions.https.HttpsError(
         'invalid-argument',
         'Missing required parameters',
@@ -734,14 +865,60 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    const config = getPayFastConfig();
     const uid = context.auth.uid;
+    const targetUserId = userId || uid;
+    if (targetUserId !== uid) {
+      throw new functions.https.HttpsError(
+          'permission-denied',
+          'You can only create payments for your own account'
+      );
+    }
+
+    const planConfig = PAYFAST_PLAN_CONFIG[planId];
+    if (!planConfig) {
+      throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Unsupported subscription plan'
+      );
+    }
+
+    const billingInterval = interval === 'year' ? 'yearly' : 'monthly';
+    if (!['monthly', 'yearly'].includes(billingInterval)) {
+      throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Invalid billing interval'
+      );
+    }
+
+    const resolvedAmount = planConfig[billingInterval];
+    if (!Number.isFinite(resolvedAmount)) {
+      throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Plan pricing is not configured for the selected interval'
+      );
+    }
+
+    const userSnapshot = await admin.firestore().collection('users').doc(uid).get();
+    const currentPlan = userSnapshot.exists ? (userSnapshot.data()?.subscriptionPlan || 'basic') : 'basic';
+    const currentRank = PLAN_RANK[currentPlan] ?? 0;
+    const desiredRank = PLAN_RANK[planId] ?? 0;
+    if (desiredRank <= currentRank) {
+      throw new functions.https.HttpsError(
+          'failed-precondition',
+          'You are already on this plan or a higher tier'
+      );
+    }
+
+    const planDisplayName = planConfig.name;
+    const paymentAmount = Number(resolvedAmount).toFixed(2);
+
+    const config = getPayFastConfig();
 
     console.log('[createPayFastPayment] Passphrase set:', config.passphrase ? 'yes' : 'no');
 
     // PayFast subscription frequency
     // 3 = Monthly, 6 = Annually
-    const frequency = interval === 'year' ? 6 : 3;
+    const frequency = billingInterval === 'yearly' ? 6 : 3;
 
     // Create PayFast payment data
     const paymentData = {
@@ -755,18 +932,18 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Buyer details
       name_first: context.auth.token.name?.split(' ')[0] || 'User',
       name_last: context.auth.token.name?.split(' ').slice(1).join(' ') || 'Name',
-      email_address: userEmail || context.auth.token.email,
+      email_address: userEmail || context.auth.token.email || userSnapshot.data()?.email || '',
 
       // Transaction details
       m_payment_id: `${uid}_${Date.now()}`,
-      amount: amount.toFixed(2),
-      item_name: `LocalLoop ${planName}`,
-      item_description: `${planName} subscription - ${interval}ly billing`,
+      amount: paymentAmount,
+      item_name: `LocalLoop ${planDisplayName}`,
+      item_description: `${planDisplayName} subscription - ${billingInterval === 'yearly' ? 'annual' : 'monthly'} billing`,
 
       // Custom fields
       custom_str1: uid, // User ID
       custom_str2: planId, // Plan ID
-      custom_str3: interval, // Billing interval
+      custom_str3: billingInterval === 'yearly' ? 'year' : 'month', // Billing interval
     };
 
     // Generate signature - first log the data
@@ -819,6 +996,12 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
     return res.status(405).send('Method Not Allowed');
   }
 
+  const requestIp = resolveRequestIp(req);
+  if (!isTrustedPayFastIp(requestIp)) {
+    console.warn('[payFastWebhook] Rejected request from untrusted IP:', requestIp);
+    return res.status(403).send('Forbidden');
+  }
+
   try {
     const pfData = req.body;
     const config = getPayFastConfig();
@@ -839,9 +1022,8 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
     console.log('[payFastWebhook] Calculated signature:', signature);
 
     if (signature !== pfData.signature) {
-      console.warn('[payFastWebhook] Signature mismatch - proceeding anyway for debugging');
-      // TEMPORARY: Don't reject for debugging purposes
-      // return res.status(400).send('Invalid signature');
+      console.warn('[payFastWebhook] Signature mismatch - rejecting ITN');
+      return res.status(400).send('Invalid signature');
     }
 
     // Check payment status
@@ -849,6 +1031,40 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
       const userId = pfData.custom_str1;
       const planId = pfData.custom_str2;
       const interval = pfData.custom_str3;
+      const planConfig = PAYFAST_PLAN_CONFIG[planId];
+
+      if (!planConfig) {
+        console.error('[payFastWebhook] Unknown plan ID:', planId);
+        return res.status(400).send('Unknown plan');
+      }
+
+      const intervalKey = interval === 'year' ? 'yearly' : 'monthly';
+      const expectedAmount = Number(planConfig[intervalKey]);
+      if (!Number.isFinite(expectedAmount)) {
+        console.error('[payFastWebhook] Pricing not configured for plan', planId, intervalKey);
+        return res.status(400).send('Plan pricing not configured');
+      }
+
+      const paidAmount = Number(pfData.amount_gross ?? pfData.amount ?? pfData.recurring_amount);
+      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - expectedAmount) > 0.5) {
+        console.error('[payFastWebhook] Amount mismatch', { paidAmount, expectedAmount });
+        return res.status(400).send('Amount mismatch');
+      }
+
+      const userRef = admin.firestore().collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        console.error('[payFastWebhook] User not found:', userId);
+        return res.status(404).send('User not found');
+      }
+
+      const currentPlan = userDoc.data().subscriptionPlan || 'basic';
+      const currentRank = PLAN_RANK[currentPlan] ?? 0;
+      const desiredRank = PLAN_RANK[planId] ?? 0;
+      if (desiredRank <= currentRank) {
+        console.warn('[payFastWebhook] Ignoring payment for same or lower tier', { userId, currentPlan, planId });
+        return res.status(200).send('Plan already active');
+      }
 
       // Calculate subscription end date
       let subscriptionEndDate;
@@ -859,7 +1075,7 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
       }
 
       // Update user subscription
-      await admin.firestore().collection('users').doc(userId).update({
+      await userRef.update({
         subscriptionPlan: planId,
         premiumUnlocked: true,
         subscriptionStartDate: Date.now(),
@@ -1010,6 +1226,64 @@ exports.cleanupExpiredStatuses = functions.pubsub
 // OPENAI PROXY FUNCTION
 // ====================================
 
+const resolveUserSubscriptionPlan = async (uid) => {
+  try {
+    const snapshot = await admin.firestore().collection('users').doc(uid).get();
+    if (!snapshot.exists) {
+      return 'basic';
+    }
+    return snapshot.data()?.subscriptionPlan || 'basic';
+  } catch (error) {
+    console.error('[openAIProxy] Failed to fetch user plan', error);
+    return 'basic';
+  }
+};
+
+const GOLD_MODEL_MARKERS = ['gpt-4', 'gpt-4o', 'omni'];
+const PREMIUM_ENDPOINT_MARKERS = ['/chat/completions', '/images', '/embeddings', '/audio'];
+
+const endpointRequiresGoldPlan = (endpoint, body = {}) => {
+  const path = String(endpoint || '').toLowerCase();
+  const modelName = String(body?.model || '').toLowerCase();
+  if (GOLD_MODEL_MARKERS.some((marker) => modelName.includes(marker))) {
+    return true;
+  }
+  if (path.includes('/images') && String(body?.quality || '').toLowerCase() === 'hd') {
+    return true;
+  }
+  return false;
+};
+
+const endpointRequiresPremiumPlan = (endpoint, body = {}) => {
+  const path = String(endpoint || '').toLowerCase();
+  if (!path) return true;
+  if (path.includes('/moderations')) return false;
+  if (endpointRequiresGoldPlan(endpoint, body)) return true;
+  return PREMIUM_ENDPOINT_MARKERS.some((marker) => path.includes(marker));
+};
+
+const assertAiSubscriptionAccess = async (uid, endpoint, body) => {
+  const plan = await resolveUserSubscriptionPlan(uid);
+  const requiresGold = endpointRequiresGoldPlan(endpoint, body);
+  const requiresPremium = endpointRequiresPremiumPlan(endpoint, body);
+  const hasGold = GOLD_PLAN_IDS.has(plan);
+  const hasPremium = PREMIUM_PLAN_IDS.has(plan);
+
+  if (requiresGold && !hasGold) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'A Gold subscription is required for this AI feature'
+    );
+  }
+  if (requiresPremium && !hasPremium) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'A Premium subscription is required for this AI feature'
+    );
+  }
+  return plan;
+};
+
 /**
  * Proxy OpenAI requests through Firebase Functions
  * This keeps the API key secure on the server side
@@ -1043,6 +1317,13 @@ exports.openAIProxy = functions.https.onCall(async (data, context) => {
       'OpenAI API is not configured on the server'
     );
   }
+
+  const plan = await assertAiSubscriptionAccess(context.auth.uid, endpoint, body);
+  console.info('[openAIProxy] Authorized request', {
+    uid: context.auth.uid,
+    endpoint,
+    plan
+  });
 
   try {
     // Make request to OpenAI
@@ -1093,147 +1374,34 @@ exports.openAIProxy = functions.https.onCall(async (data, context) => {
   }
 });
 
-// ====================================
-// DATABASE CLEANUP FUNCTION
-// ====================================
-
 /**
  * Cleanup all database data (collections and auth users)
- * HTTP endpoint - requires secret key
- */
-exports.cleanupDatabaseHTTP = functions.https.onRequest(async (req, res) => {
-  // Only allow POST
-  if (req.method !== 'POST') {
-    res.status(405).json({error: 'Method not allowed'});
-    return;
-  }
-
-  // Check secret key
-  const secretKey = req.body?.secretKey || req.query.secretKey;
-  if (secretKey !== 'cleanup_secret_2024_temp') {
-    console.log('[cleanupDatabaseHTTP] Invalid secret key');
-    res.status(403).json({error: 'Invalid secret key'});
-    return;
-  }
-
-  console.log('[cleanupDatabaseHTTP] Starting cleanup...');
-
-  try {
-    const db = admin.firestore();
-    const auth = admin.auth();
-    const results = {
-      collections: {},
-      authUsers: 0,
-      errors: [],
-    };
-
-    // Delete Firestore collections
-    const collections = [
-      'posts',
-      'statuses',
-      'users',
-      'notifications',
-      'marketListings',
-      'followers',
-      'following',
-      'blocks',
-      'reports',
-    ];
-
-    for (const collectionName of collections) {
-      try {
-        console.log(`[cleanupDatabaseHTTP] Deleting collection: ${collectionName}`);
-        let deletedCount = 0;
-        let query = db.collection(collectionName).limit(100);
-
-        while (true) {
-          const snapshot = await query.get();
-          if (snapshot.empty) break;
-
-          const batch = db.batch();
-          snapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-            deletedCount++;
-          });
-
-          await batch.commit();
-        }
-
-        results.collections[collectionName] = deletedCount;
-        console.log(`[cleanupDatabaseHTTP] Deleted ${deletedCount} documents from ${collectionName}`);
-      } catch (error) {
-        console.error(`[cleanupDatabaseHTTP] Error deleting collection ${collectionName}:`, error);
-        results.errors.push(`${collectionName}: ${error.message}`);
-      }
-    }
-
-    // Delete Authentication users
-    try {
-      console.log('[cleanupDatabaseHTTP] Deleting auth users');
-      let deletedCount = 0;
-      let pageToken;
-
-      do {
-        const listUsersResult = await auth.listUsers(1000, pageToken);
-
-        for (const userRecord of listUsersResult.users) {
-          try {
-            await auth.deleteUser(userRecord.uid);
-            deletedCount++;
-          } catch (error) {
-            console.error(`[cleanupDatabaseHTTP] Error deleting user ${userRecord.uid}:`, error.message);
-            results.errors.push(`User ${userRecord.uid}: ${error.message}`);
-          }
-        }
-
-        pageToken = listUsersResult.pageToken;
-      } while (pageToken);
-
-      results.authUsers = deletedCount;
-      console.log(`[cleanupDatabaseHTTP] Deleted ${deletedCount} auth users`);
-    } catch (error) {
-      console.error('[cleanupDatabaseHTTP] Error deleting auth users:', error);
-      results.errors.push(`Auth users: ${error.message}`);
-    }
-
-    console.log('[cleanupDatabaseHTTP] Cleanup complete', results);
-
-    res.status(200).json({
-      success: true,
-      message: 'Database cleanup complete',
-      results,
-    });
-  } catch (error) {
-    console.error('[cleanupDatabaseHTTP] Fatal error:', error);
-    res.status(500).json({
-      error: 'Internal error',
-      message: error.message,
-    });
-  }
-});
-
-/**
- * Cleanup all database data (collections and auth users)
- * HTTPS callable function - requires authentication (DEPRECATED - use HTTP version)
+ * Callable admin-only maintenance task (IAM protected via custom claims).
  */
 exports.cleanupDatabase = functions.https.onCall(async (data, context) => {
-  // Require authentication
-  if (!context.auth) {
+  if (!context.auth || !context.auth.token.admin) {
     throw new functions.https.HttpsError(
-        'unauthenticated',
-        'User must be authenticated',
+        'permission-denied',
+        'Only authenticated admins can run the cleanup task',
+    );
+  }
+
+  if (!CLEANUP_CONFIRMATION_CODE) {
+    throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Cleanup confirmation code is not configured.'
     );
   }
 
   const confirmationCode = data?.confirmationCode;
-  if (confirmationCode !== 'DELETE_EVERYTHING_NOW') {
+  if (confirmationCode !== CLEANUP_CONFIRMATION_CODE) {
     throw new functions.https.HttpsError(
         'invalid-argument',
         'Invalid confirmation code',
     );
   }
 
-  console.log(`[cleanupDatabase] Starting cleanup requested by user ${context.auth.uid}`);
+  console.log(`[cleanupDatabase] Starting cleanup requested by admin ${context.auth.uid}`);
 
   try {
     const db = admin.firestore();
@@ -1617,18 +1785,23 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
  * Security: This should be called manually or with proper authentication
  */
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.token.admin) {
+    throw new functions.https.HttpsError(
+        'permission-denied',
+        'Only authenticated admins can grant admin access'
+    );
+  }
+
+  if (!ADMIN_SETUP_SECRET) {
+    throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Admin setup secret is not configured.'
+    );
+  }
+
   try {
-    const {email, secretKey} = data;
-
-    // Simple security check - you can change this secret key
-    const ADMIN_SECRET = 'localloop-admin-setup-2025';
-
-    if (secretKey !== ADMIN_SECRET) {
-      throw new functions.https.HttpsError(
-          'permission-denied',
-          'Invalid secret key'
-      );
-    }
+    const email = String(data?.email || '').trim().toLowerCase();
+    const secretKey = data?.secretKey;
 
     if (!email) {
       throw new functions.https.HttpsError(
@@ -1637,15 +1810,22 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // Get user by email
-    const userRecord = await admin.auth().getUserByEmail(email);
+    if (secretKey !== ADMIN_SETUP_SECRET) {
+      throw new functions.https.HttpsError(
+          'permission-denied',
+          'Invalid secret key'
+      );
+    }
 
-    // Set admin custom claim
+    const userRecord = await admin.auth().getUserByEmail(email);
+    const currentClaims = userRecord.customClaims || {};
+
     await admin.auth().setCustomUserClaims(userRecord.uid, {
+      ...currentClaims,
       admin: true,
     });
 
-    console.log(`[setAdminClaim] Admin claim set for user: ${email} (${userRecord.uid})`);
+    console.log(`[setAdminClaim] Admin claim set for user: ${email} (${userRecord.uid}) by ${context.auth.uid}`);
 
     return {
       success: true,

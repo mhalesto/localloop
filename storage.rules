@@ -5,6 +5,12 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isVoiceNoteParticipant(conversationId) {
+      return isSignedIn()
+        && exists(/databases/(default)/documents/directMessages/$(conversationId))
+        && firestore.get(/databases/(default)/documents/directMessages/$(conversationId)).data.participants.hasAny([request.auth.uid]);
+    }
+
     match /albums/{userId}/{photoId} {
       allow read: if true;
       allow write: if isSignedIn() && request.auth.uid == userId;
@@ -12,8 +18,8 @@ service firebase.storage {
 
     // Voice notes for direct messages
     match /voiceNotes/{conversationId}/{filename} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isVoiceNoteParticipant(conversationId);
+      allow write: if isVoiceNoteParticipant(conversationId);
     }
 
     // Status images
