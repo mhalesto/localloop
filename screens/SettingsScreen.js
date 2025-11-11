@@ -1321,23 +1321,25 @@ export default function SettingsScreen({ navigation }) {
                 </TouchableOpacity>
               ) : null}
               <View style={styles.rewardsCard}>
-                {/* Show paid subscription card for Go/Premium subscribers */}
-                {userPlan === 'premium' || userPlan === 'gold' ? (
+                {/* Show paid subscription card for Go/Premium/Ultimate subscribers */}
+                {userPlan === 'premium' || userPlan === 'gold' || userPlan === 'ultimate' ? (
                   <>
                     <View style={styles.rewardsHeader}>
                       <Text style={styles.rewardsLabel}>
-                        {userPlan === 'gold' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
+                        {userPlan === 'gold' || userPlan === 'ultimate' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
                       </Text>
                       <View style={styles.rewardsPointsRow}>
-                        {userPlan === 'gold' ? (
-                          <Text style={[styles.rewardsPoints, { color: '#FFD700' }]}>Gold</Text>
+                        {userPlan === 'gold' || userPlan === 'ultimate' ? (
+                          <Text style={[styles.rewardsPoints, { color: '#FFD700' }]}>
+                            {userPlan === 'ultimate' ? 'Ultimate' : 'Gold'}
+                          </Text>
                         ) : (
                           <Text style={[styles.rewardsPoints, { color: themeColors.primary }]}>Go</Text>
                         )}
                       </View>
                     </View>
                     <Text style={styles.rewardsMeta}>
-                      {userPlan === 'gold'
+                      {userPlan === 'gold' || userPlan === 'ultimate'
                         ? 'Thank you for being a Premium subscriber! Enjoy unlimited AI features, custom prompts, and VIP support.'
                         : 'Thank you for being a Go subscriber! Enjoy unlimited posts, AI features, and ad-free experience.'}
                     </Text>
