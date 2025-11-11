@@ -202,7 +202,7 @@ export const SUBSCRIPTION_PLANS = {
     description: 'Ultimate power user experience with 3x limits',
     popular: false,
     features: [
-      'Everything in Premium',
+      'All Premium & Go features included',
       'Unlimited events',
       { text: '🚀 3x All AI Limits', badge: 'ULTIMATE', badgeColor: '#FFD700' },
       { text: '⚡ 60 Vision Cartoons/month', badge: 'ULTIMATE', badgeColor: '#FFD700' },
