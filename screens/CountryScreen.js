@@ -19,6 +19,7 @@ import FilteredPostCard from '../components/FilteredPostCard';
 import FilteredUserCard from '../components/FilteredUserCard';
 import ArtworkMasonryGrid from '../components/ArtworkMasonryGrid';
 import SponsoredAdCard from '../components/SponsoredAdCard';
+import SubscriptionUpgradeAd from '../components/SubscriptionUpgradeAd';
 import ArtworkSkeletonLoader from '../components/ArtworkSkeletonLoader';
 import AdSkeletonLoader from '../components/AdSkeletonLoader';
 import HorizontalListSkeletonLoader from '../components/HorizontalListSkeletonLoader';
@@ -771,8 +772,16 @@ export default function CountryScreen({ navigation }) {
           });
         }
 
-        // Randomly add an ad card (30% chance after each section)
-        if (Math.random() < 0.3) {
+        // Mix of subscription upgrade ads (60%) and regular ads (15%)
+        const random = Math.random();
+        if (random < 0.6) {
+          // 60% chance: Show subscription upgrade ad
+          feed.push({
+            type: 'subscriptionAd',
+            key: `subscription-ad-${index}-${Date.now()}`,
+          });
+        } else if (random < 0.75) {
+          // 15% chance: Show regular sponsored ad
           feed.push({
             type: 'ad',
             key: `ad-${index}-${Date.now()}`,
@@ -1094,6 +1103,17 @@ export default function CountryScreen({ navigation }) {
                               contentContainerStyle={styles.horizontalList}
                             />
                           </View>
+                        );
+                      }
+
+                      if (feedItem.type === 'subscriptionAd') {
+                        return (
+                          <SubscriptionUpgradeAd
+                            key={feedItem.key}
+                            onPress={(planId) => {
+                              navigation.navigate('Subscription', { selectedPlan: planId });
+                            }}
+                          />
                         );
                       }
 

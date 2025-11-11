@@ -45,7 +45,7 @@ export async function requestNotificationPermissions() {
 }
 
 /**
- * Get Expo push token for this device
+ * Get Expo push token for this device with retry logic
  * @returns {Promise<string|null>} Expo push token or null if failed
  */
 export async function getExpoPushToken() {
@@ -60,15 +60,54 @@ export async function getExpoPushToken() {
       return null;
     }
 
-    // Get Expo push token
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: 'b7176364-6956-455a-8d9b-231e7877ba5a',
-    });
+    // Retry logic for transient errors
+    const maxRetries = 3;
+    const retryDelays = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
 
-    console.log('[Notifications] Expo push token:', tokenData.data);
-    return tokenData.data;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Get Expo push token
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: 'b7176364-6956-455a-8d9b-231e7877ba5a',
+        });
+
+        console.log('[Notifications] Expo push token obtained successfully');
+        return tokenData.data;
+      } catch (error) {
+        const isTransient =
+          error.message?.includes('SERVICE_UNAVAILABLE') ||
+          error.message?.includes('503') ||
+          error.message?.includes('temporarily unavailable');
+
+        if (isTransient && attempt < maxRetries - 1) {
+          // Transient error and we have retries left
+          const delay = retryDelays[attempt];
+          console.warn(
+            `[Notifications] Expo API temporarily unavailable (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        } else {
+          // Either not transient or out of retries
+          throw error;
+        }
+      }
+    }
+
+    // Should not reach here, but just in case
+    return null;
   } catch (error) {
-    console.error('[Notifications] Error getting push token:', error);
+    // Only log as error if it's not a known transient issue
+    const isTransient =
+      error.message?.includes('SERVICE_UNAVAILABLE') ||
+      error.message?.includes('503') ||
+      error.message?.includes('temporarily unavailable');
+
+    if (isTransient) {
+      console.warn('[Notifications] Could not get push token - Expo API temporarily unavailable. Will retry next app launch.');
+    } else {
+      console.error('[Notifications] Error getting push token:', error);
+    }
     return null;
   }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -32,11 +33,11 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
       console.log('[ArtworkMasonryGrid] Full-screen image changed, setting loading state');
       setFullScreenLoading(true);
 
-      // Timeout fallback - if image doesn't load within 10 seconds, hide loader
+      // Timeout fallback - if image doesn't load within 30 seconds, hide loader
       const timeout = setTimeout(() => {
         console.log('[ArtworkMasonryGrid] Full-screen image load timeout, forcing hide');
         setFullScreenLoading(false);
-      }, 10000);
+      }, 30000);
 
       return () => clearTimeout(timeout);
     }
@@ -121,18 +122,19 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
           <Image
             source={{ uri: artwork.url }}
             style={styles.artworkImage}
-            resizeMode="cover"
-            cache="force-cache"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
             onLoadStart={() => {
               console.log('[ArtworkMasonryGrid] Grid image loading started:', artwork.id);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: true }));
             }}
-            onLoadEnd={() => {
+            onLoad={() => {
               console.log('[ArtworkMasonryGrid] Grid image loaded:', artwork.id);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
             }}
             onError={(error) => {
-              console.error('[ArtworkMasonryGrid] Grid image load error:', artwork.id, error?.nativeEvent);
+              console.error('[ArtworkMasonryGrid] Grid image load error:', artwork.id, error);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
             }}
           />
@@ -180,7 +182,8 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
               <Image
                 source={{ uri: artwork.profilePhoto }}
                 style={styles.artistPhoto}
-                cache="force-cache"
+                cachePolicy="memory-disk"
+                transition={100}
               />
             )}
             <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
@@ -307,15 +310,17 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
             <Image
               source={{ uri: fullScreenImage.url }}
               style={styles.fullScreenImage}
-              resizeMode="contain"
-              cache="force-cache"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={300}
+              priority="high"
               onLoadStart={() => {
                 if (fullScreenImage.visible && fullScreenImage.url) {
                   console.log('[ArtworkMasonryGrid] Full-screen image loading started');
                   setFullScreenLoading(true);
                 }
               }}
-              onLoadEnd={() => {
+              onLoad={() => {
                 if (fullScreenImage.visible && fullScreenImage.url) {
                   console.log('[ArtworkMasonryGrid] Full-screen image loaded');
                   setFullScreenLoading(false);
@@ -323,7 +328,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
               }}
               onError={(error) => {
                 if (fullScreenImage.visible && fullScreenImage.url) {
-                  console.error('[ArtworkMasonryGrid] Full-screen image load error:', error?.nativeEvent);
+                  console.error('[ArtworkMasonryGrid] Full-screen image load error:', error);
                   setFullScreenLoading(false);
                 }
               }}

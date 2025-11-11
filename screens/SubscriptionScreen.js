@@ -15,12 +15,12 @@ import { SUBSCRIPTION_PLANS, formatPrice, getPlanById } from '../config/subscrip
 import { getUserProfile, updateUserProfile } from '../services/userProfileService';
 import { useAlert } from '../contexts/AlertContext';
 
-export default function SubscriptionScreen({ navigation }) {
+export default function SubscriptionScreen({ navigation, route }) {
   const { themeColors, accentPreset } = useSettings();
   const { user } = useAuth();
   const { showAlert } = useAlert();
   const [userProfile, setUserProfile] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState('basic');
+  const [selectedPlan, setSelectedPlan] = useState(route.params?.selectedPlan || 'basic');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings, accentPresets } from '../contexts/SettingsContext';
 
@@ -30,11 +31,40 @@ export default function FilteredPostCard({ post, onPress, showPostBackground }) 
 
   const timeAgo = () => {
     if (!post.createdAt) return 'Just now';
-    const seconds = Math.floor((Date.now() - post.createdAt) / 1000);
+
+    let createdAtMs;
+
+    // Handle Firestore Timestamp object
+    if (post.createdAt?.toMillis) {
+      createdAtMs = post.createdAt.toMillis();
+    }
+    // Handle Firestore Timestamp with seconds/nanoseconds
+    else if (post.createdAt?.seconds) {
+      createdAtMs = post.createdAt.seconds * 1000;
+    }
+    // Handle plain number (Unix timestamp)
+    else if (typeof post.createdAt === 'number') {
+      // Check if timestamp is in seconds (before year 2286) or milliseconds
+      createdAtMs = post.createdAt < 10000000000
+        ? post.createdAt * 1000  // Convert seconds to milliseconds
+        : post.createdAt;          // Already in milliseconds
+    }
+    // Handle Date object
+    else if (post.createdAt instanceof Date) {
+      createdAtMs = post.createdAt.getTime();
+    }
+    else {
+      return 'Just now';
+    }
+
+    const seconds = Math.floor((Date.now() - createdAtMs) / 1000);
+
+    if (seconds < 0) return 'Just now'; // Handle future timestamps
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`; // Less than 30 days
+    return `${Math.floor(seconds / 2592000)}mo ago`; // Months
   };
 
   return (
@@ -47,7 +77,9 @@ export default function FilteredPostCard({ post, onPress, showPostBackground }) 
         <Image
           source={{ uri: post.imageUrl }}
           style={styles.image}
-          cache="force-cache"
+          cachePolicy="memory-disk"
+          transition={200}
+          contentFit="cover"
         />
       )}
       <View style={styles.content}>
@@ -143,7 +175,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 180, // Increased from 140
-    resizeMode: 'cover',
   },
   content: {
     padding: 14,

@@ -262,13 +262,14 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
     handleNext();
   }, [handleNext]);
 
-  // compute displayed image size; make it smaller and centered
-  const availableW = winW * 0.85; // Reduce to 85% of screen width
-  const availableH = winH * 0.6; // Reduce to 60% of screen height for cleaner look
+  // compute displayed image size; full screen
+  const availableW = winW; // Full screen width
+  const availableH = winH; // Full screen height
   let displayW = availableW;
   let displayH = availableH;
   if (imgNatural.w && imgNatural.h) {
-    const scale = Math.min(0.9, availableW / imgNatural.w, availableH / imgNatural.h);
+    // Scale to fit full screen
+    const scale = Math.min(availableW / imgNatural.w, availableH / imgNatural.h);
     displayW = Math.round(imgNatural.w * scale);
     displayH = Math.round(imgNatural.h * scale);
   }
@@ -318,8 +319,8 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
             <View style={styles.media}>
               <Image
                 source={{ uri: currentStatus.imageUrl }}
-                style={[styles.mediaImage, { width: displayW, height: displayH, borderRadius: 12 }]}
-                resizeMode="contain"
+                style={[styles.mediaImage, { width: displayW, height: displayH }]}
+                resizeMode="cover"
                 onLoadEnd={() => {
                   console.log('[StatusViewer] Image loaded');
                   setImageLoading(false);
@@ -478,7 +479,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
   },
   mediaImage: {
     // width/height supplied dynamically
@@ -493,7 +493,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 12,
   },
   loadingAnimation: {
     width: 150,
