@@ -59,7 +59,7 @@ export const SUBSCRIPTION_PLANS = {
   GO: {
     id: 'premium', // Internal ID remains 'premium' for backwards compatibility
     name: 'Go',
-    price: 5.00, // 🧪 TEST PRICE - PRODUCTION: 79.99
+    price: 79.99,
     currency: 'ZAR',
     interval: 'month',
     yearlyPrice: 799,
@@ -119,7 +119,7 @@ export const SUBSCRIPTION_PLANS = {
   PREMIUM: {
     id: 'gold', // Internal ID remains 'gold' for backwards compatibility
     name: 'Premium',
-    price: 10.00, // 🧪 TEST PRICE - PRODUCTION: 149.99
+    price: 149.99,
     currency: 'ZAR',
     interval: 'month',
     yearlyPrice: 1499,
