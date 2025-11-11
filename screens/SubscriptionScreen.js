@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
-import { SUBSCRIPTION_PLANS, formatPrice } from '../config/subscriptionPlans';
+import { SUBSCRIPTION_PLANS, formatPrice, getPlanById } from '../config/subscriptionPlans';
 import { getUserProfile, updateUserProfile } from '../services/userProfileService';
 import { useAlert } from '../contexts/AlertContext';
 
@@ -53,7 +53,7 @@ export default function SubscriptionScreen({ navigation }) {
     }
 
     setSelectedPlan(planId);
-    const plan = SUBSCRIPTION_PLANS[planId.toUpperCase()];
+    const plan = getPlanById(planId);
 
     if (plan.price === 0) {
       // Free plan - immediate activation
@@ -99,13 +99,14 @@ export default function SubscriptionScreen({ navigation }) {
 
   const plans = [
     SUBSCRIPTION_PLANS.BASIC,
+    SUBSCRIPTION_PLANS.GO,
     SUBSCRIPTION_PLANS.PREMIUM,
     SUBSCRIPTION_PLANS.GOLD,
   ];
 
   const currentPlanName = userProfile?.subscriptionPlan || 'basic';
-  const currentPlan = SUBSCRIPTION_PLANS[currentPlanName.toUpperCase()];
-  const isSubscribed = userProfile?.premiumUnlocked && (currentPlanName === 'premium' || currentPlanName === 'gold');
+  const currentPlan = getPlanById(currentPlanName);
+  const isSubscribed = userProfile?.premiumUnlocked && (currentPlanName === 'premium' || currentPlanName === 'gold' || currentPlanName === 'ultimate');
   const subscriptionEndDate = userProfile?.subscriptionEndDate;
 
   return (
