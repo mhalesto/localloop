@@ -204,9 +204,9 @@ export default function SubscriptionScreen({ navigation }) {
                 styles.planCard,
                 {
                   backgroundColor: themeColors.card,
-                  borderColor: isSelected ? primaryColor : themeColors.divider,
+                  borderColor: isSelected ? primaryColor : isDowngrade ? `${primaryColor}20` : themeColors.divider,
                   borderWidth: isSelected ? 2 : 1,
-                  opacity: isDowngrade ? 0.6 : 1,
+                  opacity: isDowngrade ? 0.85 : 1,
                 },
                 plan.popular && styles.popularCard,
               ]}
@@ -233,8 +233,8 @@ export default function SubscriptionScreen({ navigation }) {
                     </View>
                   )}
                   {isDowngrade && !isCurrentPlan && (
-                    <View style={[styles.currentBadge, { backgroundColor: `${themeColors.textTertiary}20` }]}>
-                      <Text style={[styles.currentText, { color: themeColors.textTertiary }]}>Included</Text>
+                    <View style={[styles.currentBadge, { backgroundColor: `${primaryColor}15` }]}>
+                      <Text style={[styles.currentText, { color: primaryColor, opacity: 0.8 }]}>Included</Text>
                     </View>
                   )}
                 </View>
@@ -305,9 +305,9 @@ export default function SubscriptionScreen({ navigation }) {
                   style={[
                     styles.selectButton,
                     {
-                      backgroundColor: isSelected ? primaryColor : isDowngrade ? themeColors.divider : 'transparent',
-                      borderColor: isDowngrade ? themeColors.divider : primaryColor,
-                      borderWidth: isSelected || isDowngrade ? 0 : 1,
+                      backgroundColor: isSelected ? primaryColor : isDowngrade ? `${primaryColor}10` : 'transparent',
+                      borderColor: isDowngrade ? `${primaryColor}30` : primaryColor,
+                      borderWidth: isSelected ? 0 : 1,
                     },
                   ]}
                   onPress={() => handleSelectPlan(plan.id)}
@@ -319,7 +319,10 @@ export default function SubscriptionScreen({ navigation }) {
                     <Text
                       style={[
                         styles.selectButtonText,
-                        { color: isSelected ? '#fff' : isDowngrade ? themeColors.textTertiary : primaryColor },
+                        {
+                          color: isSelected ? '#fff' : isDowngrade ? primaryColor : primaryColor,
+                          opacity: isDowngrade ? 0.7 : 1
+                        },
                       ]}
                     >
                       {isCurrentPlan ? 'Current Plan' : isDowngrade ? 'Included in Your Plan' : plan.price === 0 ? 'Select Plan' : 'Subscribe Now'}
