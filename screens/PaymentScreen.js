@@ -81,12 +81,31 @@ export default function PaymentScreen({ route, navigation }) {
     } catch (error) {
       setIsProcessing(false);
       console.error('[PaymentScreen] Payment error:', error);
-      showAlert(
-        'Payment Error',
-        error.message || 'Unable to process payment. Please try again.',
-        [{ text: 'OK' }],
-        { icon: 'alert-circle', iconColor: '#FF3B30' }
-      );
+
+      // Check if user already has this plan or a higher tier
+      if (error.message && (
+        error.message.includes('already on this plan') ||
+        error.message.includes('higher tier')
+      )) {
+        showAlert(
+          'Already Subscribed',
+          `You're already on the ${planName} plan or a higher tier. No payment needed!`,
+          [
+            {
+              text: 'Great!',
+              onPress: () => navigation.navigate('Subscription'),
+            },
+          ],
+          { icon: 'checkmark-circle', iconColor: '#34C759' }
+        );
+      } else {
+        showAlert(
+          'Payment Error',
+          error.message || 'Unable to process payment. Please try again.',
+          [{ text: 'OK' }],
+          { icon: 'alert-circle', iconColor: '#FF3B30' }
+        );
+      }
     }
   };
 
@@ -123,12 +142,31 @@ export default function PaymentScreen({ route, navigation }) {
     } catch (error) {
       setIsProcessing(false);
       console.error('[PaymentScreen] Test payment error:', error);
-      showAlert(
-        'Payment Failed',
-        error.message || 'Something went wrong. Please try again.',
-        [{ text: 'OK' }],
-        { icon: 'alert-circle', iconColor: '#FF3B30' }
-      );
+
+      // Check if user already has this plan or a higher tier
+      if (error.message && (
+        error.message.includes('already on this plan') ||
+        error.message.includes('higher tier')
+      )) {
+        showAlert(
+          'Already Subscribed',
+          `You're already on the ${planName} plan or a higher tier. No payment needed!`,
+          [
+            {
+              text: 'Great!',
+              onPress: () => navigation.navigate('Subscription'),
+            },
+          ],
+          { icon: 'checkmark-circle', iconColor: '#34C759' }
+        );
+      } else {
+        showAlert(
+          'Payment Failed',
+          error.message || 'Something went wrong. Please try again.',
+          [{ text: 'OK' }],
+          { icon: 'alert-circle', iconColor: '#FF3B30' }
+        );
+      }
     }
   };
 
