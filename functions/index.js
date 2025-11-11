@@ -624,16 +624,14 @@ const crypto = require('crypto');
 const getPayFastConfig = () => {
   const config = functions.config().payfast || {};
 
-  // Check mode from config
-  const isProduction = config.mode === 'production';
-
+  // PRODUCTION MODE - Using live PayFast
+  // Credentials should be set via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY"
   return {
     merchantId: config.merchant_id || '10043394', // Fallback to sandbox if not configured
     merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Fallback to sandbox if not configured
     passphrase: config.passphrase || '',
-    processUrl: isProduction
-      ? 'https://www.payfast.co.za/eng/process'
-      : 'https://sandbox.payfast.co.za/eng/process',
+    processUrl: 'https://www.payfast.co.za/eng/process', // PRODUCTION URL
+    // For testing, use: 'https://sandbox.payfast.co.za/eng/process'
   };
 };
 
@@ -750,8 +748,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Merchant details
       merchant_id: config.merchantId,
       merchant_key: config.merchantKey,
-      return_url: `https://${process.env.GCLOUD_PROJECT}.web.app/payment-success.html`,
-      cancel_url: `https://${process.env.GCLOUD_PROJECT}.web.app/payment-cancelled.html`,
+      return_url: `localloop://payment-success`,
+      cancel_url: `localloop://payment-cancelled`,
       notify_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
 
       // Buyer details
