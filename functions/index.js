@@ -624,14 +624,17 @@ const crypto = require('crypto');
 const getPayFastConfig = () => {
   const config = functions.config().payfast || {};
 
-  // PRODUCTION MODE - Using live PayFast
-  // Credentials should be set via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY"
+  // SANDBOX MODE - Using sandbox PayFast for testing
+  // For production, set credentials via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY" payfast.mode="production"
+  const isProduction = config.mode === 'production';
+
   return {
     merchantId: config.merchant_id || '10043394', // Fallback to sandbox if not configured
     merchantKey: config.merchant_key || 'vxS0fu3o299dm', // Fallback to sandbox if not configured
     passphrase: config.passphrase || '',
-    processUrl: 'https://www.payfast.co.za/eng/process', // PRODUCTION URL
-    // For testing, use: 'https://sandbox.payfast.co.za/eng/process'
+    processUrl: isProduction
+      ? 'https://www.payfast.co.za/eng/process'
+      : 'https://sandbox.payfast.co.za/eng/process', // SANDBOX URL for testing
   };
 };
 
@@ -648,6 +651,7 @@ const payFastEncode = (value) => {
  * Generate MD5 signature for PayFast
  * IMPORTANT: Parameters must be in the order they appear in the form, NOT alphabetical!
  * Per PayFast docs: "Do not use the API signature format, which uses alphabetical ordering!"
+ * CRITICAL: Use RAW values (no URL encoding) for signature generation
  */
 function generatePayFastSignature(data, passphrase = null) {
   // PayFast requires specific order (as they appear in the form)
@@ -696,10 +700,11 @@ function generatePayFastSignature(data, passphrase = null) {
     }
   }
 
-  const pairs = orderedKeys.map((key) => `${key}=${payFastEncode(data[key])}`);
+  // CRITICAL: Use RAW values (no encoding) for signature generation
+  const pairs = orderedKeys.map((key) => `${key}=${data[key].toString().trim()}`);
 
   if (passphrase !== null && passphrase !== '') {
-    pairs.push(`passphrase=${payFastEncode(passphrase)}`);
+    pairs.push(`passphrase=${passphrase}`);
   }
 
   const signatureBase = pairs.join('&');
@@ -748,8 +753,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Merchant details
       merchant_id: config.merchantId,
       merchant_key: config.merchantKey,
-      return_url: `localloop://payment-success`,
-      cancel_url: `localloop://payment-cancelled`,
+      return_url: `https://${process.env.GCLOUD_PROJECT}.web.app/payment-success.html`,
+      cancel_url: `https://${process.env.GCLOUD_PROJECT}.web.app/payment-cancelled.html`,
       notify_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
 
       // Buyer details
@@ -763,12 +768,12 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       item_name: `LocalLoop ${planName}`,
       item_description: `${planName} subscription - ${interval}ly billing`,
 
-      // Subscription details (TEMPORARILY DISABLED - testing one-time payment first)
-      // subscription_type: '1', // 1 = subscription
-      // billing_date: new Date().toISOString().split('T')[0],
-      // recurring_amount: amount.toFixed(2),
-      // frequency: frequency.toString(),
-      // cycles: '0', // 0 = forever
+      // Subscription details - RECURRING until cancelled
+      subscription_type: '1', // 1 = subscription
+      billing_date: new Date().toISOString().split('T')[0],
+      recurring_amount: amount.toFixed(2),
+      frequency: frequency.toString(),
+      cycles: '0', // 0 = forever (until cancelled)
 
       // Custom fields
       custom_str1: uid, // User ID
