@@ -19,7 +19,6 @@ import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
-import LoadingOverlay from './LoadingOverlay';
 import PollComposer from './PollComposer';
 import {
   EMAIL_ADDRESS_REGEX,

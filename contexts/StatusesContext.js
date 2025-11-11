@@ -11,7 +11,6 @@ import React, {
 
 import {
   addStatusReply,
-  cleanupExpiredStatuses,
   createStatus,
   fetchReportedStatuses,
   reportStatus as reportStatusRemote,
@@ -94,9 +93,8 @@ export function StatusesProvider({ children }) {
       setStatusesError(message);
     }
 
-    cleanupExpiredStatuses().catch((error) =>
-      console.warn('[StatusesProvider] cleanup expired statuses failed', error)
-    );
+    // Note: Expired statuses cleanup is now handled server-side via Cloud Function
+    // Client-side cleanup was removed due to Firestore security rules
 
     return () => {
       setIsLoading(false);

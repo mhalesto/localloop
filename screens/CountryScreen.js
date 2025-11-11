@@ -52,6 +52,8 @@ const FALLBACK_COUNTRY_CODES = ['US', 'CN', 'IN', 'ID', 'BR', 'PK', 'NG', 'BD', 
 const COUNTRIES_CACHE_KEY = '@localloop.countriesCache';
 const COUNTRIES_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
 const EXPLORE_FILTERS_KEY = '@localloop.exploreFilters';
+const EXPLORE_CONTENT_CACHE_KEY = '@localloop.exploreContentCache';
+const EXPLORE_CONTENT_CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 const DEFAULT_FILTERS = {
   showNearbyCities: true,
   showPostsFromCurrentCity: true,
@@ -263,14 +265,45 @@ export default function CountryScreen({ navigation }) {
   const loadFilteredContent = useCallback(async () => {
     if (!userProfile?.city) return;
 
-    setLoadingFilteredContent(true);
+    const cacheKey = `${EXPLORE_CONTENT_CACHE_KEY}_${userProfile.city}`;
+    let hasValidCache = false;
+
+    // Try to load from cache first
+    try {
+      const cached = await AsyncStorage.getItem(cacheKey);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        const age = Date.now() - timestamp;
+
+        // If cache is still valid, use it immediately (no loading state)
+        if (age < EXPLORE_CONTENT_CACHE_TTL) {
+          if (isMounted.current) {
+            if (data.posts) setFilteredPosts(data.posts);
+            if (data.artwork) setFilteredArtwork(data.artwork);
+            if (data.users) setFilteredUsers(data.users);
+            hasValidCache = true;
+          }
+          // Skip loading state if we have valid cache
+          // But still fetch fresh data in background
+        }
+      }
+    } catch (err) {
+      console.error('[CountryScreen] Error loading cached content:', err);
+    }
+
+    // Only show loading state if we don't have cached data
+    if (!hasValidCache) {
+      setLoadingFilteredContent(true);
+    }
     try {
       const promises = [];
+      const freshData = { posts: [], artwork: [], users: [] };
 
       // Load posts if filter is enabled
       if (exploreFilters.showPostsFromCurrentCity) {
         promises.push(
           getPostsFromCity(userProfile.city, 10).then((posts) => {
+            freshData.posts = posts;
             if (isMounted.current) setFilteredPosts(posts);
           })
         );
@@ -282,6 +315,7 @@ export default function CountryScreen({ navigation }) {
       if (exploreFilters.showAIArtGallery) {
         promises.push(
           getAIArtworkFromCity(userProfile.city, 20).then((artworks) => {
+            freshData.artwork = artworks;
             if (isMounted.current) setFilteredArtwork(artworks);
           })
         );
@@ -293,6 +327,7 @@ export default function CountryScreen({ navigation }) {
       if (exploreFilters.showLocalUsers) {
         promises.push(
           getLocalUsers(userProfile.city, currentUser?.uid, 20).then((users) => {
+            freshData.users = users;
             if (isMounted.current) {
               setFilteredUsers(users);
             }
@@ -303,6 +338,19 @@ export default function CountryScreen({ navigation }) {
       }
 
       await Promise.all(promises);
+
+      // Save fresh data to cache
+      try {
+        await AsyncStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            data: freshData,
+            timestamp: Date.now(),
+          })
+        );
+      } catch (err) {
+        console.error('[CountryScreen] Error saving cache:', err);
+      }
     } catch (err) {
       console.error('[CountryScreen] Error loading filtered content:', err);
     } finally {

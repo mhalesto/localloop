@@ -3,6 +3,7 @@ import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, Sta
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+import LottieView from 'lottie-react-native';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
@@ -17,11 +18,29 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
   const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '', prompt: '' });
   const [downloadLimits, setDownloadLimits] = useState({ allowed: true, remaining: -1, limit: -1 });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [loadingImages, setLoadingImages] = useState({}); // Track loading state for grid images
+  const [fullScreenLoading, setFullScreenLoading] = useState(true); // Track loading for full screen image
 
   // Check download limits on mount and when modal opens
   useEffect(() => {
     checkDownloadLimits();
   }, [fullScreenImage.visible, isAdmin, userProfile?.subscriptionPlan]);
+
+  // Reset full-screen loading when image changes with timeout fallback
+  useEffect(() => {
+    if (fullScreenImage.visible && fullScreenImage.url) {
+      console.log('[ArtworkMasonryGrid] Full-screen image changed, setting loading state');
+      setFullScreenLoading(true);
+
+      // Timeout fallback - if image doesn't load within 10 seconds, hide loader
+      const timeout = setTimeout(() => {
+        console.log('[ArtworkMasonryGrid] Full-screen image load timeout, forcing hide');
+        setFullScreenLoading(false);
+      }, 10000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [fullScreenImage.url, fullScreenImage.visible]);
 
   const checkDownloadLimits = async () => {
     const planId = userProfile?.subscriptionPlan || 'basic';
@@ -104,7 +123,30 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
             style={styles.artworkImage}
             resizeMode="cover"
             cache="force-cache"
+            onLoadStart={() => {
+              console.log('[ArtworkMasonryGrid] Grid image loading started:', artwork.id);
+              setLoadingImages(prev => ({ ...prev, [artwork.id]: true }));
+            }}
+            onLoadEnd={() => {
+              console.log('[ArtworkMasonryGrid] Grid image loaded:', artwork.id);
+              setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
+            }}
+            onError={(error) => {
+              console.error('[ArtworkMasonryGrid] Grid image load error:', artwork.id, error?.nativeEvent);
+              setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
+            }}
           />
+          {/* Loading overlay with broom animation */}
+          {loadingImages[artwork.id] && (
+            <View style={styles.gridLoadingOverlay}>
+              <LottieView
+                source={require('../assets/broom.json')}
+                autoPlay
+                loop
+                style={styles.gridLoadingAnimation}
+              />
+            </View>
+          )}
           {/* Info icon for prompt */}
           {artwork.prompt && (
             <TouchableOpacity
@@ -261,12 +303,44 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
             </View>
           )}
 
-          <Image
-            source={{ uri: fullScreenImage.url }}
-            style={styles.fullScreenImage}
-            resizeMode="contain"
-            cache="force-cache"
-          />
+          {fullScreenImage.url ? (
+            <Image
+              source={{ uri: fullScreenImage.url }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+              cache="force-cache"
+              onLoadStart={() => {
+                if (fullScreenImage.visible && fullScreenImage.url) {
+                  console.log('[ArtworkMasonryGrid] Full-screen image loading started');
+                  setFullScreenLoading(true);
+                }
+              }}
+              onLoadEnd={() => {
+                if (fullScreenImage.visible && fullScreenImage.url) {
+                  console.log('[ArtworkMasonryGrid] Full-screen image loaded');
+                  setFullScreenLoading(false);
+                }
+              }}
+              onError={(error) => {
+                if (fullScreenImage.visible && fullScreenImage.url) {
+                  console.error('[ArtworkMasonryGrid] Full-screen image load error:', error?.nativeEvent);
+                  setFullScreenLoading(false);
+                }
+              }}
+            />
+          ) : null}
+
+          {/* Loading overlay with broom animation */}
+          {fullScreenLoading && (
+            <View style={styles.fullScreenLoadingOverlay}>
+              <LottieView
+                source={require('../assets/broom.json')}
+                autoPlay
+                loop
+                style={styles.fullScreenLoadingAnimation}
+              />
+            </View>
+          )}
 
           {fullScreenImage.style && (
             <View style={styles.fullScreenInfo}>
@@ -501,5 +575,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  gridLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridLoadingAnimation: {
+    width: 80,
+    height: 80,
+  },
+  fullScreenLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenLoadingAnimation: {
+    width: 150,
+    height: 150,
   },
 });

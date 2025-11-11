@@ -15,6 +15,7 @@ import {
   Platform,
   Alert,
   Image,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenLayout from '../components/ScreenLayout';
@@ -25,6 +26,7 @@ import {
   sendMessage,
   removeParticipant,
   getEventChat,
+  isParticipant,
 } from '../services/eventChatService';
 
 export default function EventChatScreen({ route, navigation }) {
@@ -36,6 +38,8 @@ export default function EventChatScreen({ route, navigation }) {
   const [inputText, setInputText] = useState('');
   const [chatInfo, setChatInfo] = useState(null);
   const [sending, setSending] = useState(false);
+  const [isUserParticipant, setIsUserParticipant] = useState(false);
+  const [checkingParticipant, setCheckingParticipant] = useState(true);
 
   const flatListRef = useRef(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
@@ -56,24 +60,63 @@ export default function EventChatScreen({ route, navigation }) {
     };
   }, [eventId]);
 
-  // Load chat info
+  // Load chat info and check participant status
   useEffect(() => {
     const loadChatInfo = async () => {
-      const info = await getEventChat(eventId);
-      setChatInfo(info);
+      try {
+        const info = await getEventChat(eventId);
+        setChatInfo(info);
+
+        // Check if current user is a participant
+        const participantStatus = await isParticipant(eventId, user.uid);
+        setIsUserParticipant(participantStatus);
+      } catch (error) {
+        console.error('[EventChat] Error loading chat info:', error);
+      } finally {
+        setCheckingParticipant(false);
+      }
     };
 
     loadChatInfo();
-  }, [eventId]);
+  }, [eventId, user.uid]);
+
+  // Keyboard listeners - scroll to bottom when keyboard appears
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+    };
+  }, []);
 
   const handleSend = async () => {
-    if (!inputText.trim() || sending) return;
+    if (!inputText.trim() || sending || !isUserParticipant) return;
 
     const messageText = inputText.trim();
     setInputText('');
     setSending(true);
 
     try {
+      // Double-check participant status before sending
+      const participantStatus = await isParticipant(eventId, user.uid);
+      if (!participantStatus) {
+        Alert.alert(
+          'Not Authorized',
+          'You must be accepted to the event before you can send messages.',
+          [{ text: 'OK' }]
+        );
+        setInputText(messageText); // Restore message
+        setIsUserParticipant(false);
+        return;
+      }
+
       await sendMessage(
         eventId,
         user.uid,
@@ -81,6 +124,11 @@ export default function EventChatScreen({ route, navigation }) {
         userProfile?.photoURL || null,
         messageText
       );
+
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       console.error('[EventChat] Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
@@ -202,26 +250,17 @@ export default function EventChatScreen({ route, navigation }) {
   return (
     <ScreenLayout
       navigation={navigation}
-      showHeader
-      headerTitle={event.title}
-      headerBackButton
-      headerRight={
-        // Only show leave button if not organizer
-        event.organizerId !== user?.uid ? (
-          <TouchableOpacity
-            onPress={handleLeaveChat}
-            style={styles.headerButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="exit-outline" size={22} color={themeColors.error} />
-          </TouchableOpacity>
-        ) : null
-      }
+      title={event.title}
+      onBack={() => navigation.goBack()}
+      showFooter={false}
+      showDrawerButton={false}
+      rightIcon="exit-outline"
+      onRightPress={event.organizerId !== user?.uid ? handleLeaveChat : undefined}
     >
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: themeColors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 140 : 20}
       >
         {/* Event Info Banner */}
         <View style={[styles.eventBanner, { backgroundColor: themeColors.card, borderBottomColor: themeColors.divider }]}>
@@ -250,51 +289,82 @@ export default function EventChatScreen({ route, navigation }) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesContent}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={64} color={themeColors.textTertiary} />
-              <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
-                Start the Conversation
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
-                Send a message to connect with other attendees
-              </Text>
+              {!isUserParticipant ? (
+                <>
+                  <Ionicons name="lock-closed-outline" size={64} color={themeColors.textTertiary} />
+                  <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
+                    Waiting for Approval
+                  </Text>
+                  <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
+                    The organizer needs to accept your attendance request before you can join the chat
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="chatbubbles-outline" size={64} color={themeColors.textTertiary} />
+                  <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
+                    Start the Conversation
+                  </Text>
+                  <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
+                    Send a message to connect with other attendees
+                  </Text>
+                </>
+              )}
             </View>
           }
         />
 
         {/* Message Input */}
         <View style={[styles.inputContainer, { backgroundColor: themeColors.card, borderTopColor: themeColors.divider }]}>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: themeColors.background,
-                color: themeColors.textPrimary,
-                borderColor: themeColors.divider,
-              },
-            ]}
-            placeholder="Type a message..."
-            placeholderTextColor={themeColors.textTertiary}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
+          {!isUserParticipant ? (
+            <View style={styles.lockedInputContainer}>
+              <Ionicons name="lock-closed" size={18} color={themeColors.textTertiary} />
+              <Text style={[styles.lockedText, { color: themeColors.textSecondary }]}>
+                You must be accepted to the event to send messages
+              </Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: themeColors.background,
+                    color: themeColors.textPrimary,
+                    borderColor: themeColors.divider,
+                  },
+                ]}
+                placeholder="Type a message..."
+                placeholderTextColor={themeColors.textTertiary}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={handleSend}
+                enablesReturnKeyAutomatically
+              />
 
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              {
-                backgroundColor: inputText.trim() ? primaryColor : themeColors.divider,
-              },
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="send" size={20} color={inputText.trim() ? '#fff' : themeColors.textTertiary} />
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  {
+                    backgroundColor: inputText.trim() ? primaryColor : themeColors.divider,
+                  },
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || sending}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="send" size={20} color={inputText.trim() ? '#fff' : themeColors.textTertiary} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </ScreenLayout>
@@ -430,5 +500,17 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  lockedInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  lockedText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

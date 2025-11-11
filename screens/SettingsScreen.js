@@ -1280,6 +1280,19 @@ export default function SettingsScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
+              {/* Tutorial Demo Button */}
+              <TouchableOpacity
+                style={styles.profileLinkRow}
+                onPress={() => navigation.navigate('TutorialDemo')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.profileLinkCopy}>
+                  <Text style={styles.profileLinkLabel}>📚 Tutorial & Onboarding</Text>
+                  <Text style={styles.profileLinkHint}>See the interactive step-by-step guide</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} style={styles.profileLinkIcon} />
+              </TouchableOpacity>
+
               {/* [PUBLIC-MODE] View Public Profile button */}
               {userProfile?.isPublicProfile ? (
                 <TouchableOpacity

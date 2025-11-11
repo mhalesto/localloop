@@ -14,7 +14,6 @@ import CreatePostModal from './CreatePostModal';
 import MainDrawerContent from './MainDrawerContent';
 import { getAvatarConfig } from '../constants/avatars';
 import NotificationsModal from './NotificationsModal';
-import LoadingOverlay from './LoadingOverlay';
 import { analyzePostContent } from '../services/openai/moderationService';
 import { autoTagPost } from '../services/openai/autoTaggingService';
 import { analyzeContent } from '../services/openai/contentAnalysisService';
@@ -40,6 +39,7 @@ export default function ScreenLayout({
   activeTab = 'home',
   navigation,
   showFooter = true,
+  showDrawerButton = true,
   headerStyle,
   headerBackgroundStyle,
   enableHeaderOverlap = false,
@@ -78,7 +78,6 @@ export default function ScreenLayout({
   const [composerVisible, setComposerVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
-  const [loadingVisible, setLoadingVisible] = useState(false);
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
   const [postLimitInfo, setPostLimitInfo] = useState({ count: 0, limit: 5, remaining: 5 });
 
@@ -354,14 +353,10 @@ export default function ScreenLayout({
       onFabPress();
       return;
     }
-    // Otherwise show loading overlay for post creation
-    setLoadingVisible(true);
+    // Open composer modal immediately (no loading delay)
+    setComposerVisible(true);
   };
 
-  const handleLoadingComplete = useCallback(() => {
-    setLoadingVisible(false);
-    setComposerVisible(true);
-  }, []);
 
   const handleTabPress = (tab) => {
     if (!navigation) return;
@@ -493,7 +488,7 @@ export default function ScreenLayout({
           title={title}
           subtitle={subtitle}
           onBack={onBack}
-          onMenu={!onBack ? handleMenuPress : undefined}
+          onMenu={!onBack && showDrawerButton ? handleMenuPress : undefined}
           rightIcon={defaultRightIcon}
           onRightPress={handleHeaderRightPress}
           rightBadgeCount={headerBadgeCount}
@@ -580,11 +575,6 @@ export default function ScreenLayout({
           navigation={navigation}
         />
 
-        <LoadingOverlay
-          visible={loadingVisible}
-          onComplete={handleLoadingComplete}
-          duration={1000}
-        />
 
         <UpgradePromptModal
           visible={upgradeModalVisible}

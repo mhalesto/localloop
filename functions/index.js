@@ -942,6 +942,71 @@ exports.resetMySubscription = functions.https.onCall(async (data, context) => {
 });
 
 // ====================================
+// SCHEDULED CLEANUP FUNCTIONS
+// ====================================
+
+/**
+ * Cleanup expired statuses - runs every hour
+ * This runs with admin privileges and can delete any expired status
+ */
+exports.cleanupExpiredStatuses = functions.pubsub
+    .schedule('every 1 hours')
+    .onRun(async (context) => {
+      console.log('[cleanupExpiredStatuses] Starting cleanup...');
+
+      try {
+        const db = admin.firestore();
+        const storage = admin.storage();
+        const now = Date.now();
+        const limit = 100; // Process 100 at a time to avoid timeouts
+
+        // Query expired statuses
+        const snapshot = await db.collection('statuses')
+            .where('expiresAt', '<=', now)
+            .limit(limit)
+            .get();
+
+        if (snapshot.empty) {
+          console.log('[cleanupExpiredStatuses] No expired statuses found');
+          return null;
+        }
+
+        console.log(`[cleanupExpiredStatuses] Found ${snapshot.size} expired statuses`);
+
+        // Delete each expired status and its image
+        const deletions = snapshot.docs.map(async (doc) => {
+          const data = doc.data();
+          try {
+            // Delete image from storage if exists
+            if (data?.imageStoragePath) {
+              try {
+                await storage.bucket().file(data.imageStoragePath).delete();
+                console.log(`[cleanupExpiredStatuses] Deleted image: ${data.imageStoragePath}`);
+              } catch (error) {
+                // Image might not exist, that's okay
+                console.warn(`[cleanupExpiredStatuses] Could not delete image: ${error.message}`);
+              }
+            }
+
+            // Delete the status document
+            await doc.ref.delete();
+            console.log(`[cleanupExpiredStatuses] Deleted status: ${doc.id}`);
+          } catch (error) {
+            console.error(`[cleanupExpiredStatuses] Error deleting status ${doc.id}:`, error);
+          }
+        });
+
+        await Promise.all(deletions);
+        console.log(`[cleanupExpiredStatuses] Cleanup complete - deleted ${snapshot.size} statuses`);
+
+        return null;
+      } catch (error) {
+        console.error('[cleanupExpiredStatuses] Fatal error:', error);
+        return null;
+      }
+    });
+
+// ====================================
 // OPENAI PROXY FUNCTION
 // ====================================
 

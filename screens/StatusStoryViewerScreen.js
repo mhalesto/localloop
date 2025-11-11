@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import LottieView from 'lottie-react-native';
 
 import { useStatuses } from '../contexts/StatusesContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -83,6 +84,7 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   const [reply, setReply] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [error, setError] = useState('');
+  const [imageLoading, setImageLoading] = useState(true);
 
   // uploaded image natural size
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 });
@@ -91,6 +93,19 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   useEffect(() => { progressRef.current = progress; }, [progress]);
 
   useEffect(() => { setCurrentIndex(derivedInitialIndex); }, [derivedInitialIndex]);
+
+  // Reset image loading state when currentIndex changes
+  useEffect(() => {
+    setImageLoading(true);
+
+    // Fallback: hide loading after 10 seconds if image still hasn't loaded
+    const timeout = setTimeout(() => {
+      console.log('[StatusViewer] Image load timeout, hiding loader');
+      setImageLoading(false);
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [currentIndex, currentStatus?.imageUrl]);
 
   const currentStatus = storyItems[currentIndex] ?? null;
 
@@ -305,7 +320,30 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
                 source={{ uri: currentStatus.imageUrl }}
                 style={[styles.mediaImage, { width: displayW, height: displayH, borderRadius: 12 }]}
                 resizeMode="contain"
+                onLoadEnd={() => {
+                  console.log('[StatusViewer] Image loaded');
+                  setImageLoading(false);
+                }}
+                onLoadStart={() => {
+                  console.log('[StatusViewer] Image loading started');
+                  setImageLoading(true);
+                }}
+                onError={(error) => {
+                  console.error('[StatusViewer] Image load error:', error);
+                  setImageLoading(false);
+                }}
               />
+              {/* Loading animation overlay */}
+              {imageLoading && (
+                <View style={styles.loadingOverlay}>
+                  <LottieView
+                    source={require('../assets/broom.json')}
+                    autoPlay
+                    loop
+                    style={styles.loadingAnimation}
+                  />
+                </View>
+              )}
             </View>
           ) : (
             <View style={[styles.media, styles.mediaFallback]}>
@@ -449,6 +487,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 12,
+  },
+  loadingAnimation: {
+    width: 150,
+    height: 150,
   },
 
   mediaFallback: {

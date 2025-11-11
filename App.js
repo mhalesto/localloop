@@ -8,7 +8,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LoadingOverlay from './components/LoadingOverlay';
 import CustomSplashScreen from './components/SplashScreen';
 import { useAlert } from './contexts/AlertContext';
 
@@ -44,6 +43,7 @@ import PostComposerScreen from './screens/PostComposerScreen';
 import LocalLoopMarketsScreen from './screens/LocalLoopMarketsScreen';
 import CreateMarketListingScreen from './screens/CreateMarketListingScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
+import TutorialDemoScreen from './screens/TutorialDemoScreen';
 
 import { PostsProvider } from './contexts/PostsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -52,6 +52,7 @@ import { StatusesProvider } from './contexts/StatusesContext';
 import { SensorsProvider } from './contexts/SensorsContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { AlertProvider } from './contexts/AlertContext';
+import { OnboardingProvider } from './contexts/OnboardingContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -131,6 +132,7 @@ function RootNavigator() {
       <Stack.Screen name="MyComments" component={MyCommentsScreen} />
       <Stack.Screen name="MyPosts" component={MyPostsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="TutorialDemo" component={TutorialDemoScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="StatusDetail" component={StatusDetailScreen} />
       <Stack.Screen name="StatusComposer" component={StatusComposerScreen} />
@@ -163,9 +165,7 @@ function RootNavigator() {
  */
 function AuthGate() {
   const { isInitializing } = useAuth();
-  const [showLoader, setShowLoader] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   useEffect(() => {
     if (!isInitializing) {
@@ -178,18 +178,9 @@ function AuthGate() {
     try {
       const completed = await AsyncStorage.getItem('@onboarding_completed');
       setShowOnboarding(completed !== 'true');
-
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setShowLoader(false);
-        setCheckingOnboarding(false);
-      }, 100);
-      return () => clearTimeout(timer);
     } catch (error) {
       console.error('Error checking onboarding status:', error);
       setShowOnboarding(false);
-      setShowLoader(false);
-      setCheckingOnboarding(false);
     }
   };
 
@@ -197,18 +188,8 @@ function AuthGate() {
     setShowOnboarding(false);
   };
 
-  if (isInitializing || showLoader || checkingOnboarding) {
-    return (
-      <View style={{ flex: 1 }}>
-        <LoadingOverlay
-          visible={true}
-          onComplete={() => {}}
-          duration={2000}
-        />
-      </View>
-    );
-  }
-
+  // Show onboarding if needed, otherwise show main app
+  // Removed LoadingOverlay - screens have their own skeleton loaders
   if (showOnboarding) {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
@@ -238,21 +219,23 @@ export default function App() {
       <AuthProvider>
         <SettingsProvider>
           <AlertProvider>
-            <SensorsProvider>
-              <PostsProvider>
-                <StatusesProvider>
-                  <NotificationsProvider>
-                    <SafeAreaProvider>
-                      <NavigationContainer linking={linking}>
-                        <StatusBar style="light" />
-                        <DeepLinkHandler />
-                        <AuthGate />
-                      </NavigationContainer>
-                    </SafeAreaProvider>
-                  </NotificationsProvider>
-                </StatusesProvider>
-              </PostsProvider>
-            </SensorsProvider>
+            <OnboardingProvider>
+              <SensorsProvider>
+                <PostsProvider>
+                  <StatusesProvider>
+                    <NotificationsProvider>
+                      <SafeAreaProvider>
+                        <NavigationContainer linking={linking}>
+                          <StatusBar style="light" />
+                          <DeepLinkHandler />
+                          <AuthGate />
+                        </NavigationContainer>
+                      </SafeAreaProvider>
+                    </NotificationsProvider>
+                  </StatusesProvider>
+                </PostsProvider>
+              </SensorsProvider>
+            </OnboardingProvider>
           </AlertProvider>
         </SettingsProvider>
       </AuthProvider>
