@@ -56,14 +56,14 @@ export const SUBSCRIPTION_PLANS = {
       aiTitleGenerationsPerDay: 0, // No AI title generation for Basic
     },
   },
-  PREMIUM: {
-    id: 'premium',
-    name: 'Premium',
-    price: 49.99,
+  GO: {
+    id: 'premium', // Internal ID remains 'premium' for backwards compatibility
+    name: 'Go',
+    price: 5.00, // 🧪 TEST PRICE - PRODUCTION: 79.99
     currency: 'ZAR',
     interval: 'month',
-    yearlyPrice: 499,
-    yearlySavings: 'save almost 20%',
+    yearlyPrice: 799,
+    yearlySavings: 'save 17% (2 months free)',
     popular: true,
     description: 'Perfect for active community members',
     features: [
@@ -116,18 +116,18 @@ export const SUBSCRIPTION_PLANS = {
     },
     savings: null,
   },
-  GOLD: {
-    id: 'gold',
-    name: 'Gold',
-    price: 149.99,
+  PREMIUM: {
+    id: 'gold', // Internal ID remains 'gold' for backwards compatibility
+    name: 'Premium',
+    price: 10.00, // 🧪 TEST PRICE - PRODUCTION: 149.99
     currency: 'ZAR',
     interval: 'month',
     yearlyPrice: 1499,
-    yearlySavings: 'save 20% (2 months)',
+    yearlySavings: 'save 17% (2 months free)',
     description: 'GPT-4o powered AI + VIP experience',
-    popular: true,
+    popular: false,
     features: [
-      'Everything in Premium',
+      'Everything in Go',
       '15 events per month',
       { text: '✨ GPT-4o AI Post Composer', badge: 'NEW', badgeColor: '#5E5CE6' },
       { text: '🎨 Vision-Personalized Cartoons', badge: 'NEW', badgeColor: '#5E5CE6' },
@@ -138,13 +138,13 @@ export const SUBSCRIPTION_PLANS = {
       { text: '🌍 Cultural Translation (11 SA languages)', badge: 'NEW', badgeColor: '#5E5CE6' },
       '20 Vision-enhanced generations/month (HD quality)',
       'Custom prompts - unlimited creativity',
-      'Gold Crown badge',
-      '5 exclusive Gold themes',
+      'Premium Crown badge',
+      '5 exclusive Premium themes',
       'Advanced color controls',
       'Early access to features',
       'Market listing priority',
       'Profile analytics dashboard',
-      'VIP support (2h)',
+      'Priority email support (24h)',
     ],
     limits: {
       postsPerDay: -1,
@@ -189,6 +189,85 @@ export const SUBSCRIPTION_PLANS = {
       aiSummarizationsPerDay: 50, // 50 summaries per day with GPT-4o
       aiPostImprovementsPerDay: 30, // 30 post improvements per day with GPT-4o
       aiTitleGenerationsPerDay: 50, // 50 title generations per day
+    },
+  },
+  GOLD: {
+    id: 'ultimate',
+    name: 'Gold',
+    price: 15.00, // 🧪 TEST PRICE - PRODUCTION: 249.99
+    currency: 'ZAR',
+    interval: 'month',
+    yearlyPrice: 2499,
+    yearlySavings: 'save 17% (2 months free)',
+    description: 'Ultimate power user experience with 3x limits',
+    popular: true,
+    features: [
+      'Everything in Premium',
+      'Unlimited events',
+      { text: '🚀 3x All AI Limits', badge: 'ULTIMATE', badgeColor: '#FFD700' },
+      { text: '⚡ 60 Vision Cartoons/month', badge: 'ULTIMATE', badgeColor: '#FFD700' },
+      { text: '🎯 150 GPT-4o Summaries/day', badge: 'ULTIMATE', badgeColor: '#FFD700' },
+      { text: '✍️ 90 Post Improvements/day', badge: 'ULTIMATE', badgeColor: '#FFD700' },
+      { text: '📊 Advanced Analytics Dashboard', badge: 'NEW', badgeColor: '#5E5CE6' },
+      { text: '💎 Exclusive Gold Crown Badge', badge: 'VIP', badgeColor: '#FFD700' },
+      { text: '🎨 Unlimited Custom Themes', badge: 'ULTIMATE', badgeColor: '#FFD700' },
+      '100 avatar choices (vs 50 in Premium)',
+      '90-day market listing duration',
+      '20 images per market listing',
+      'Priority marketplace positioning',
+      'Early beta feature access',
+      'Email support (faster priority)',
+    ],
+    limits: {
+      postsPerDay: -1,
+      statusesPerDay: -1,
+      customThemes: true,
+      premiumThemes: true,
+      goldThemes: true,
+      ultimateThemes: true,
+      customTypography: true,
+      dreamyScroll: true,
+      aiFeatures: true,
+      threadSummarization: true,
+      commentSuggestions: true,
+      translation: true,
+      titleGeneration: true,
+      semanticSearch: true,
+      qualityScoring: true,
+      premiumBadge: false,
+      goldBadge: false,
+      ultimateBadge: true,
+      prioritySupport: true,
+      earlyAccess: true,
+      marketListingsActive: -1,
+      marketListingDuration: 90,
+      marketListingImages: 20,
+      avatarChoices: 100,
+      profileAnalytics: true,
+      advancedAnalytics: true,
+      verifiedCheckmark: true,
+      advancedColorControls: true,
+      cartoonAvatarsMonthly: 60, // 3x Premium's 20
+      cartoonAvatarsLifetime: null,
+      customCartoonPrompts: true,
+      customImageUpload: true,
+      unlimitedGeneration: true,
+      apiAccess: true, // ULTIMATE EXCLUSIVE
+      whiteLabel: true, // ULTIMATE EXCLUSIVE
+      customBranding: true, // ULTIMATE EXCLUSIVE
+      dedicatedManager: true, // ULTIMATE EXCLUSIVE
+      // GPT-4o Features
+      gpt4oComposer: true,
+      gpt4oSummarization: true,
+      gpt4oVisionCartoons: true,
+      gpt4oCommentSuggestions: true,
+      gpt4oCulturalTranslation: true,
+      artworkDownloadsPerDay: -1,
+      eventsPerMonth: -1, // Unlimited events
+      // AI Feature Daily Limits (Ultimate - 3x Premium limits)
+      aiSummarizationsPerDay: 150, // 3x Premium's 50
+      aiPostImprovementsPerDay: 90, // 3x Premium's 30
+      aiTitleGenerationsPerDay: 150, // 3x Premium's 50
     },
   },
 };
@@ -263,16 +342,22 @@ export function canUserPerformAction(planId, action, isAdmin = false) {
 
 /**
  * Get required plan for a feature
- * Returns 'basic', 'premium', or 'gold'
+ * Returns 'basic', 'premium', 'gold', or 'ultimate'
  */
 export function getRequiredPlan(featureName) {
-  // Gold-exclusive features
+  // Ultimate-exclusive features (new Gold tier)
+  const ultimateFeatures = ['ultimateBadge', 'ultimateThemes', 'apiAccess', 'whiteLabel', 'customBranding', 'dedicatedManager', 'advancedAnalytics'];
+  if (ultimateFeatures.includes(featureName)) {
+    return 'ultimate';
+  }
+
+  // Gold-exclusive features (now Premium tier)
   const goldFeatures = ['goldThemes', 'goldBadge', 'earlyAccess', 'verifiedCheckmark', 'advancedColorControls', 'customCartoonPrompts'];
   if (goldFeatures.includes(featureName)) {
     return 'gold';
   }
 
-  // Premium features
+  // Premium features (now Go tier)
   const premiumFeatures = [
     'premiumThemes',
     'customTypography',
@@ -305,7 +390,7 @@ export function getPlanInfo(planId) {
     name: plan.name,
     price: plan.price,
     formattedPrice: formatPrice(plan),
-    badge: plan.id === 'gold' ? '👑' : plan.id === 'premium' ? '⭐' : null,
+    badge: plan.id === 'ultimate' ? '💎' : plan.id === 'gold' ? '👑' : plan.id === 'premium' ? '⭐' : null,
   };
 }
 

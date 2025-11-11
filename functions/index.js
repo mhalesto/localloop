@@ -624,8 +624,7 @@ const crypto = require('crypto');
 const getPayFastConfig = () => {
   const config = functions.config().payfast || {};
 
-  // SANDBOX MODE - Using sandbox PayFast for testing
-  // For production, set credentials via: firebase functions:config:set payfast.merchant_id="YOUR_ID" payfast.merchant_key="YOUR_KEY" payfast.mode="production"
+  // Check mode from config
   const isProduction = config.mode === 'production';
 
   return {
@@ -634,7 +633,7 @@ const getPayFastConfig = () => {
     passphrase: config.passphrase || '',
     processUrl: isProduction
       ? 'https://www.payfast.co.za/eng/process'
-      : 'https://sandbox.payfast.co.za/eng/process', // SANDBOX URL for testing
+      : 'https://sandbox.payfast.co.za/eng/process',
   };
 };
 
@@ -651,7 +650,6 @@ const payFastEncode = (value) => {
  * Generate MD5 signature for PayFast
  * IMPORTANT: Parameters must be in the order they appear in the form, NOT alphabetical!
  * Per PayFast docs: "Do not use the API signature format, which uses alphabetical ordering!"
- * CRITICAL: Use RAW values (no URL encoding) for signature generation
  */
 function generatePayFastSignature(data, passphrase = null) {
   // PayFast requires specific order (as they appear in the form)
@@ -700,11 +698,10 @@ function generatePayFastSignature(data, passphrase = null) {
     }
   }
 
-  // CRITICAL: Use RAW values (no encoding) for signature generation
-  const pairs = orderedKeys.map((key) => `${key}=${data[key].toString().trim()}`);
+  const pairs = orderedKeys.map((key) => `${key}=${payFastEncode(data[key])}`);
 
   if (passphrase !== null && passphrase !== '') {
-    pairs.push(`passphrase=${passphrase}`);
+    pairs.push(`passphrase=${payFastEncode(passphrase)}`);
   }
 
   const signatureBase = pairs.join('&');
@@ -767,13 +764,6 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       amount: amount.toFixed(2),
       item_name: `LocalLoop ${planName}`,
       item_description: `${planName} subscription - ${interval}ly billing`,
-
-      // Subscription details - RECURRING until cancelled
-      subscription_type: '1', // 1 = subscription
-      billing_date: new Date().toISOString().split('T')[0],
-      recurring_amount: amount.toFixed(2),
-      frequency: frequency.toString(),
-      cycles: '0', // 0 = forever (until cancelled)
 
       // Custom fields
       custom_str1: uid, // User ID

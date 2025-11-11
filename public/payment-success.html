@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - LocalLoop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #34C759;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .success-icon svg {
+            width: 48px;
+            height: 48px;
+            stroke: white;
+            stroke-width: 3;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            animation: checkmark 0.8s ease-out 0.3s;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes checkmark {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        h1 {
+            color: #1d1d1f;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: #6e6e73;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 24px;
+            padding: 16px;
+            background: #f5f5f7;
+            border-radius: 12px;
+            font-size: 14px;
+            color: #6e6e73;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .redirect-text {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #86868b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52">
+                <polyline points="14 27 22 35 38 19"/>
+            </svg>
+        </div>
+
+        <h1>Payment Successful!</h1>
+        <p>Your subscription has been activated. You now have access to all premium features!</p>
+
+        <a href="localloop://payment-success" class="button" id="returnButton">
+            Return to LocalLoop
+        </a>
+
+        <p class="redirect-text" id="redirectText">
+            <span class="loader"></span>
+            Redirecting to app...
+        </p>
+
+        <div class="info">
+            Your payment has been processed securely by PayFast. You will receive a confirmation email shortly.
+        </div>
+    </div>
+
+    <script>
+        // Attempt to deep link back to the app
+        window.onload = function() {
+            setTimeout(function() {
+                // Try to open the app
+                window.location.href = 'localloop://payment-success';
+
+                // If still on page after 2 seconds, show manual button
+                setTimeout(function() {
+                    document.getElementById('redirectText').style.display = 'none';
+                }, 2000);
+            }, 1000);
+        };
+
+        // Handle button click
+        document.getElementById('returnButton').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = 'localloop://payment-success';
+        });
+    </script>
+</body>
+</html>
