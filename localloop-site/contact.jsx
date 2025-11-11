@@ -3,59 +3,118 @@ const tierDetails = [
     name: 'Basic',
     price: 'R0',
     cadence: '/month',
-    summary: 'Essential features for casual users who want to stay tuned-in without the extras.',
+    summary: 'R0 forever for neighbors who need core updates, AI starter perks, and essential safety tools.',
     features: [
       {
         title: 'Creation limits',
-        items: ['5 posts per day', '5 statuses per day', 'Unlimited comments & replies']
+        items: ['5 posts per day', '5 statuses per day', '2 events per month', 'Unlimited comments & replies']
       },
       {
         title: 'Customization & AI',
         items: ['5 basic accent themes', '5 AI cartoon avatars (lifetime)', 'Free AI features']
       },
       {
-        title: 'Support',
-        items: ['Standard support (48h)', 'Community reporting tools']
+        title: 'Support & trust',
+        items: ['Standard support (48h)', 'Ads + watermark until you upgrade', 'Community reporting tools']
+      }
+    ]
+  },
+  {
+    name: 'Go',
+    price: 'R79.99',
+    cadence: '/month',
+    summary: 'R79.99/month or R799/year (save 17% - 2 months free) for active members who want premium creative control.',
+    features: [
+      {
+        title: 'Creation & style',
+        items: ['Unlimited posts & statuses', '5 events per month', '15+ premium gradient themes', 'Custom typography controls']
+      },
+      {
+        title: 'AI studio',
+        items: [
+          '10 AI cartoon avatars/month',
+          '8 cartoon styles (Pixar, Anime, etc.)',
+          'AI thread summaries',
+          'Smart comment suggestions',
+          'Translation (11 languages)'
+        ]
+      },
+      {
+        title: 'Status & support',
+        items: ['Premium badge', 'Ad-free experience', 'Priority support (12h)', 'Monthly marketplace boost credit']
       }
     ]
   },
   {
     name: 'Premium',
-    price: 'R49.99',
+    price: 'R149.99',
     cadence: '/month',
-    summary: 'R49.99/month or R499/year (save almost 20%) for active community members who publish frequently and want premium creative control.',
+    summary: 'R149.99/month or R1499/year (save 17%) for teams ready for GPT-4o workflows and pro analytics.',
     features: [
       {
-        title: 'Creation & style',
-        items: ['Unlimited posts & statuses', '15+ premium gradient themes', 'Custom typography controls', 'Ad-free experience']
+        title: 'GPT-4o studio',
+        items: [
+          '✨ GPT-4o AI Post Composer',
+          '🎨 Vision-Personalized Cartoons',
+          '🖼️ Upload custom images for generation',
+          '🚀 Generate anything beyond cartoons'
+        ]
       },
       {
-        title: 'AI studio',
-        items: ['10 AI cartoon avatars per month', '8 cartoon styles (Pixar, Anime, etc.)', 'AI thread summaries & smart suggestions', 'Translation in 11 languages']
+        title: 'Productivity & reach',
+        items: [
+          '📝 GPT-4o summaries (4 styles)',
+          '💬 Smart comment suggestions',
+          '🌍 Cultural translation (11 SA languages)',
+          '20 Vision-enhanced generations/month (HD)',
+          'Custom prompts for unlimited creativity'
+        ]
       },
       {
-        title: 'Status & support',
-        items: ['Premium badge', 'Priority support (12h)', 'Premium marketplace boosts']
+        title: 'Status & growth',
+        items: [
+          'Premium Crown badge',
+          '5 exclusive Premium themes',
+          'Advanced color controls',
+          'Market listing priority',
+          'Profile analytics dashboard',
+          'Priority email support (24h)',
+          'Early access to features'
+        ]
       }
     ]
   },
   {
     name: 'Gold',
-    price: 'R499.99',
-    cadence: '/year',
-    summary: 'R79.99/month or R799/year (save 20%) for creators and teams that need advanced branding, analytics, and concierge support.',
+    price: 'R249.99',
+    cadence: '/month',
+    summary: 'R249.99/month or R2499/year (save 17% - 2 months free) for leaders who need concierge support and 3x AI limits.',
     features: [
       {
-        title: 'AI studio+',
-        items: ['20 AI cartoon avatars per month', 'Custom avatar prompts (Gold exclusive)', 'Describe your own cartoon style']
+        title: 'AI power stack',
+        items: [
+          'Everything in Premium + unlimited events',
+          '🚀 3x all AI limits',
+          '⚡ 60 Vision Cartoons/month',
+          '🎯 150 GPT-4o summaries/day',
+          '✍️ 90 Post Improvements/day'
+        ]
       },
       {
-        title: 'Branding & control',
-        items: ['Gold Crown badge & 5 Gold themes', 'Advanced color controls', 'Market listing priority', 'Save 2 months each year']
+        title: 'Branding & reach',
+        items: [
+          '📊 Advanced Analytics Dashboard',
+          '💎 Exclusive Gold Crown badge',
+          '🎨 Unlimited custom themes',
+          '100 avatar choices',
+          '90-day market listing duration',
+          '20 images per listing',
+          'Priority marketplace positioning'
+        ]
       },
       {
-        title: 'Insights & support',
-        items: ['Profile analytics dashboard', 'Early access to new features', 'VIP support (2h)']
+        title: 'Support & access',
+        items: ['Early beta feature access', 'Email support (faster priority)']
       }
     ]
   }
