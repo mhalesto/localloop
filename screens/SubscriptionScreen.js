@@ -47,23 +47,27 @@ export default function SubscriptionScreen({ navigation }) {
   }, [user]);
 
   const handleSelectPlan = async (planId) => {
-    // Handle ultimate/gold equivalence
     const currentPlanId = userProfile?.subscriptionPlan;
-    const normalizedCurrentPlan = (currentPlanId === 'ultimate' || currentPlanId === 'gold') ? 'gold' : currentPlanId;
-    const normalizedSelectedPlan = (planId === 'ultimate' || planId === 'gold') ? 'gold' : planId;
 
-    if (normalizedSelectedPlan === normalizedCurrentPlan) {
+    // Check if already on this plan
+    if (planId === currentPlanId) {
       showAlert('Already Subscribed', 'You are already on this plan.', [{ text: 'OK' }]);
       return;
     }
 
-    // Define plan hierarchy (higher index = higher tier)
-    const planHierarchy = ['basic', 'go', 'premium', 'gold'];
-    const currentPlanIndex = planHierarchy.indexOf(normalizedCurrentPlan || 'basic');
-    const selectedPlanIndex = planHierarchy.indexOf(normalizedSelectedPlan);
+    // Map plan IDs to hierarchy levels (higher number = higher tier)
+    const planHierarchyMap = {
+      'basic': 0,
+      'premium': 1,  // GO plan (id='premium')
+      'gold': 2,     // PREMIUM plan (id='gold')
+      'ultimate': 3  // GOLD plan (id='ultimate')
+    };
+
+    const currentPlanLevel = planHierarchyMap[currentPlanId] || 0;
+    const selectedPlanLevel = planHierarchyMap[planId] || 0;
 
     // Check if trying to downgrade
-    if (currentPlanIndex > selectedPlanIndex) {
+    if (currentPlanLevel > selectedPlanLevel) {
       showAlert(
         'Already on Higher Tier',
         `You're currently on the ${getPlanById(currentPlanId)?.name} plan, which includes all features of ${getPlanById(planId)?.name}.`,
@@ -174,20 +178,24 @@ export default function SubscriptionScreen({ navigation }) {
 
         {/* Plan Cards */}
         {!isLoading && plans.map((plan, index) => {
-          // Handle ultimate/gold equivalence
+          // Check if this is the user's current plan
           const currentPlanId = userProfile?.subscriptionPlan;
-          const normalizedCurrentPlan = (currentPlanId === 'ultimate' || currentPlanId === 'gold') ? 'gold' : currentPlanId;
-          const normalizedPlanId = (plan.id === 'ultimate' || plan.id === 'gold') ? 'gold' : plan.id;
-
-          const isCurrentPlan = normalizedPlanId === normalizedCurrentPlan;
+          const isCurrentPlan = plan.id === currentPlanId;
           const isSelected = selectedPlan === plan.id;
           const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
           // Check if this is a downgrade
-          const planHierarchy = ['basic', 'go', 'premium', 'gold'];
-          const currentPlanIndex = planHierarchy.indexOf(normalizedCurrentPlan || 'basic');
-          const thisPlanIndex = planHierarchy.indexOf(normalizedPlanId);
-          const isDowngrade = currentPlanIndex > thisPlanIndex;
+          // Map plan IDs to hierarchy levels (higher number = higher tier)
+          const planHierarchyMap = {
+            'basic': 0,
+            'premium': 1,  // GO plan (id='premium')
+            'gold': 2,     // PREMIUM plan (id='gold')
+            'ultimate': 3  // GOLD plan (id='ultimate')
+          };
+
+          const currentPlanLevel = planHierarchyMap[currentPlanId] || 0;
+          const thisPlanLevel = planHierarchyMap[plan.id] || 0;
+          const isDowngrade = currentPlanLevel > thisPlanLevel;
 
           return (
             <TouchableOpacity
