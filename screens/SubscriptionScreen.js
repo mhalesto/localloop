@@ -215,7 +215,7 @@ export default function SubscriptionScreen({ navigation }) {
               ]}
               onPress={() => handleSelectPlan(plan.id)}
               activeOpacity={0.7}
-              disabled={isProcessing || isDowngrade}
+              disabled={isProcessing}
             >
               {/* Popular Badge */}
               {plan.popular && (
@@ -314,7 +314,7 @@ export default function SubscriptionScreen({ navigation }) {
                     },
                   ]}
                   onPress={() => handleSelectPlan(plan.id)}
-                  disabled={isProcessing || isDowngrade}
+                  disabled={isProcessing}
                 >
                   {isProcessing && isSelected ? (
                     <ActivityIndicator color="#fff" />
