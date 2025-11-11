@@ -375,10 +375,32 @@
         }
 
         .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            display: flex;
             gap: 2rem;
             margin-top: 3rem;
+            overflow-x: auto;
+            overflow-y: visible;
+            padding: 2rem 0;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .pricing-grid::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .pricing-grid::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+            border-radius: 10px;
+        }
+
+        .pricing-grid::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+        }
+
+        .pricing-grid::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
 
         .pricing-card {
@@ -388,6 +410,9 @@
             box-shadow: 0 5px 20px rgba(0,0,0,0.08);
             position: relative;
             transition: all 0.3s;
+            flex: 0 0 320px;
+            min-width: 320px;
+            max-width: 320px;
         }
 
         .pricing-card:hover {
@@ -608,9 +633,14 @@
                 font-size: 2rem;
             }
 
-            .features-grid,
-            .pricing-grid {
+            .features-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .pricing-card {
+                flex: 0 0 280px;
+                min-width: 280px;
+                max-width: 280px;
             }
 
             .pricing-card.featured {
@@ -864,7 +894,7 @@
                 <h2 class="section-title">Simple, Transparent <span style="color: var(--primary);">Pricing</span></h2>
                 <p class="section-description">Choose the perfect plan for your community engagement</p>
             </div>
-            <div class="pricing-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            <div class="pricing-grid">
                 <div class="pricing-card">
                     <h3 class="plan-name">Basic</h3>
                     <div class="plan-price">
