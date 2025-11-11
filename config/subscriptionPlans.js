@@ -64,7 +64,7 @@ export const SUBSCRIPTION_PLANS = {
     interval: 'month',
     yearlyPrice: 799,
     yearlySavings: 'save 17% (2 months free)',
-    popular: true,
+    popular: false,
     description: 'Perfect for active community members',
     features: [
       'Unlimited posts & statuses',
@@ -125,7 +125,7 @@ export const SUBSCRIPTION_PLANS = {
     yearlyPrice: 1499,
     yearlySavings: 'save 17% (2 months free)',
     description: 'GPT-4o powered AI + VIP experience',
-    popular: false,
+    popular: true,
     features: [
       'Everything in Go',
       '15 events per month',
@@ -200,7 +200,7 @@ export const SUBSCRIPTION_PLANS = {
     yearlyPrice: 2499,
     yearlySavings: 'save 17% (2 months free)',
     description: 'Ultimate power user experience with 3x limits',
-    popular: true,
+    popular: false,
     features: [
       'Everything in Premium',
       'Unlimited events',
