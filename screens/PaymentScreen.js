@@ -80,13 +80,14 @@ export default function PaymentScreen({ route, navigation }) {
       }
     } catch (error) {
       setIsProcessing(false);
-      console.error('[PaymentScreen] Payment error:', error);
 
       // Check if user already has this plan or a higher tier
       if (error.message && (
         error.message.includes('already on this plan') ||
         error.message.includes('higher tier')
       )) {
+        // This is expected - user already has the plan, don't log as error
+        console.log('[PaymentScreen] User already has this plan or higher:', planName);
         showAlert(
           'Already Subscribed',
           `You're already on the ${planName} plan or a higher tier. No payment needed!`,
@@ -99,6 +100,8 @@ export default function PaymentScreen({ route, navigation }) {
           { icon: 'checkmark-circle', iconColor: '#34C759' }
         );
       } else {
+        // This is an actual error - log it
+        console.error('[PaymentScreen] Payment error:', error);
         showAlert(
           'Payment Error',
           error.message || 'Unable to process payment. Please try again.',
@@ -141,13 +144,14 @@ export default function PaymentScreen({ route, navigation }) {
       );
     } catch (error) {
       setIsProcessing(false);
-      console.error('[PaymentScreen] Test payment error:', error);
 
       // Check if user already has this plan or a higher tier
       if (error.message && (
         error.message.includes('already on this plan') ||
         error.message.includes('higher tier')
       )) {
+        // This is expected - user already has the plan, don't log as error
+        console.log('[PaymentScreen] Test: User already has this plan or higher:', planName);
         showAlert(
           'Already Subscribed',
           `You're already on the ${planName} plan or a higher tier. No payment needed!`,
@@ -160,6 +164,8 @@ export default function PaymentScreen({ route, navigation }) {
           { icon: 'checkmark-circle', iconColor: '#34C759' }
         );
       } else {
+        // This is an actual error - log it
+        console.error('[PaymentScreen] Test payment error:', error);
         showAlert(
           'Payment Failed',
           error.message || 'Something went wrong. Please try again.',
