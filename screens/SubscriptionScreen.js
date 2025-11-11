@@ -68,11 +68,14 @@ export default function SubscriptionScreen({ navigation }) {
 
     // Check if trying to downgrade
     if (currentPlanLevel > selectedPlanLevel) {
+      const currentPlanObj = getPlanById(currentPlanId);
+      const selectedPlanObj = getPlanById(planId);
+
       showAlert(
-        'Already on Higher Tier',
-        `You're currently on the ${getPlanById(currentPlanId)?.name} plan, which includes all features of ${getPlanById(planId)?.name}.`,
-        [{ text: 'OK' }],
-        { icon: 'information-circle', iconColor: accentPreset?.buttonBackground || themeColors.primary }
+        '✨ Already Included!',
+        `You're on the ${currentPlanObj?.name} plan, which already includes all ${selectedPlanObj?.name} features plus much more!\n\nEnjoy your premium benefits! 🎉`,
+        [{ text: 'Got it!' }],
+        { type: 'success' }
       );
       return;
     }
