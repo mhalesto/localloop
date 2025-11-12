@@ -491,12 +491,12 @@ export default function CountryScreen({ navigation }) {
     }
   };
 
-  // Load cartoon data on mount
+  // Load cartoon data on mount and when subscription changes
   useEffect(() => {
     if (user?.uid) {
       loadCartoonData();
     }
-  }, [user?.uid, loadCartoonData]);
+  }, [user?.uid, userProfile?.subscriptionPlan, loadCartoonData]);
 
   const statusList = useMemo(
     () =>
