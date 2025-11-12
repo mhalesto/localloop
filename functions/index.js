@@ -635,6 +635,16 @@ const getPayFastConfig = () => {
   };
 };
 
+const PAYFAST_RETURN_URL =
+  process.env.PAYFAST_RETURN_URL ||
+  (functions.config().payfast && functions.config().payfast.return_url) ||
+  'https://share-your-story-1.web.app/payment-success.html';
+
+const PAYFAST_CANCEL_URL =
+  process.env.PAYFAST_CANCEL_URL ||
+  (functions.config().payfast && functions.config().payfast.cancel_url) ||
+  'https://share-your-story-1.web.app/payment-cancelled.html';
+
 // Encode values like PHP's urlencode: uppercase hex and space => +
 const payFastEncode = (value) => {
   if (value === null || value === undefined) {
@@ -748,8 +758,8 @@ exports.createPayFastPayment = functions.https.onCall(async (data, context) => {
       // Merchant details
       merchant_id: config.merchantId,
       merchant_key: config.merchantKey,
-      return_url: `localloop://payment-success`,
-      cancel_url: `localloop://payment-cancelled`,
+      return_url: PAYFAST_RETURN_URL,
+      cancel_url: PAYFAST_CANCEL_URL,
       notify_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/payFastWebhook`,
 
       // Buyer details
