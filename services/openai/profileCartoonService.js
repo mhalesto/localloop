@@ -327,7 +327,7 @@ export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeU
   if (limits.lifetime !== null && lifetimeUsage >= limits.lifetime) {
     return {
       canGenerate: false,
-      reason: `Basic plan users can generate ${limits.lifetime} cartoon profiles. Upgrade to Premium for ${USAGE_LIMITS.premium.monthly}/month!`,
+      reason: `Basic plan users can generate ${limits.lifetime} cartoon profiles. Upgrade to Go for ${USAGE_LIMITS.premium.monthly} generations/month!`,
     };
   }
 
@@ -357,7 +357,7 @@ export function getUsageStatsText(subscriptionPlan = 'basic', currentMonthUsage 
 
   if (subscriptionPlan === 'basic') {
     return lifetimeUsage >= limits.lifetime
-      ? `Used all ${limits.lifetime} generations. Upgrade to Premium for ${USAGE_LIMITS.premium.monthly}/month!`
+      ? `Used all ${limits.lifetime} generations. Upgrade to Go for ${USAGE_LIMITS.premium.monthly} generations/month!`
       : `${lifetimeUsage}/${limits.lifetime} lifetime generations used`;
   }
 

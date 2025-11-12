@@ -1022,6 +1022,7 @@ export default function CountryScreen({ navigation }) {
                             <ArtworkMasonryGrid
                               artworks={feedItem.data}
                               onArtworkPress={(artwork) => navigation.navigate('PublicProfile', { userId: artwork.userId })}
+                              navigation={navigation}
                             />
                           </View>
                         );
@@ -1229,6 +1230,7 @@ export default function CountryScreen({ navigation }) {
         usageData={cartoonUsageData}
         isGenerating={isGeneratingCartoon}
         isAdmin={isAdmin}
+        navigation={navigation}
       />
 
       {/* Cartoon Generation Progress */}

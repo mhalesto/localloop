@@ -11,7 +11,7 @@ import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscription
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
 
-export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
+export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigation }) {
   const { themeColors, userProfile } = useSettings();
   const { currentUser, isAdmin } = useAuth();
   const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
@@ -57,7 +57,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress }) {
         `You've used all ${downloadLimits.limit} downloads today. Upgrade to get more!`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => { /* Navigate to subscription screen */ } },
+          { text: 'Upgrade', onPress: () => navigation?.navigate('Subscription') },
         ]
       );
       return;

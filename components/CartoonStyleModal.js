@@ -33,6 +33,7 @@ export default function CartoonStyleModal({
   usageData,
   isGenerating = false,
   isAdmin = false,
+  navigation,
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [selectedStyle, setSelectedStyle] = useState(null);
@@ -165,7 +166,24 @@ export default function CartoonStyleModal({
     }
   };
 
-  const canProceed = canGenerate && ((useCustomPrompt && customPrompt.trim().length > 0) || (!useCustomPrompt && selectedStyle));
+  const hasSourceImage =
+    Boolean(
+      (useCustomImage && customImage) ||
+      userProfile?.profilePhoto ||
+      (isGoldUser && ignoreProfilePicture)
+    );
+
+  const needsSourceImage = !hasSourceImage;
+
+  const canProceed =
+    canGenerate &&
+    !needsSourceImage &&
+    (
+      (useCustomPrompt && customPrompt.trim().length > 0) ||
+      (!useCustomPrompt && selectedStyle)
+    );
+
+  const isGenerateDisabled = !canProceed || isGenerating;
 
   return (
     <Modal
@@ -210,12 +228,20 @@ export default function CartoonStyleModal({
               </View>
 
               {!canGenerate && (
-                <View style={[localStyles.warningBanner, { backgroundColor: '#FF950015' }]}>
+                <TouchableOpacity
+                  style={[localStyles.warningBanner, { backgroundColor: '#FF950015' }]}
+                  onPress={() => {
+                    onClose();
+                    navigation?.navigate('Subscription');
+                  }}
+                  activeOpacity={0.7}
+                >
                   <Ionicons name="information-circle" size={16} color="#FF9500" />
                   <Text style={[localStyles.warningText, { color: '#FF9500' }]}>
                     {reason}
                   </Text>
-                </View>
+                  <Ionicons name="arrow-forward" size={16} color="#FF9500" style={{ marginLeft: 8 }} />
+                </TouchableOpacity>
               )}
             </View>
 
@@ -544,15 +570,25 @@ export default function CartoonStyleModal({
 
           {/* Generate Button */}
           <View style={[localStyles.footer, { borderTopColor: themeColors.divider }]}>
+            {needsSourceImage && (
+              <Text style={[localStyles.helperText, { color: themeColors.warning || '#f5a623' }]}>
+                Add a profile photo or upload a custom image to generate a cartoon.
+              </Text>
+            )}
+            {reason && !canGenerate && (
+              <Text style={[localStyles.helperText, { color: themeColors.warning || '#f5a623' }]}>
+                {reason}
+              </Text>
+            )}
             <TouchableOpacity
               style={[
                 localStyles.generateButton,
                 {
-                  backgroundColor: canProceed ? primaryColor : themeColors.divider,
+                  backgroundColor: isGenerateDisabled ? themeColors.divider : primaryColor,
                 },
               ]}
               onPress={handleGenerate}
-              disabled={!canProceed || isGenerating}
+              disabled={isGenerateDisabled}
               activeOpacity={0.8}
             >
               {isGenerating ? (
@@ -678,6 +714,10 @@ const localStyles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     flexShrink: 0,
+  },
+  helperText: {
+    fontSize: 13,
+    marginBottom: 8,
   },
   generateButton: {
     flexDirection: 'row',
