@@ -132,14 +132,9 @@ service cloud.firestore {
       allow update: if isOwner(userId)
         && !isRestrictedUserFieldChange();
 
-      // Allow updating push token
-      allow update: if isSignedIn()
-        && request.auth.uid == userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['expoPushToken', 'lastPushTokenUpdate']);
-
       // Allow updating follower/following counts when following/unfollowing
       allow update: if isSignedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'followingCount'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount', 'followingCount', 'lastPushTokenUpdate'])
         && (
           request.resource.data.followersCount == resource.data.followersCount + 1
           || request.resource.data.followersCount == resource.data.followersCount - 1
