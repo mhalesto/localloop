@@ -23,6 +23,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
+import ProfileShareCode from './ProfileShareCode';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PORTFOLIO_WIDTH = SCREEN_WIDTH - 40; // 20px padding on each side
@@ -224,35 +225,46 @@ export default function ProfilePortfolioModal({
       {/* Contact Information */}
       <View style={localStyles.cardSection}>
         <Text style={localStyles.cardSectionLabel}>📬 CONTACT</Text>
-        <View style={localStyles.cardContactGrid}>
-          {profile.contactEmail && (
+        <View style={localStyles.cardContactShareRow}>
+          <View style={[localStyles.cardContactGrid, localStyles.cardContactDetails]}>
+            {profile.contactEmail && (
+              <View style={localStyles.cardContactItem}>
+                <View style={localStyles.cardContactIconContainer}>
+                  <Ionicons name="mail" size={18} color="#fff" />
+                </View>
+                <Text style={localStyles.cardContactValue} numberOfLines={1}>
+                  {profile.contactEmail}
+                </Text>
+              </View>
+            )}
             <View style={localStyles.cardContactItem}>
               <View style={localStyles.cardContactIconContainer}>
-                <Ionicons name="mail" size={18} color="#fff" />
+                <Ionicons name="location" size={18} color="#fff" />
               </View>
               <Text style={localStyles.cardContactValue} numberOfLines={1}>
-                {profile.contactEmail}
+                {getLocationText()}
               </Text>
             </View>
-          )}
-          <View style={localStyles.cardContactItem}>
-            <View style={localStyles.cardContactIconContainer}>
-              <Ionicons name="location" size={18} color="#fff" />
-            </View>
-            <Text style={localStyles.cardContactValue} numberOfLines={1}>
-              {getLocationText()}
-            </Text>
+            {profile.links && profile.links.length > 0 && (
+              <View style={localStyles.cardContactItem}>
+                <View style={localStyles.cardContactIconContainer}>
+                  <Ionicons name="link" size={18} color="#fff" />
+                </View>
+                <Text style={localStyles.cardContactValue} numberOfLines={1}>
+                  {profile.links[0].label}
+                </Text>
+              </View>
+            )}
           </View>
-          {profile.links && profile.links.length > 0 && (
-            <View style={localStyles.cardContactItem}>
-              <View style={localStyles.cardContactIconContainer}>
-                <Ionicons name="link" size={18} color="#fff" />
-              </View>
-              <Text style={localStyles.cardContactValue} numberOfLines={1}>
-                {profile.links[0].label}
-              </Text>
-            </View>
-          )}
+          <ProfileShareCode
+            profile={profile}
+            primaryColor={primaryColor}
+            variant="light"
+            size="inline"
+            showMeta={false}
+            showHeader={false}
+            style={localStyles.cardShareCodeCompact}
+          />
         </View>
       </View>
 
@@ -364,6 +376,14 @@ export default function ProfilePortfolioModal({
         </View>
       )}
 
+      <View style={localStyles.minimalShareSection}>
+        <ProfileShareCode
+          profile={profile}
+          primaryColor={primaryColor}
+          variant="minimal"
+        />
+      </View>
+
       {/* Footer */}
       <View style={localStyles.minimalFooter}>
         <Text style={localStyles.minimalFooterText}>@{profile.username}</Text>
@@ -434,6 +454,14 @@ export default function ProfilePortfolioModal({
             ))}
           </View>
         )}
+
+        <View style={localStyles.gradientShareSection}>
+          <ProfileShareCode
+            profile={profile}
+            primaryColor={primaryColor}
+            variant="dark"
+          />
+        </View>
 
         {/* Available Badge */}
         {profile.availableForWork && (
@@ -510,6 +538,14 @@ export default function ProfilePortfolioModal({
           </Text>
         </View>
       )}
+
+      <View style={localStyles.elegantShareSection}>
+        <ProfileShareCode
+          profile={profile}
+          primaryColor={primaryColor}
+          variant="elegant"
+        />
+      </View>
 
       {/* Footer */}
       <View style={localStyles.elegantFooter}>
@@ -899,8 +935,18 @@ export default function ProfilePortfolioModal({
       lineHeight: 22,
       fontStyle: 'italic',
     },
+    cardContactShareRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'stretch',
+      gap: 16,
+    },
     cardContactGrid: {
       gap: 10,
+    },
+    cardContactDetails: {
+      flex: 1,
+      minWidth: 0,
     },
     cardContactItem: {
       flexDirection: 'row',
@@ -926,6 +972,12 @@ export default function ProfilePortfolioModal({
       fontWeight: '600',
       color: '#333',
       flex: 1,
+    },
+    cardShareCodeCompact: {
+      minWidth: 130,
+      flexBasis: 140,
+      flexGrow: 0,
+      flexShrink: 0,
     },
     cardSkills: {
       flexDirection: 'row',
@@ -1067,6 +1119,10 @@ export default function ProfilePortfolioModal({
     minimalSkillsSection: {
       marginBottom: 16,
     },
+    minimalShareSection: {
+      marginTop: 8,
+      marginBottom: 16,
+    },
     minimalSkills: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -1166,6 +1222,9 @@ export default function ProfilePortfolioModal({
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      marginBottom: 16,
+    },
+    gradientShareSection: {
       marginBottom: 16,
     },
     gradientSkillPill: {
@@ -1323,6 +1382,9 @@ export default function ProfilePortfolioModal({
       fontWeight: '600',
       color: '#4A3F2E',
       lineHeight: 20,
+    },
+    elegantShareSection: {
+      marginBottom: 16,
     },
     elegantFooter: {
       marginTop: 20,

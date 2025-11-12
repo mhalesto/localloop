@@ -873,11 +873,38 @@ export default function SettingsScreen({ navigation }) {
 
   // Open style selection modal
   const handleOpenCartoonGenerator = () => {
+    // Check email verification first (required for all AI features to prevent abuse)
+    // Google users are automatically verified by Google
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link or click "Resend" on the verification banner.',
+        [],
+        { type: 'warning', icon: 'mail-outline', iconColor: '#FF9500' }
+      );
+      return;
+    }
+
     setCartoonStyleModalVisible(true);
   };
 
   // Open history modal
   const handleOpenCartoonHistory = () => {
+    // Check email verification first
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address to access AI features.',
+        [],
+        { type: 'warning', icon: 'mail-outline', iconColor: '#FF9500' }
+      );
+      return;
+    }
+
     setCartoonHistoryModalVisible(true);
   };
 

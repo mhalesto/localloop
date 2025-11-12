@@ -81,7 +81,7 @@ export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const { showAddShortcut, showDiscoveryOnExplore, userProfile, themeColors, isDarkMode } = useSettings();
   const { getRecentCityActivity, refreshPosts, addFetchedPost } = usePosts();
-  const { currentUser, user, isAdmin } = useAuth();
+  const { currentUser, user, isAdmin, emailVerified } = useAuth();
   const { showAlert } = useAlert();
   const haptics = useHaptics();
   const {
@@ -957,6 +957,20 @@ export default function CountryScreen({ navigation }) {
                   style={styles.aiAvatarButton}
                   onPress={() => {
                     haptics.light();
+
+                    // Check email verification first
+                    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+                    if (!emailVerified && !isGoogleUser) {
+                      showAlert(
+                        'Email Verification Required',
+                        'Please verify your email address before using AI features. Check your inbox for the verification link or click "Resend" on the verification banner.',
+                        [],
+                        { type: 'warning', icon: 'mail-outline', iconColor: '#FF9500' }
+                      );
+                      return;
+                    }
+
                     setCartoonModalVisible(true);
                   }}
                   activeOpacity={0.85}

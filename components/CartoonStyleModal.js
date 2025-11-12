@@ -45,8 +45,12 @@ export default function CartoonStyleModal({
   const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
   const [useCustomImage, setUseCustomImage] = useState(false); // Toggle for using custom image vs profile pic
   const [ignoreProfilePicture, setIgnoreProfilePicture] = useState(false); // Gold feature: generate without profile pic
-  const [realisticExpanded, setRealisticExpanded] = useState(true); // Expandable sections
-  const [cartoonExpanded, setCartoonExpanded] = useState(true);
+  // Expandable sections
+  const [professionalExpanded, setProfessionalExpanded] = useState(true);
+  const [naturalExpanded, setNaturalExpanded] = useState(false);
+  const [animation3DExpanded, setAnimation3DExpanded] = useState(false);
+  const [animation2DExpanded, setAnimation2DExpanded] = useState(false);
+  const [artisticExpanded, setArtisticExpanded] = useState(false);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   // Check notification permissions on mount
@@ -84,12 +88,21 @@ export default function CartoonStyleModal({
 
   const styles = Object.values(CARTOON_STYLES);
 
-  // Group styles into Cartoon and Realistic categories
-  const cartoonStyles = styles.filter(s =>
-    ['pixar', 'anime', 'comic', 'watercolor', 'disney', 'cartoon', 'ghibli', 'southpark'].includes(s.id)
+  // Group styles into 5 categories
+  const professionalStyles = styles.filter(s =>
+    ['professional', 'cinematic', 'fashion'].includes(s.id)
   );
-  const realisticStyles = styles.filter(s =>
-    ['professional', 'golden', 'cinematic', 'fashion', 'natural', 'dramatic'].includes(s.id)
+  const naturalStyles = styles.filter(s =>
+    ['golden', 'natural', 'dramatic'].includes(s.id)
+  );
+  const animation3DStyles = styles.filter(s =>
+    ['pixar', 'disney'].includes(s.id)
+  );
+  const animation2DStyles = styles.filter(s =>
+    ['anime', 'comic', 'ghibli'].includes(s.id)
+  );
+  const artisticStyles = styles.filter(s =>
+    ['watercolor', 'cartoon', 'southpark'].includes(s.id)
   );
 
   // Color palette for style pills
@@ -562,30 +575,30 @@ export default function CartoonStyleModal({
           <View style={localStyles.stylesContainer}>
             {!useCustomPrompt && (
               <>
-                {/* Realistic Photography Styles */}
+                {/* Professional Photography */}
                 <View style={localStyles.styleSection}>
                   <TouchableOpacity
                     style={localStyles.sectionHeader}
-                    onPress={() => setRealisticExpanded(!realisticExpanded)}
+                    onPress={() => setProfessionalExpanded(!professionalExpanded)}
                     activeOpacity={0.7}
                   >
                     <View style={localStyles.sectionHeaderLeft}>
                       <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
-                        📸 Realistic Photography
+                        📸 Professional Photography
                       </Text>
                       <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
-                        Professional photo-quality results
+                        Studio & editorial quality
                       </Text>
                     </View>
                     <Ionicons
-                      name={realisticExpanded ? 'chevron-up' : 'chevron-down'}
+                      name={professionalExpanded ? 'chevron-up' : 'chevron-down'}
                       size={24}
                       color={themeColors.textSecondary}
                     />
                   </TouchableOpacity>
-                  {realisticExpanded && (
+                  {professionalExpanded && (
                     <View style={localStyles.pillsContainer}>
-                      {realisticStyles.map((style) => {
+                      {professionalStyles.map((style) => {
                         const isSelected = selectedStyle === style.id;
                         const pillColor = getStyleColor(style.id);
                         return (
@@ -620,30 +633,204 @@ export default function CartoonStyleModal({
                   )}
                 </View>
 
-                {/* Cartoon Styles */}
-                <View style={[localStyles.styleSection, { marginTop: 24 }]}>
+                {/* Natural & Artistic Photography */}
+                <View style={[localStyles.styleSection, { marginTop: 8 }]}>
                   <TouchableOpacity
                     style={localStyles.sectionHeader}
-                    onPress={() => setCartoonExpanded(!cartoonExpanded)}
+                    onPress={() => setNaturalExpanded(!naturalExpanded)}
                     activeOpacity={0.7}
                   >
                     <View style={localStyles.sectionHeaderLeft}>
                       <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
-                        🎨 Cartoon Styles
+                        🌅 Natural & Artistic
                       </Text>
                       <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
-                        Artistic and animated styles
+                        Natural lighting & dramatic effects
                       </Text>
                     </View>
                     <Ionicons
-                      name={cartoonExpanded ? 'chevron-up' : 'chevron-down'}
+                      name={naturalExpanded ? 'chevron-up' : 'chevron-down'}
                       size={24}
                       color={themeColors.textSecondary}
                     />
                   </TouchableOpacity>
-                  {cartoonExpanded && (
+                  {naturalExpanded && (
                     <View style={localStyles.pillsContainer}>
-                      {cartoonStyles.map((style) => {
+                      {naturalStyles.map((style) => {
+                        const isSelected = selectedStyle === style.id;
+                        const pillColor = getStyleColor(style.id);
+                        return (
+                          <TouchableOpacity
+                            key={style.id}
+                            style={[
+                              localStyles.stylePill,
+                              {
+                                backgroundColor: isSelected ? pillColor : `${pillColor}20`,
+                                borderColor: pillColor,
+                                borderWidth: isSelected ? 2 : 1,
+                                opacity: canGenerate ? 1 : 0.5,
+                              },
+                            ]}
+                            onPress={() => handleStyleSelect(style.id)}
+                            disabled={!canGenerate || isGenerating}
+                            activeOpacity={0.7}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                            )}
+                            <Text style={[
+                              localStyles.pillText,
+                              { color: isSelected ? '#fff' : pillColor }
+                            ]}>
+                              {style.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
+                {/* 3D Animation */}
+                <View style={[localStyles.styleSection, { marginTop: 8 }]}>
+                  <TouchableOpacity
+                    style={localStyles.sectionHeader}
+                    onPress={() => setAnimation3DExpanded(!animation3DExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={localStyles.sectionHeaderLeft}>
+                      <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
+                        🎬 3D Animation
+                      </Text>
+                      <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
+                        Pixar & Disney styles
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={animation3DExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {animation3DExpanded && (
+                    <View style={localStyles.pillsContainer}>
+                      {animation3DStyles.map((style) => {
+                        const isSelected = selectedStyle === style.id;
+                        const pillColor = getStyleColor(style.id);
+                        return (
+                          <TouchableOpacity
+                            key={style.id}
+                            style={[
+                              localStyles.stylePill,
+                              {
+                                backgroundColor: isSelected ? pillColor : `${pillColor}20`,
+                                borderColor: pillColor,
+                                borderWidth: isSelected ? 2 : 1,
+                                opacity: canGenerate ? 1 : 0.5,
+                              },
+                            ]}
+                            onPress={() => handleStyleSelect(style.id)}
+                            disabled={!canGenerate || isGenerating}
+                            activeOpacity={0.7}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                            )}
+                            <Text style={[
+                              localStyles.pillText,
+                              { color: isSelected ? '#fff' : pillColor }
+                            ]}>
+                              {style.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
+                {/* 2D Animation */}
+                <View style={[localStyles.styleSection, { marginTop: 8 }]}>
+                  <TouchableOpacity
+                    style={localStyles.sectionHeader}
+                    onPress={() => setAnimation2DExpanded(!animation2DExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={localStyles.sectionHeaderLeft}>
+                      <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
+                        ✏️ 2D Animation
+                      </Text>
+                      <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
+                        Anime, comic & Ghibli styles
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={animation2DExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {animation2DExpanded && (
+                    <View style={localStyles.pillsContainer}>
+                      {animation2DStyles.map((style) => {
+                        const isSelected = selectedStyle === style.id;
+                        const pillColor = getStyleColor(style.id);
+                        return (
+                          <TouchableOpacity
+                            key={style.id}
+                            style={[
+                              localStyles.stylePill,
+                              {
+                                backgroundColor: isSelected ? pillColor : `${pillColor}20`,
+                                borderColor: pillColor,
+                                borderWidth: isSelected ? 2 : 1,
+                                opacity: canGenerate ? 1 : 0.5,
+                              },
+                            ]}
+                            onPress={() => handleStyleSelect(style.id)}
+                            disabled={!canGenerate || isGenerating}
+                            activeOpacity={0.7}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                            )}
+                            <Text style={[
+                              localStyles.pillText,
+                              { color: isSelected ? '#fff' : pillColor }
+                            ]}>
+                              {style.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
+                {/* Artistic Styles */}
+                <View style={[localStyles.styleSection, { marginTop: 8 }]}>
+                  <TouchableOpacity
+                    style={localStyles.sectionHeader}
+                    onPress={() => setArtisticExpanded(!artisticExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={localStyles.sectionHeaderLeft}>
+                      <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
+                        🎨 Artistic Styles
+                      </Text>
+                      <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
+                        Watercolor, cartoon & illustrated
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={artisticExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {artisticExpanded && (
+                    <View style={localStyles.pillsContainer}>
+                      {artisticStyles.map((style) => {
                         const isSelected = selectedStyle === style.id;
                         const pillColor = getStyleColor(style.id);
                         return (
