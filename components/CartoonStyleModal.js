@@ -45,6 +45,8 @@ export default function CartoonStyleModal({
   const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
   const [useCustomImage, setUseCustomImage] = useState(false); // Toggle for using custom image vs profile pic
   const [ignoreProfilePicture, setIgnoreProfilePicture] = useState(false); // Gold feature: generate without profile pic
+  const [realisticExpanded, setRealisticExpanded] = useState(true); // Expandable sections
+  const [cartoonExpanded, setCartoonExpanded] = useState(true);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   // Check notification permissions on mount
@@ -62,6 +64,10 @@ export default function CartoonStyleModal({
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
   const isGoldUser = subscriptionPlan === 'gold' || isAdmin; // Admin has Gold features
+  const isUltimateUser = subscriptionPlan === 'ultimate' || isAdmin; // Ultimate tier
+
+  // Map subscription plan to user-facing tier name
+  const tierName = subscriptionPlan === 'ultimate' ? 'Gold' : subscriptionPlan === 'gold' ? 'Premium' : 'Go';
 
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,
@@ -77,6 +83,37 @@ export default function CartoonStyleModal({
   );
 
   const styles = Object.values(CARTOON_STYLES);
+
+  // Group styles into Cartoon and Realistic categories
+  const cartoonStyles = styles.filter(s =>
+    ['pixar', 'anime', 'comic', 'watercolor', 'disney', 'cartoon', 'ghibli', 'southpark'].includes(s.id)
+  );
+  const realisticStyles = styles.filter(s =>
+    ['professional', 'golden', 'cinematic', 'fashion', 'natural', 'dramatic'].includes(s.id)
+  );
+
+  // Color palette for style pills
+  const getStyleColor = (styleId) => {
+    const colors = {
+      // Realistic styles - professional tones
+      professional: '#4A90E2',
+      golden: '#F5A623',
+      cinematic: '#7B68EE',
+      fashion: '#E91E63',
+      natural: '#4CAF50',
+      dramatic: '#9C27B0',
+      // Cartoon styles - vibrant tones
+      pixar: '#FF6B6B',
+      anime: '#FF69B4',
+      comic: '#FFA500',
+      watercolor: '#87CEEB',
+      disney: '#FFD700',
+      cartoon: '#FF8C00',
+      ghibli: '#98D8C8',
+      southpark: '#F7DC6F',
+    };
+    return colors[styleId] || primaryColor;
+  };
 
   const handleStyleSelect = (styleId) => {
     if (!canGenerate) return;
@@ -272,7 +309,7 @@ export default function CartoonStyleModal({
                 <View style={localStyles.customPromptHeader}>
                   <Ionicons name="create" size={20} color={primaryColor} />
                   <Text style={[localStyles.customPromptTitle, { color: themeColors.textPrimary }]}>
-                    Custom Request (Gold Exclusive)
+                    Custom Request ({tierName} Exclusive)
                   </Text>
                   {useCustomPrompt && (
                     <View style={[localStyles.selectedBadge, { backgroundColor: primaryColor }]}>
@@ -367,7 +404,7 @@ export default function CartoonStyleModal({
           {isGoldUser && (
             <View style={[localStyles.modelSection, { paddingHorizontal: 20, paddingBottom: 16 }]}>
               <Text style={[localStyles.sectionLabel, { color: themeColors.textSecondary }]}>
-                AI Model (Gold Exclusive)
+                AI Model ({tierName} Exclusive)
               </Text>
               <View style={localStyles.modelButtons}>
                 <TouchableOpacity
@@ -495,7 +532,7 @@ export default function CartoonStyleModal({
             )}
           </View>
 
-          {/* Ignore Profile Picture Toggle (Gold Exclusive) */}
+          {/* Ignore Profile Picture Toggle (Premium/Gold Exclusive) */}
           {isGoldUser && (
             <View style={[localStyles.notificationSection, { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 0 }]}>
               <View style={localStyles.notificationToggle}>
@@ -523,39 +560,125 @@ export default function CartoonStyleModal({
 
           {/* Style Options */}
           <View style={localStyles.stylesContainer}>
-            {!useCustomPrompt && styles.map((style) => {
-              const isSelected = selectedStyle === style.id;
-              return (
-                <TouchableOpacity
-                  key={style.id}
-                  style={[
-                    localStyles.styleCard,
-                    {
-                      backgroundColor: themeColors.background,
-                      borderColor: isSelected ? primaryColor : themeColors.divider,
-                      borderWidth: isSelected ? 2 : 1,
-                      opacity: canGenerate ? 1 : 0.5,
-                    },
-                  ]}
-                  onPress={() => handleStyleSelect(style.id)}
-                  disabled={!canGenerate || isGenerating}
-                  activeOpacity={0.7}
-                >
-                  {isSelected && (
-                    <View style={[localStyles.selectedBadge, { backgroundColor: primaryColor }]}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
+            {!useCustomPrompt && (
+              <>
+                {/* Realistic Photography Styles */}
+                <View style={localStyles.styleSection}>
+                  <TouchableOpacity
+                    style={localStyles.sectionHeader}
+                    onPress={() => setRealisticExpanded(!realisticExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={localStyles.sectionHeaderLeft}>
+                      <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
+                        📸 Realistic Photography
+                      </Text>
+                      <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
+                        Professional photo-quality results
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={realisticExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {realisticExpanded && (
+                    <View style={localStyles.pillsContainer}>
+                      {realisticStyles.map((style) => {
+                        const isSelected = selectedStyle === style.id;
+                        const pillColor = getStyleColor(style.id);
+                        return (
+                          <TouchableOpacity
+                            key={style.id}
+                            style={[
+                              localStyles.stylePill,
+                              {
+                                backgroundColor: isSelected ? pillColor : `${pillColor}20`,
+                                borderColor: pillColor,
+                                borderWidth: isSelected ? 2 : 1,
+                                opacity: canGenerate ? 1 : 0.5,
+                              },
+                            ]}
+                            onPress={() => handleStyleSelect(style.id)}
+                            disabled={!canGenerate || isGenerating}
+                            activeOpacity={0.7}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                            )}
+                            <Text style={[
+                              localStyles.pillText,
+                              { color: isSelected ? '#fff' : pillColor }
+                            ]}>
+                              {style.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
+                </View>
 
-                  <Text style={[localStyles.styleName, { color: themeColors.textPrimary }]}>
-                    {style.name}
-                  </Text>
-                  <Text style={[localStyles.styleDescription, { color: themeColors.textSecondary }]}>
-                    {style.description}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                {/* Cartoon Styles */}
+                <View style={[localStyles.styleSection, { marginTop: 24 }]}>
+                  <TouchableOpacity
+                    style={localStyles.sectionHeader}
+                    onPress={() => setCartoonExpanded(!cartoonExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={localStyles.sectionHeaderLeft}>
+                      <Text style={[localStyles.sectionTitle, { color: themeColors.textPrimary }]}>
+                        🎨 Cartoon Styles
+                      </Text>
+                      <Text style={[localStyles.sectionSubtitle, { color: themeColors.textSecondary }]}>
+                        Artistic and animated styles
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={cartoonExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {cartoonExpanded && (
+                    <View style={localStyles.pillsContainer}>
+                      {cartoonStyles.map((style) => {
+                        const isSelected = selectedStyle === style.id;
+                        const pillColor = getStyleColor(style.id);
+                        return (
+                          <TouchableOpacity
+                            key={style.id}
+                            style={[
+                              localStyles.stylePill,
+                              {
+                                backgroundColor: isSelected ? pillColor : `${pillColor}20`,
+                                borderColor: pillColor,
+                                borderWidth: isSelected ? 2 : 1,
+                                opacity: canGenerate ? 1 : 0.5,
+                              },
+                            ]}
+                            onPress={() => handleStyleSelect(style.id)}
+                            disabled={!canGenerate || isGenerating}
+                            activeOpacity={0.7}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                            )}
+                            <Text style={[
+                              localStyles.pillText,
+                              { color: isSelected ? '#fff' : pillColor }
+                            ]}>
+                              {style.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
 
             {useCustomPrompt && (
               <View style={[localStyles.customPromptPlaceholder, { backgroundColor: themeColors.background }]}>
@@ -684,6 +807,49 @@ const localStyles = StyleSheet.create({
     padding: 20,
     paddingTop: 8,
     gap: 12,
+  },
+  styleSection: {
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    marginBottom: 0,
+  },
+  pillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: -8,
+    marginBottom: -8,
+  },
+  stylePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  pillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   styleCard: {
     borderRadius: 12,

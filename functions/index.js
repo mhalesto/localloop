@@ -881,10 +881,18 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
 
       console.log(`[payFastWebhook] Updated subscription for user ${userId} to ${planId}`);
 
+      // Map internal planId to user-facing tier names
+      const tierNames = {
+        'premium': 'Go',
+        'gold': 'Premium',
+        'ultimate': 'Gold'
+      };
+      const tierName = tierNames[planId] || 'Premium';
+
       // Send notification to user
       await sendNotificationToUser(userId, {
         title: 'Subscription Activated! 🎉',
-        body: `Your ${planId === 'gold' ? 'Gold' : 'Premium'} subscription is now active. Enjoy unlimited features!`,
+        body: `Your ${tierName} subscription is now active. Enjoy unlimited features!`,
         data: {
           type: 'subscription_activated',
           planId: planId,

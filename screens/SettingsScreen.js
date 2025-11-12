@@ -44,6 +44,7 @@ import CartoonStyleModal from '../components/CartoonStyleModal';
 import CartoonHistoryModal from '../components/CartoonHistoryModal';
 import CartoonSuccessModal from '../components/CartoonSuccessModal';
 import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import { generateCartoonProfile, getUsageStatsText } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
@@ -68,6 +69,7 @@ export default function SettingsScreen({ navigation }) {
   const {
     user,
     profile: authProfile,
+    emailVerified,
     startGoogleSignIn,
     signOut: signOutAccount,
     isSigningIn,
@@ -200,7 +202,15 @@ export default function SettingsScreen({ navigation }) {
 
   // Get user's current plan
   const userPlan = userProfile?.subscriptionPlan || 'basic';
-  const isGoldMember = userPlan === 'gold';
+  const isGoldMember = userPlan === 'gold'; // Premium tier
+  const isUltimateMember = userPlan === 'ultimate'; // Gold/Ultimate tier
+  const isPremiumOrAbove = userPlan === 'gold' || userPlan === 'ultimate'; // Premium or Gold tier
+
+  // Check subscription feature access
+  const canUseTypography = canUserPerformAction(userPlan, 'customTypography', isAdmin);
+  const canUsePremiumThemes = canUserPerformAction(userPlan, 'premiumThemes', isAdmin);
+  const hasAnyPaidPlan = userPlan !== 'basic' || isAdmin;
+
   const goldAccent = useMemo(
     () => buildDreamyAccent(accentPreset, themeColors),
     [accentPreset, themeColors]
@@ -689,7 +699,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleTogglePremiumSummaries = (value) => {
-    if (value && !premiumUnlocked) {
+    if (value && !hasAnyPaidPlan) {
       showPremiumRequiredAlert();
       return;
     }
@@ -873,6 +883,20 @@ export default function SettingsScreen({ navigation }) {
 
   // Handle style selection and generation
   const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
+    // Check email verification first (required for all AI features to prevent abuse)
+    // Google users are automatically verified by Google
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link or click "Resend" on the verification banner.',
+        [],
+        { type: 'warning' }
+      );
+      return;
+    }
+
     // For custom prompts with custom images or ignoreProfilePicture flag, we allow generation without profile photo
     const { customImage, ignoreProfilePicture } = generationOptions;
     const needsProfilePhoto = !customImage && !ignoreProfilePicture;
@@ -1201,6 +1225,7 @@ export default function SettingsScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <EmailVerificationBanner />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           {user ? (
@@ -1208,7 +1233,7 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.sectionHint}>
                 Signed in with Google. Your rewards travel with you.
               </Text>
-              {isGoldMember ? (
+              {isPremiumOrAbove ? (
                 <LinearGradient
                   colors={goldAccent.gradient}
                   start={{ x: 0, y: 0 }}
@@ -1218,10 +1243,14 @@ export default function SettingsScreen({ navigation }) {
                   <View style={styles.goldHeroCopy}>
                     <View style={styles.goldHeroBadgeRow}>
                       <PremiumBadge size={40} />
-                      <Text style={styles.goldHeroTitle}>Gold lounge access</Text>
+                      <Text style={styles.goldHeroTitle}>
+                        {isUltimateMember ? 'Gold lounge access' : 'Premium lounge access'}
+                      </Text>
                     </View>
                     <Text style={styles.goldHeroSubtitle}>
-                      Thanks for backing the community. Your boosts, VIP support, and secret drops stay active while this badge glows.
+                      {isUltimateMember
+                        ? 'Thanks for backing the community. Your boosts, VIP support, and secret drops stay active while this badge glows.'
+                        : 'Thank you for being a Premium subscriber! Enjoy unlimited AI features, custom prompts, and VIP support.'}
                     </Text>
                     <View style={styles.goldHeroPerks}>
                       <View style={styles.goldHeroChip}>
@@ -1234,7 +1263,9 @@ export default function SettingsScreen({ navigation }) {
                       </View>
                       <View style={styles.goldHeroChip}>
                         <Ionicons name="sparkles-outline" size={14} color="#fff" />
-                        <Text style={styles.goldHeroChipText}>Exclusive drops</Text>
+                        <Text style={styles.goldHeroChipText}>
+                          {isUltimateMember ? 'Exclusive drops' : 'Premium features'}
+                        </Text>
                       </View>
                     </View>
                     <TouchableOpacity
@@ -1242,7 +1273,9 @@ export default function SettingsScreen({ navigation }) {
                       onPress={() => navigation.navigate('Subscription')}
                       activeOpacity={0.9}
                     >
-                      <Text style={styles.goldHeroButtonText}>View Gold perks</Text>
+                      <Text style={styles.goldHeroButtonText}>
+                        {isUltimateMember ? 'View Gold perks' : 'View Premium perks'}
+                      </Text>
                       <Ionicons name="chevron-forward" size={16} color="#0d0f1c" />
                     </TouchableOpacity>
                   </View>
@@ -1339,12 +1372,12 @@ export default function SettingsScreen({ navigation }) {
                   <>
                     <View style={styles.rewardsHeader}>
                       <Text style={styles.rewardsLabel}>
-                        {userPlan === 'gold' || userPlan === 'ultimate' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
+                        {userPlan === 'ultimate' ? '👑 Gold Subscriber' : userPlan === 'gold' ? '👑 Premium Subscriber' : '⭐ Go Subscriber'}
                       </Text>
                       <View style={styles.rewardsPointsRow}>
                         {userPlan === 'gold' || userPlan === 'ultimate' ? (
                           <Text style={[styles.rewardsPoints, { color: '#FFD700' }]}>
-                            {userPlan === 'ultimate' ? 'Ultimate' : 'Gold'}
+                            {userPlan === 'ultimate' ? 'Gold' : 'Premium'}
                           </Text>
                         ) : (
                           <Text style={[styles.rewardsPoints, { color: themeColors.primary }]}>Go</Text>
@@ -1352,7 +1385,9 @@ export default function SettingsScreen({ navigation }) {
                       </View>
                     </View>
                     <Text style={styles.rewardsMeta}>
-                      {userPlan === 'gold' || userPlan === 'ultimate'
+                      {userPlan === 'ultimate'
+                        ? 'Thank you for being a Gold subscriber! Enjoy ultimate AI features, custom prompts, VIP support, and exclusive drops.'
+                        : userPlan === 'gold'
                         ? 'Thank you for being a Premium subscriber! Enjoy unlimited AI features, custom prompts, and VIP support.'
                         : 'Thank you for being a Go subscriber! Enjoy unlimited posts, AI features, and ad-free experience.'}
                     </Text>
@@ -1831,7 +1866,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumTypographyEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumUnlocked}
+              disabled={!canUseTypography}
             />
           </View>
           <View
@@ -1855,7 +1890,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumTitleFontSizeEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumUnlocked || !premiumTypographyEnabled}
+              disabled={!canUseTypography || !premiumTypographyEnabled}
             />
           </View>
           {premiumTypographyEnabled && premiumTitleFontSizeEnabled ? (
@@ -1902,7 +1937,7 @@ export default function SettingsScreen({ navigation }) {
                 premiumDescriptionFontSizeEnabled ? activeThumbColor : inactiveThumbColor
               }
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumUnlocked || !premiumTypographyEnabled}
+              disabled={!canUseTypography || !premiumTypographyEnabled}
             />
           </View>
           {premiumTypographyEnabled && premiumDescriptionFontSizeEnabled ? (
@@ -1939,7 +1974,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumSummariesEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumUnlocked}
+              disabled={!hasAnyPaidPlan}
             />
           </View>
           {premiumSummariesEnabled ? (
@@ -2018,7 +2053,7 @@ export default function SettingsScreen({ navigation }) {
               trackColor={{ true: accentSwitchColor, false: inactiveTrackColor }}
               thumbColor={premiumAccentEnabled ? activeThumbColor : inactiveThumbColor}
               ios_backgroundColor={inactiveTrackColor}
-              disabled={!premiumUnlocked}
+              disabled={!canUsePremiumThemes}
             />
           </View>
           {premiumAccentEnabled ? (

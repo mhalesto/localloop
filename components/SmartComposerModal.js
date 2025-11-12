@@ -15,6 +15,8 @@ import {
   Modal,
 } from 'react-native';
 import { composePost } from '../services/openai/gpt4Service';
+import { useAuth } from '../contexts/AuthContext';
+import { useAlert } from '../contexts/AlertContext';
 
 const TONE_OPTIONS = [
   { id: 'friendly', label: 'Friendly', icon: '😊', description: 'Warm and approachable' },
@@ -30,6 +32,9 @@ const LENGTH_OPTIONS = [
 ];
 
 export default function SmartComposerModal({ visible, onClose, onUsePost }) {
+  const { user, emailVerified } = useAuth();
+  const { showAlert } = useAlert();
+
   const [idea, setIdea] = useState('');
   const [selectedTone, setSelectedTone] = useState('friendly');
   const [selectedLength, setSelectedLength] = useState('medium');
@@ -40,6 +45,21 @@ export default function SmartComposerModal({ visible, onClose, onUsePost }) {
   const [error, setError] = useState(null);
 
   const handleGenerate = async () => {
+    // Check email verification first (required for all AI features)
+    // Google users are automatically verified by Google
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      setError('Email verification required');
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link.',
+        [],
+        { type: 'warning' }
+      );
+      return;
+    }
+
     if (!idea.trim()) {
       setError('Please enter your post idea');
       return;

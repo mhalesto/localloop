@@ -58,6 +58,43 @@ export const CARTOON_STYLES = {
     description: 'Simple, minimalist cartoon style with basic shapes',
     prompt: 'in simple minimalist cartoon style, basic geometric shapes, flat colors, cutout paper style',
   },
+  // Realistic Photography Styles
+  PROFESSIONAL_PORTRAIT: {
+    id: 'professional',
+    name: 'Professional Portrait',
+    description: 'High-quality professional photography with soft studio lighting',
+    prompt: 'professional portrait photography, soft studio lighting, clean background, sharp focus, professional headshot quality, natural skin tones, confident expression',
+  },
+  GOLDEN_HOUR: {
+    id: 'golden',
+    name: 'Golden Hour',
+    description: 'Warm sunset lighting with natural outdoor glow',
+    prompt: 'golden hour photography, warm sunset lighting, natural outdoor setting, soft glowing light, dreamy atmosphere, professional photography quality',
+  },
+  CINEMATIC: {
+    id: 'cinematic',
+    name: 'Cinematic',
+    description: 'Movie-quality dramatic lighting and composition',
+    prompt: 'cinematic photography, dramatic lighting, movie poster quality, professional color grading, depth of field, artistic composition',
+  },
+  FASHION_EDITORIAL: {
+    id: 'fashion',
+    name: 'Fashion Editorial',
+    description: 'High-fashion magazine style with bold creative lighting',
+    prompt: 'fashion editorial photography, high-end magazine quality, creative lighting, professional styling, bold composition, vogue style',
+  },
+  NATURAL_BEAUTY: {
+    id: 'natural',
+    name: 'Natural Beauty',
+    description: 'Soft natural lighting with authentic, organic feel',
+    prompt: 'natural beauty photography, soft diffused natural light, authentic expression, minimal retouching, fresh and organic feel',
+  },
+  DRAMATIC_LIGHTING: {
+    id: 'dramatic',
+    name: 'Dramatic Lighting',
+    description: 'Bold shadows and highlights with artistic flair',
+    prompt: 'dramatic portrait lighting, bold shadows and highlights, artistic lighting setup, professional photography, striking contrast',
+  },
 };
 
 // Usage limits per subscription plan
@@ -185,21 +222,30 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   let personalizedDescription = null;
   let usedGpt4 = false;
 
-  // Gold users get GPT-4o Vision analysis for personalized cartoons (if within limit)
-  if (subscriptionPlan === 'gold' && imageUrl && actualModel === 'gpt-4') {
+  // ALL users get Vision analysis for accurate, personalized cartoons
+  // Only skip if no image URL is provided (text-only generation)
+  if (imageUrl) {
     try {
       // Check if we have a valid public URL
       if (!imageUrl.startsWith('https://')) {
         console.log('[profileCartoonService] Skipping Vision analysis - profile photo not yet uploaded to cloud storage (local file path)');
       } else {
-        console.log(`[profileCartoonService] Gold user - analyzing photo with ${actualModel} Vision`);
-        personalizedDescription = await analyzePhotoForCartoon(imageUrl, actualModel);
-        console.log('[profileCartoonService] Vision analysis complete');
-        usedGpt4 = true; // Track that we used GPT-4
+        // Use GPT-4o mini for all users (cost-effective and accurate vision analysis)
+        const visionModel = 'gpt-4o-mini';
+        console.log(`[profileCartoonService] Analyzing photo with ${visionModel} Vision for personalized cartoon (ALL users)`);
+
+        // Use Vision analysis for ALL users to ensure accurate likeness
+        personalizedDescription = await analyzePhotoForCartoon(imageUrl, visionModel);
+        console.log('[profileCartoonService] Vision analysis complete:', personalizedDescription);
+
+        // Only track GPT-4 usage for Gold users using the full GPT-4 model
+        if (subscriptionPlan === 'gold' && actualModel === 'gpt-4') {
+          usedGpt4 = true;
+        }
       }
     } catch (visionError) {
       console.warn('[profileCartoonService] Vision analysis failed:', visionError.message);
-      // Continue without personalization
+      // Continue without personalization - fallback to gender-based prompt
     }
   }
 
@@ -225,13 +271,14 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     styleName = style.name;
 
     if (personalizedDescription) {
-      // Gold: Use personalized Vision description
-      prompt = `Create a portrait ${style.prompt} of this person: ${personalizedDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
-      console.log('[profileCartoonService] Using predefined style with Vision personalization (Gold)');
+      // ALL users: Use personalized Vision description for accurate likeness
+      prompt = `Create a portrait ${style.prompt} of this person: ${personalizedDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive. IMPORTANT: Match the person's gender, hair color, hair style, and facial features accurately.`;
+      console.log('[profileCartoonService] Using predefined style with Vision personalization (ALL users)');
     } else {
-      // Basic/Premium: Use generic prompt
+      // Fallback: Use generic prompt (only if Vision failed)
       const genderHint = gender !== 'neutral' ? `${gender} ` : '';
       prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+      console.log('[profileCartoonService] Using generic prompt (Vision analysis unavailable)');
     }
   }
 

@@ -10,6 +10,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenLayout from '../components/ScreenLayout';
 import NeighborhoodExplorer from '../components/NeighborhoodExplorer';
 import StatusStoryCard from '../components/StatusStoryCard';
@@ -24,6 +25,7 @@ import AdSkeletonLoader from '../components/AdSkeletonLoader';
 import HorizontalListSkeletonLoader from '../components/HorizontalListSkeletonLoader';
 import CartoonStyleModal from '../components/CartoonStyleModal';
 import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import useHaptics from '../hooks/useHaptics';
 import { useSettings } from '../contexts/SettingsContext';
 import { usePosts } from '../contexts/PostsContext';
@@ -491,12 +493,28 @@ export default function CountryScreen({ navigation }) {
     }
   };
 
+  // Clear cartoon data when user logs out
+  useEffect(() => {
+    if (!user?.uid) {
+      setCartoonUsageData(null);
+    }
+  }, [user?.uid]);
+
   // Load cartoon data on mount and when subscription changes
   useEffect(() => {
     if (user?.uid) {
       loadCartoonData();
     }
   }, [user?.uid, userProfile?.subscriptionPlan, loadCartoonData]);
+
+  // Reload cartoon data when screen comes into focus (to sync with Settings screen)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.uid) {
+        loadCartoonData();
+      }
+    }, [user?.uid, loadCartoonData])
+  );
 
   const statusList = useMemo(
     () =>
@@ -868,6 +886,7 @@ export default function CountryScreen({ navigation }) {
           }
           ListHeaderComponent={
             <View>
+              <EmailVerificationBanner />
               {showDiscoveryCard ? (
                 <View style={styles.discoverySection}>
                   <NeighborhoodExplorer />

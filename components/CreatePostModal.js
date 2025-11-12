@@ -17,6 +17,7 @@ import * as Clipboard from 'expo-clipboard'; // [AI-SUMMARY]
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { accentPresets, useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
+import { useAuth } from '../contexts/AuthContext';
 import ShareLocationModal from './ShareLocationModal';
 import { getAvatarConfig } from '../constants/avatars';
 import PollComposer from './PollComposer';
@@ -105,6 +106,7 @@ export default function CreatePostModal({
     updateUserProfile
   } = useSettings();
   const { showAlert } = useAlert();
+  const { user, emailVerified } = useAuth();
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
 
   const [title, setTitle] = useState('');
@@ -464,6 +466,22 @@ export default function CreatePostModal({
   // --------- Summarize + Expand ----------
   const runSummarize = async (lengthPref, quality) => {
     if (isSummarizing) return;
+
+    // Check email verification first (required for all AI features)
+    // Google users are automatically verified by Google
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      setSummaryError('Please verify your email before using AI features.');
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link.',
+        [],
+        { type: 'warning' }
+      );
+      return;
+    }
+
     const sanitized = sanitizeDescriptionForSummary(message);
     if (!sanitized) {
       setSummaryError('Add a description before requesting a summary.');
@@ -559,6 +577,21 @@ export default function CreatePostModal({
   // [AI-IMPROVE] Post improvement handler
   const handleImprovePost = async () => {
     if (isImproving) return;
+
+    // Check email verification first (required for all AI features)
+    // Google users are automatically verified by Google
+    const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      setImproveError('Please verify your email before using AI features.');
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link.',
+        [],
+        { type: 'warning' }
+      );
+      return;
+    }
 
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {

@@ -96,12 +96,13 @@ export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
               type: 'text',
               text: `Analyze this person's appearance in detail for creating a personalized cartoon avatar. Provide a comprehensive description including:
 
-- Hair: style, length, color, texture
+- Gender: explicitly state if this person appears to be male, female, or non-binary
+- Hair: style, length, color (be very specific with color - e.g., "blonde", "brown", "black", "red"), texture
 - Face shape: oval, round, square, heart-shaped, etc.
 - Eyes: color, size, shape, any distinctive features
 - Nose: shape and size
 - Mouth: lips shape, smile type
-- Facial hair: if any (beard, mustache style)
+- Facial hair: if any (beard, mustache style and color)
 - Skin tone: specific description
 - Age range: approximate
 - Expression: mood and feeling
@@ -109,7 +110,7 @@ export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
 - Clothing: visible attire and colors
 - Any distinctive or unique features
 
-Be specific and detailed. This will be used to create a cartoon that truly looks like this person.`,
+IMPORTANT: Be very specific and accurate about gender, hair color, and facial features. This description will be used to create a cartoon that must truly look like this person.`,
             },
             {
               type: 'image_url',

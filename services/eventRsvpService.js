@@ -96,20 +96,9 @@ export async function acceptRSVP(eventId, userId, organizerId) {
       respondedBy: organizerId,
     });
 
-    // Update user's event RSVPs list
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
-      const updatedRSVPs = (userData.eventRSVPs || []).map(rsvp =>
-        rsvp.eventId === eventId ? { ...rsvp, status: 'accepted' } : rsvp
-      );
-
-      await updateDoc(userRef, {
-        eventRSVPs: updatedRSVPs,
-      });
-    }
+    // NOTE: We don't update user's eventRSVPs array here because the organizer
+    // doesn't have permission to update other users' documents.
+    // The RSVP status can be queried directly from events/{eventId}/rsvps/{userId}
 
     // Increment event attendees count
     const eventRef = doc(db, EVENTS_COLLECTION, eventId);
@@ -141,20 +130,9 @@ export async function rejectRSVP(eventId, userId, organizerId) {
       respondedBy: organizerId,
     });
 
-    // Update user's event RSVPs list
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const userData = userSnap.data();
-      const updatedRSVPs = (userData.eventRSVPs || []).map(rsvp =>
-        rsvp.eventId === eventId ? { ...rsvp, status: 'rejected' } : rsvp
-      );
-
-      await updateDoc(userRef, {
-        eventRSVPs: updatedRSVPs,
-      });
-    }
+    // NOTE: We don't update user's eventRSVPs array here because the organizer
+    // doesn't have permission to update other users' documents.
+    // The RSVP status can be queried directly from events/{eventId}/rsvps/{userId}
 
     return { success: true };
   } catch (error) {

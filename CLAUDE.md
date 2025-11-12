@@ -131,7 +131,9 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 
 **Cost:**
 - DALL-E 3 (Standard quality): $0.04 per generation
-- 10,000 generations = $400
+- GPT-4o mini Vision analysis: ~$0.003 per analysis (all users for accurate likeness)
+- Total per generation: ~$0.043 (all users)
+- 10,000 generations = $430
 
 **Storage:**
 - Generated cartoons saved to Firebase Storage at `cartoon-profiles/{userId}/{style}-{timestamp}.jpg`
@@ -149,7 +151,8 @@ Transforms user profile photos into various cartoon/artistic styles using OpenAI
 - Image size: 1024x1024
 - Quality: Standard (Basic/Premium), HD (Gold)
 - Style: Vivid (more dramatic colors)
-- Gold: GPT-4o Vision analysis for personalized results
+- **ALL users**: GPT-4o mini Vision analysis for accurate likeness and personalization
+- **Gold users**: Optional GPT-4o (full) Vision for even higher quality analysis
 
 **Database Schema (Firestore):**
 ```

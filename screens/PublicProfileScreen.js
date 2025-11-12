@@ -33,6 +33,7 @@ import {
   deleteAlbumPhoto,
   updateAlbumPreferences
 } from '../services/albumService';
+import ProfilePortfolioModal from '../components/ProfilePortfolioModal';
 
 const withAlpha = (color, alpha) => {
   const clamped = Math.min(Math.max(alpha, 0), 1);
@@ -59,7 +60,7 @@ const withAlpha = (color, alpha) => {
 
 export default function PublicProfileScreen({ navigation, route }) {
   const { userId, username } = route.params;
-  const { themeColors, accentPreset, userProfile: currentUserProfile } = useSettings();
+  const { themeColors, accentPreset, userProfile: currentUserProfile, reloadProfile } = useSettings();
   const { user, profile: authProfile, hasActivePremium, pointsToNextPremium, premiumDayCost, premiumAccessDurationMs } = useAuth();
   const { showAlert } = useAlert();
   const [profile, setProfile] = useState(null);
@@ -98,6 +99,9 @@ export default function PublicProfileScreen({ navigation, route }) {
 
   // Profile menu (three dots)
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Portfolio modal
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const isOwnProfile = user?.uid === userId;
@@ -820,7 +824,15 @@ export default function PublicProfileScreen({ navigation, route }) {
     navigation.navigate('Following', { userId, username: profile?.username });
   };
 
-  const navigateToEdit = () => {
+  const navigateToEdit = async () => {
+    // Reload profile to ensure we have the latest data before editing
+    try {
+      console.log('[PublicProfile] Reloading profile before edit navigation');
+      await reloadProfile();
+      console.log('[PublicProfile] Profile reloaded successfully');
+    } catch (error) {
+      console.error('[PublicProfile] Error reloading profile:', error);
+    }
     navigation.navigate('ProfileSetup', { isEditing: true });
   };
 
@@ -1149,19 +1161,29 @@ export default function PublicProfileScreen({ navigation, route }) {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={{ flexGrow: 0 }}
                 contentContainerStyle={styles.interestsScroll}
               >
                 {profile.interests.map((interestId) => {
                   const interest = ALL_INTERESTS.find((i) => i.id === interestId);
-                  if (!interest) return null;
+                  if (!interest) {
+                    console.log('Interest not found for ID:', interestId);
+                    return null;
+                  }
                   return (
                     <View
                       key={interestId}
-                      style={[styles.interestPill, { backgroundColor: withAlpha(primaryColor, 0.12), borderColor: withAlpha(primaryColor, 0.3) }]}
+                      style={[
+                        styles.interestPill,
+                        {
+                          backgroundColor: withAlpha(primaryColor, 0.12),
+                          borderColor: withAlpha(primaryColor, 0.3),
+                        },
+                      ]}
                     >
-                      <Ionicons name={interest.icon} size={14} color={primaryColor} />
+                      <Ionicons name={interest.icon || 'heart'} size={14} color={primaryColor} />
                       <Text style={[styles.interestText, { color: themeColors.textPrimary }]}>
-                        {interest.label}
+                        {interest.label || interestId}
                       </Text>
                     </View>
                   );
@@ -1224,28 +1246,7 @@ export default function PublicProfileScreen({ navigation, route }) {
 
           {/* Action Buttons (Instagram-style) */}
           <View style={styles.actionsRow}>
-            {isOwnProfile ? (
-              <>
-                <TouchableOpacity
-                  style={[styles.editProfileButton, { backgroundColor: themeColors.divider }]}
-                  onPress={navigateToEdit}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editProfileButtonText, { color: themeColors.textPrimary }]}>
-                    Edit profile
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.shareProfileButton, { backgroundColor: themeColors.divider }]}
-                  onPress={() => setShowProfileMenu(true)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.shareProfileButtonText, { color: themeColors.textPrimary }]}>
-                    Share profile
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
+            {!isOwnProfile && (
               <>
                 <TouchableOpacity
                   style={[
@@ -1459,33 +1460,51 @@ export default function PublicProfileScreen({ navigation, route }) {
           <View style={[styles.menuContainer, { backgroundColor: themeColors.card }]}>
             <View style={styles.menuHandle} />
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowProfileMenu(false);
-                navigation.navigate('Settings');
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="settings-outline" size={24} color={themeColors.textPrimary} />
-              <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
-                Settings
-              </Text>
-            </TouchableOpacity>
+            {isOwnProfile && (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    navigateToEdit();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create-outline" size={24} color={themeColors.textPrimary} />
+                  <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
+                    Edit Profile
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setShowProfileMenu(false);
-                // Share functionality would go here
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="share-outline" size={24} color={themeColors.textPrimary} />
-              <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
-                Share Profile
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    setShowPortfolioModal(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="share-outline" size={24} color={themeColors.textPrimary} />
+                  <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
+                    Share Profile
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    navigation.navigate('Settings');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="settings-outline" size={24} color={themeColors.textPrimary} />
+                  <Text style={[styles.menuItemText, { color: themeColors.textPrimary }]}>
+                    Settings
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             <View style={[styles.menuDivider, { backgroundColor: themeColors.divider }]} />
 
@@ -1501,6 +1520,14 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Portfolio Share Modal */}
+      <ProfilePortfolioModal
+        visible={showPortfolioModal}
+        onClose={() => setShowPortfolioModal(false)}
+        profile={profile}
+        albumPhotos={albumPhotos}
+      />
     </ScreenLayout>
   );
 }
@@ -1714,20 +1741,23 @@ const styles = StyleSheet.create({
   },
   interestsScroll: {
     paddingHorizontal: 20,
-    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   interestPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
+    marginRight: 8,
+    height: 38,
   },
   interestText: {
     fontSize: 13,
     fontWeight: '600',
+    marginLeft: 6,
   },
   mutualFollowersContainer: {
     flexDirection: 'row',

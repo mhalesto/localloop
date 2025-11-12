@@ -455,7 +455,7 @@ export default function PostThreadScreen({ route, navigation }) {
     premiumTitleFontSize,
     premiumDescriptionFontSize
   } = useSettings();
-  const { user: firebaseUser } = useAuth();
+  const { user: firebaseUser, emailVerified } = useAuth();
   const { showAlert } = useAlert();
   const effectiveTitleFontSize =
     premiumTypographyEnabled && premiumTitleFontSizeEnabled
@@ -1805,6 +1805,20 @@ export default function PostThreadScreen({ route, navigation }) {
 
   // [AI-FEATURES] Comment Suggestions
   const handleGetSuggestion = async (type = SUGGESTION_TYPES.THOUGHTFUL) => {
+    // Check email verification first (required for all AI features)
+    // Google users are automatically verified by Google
+    const isGoogleUser = firebaseUser?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link.',
+        [],
+        { type: 'warning' }
+      );
+      return;
+    }
+
     setIsLoadingSuggestion(true);
     try {
       const result = await suggestComment(post, type);
@@ -1818,6 +1832,21 @@ export default function PostThreadScreen({ route, navigation }) {
 
   // [AI-FEATURES] Translation
   const handleTranslate = async (targetLang) => {
+    // Check email verification first (required for all AI features)
+    // Google users are automatically verified by Google
+    const isGoogleUser = firebaseUser?.providerData?.some(provider => provider.providerId === 'google.com');
+
+    if (!emailVerified && !isGoogleUser) {
+      showAlert(
+        'Email Verification Required',
+        'Please verify your email address before using AI features. Check your inbox for the verification link.',
+        [],
+        { type: 'warning' }
+      );
+      setShowTranslationPicker(false);
+      return;
+    }
+
     setIsTranslating(true);
     setShowTranslationPicker(false);
     try {

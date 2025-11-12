@@ -3,7 +3,7 @@
  * Allows users to add and manage up to 5 links (social media, website, etc.)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
-import { LINK_TYPES, PROFILE_LIMITS } from '../constants/profileConstants';
+import { LINK_TYPES } from '../constants/profileConstants';
+
+// MVP: Limit to 1 link for now
+const MAX_LINKS = 1;
 
 export default function LinksManagerModal({
   visible,
@@ -31,6 +34,18 @@ export default function LinksManagerModal({
   const [newLinkType, setNewLinkType] = useState('website');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkLabel, setNewLinkLabel] = useState('');
+
+  // Sync local state when modal opens or links prop changes
+  useEffect(() => {
+    if (visible) {
+      console.log('[LinksManagerModal] Modal opened, syncing links:', links);
+      setLocalLinks(links);
+      setShowAddLink(false);
+      setNewLinkUrl('');
+      setNewLinkLabel('');
+      setNewLinkType('website');
+    }
+  }, [visible, links]);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
@@ -51,8 +66,8 @@ export default function LinksManagerModal({
       return;
     }
 
-    if (localLinks.length >= PROFILE_LIMITS.MAX_LINKS) {
-      Alert.alert('Limit Reached', `You can add up to ${PROFILE_LIMITS.MAX_LINKS} links`);
+    if (localLinks.length >= MAX_LINKS) {
+      Alert.alert('Limit Reached', `You can add up to ${MAX_LINKS} link${MAX_LINKS > 1 ? 's' : ''}`);
       return;
     }
 
@@ -340,11 +355,11 @@ export default function LinksManagerModal({
             <Ionicons
               name="link"
               size={16}
-              color={localLinks.length >= PROFILE_LIMITS.MAX_LINKS ? '#FF3B30' : primaryColor}
+              color={localLinks.length >= MAX_LINKS ? '#FF3B30' : primaryColor}
             />
             <Text style={localStyles.linkCount}>
-              {localLinks.length}/{PROFILE_LIMITS.MAX_LINKS} links
-              {localLinks.length >= PROFILE_LIMITS.MAX_LINKS && ' (Max reached)'}
+              {localLinks.length}/{MAX_LINKS} link{MAX_LINKS > 1 ? 's' : ''}
+              {localLinks.length >= MAX_LINKS && ' (Max reached)'}
             </Text>
           </View>
 
@@ -511,7 +526,7 @@ export default function LinksManagerModal({
             })}
 
             {/* Add Link Button */}
-            {!showAddLink && localLinks.length < PROFILE_LIMITS.MAX_LINKS && (
+            {!showAddLink && localLinks.length < MAX_LINKS && (
               <TouchableOpacity
                 style={localStyles.addLinkButton}
                 onPress={() => setShowAddLink(true)}

@@ -15,6 +15,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   GoogleAuthProvider,
@@ -24,6 +25,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
 } from 'firebase/auth';
 import {
@@ -423,6 +425,21 @@ export function AuthProvider({ children }) {
             warn('Failed to update profile display name', updateError);
           }
         }
+
+        // Send email verification
+        try {
+          const actionCodeSettings = {
+            url: 'https://share-your-story-1.web.app/email-verified.html',
+            handleCodeInApp: false,
+          };
+          await sendEmailVerification(cred.user, actionCodeSettings);
+          log('Verification email sent to', email);
+        } catch (verificationError) {
+          warn('Failed to send verification email', verificationError);
+          console.error('Verification email error details:', verificationError);
+          // Don't block signup if verification email fails
+        }
+
         return { ok: true };
       } catch (e) {
         warn('Email sign-up failed', e);
@@ -433,6 +450,36 @@ export function AuthProvider({ children }) {
       }
     },
     [auth]
+  );
+
+  const resendVerificationEmail = useCallback(
+    async () => {
+      if (!auth || !firebaseUser) {
+        setAuthError('Sign in to resend verification email.');
+        return { ok: false, error: 'not_authenticated' };
+      }
+
+      if (firebaseUser.emailVerified) {
+        return { ok: false, error: 'already_verified', message: 'Your email is already verified!' };
+      }
+
+      setAuthError(null);
+      try {
+        const actionCodeSettings = {
+          url: 'https://share-your-story-1.web.app/email-verified.html',
+          handleCodeInApp: false,
+        };
+        await sendEmailVerification(firebaseUser, actionCodeSettings);
+        log('Verification email resent to', firebaseUser.email);
+        return { ok: true, message: 'Verification email sent! Check your inbox.' };
+      } catch (e) {
+        warn('Failed to resend verification email', e);
+        console.error('Resend verification error details:', e);
+        setAuthError('Failed to send verification email. Please try again later.');
+        return { ok: false, error: e.code ?? e.message, details: e.message };
+      }
+    },
+    [auth, firebaseUser]
   );
 
   const sendResetEmail = useCallback(
@@ -522,8 +569,15 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(async () => {
     if (!auth) return;
     try {
+      // Clear all AsyncStorage data to prevent data leakage between users
+      console.log('[AuthContext] Clearing AsyncStorage on sign out');
+      await AsyncStorage.clear();
+
+      // Sign out from Firebase
       await firebaseSignOut(auth);
       setAuthError(null);
+
+      console.log('[AuthContext] Sign out successful');
     } catch (e) {
       warn('Sign-out failed', e);
       setAuthError('Unable to sign out. Please try again.');
@@ -608,6 +662,7 @@ export function AuthProvider({ children }) {
     () => ({
       user: firebaseUser,
       profile,
+      emailVerified: firebaseUser?.emailVerified ?? false,
       isInitializing: initializing,
       isSigningIn: signInInFlight,
       isRedeeming: redeemInFlight,
@@ -621,6 +676,7 @@ export function AuthProvider({ children }) {
       signInWithEmail,
       signUpWithEmail,
       sendPasswordReset: sendResetEmail,
+      resendVerificationEmail,
       isResettingPassword: resetInFlight,
       awardEngagementPoints,
       isAdmin,
@@ -646,6 +702,7 @@ export function AuthProvider({ children }) {
       signInWithEmail,
       signUpWithEmail,
       sendResetEmail,
+      resendVerificationEmail,
       awardEngagementPoints,
       isAdmin,
       signOut,

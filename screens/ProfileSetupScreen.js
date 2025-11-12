@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import InterestsSelectorModal from '../components/InterestsSelectorModal';
 import LinksManagerModal from '../components/LinksManagerModal';
 import PronounsPicker from '../components/PronounsPicker';
+import LocationPickerModal from '../components/LocationPickerModal';
 import { ALL_INTERESTS, LINK_TYPES, DEFAULT_PRIVACY_SETTINGS } from '../constants/profileConstants';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +38,8 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const { showAlert } = useAlert();
   const isEditing = route.params?.isEditing ?? false;
 
+  console.log('[ProfileSetup] Component mounted/rendered, isEditing:', isEditing, 'userProfile.interests:', userProfile?.interests?.length);
+
   const [username, setUsername] = useState(userProfile?.username || '');
   const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
   const [bio, setBio] = useState(userProfile?.bio || '');
@@ -48,6 +52,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(isEditing); // Loading state for edit mode
 
   // New profile fields
   const [pronouns, setPronouns] = useState(userProfile?.pronouns || '');
@@ -59,6 +64,12 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [contactEmail, setContactEmail] = useState(userProfile?.contactEmail || '');
   const [channelName, setChannelName] = useState(userProfile?.channelName || '');
   const [channelMemberCount, setChannelMemberCount] = useState(userProfile?.channelMemberCount?.toString() || '');
+
+  // New CV/Portfolio fields
+  const [education, setEducation] = useState(userProfile?.education || '');
+  const [skills, setSkills] = useState(userProfile?.skills || '');
+  const [yearsOfExperience, setYearsOfExperience] = useState(userProfile?.yearsOfExperience?.toString() || '');
+  const [availableForWork, setAvailableForWork] = useState(userProfile?.availableForWork ?? false);
 
   // Privacy settings
   const [showPronouns, setShowPronouns] = useState(userProfile?.showPronouns ?? DEFAULT_PRIVACY_SETTINGS.showPronouns);
@@ -74,6 +85,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [pronounsPickerVisible, setPronounsPickerVisible] = useState(false);
   const [interestsModalVisible, setInterestsModalVisible] = useState(false);
   const [linksModalVisible, setLinksModalVisible] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
 
   // Location data
   const countries = {
@@ -107,6 +119,28 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const handleProvinceChange = (value) => {
     setProvince(value);
     setCity('');
+  };
+
+  // Handle location modal save
+  const handleLocationSave = (selectedCountry, selectedProvince, selectedCity) => {
+    console.log('[ProfileSetup] Location saved:', {
+      country: selectedCountry,
+      province: selectedProvince,
+      city: selectedCity,
+    });
+    setCountry(selectedCountry);
+    setProvince(selectedProvince);
+    setCity(selectedCity);
+  };
+
+  // Get location display text
+  const getLocationDisplayText = () => {
+    if (!country) return 'Select your location...';
+    const countryName = countries[country];
+    const parts = [countryName];
+    if (province) parts.push(province);
+    if (city) parts.push(city);
+    return parts.join(', ');
   };
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
@@ -157,6 +191,79 @@ export default function ProfileSetupScreen({ navigation, route }) {
     const debounce = setTimeout(validateUsername, 500);
     return () => clearTimeout(debounce);
   }, [username, isEditing, userProfile?.username]);
+
+  // Reload profile data when screen is focused (for edit mode)
+  useFocusEffect(
+    useCallback(() => {
+      if (isEditing) {
+        setIsLoadingProfile(true);
+        console.log('[ProfileSetup] Screen focused, reloading profile data');
+        reloadProfile().then(() => {
+          console.log('[ProfileSetup] Profile reloaded on focus');
+        }).catch(error => {
+          console.error('[ProfileSetup] Error reloading profile on focus:', error);
+          setIsLoadingProfile(false);
+        });
+      }
+    }, [isEditing, reloadProfile])
+  );
+
+  // Sync form fields with userProfile when editing
+  useEffect(() => {
+    console.log('[ProfileSetup] useEffect triggered - isEditing:', isEditing, 'userProfile exists:', !!userProfile);
+
+    if (isEditing && userProfile) {
+      console.log('[ProfileSetup] Syncing form fields with userProfile:', {
+        interests: userProfile.interests?.length,
+        interestsArray: userProfile.interests,
+        links: userProfile.links?.length,
+        pronouns: userProfile.pronouns,
+        profession: userProfile.profession,
+      });
+
+      setUsername(userProfile.username || '');
+      setDisplayName(userProfile.displayName || '');
+      setBio(userProfile.bio || '');
+      setProfilePhoto(userProfile.profilePhoto || '');
+      setCountry(userProfile.country || '');
+      setProvince(userProfile.province || '');
+      setCity(userProfile.city || '');
+      setPronouns(userProfile.pronouns || '');
+      setProfession(userProfile.profession || '');
+      setCompany(userProfile.company || '');
+      const loadedInterests = userProfile.interests || [];
+      const loadedLinks = userProfile.links || [];
+      console.log('[ProfileSetup] ABOUT TO SET INTERESTS:', loadedInterests.length, loadedInterests);
+      console.log('[ProfileSetup] Setting links:', loadedLinks.length);
+      setInterests(loadedInterests);
+      setLinks(loadedLinks);
+      setCategory(userProfile.category || '');
+      setContactEmail(userProfile.contactEmail || '');
+      setChannelName(userProfile.channelName || '');
+      setChannelMemberCount(userProfile.channelMemberCount?.toString() || '');
+      // CV/Portfolio fields
+      setEducation(userProfile.education || '');
+      setSkills(userProfile.skills || '');
+      setYearsOfExperience(userProfile.yearsOfExperience?.toString() || '');
+      setAvailableForWork(userProfile.availableForWork ?? false);
+
+      // Privacy settings
+      setShowPronouns(userProfile.showPronouns ?? DEFAULT_PRIVACY_SETTINGS.showPronouns);
+      setShowProfession(userProfile.showProfession ?? DEFAULT_PRIVACY_SETTINGS.showProfession);
+      setShowCompany(userProfile.showCompany ?? DEFAULT_PRIVACY_SETTINGS.showCompany);
+      setShowInterests(userProfile.showInterests ?? DEFAULT_PRIVACY_SETTINGS.showInterests);
+      setShowLinks(userProfile.showLinks ?? DEFAULT_PRIVACY_SETTINGS.showLinks);
+      setShowCategory(userProfile.showCategory ?? DEFAULT_PRIVACY_SETTINGS.showCategory);
+      setShowContactEmail(userProfile.showContactEmail ?? DEFAULT_PRIVACY_SETTINGS.showContactEmail);
+      setShowChannel(userProfile.showChannel ?? DEFAULT_PRIVACY_SETTINGS.showChannel);
+
+      // Done loading
+      setIsLoadingProfile(false);
+      console.log('[ProfileSetup] Form fields synced, loading complete. Interests set to:', loadedInterests.length);
+    } else {
+      console.log('[ProfileSetup] useEffect skipped - conditions not met');
+    }
+  }, [isEditing, userProfile]);
 
   const pickImage = async () => {
     try {
@@ -246,6 +353,11 @@ export default function ProfileSetupScreen({ navigation, route }) {
         contactEmail: contactEmail || '',
         channelName: channelName || '',
         channelMemberCount: channelMemberCount ? parseInt(channelMemberCount, 10) : 0,
+        // CV/Portfolio fields
+        education: education || '',
+        skills: skills || '',
+        yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience, 10) : 0,
+        availableForWork: availableForWork,
         // Privacy settings
         showPronouns,
         showProfession,
@@ -440,89 +552,35 @@ export default function ProfileSetupScreen({ navigation, route }) {
             Help neighbors find you and improve local recommendations
           </Text>
 
-          {/* Country */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Country</Text>
-            <View
+            <TouchableOpacity
               style={[
-                styles.pickerContainer,
+                styles.pickerButton,
                 {
                   backgroundColor: themeColors.background,
                   borderColor: themeColors.divider,
                 },
               ]}
+              onPress={() => setLocationModalVisible(true)}
+              activeOpacity={0.7}
             >
-              <Picker
-                selectedValue={country}
-                onValueChange={handleCountryChange}
-                style={[
-                  styles.picker,
-                  { color: themeColors.textPrimary },
-                ]}
-                itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary, height: 44 } : undefined}
-              >
-                <Picker.Item label="Select your country..." value="" />
-                {Object.entries(countries).map(([code, name]) => (
-                  <Picker.Item key={code} label={name} value={code} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-
-          {/* Province/State */}
-          {country && (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: themeColors.textPrimary }]}>
-                {country === 'US' ? 'State' : country === 'ZA' ? 'Province' : 'Region'}
-              </Text>
-              <View
-                style={[
-                  styles.pickerContainer,
-                  {
-                    backgroundColor: themeColors.background,
-                    borderColor: themeColors.divider,
-                  },
-                ]}
-              >
-                <Picker
-                  selectedValue={province}
-                  onValueChange={handleProvinceChange}
-                  style={[
-                    styles.picker,
-                    { color: themeColors.textPrimary },
-                  ]}
-                  itemStyle={Platform.OS === 'ios' ? { color: themeColors.textPrimary, height: 44 } : undefined}
-                >
-                  <Picker.Item label={`Select your ${country === 'US' ? 'state' : 'province'}...`} value="" />
-                  {getAvailableProvinces().map((prov) => (
-                    <Picker.Item key={prov} label={prov} value={prov} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-          )}
-
-          {/* City */}
-          {province && (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: themeColors.textPrimary }]}>City</Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  {
-                    backgroundColor: themeColors.background,
-                    color: themeColors.textPrimary,
-                    borderColor: themeColors.divider,
-                  },
-                ]}
-                placeholder="Enter your city..."
-                placeholderTextColor={themeColors.textSecondary}
-                value={city}
-                onChangeText={setCity}
-                maxLength={50}
+              <Ionicons
+                name="location-outline"
+                size={20}
+                color={country ? primaryColor : themeColors.textSecondary}
+                style={{ marginRight: 8 }}
               />
-            </View>
-          )}
+              <Text
+                style={[
+                  styles.pickerButtonText,
+                  { color: country ? themeColors.textPrimary : themeColors.textSecondary },
+                ]}
+              >
+                {getLocationDisplayText()}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Professional Profile Section */}
@@ -593,6 +651,96 @@ export default function ProfileSetupScreen({ navigation, route }) {
               onChangeText={setCompany}
               maxLength={50}
             />
+          </View>
+
+          {/* Education */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Education</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., BSc Computer Science, University of Cape Town"
+              placeholderTextColor={themeColors.textSecondary}
+              value={education}
+              onChangeText={setEducation}
+              maxLength={100}
+            />
+            <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+              Your highest degree or current education
+            </Text>
+          </View>
+
+          {/* Years of Experience */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Years of Experience</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., 5"
+              placeholderTextColor={themeColors.textSecondary}
+              value={yearsOfExperience}
+              onChangeText={(text) => setYearsOfExperience(text.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+              Years of professional experience in your field
+            </Text>
+          </View>
+
+          {/* Skills */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: themeColors.textPrimary }]}>Skills</Text>
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
+                  borderColor: themeColors.divider,
+                },
+              ]}
+              placeholder="e.g., JavaScript, React, Design, Leadership"
+              placeholderTextColor={themeColors.textSecondary}
+              value={skills}
+              onChangeText={setSkills}
+              maxLength={200}
+            />
+            <Text style={[styles.hint, { color: themeColors.textSecondary }]}>
+              Your key skills (comma-separated)
+            </Text>
+          </View>
+
+          {/* Available for Work */}
+          <View style={styles.inputGroup}>
+            <View style={styles.privacyRow}>
+              <View style={styles.privacyLabel}>
+                <Text style={[styles.label, { color: themeColors.textPrimary }]}>
+                  Available for Work
+                </Text>
+                <Text style={[styles.privacyHint, { color: themeColors.textSecondary }]}>
+                  {availableForWork ? 'Open to opportunities' : 'Not currently looking'}
+                </Text>
+              </View>
+              <Switch
+                value={availableForWork}
+                onValueChange={setAvailableForWork}
+                trackColor={{ false: themeColors.divider, true: primaryColor }}
+                thumbColor={availableForWork ? '#fff' : '#f4f3f4'}
+              />
+            </View>
           </View>
 
           {/* Category (Tagline) */}
@@ -706,8 +854,19 @@ export default function ProfileSetupScreen({ navigation, route }) {
                   borderColor: themeColors.divider,
                 },
               ]}
-              onPress={() => setInterestsModalVisible(true)}
+              onPress={() => {
+                console.log('[ProfileSetup] Opening interests modal - current state:', interests.length, 'interests');
+                console.log('[ProfileSetup] userProfile.interests:', userProfile?.interests?.length, 'interests');
+
+                if (isLoadingProfile) {
+                  console.log('[ProfileSetup] Still loading profile, waiting...');
+                  return;
+                }
+
+                setInterestsModalVisible(true);
+              }}
               activeOpacity={0.7}
+              disabled={isLoadingProfile}
             >
               <Text style={[styles.pickerButtonText, { color: interests.length > 0 ? themeColors.textPrimary : themeColors.textSecondary }]}>
                 {interests.length > 0 ? `${interests.length} selected` : 'Select interests...'}
@@ -751,7 +910,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
             <View style={styles.labelRow}>
               <Text style={[styles.label, { color: themeColors.textPrimary }]}>Links</Text>
               <Text style={[styles.charCount, { color: themeColors.textSecondary }]}>
-                {links.length}/5
+                {links.length}/1
               </Text>
             </View>
             <TouchableOpacity
@@ -1035,6 +1194,15 @@ export default function ProfileSetupScreen({ navigation, route }) {
         onClose={() => setLinksModalVisible(false)}
         links={links}
         onSave={setLinks}
+      />
+
+      <LocationPickerModal
+        visible={locationModalVisible}
+        onClose={() => setLocationModalVisible(false)}
+        currentCountry={country}
+        currentProvince={province}
+        currentCity={city}
+        onSave={handleLocationSave}
       />
     </ScreenLayout>
   );

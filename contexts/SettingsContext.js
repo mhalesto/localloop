@@ -1102,8 +1102,16 @@ export function SettingsProvider({ children }) {
     if (!user?.uid) return;
 
     try {
+      console.log('[SettingsContext] Loading profile from Firebase for user:', user.uid);
       const profile = await getUserProfile(user.uid);
       if (profile) {
+        console.log('[SettingsContext] Profile loaded from Firestore:', {
+          interests: profile.interests?.length,
+          links: profile.links?.length,
+          pronouns: profile.pronouns,
+          profession: profile.profession,
+        });
+
         setUserProfile(prev => ({
           ...prev,
           uid: user.uid,                                  // Set Firebase Auth UID
@@ -1123,10 +1131,43 @@ export function SettingsProvider({ children }) {
           // Load subscription data
           subscriptionPlan: profile.subscriptionPlan || 'basic',
           premiumUnlocked: profile.premiumUnlocked || false,
+          // Load professional profile fields
+          pronouns: profile.pronouns || '',
+          profession: profile.profession || '',
+          company: profile.company || '',
+          interests: profile.interests || [],
+          links: profile.links || [],
+          category: profile.category || '',
+          contactEmail: profile.contactEmail || '',
+          channelName: profile.channelName || '',
+          channelMemberCount: profile.channelMemberCount || 0,
+          // Load CV/Portfolio fields
+          education: profile.education || '',
+          skills: profile.skills || '',
+          yearsOfExperience: profile.yearsOfExperience || 0,
+          availableForWork: profile.availableForWork ?? false,
+          // Load privacy settings
+          showPronouns: profile.showPronouns !== undefined ? profile.showPronouns : true,
+          showProfession: profile.showProfession !== undefined ? profile.showProfession : true,
+          showCompany: profile.showCompany !== undefined ? profile.showCompany : true,
+          showInterests: profile.showInterests !== undefined ? profile.showInterests : true,
+          showLinks: profile.showLinks !== undefined ? profile.showLinks : true,
+          showCategory: profile.showCategory !== undefined ? profile.showCategory : true,
+          showContactEmail: profile.showContactEmail !== undefined ? profile.showContactEmail : true,
+          showChannel: profile.showChannel !== undefined ? profile.showChannel : true,
+          // Load location data
+          country: profile.country || '',
+          province: profile.province || '',
+          city: profile.city || '',
+          countryName: profile.countryName || '',
         }));
+
+        console.log('[SettingsContext] Profile state updated with interests:', profile.interests?.length);
+      } else {
+        console.log('[SettingsContext] No profile found in Firestore');
       }
     } catch (error) {
-      console.warn('[SettingsContext] Error loading profile:', error);
+      console.error('[SettingsContext] Error loading profile:', error);
     }
   }, [user?.uid]);
 

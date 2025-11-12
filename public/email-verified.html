@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verified - LocalLoop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            animation: gradientShift 10s ease infinite;
+            background-size: 200% 200%;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .lottie-container {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 24px;
+        }
+
+        .success-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #34C759 0%, #30D158 100%);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: scaleIn 0.5s ease-out;
+            box-shadow: 0 8px 32px rgba(52, 199, 89, 0.4);
+        }
+
+        .success-icon svg {
+            width: 60px;
+            height: 60px;
+            stroke: white;
+            stroke-width: 4;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            animation: checkmark 0.8s ease-out 0.3s forwards;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0) rotate(-180deg);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes checkmark {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .lottie-container.hidden {
+            display: none;
+        }
+
+        h1 {
+            color: #1d1d1f;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        p {
+            color: #6e6e73;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 32px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ea 100%);
+            border-radius: 16px;
+            font-size: 15px;
+            color: #6e6e73;
+            border: 1px solid #e5e5e7;
+        }
+
+        .info strong {
+            color: #1d1d1f;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .redirect-text {
+            margin-top: 24px;
+            font-size: 14px;
+            color: #86868b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .features {
+            margin-top: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .feature {
+            background: #f9f9fb;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #6e6e73;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-icon {
+            font-size: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            p {
+                font-size: 16px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52">
+                <polyline points="14 27 22 35 38 19"/>
+            </svg>
+        </div>
+
+        <h1>Email Verified! 🎉</h1>
+        <p>Your email has been successfully verified. You can now access all features of LocalLoop!</p>
+
+        <a href="#" class="button" id="returnButton">
+            Open LocalLoop
+        </a>
+
+        <div class="redirect-text" id="redirectText">
+            <span class="loader"></span>
+            <span>Opening app automatically...</span>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">✉️</span>
+                <span>Email confirmed</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">🔒</span>
+                <span>Account secured</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">🚀</span>
+                <span>Full access granted</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">✨</span>
+                <span>Ready to go</span>
+            </div>
+        </div>
+
+        <div class="info">
+            <strong>What's next?</strong>
+            Return to LocalLoop and start exploring your local community. Share posts, connect with neighbors, and discover what's happening around you!
+        </div>
+    </div>
+
+    <script>
+        // Deep link schemes to try
+        const deepLinks = [
+            'localloop://email-verified',
+            'localloop://',
+            'exp://192.168.1.1:8081/--/email-verified' // For Expo dev
+        ];
+
+        // Attempt to deep link back to the app
+        window.onload = function() {
+            setTimeout(function() {
+                // Try each deep link
+                deepLinks.forEach((link, index) => {
+                    setTimeout(() => {
+                        window.location.href = link;
+                    }, index * 500);
+                });
+
+                // Hide loader after attempts
+                setTimeout(function() {
+                    const redirectText = document.getElementById('redirectText');
+                    if (redirectText) {
+                        redirectText.innerHTML = '<span style="color: #86868b;">Didn\'t open automatically? Click the button above.</span>';
+                    }
+                }, 3000);
+            }, 1000);
+        };
+
+        // Handle button click
+        document.getElementById('returnButton').addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Try to open app
+            window.location.href = 'localloop://email-verified';
+
+            // If still here after 1 second, try alternative
+            setTimeout(() => {
+                window.location.href = 'localloop://';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

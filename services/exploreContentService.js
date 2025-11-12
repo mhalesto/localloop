@@ -9,6 +9,19 @@ import { app } from '../api/firebaseConfig';
 const db = getFirestore(app);
 
 /**
+ * Normalize Firebase Timestamp to milliseconds
+ */
+const normalizeTimestamp = (value) => {
+  if (!value) return Date.now();
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object') {
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof value.seconds === 'number') return value.seconds * 1000;
+  }
+  return Date.now();
+};
+
+/**
  * Get posts from current city
  * @param {string} city - City name
  * @param {number} maxResults - Maximum number of posts to return
@@ -35,6 +48,9 @@ export async function getPostsFromCity(city, maxResults = 10) {
         id: doc.id,
         postId: doc.id, // Some screens use postId
         ...data,
+        // Normalize timestamp to milliseconds
+        createdAt: normalizeTimestamp(data.createdAt),
+        updatedAt: data.updatedAt ? normalizeTimestamp(data.updatedAt) : null,
         // Ensure author object exists
         author: data.author || {
           uid: data.authorId,
@@ -86,7 +102,7 @@ export async function getAIArtworkFromCity(city, maxResults = 20) {
               id: cartoon.id || `${doc.id}-${cartoon.createdAt}`,
               url: cartoon.url,
               style: cartoon.style || 'Unknown',
-              createdAt: cartoon.createdAt || Date.now(),
+              createdAt: normalizeTimestamp(cartoon.createdAt),
               userId: doc.id,
               username: data.username,
               displayName: data.displayName,

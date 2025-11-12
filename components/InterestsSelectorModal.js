@@ -96,8 +96,8 @@ export default function InterestsSelectorModal({
       backgroundColor: themeColors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      maxHeight: '90%',
       paddingBottom: 40,
+      height: '90%',
     },
     header: {
       flexDirection: 'row',
@@ -165,6 +165,7 @@ export default function InterestsSelectorModal({
     contentContainer: {
       paddingHorizontal: 20,
       paddingVertical: 16,
+      minHeight: 300,
     },
     categorySection: {
       marginBottom: 20,
@@ -315,9 +316,10 @@ export default function InterestsSelectorModal({
 
           {/* Interests Grid */}
           <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={localStyles.contentContainer}
-            showsVerticalScrollIndicator={false}
+            style={{ flex: 1, minHeight: 200 }}
+            contentContainerStyle={[localStyles.contentContainer, { flexGrow: 1 }]}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
           >
             {Object.keys(filteredInterests).length === 0 ? (
               <View style={localStyles.emptyState}>
