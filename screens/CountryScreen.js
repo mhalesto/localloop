@@ -20,6 +20,7 @@ import FilteredPostCard from '../components/FilteredPostCard';
 import FilteredUserCard from '../components/FilteredUserCard';
 import ArtworkMasonryGrid from '../components/ArtworkMasonryGrid';
 import SponsoredAdCard from '../components/SponsoredAdCard';
+import SubscriptionUpgradeAd from '../components/SubscriptionUpgradeAd';
 import ArtworkSkeletonLoader from '../components/ArtworkSkeletonLoader';
 import AdSkeletonLoader from '../components/AdSkeletonLoader';
 import HorizontalListSkeletonLoader from '../components/HorizontalListSkeletonLoader';
@@ -761,6 +762,17 @@ export default function CountryScreen({ navigation }) {
       artworkChunks.push(searchFilteredArtwork.slice(i, i + ARTWORKS_PER_CHUNK));
     }
 
+    // Prioritize upgrade ad at the beginning (if not on highest plan)
+    const currentPlan = userProfile?.subscriptionPlan || 'basic';
+    const showUpgradeAd = currentPlan !== 'ultimate'; // Show to basic, premium, and gold users
+
+    if (showUpgradeAd && feed.length === 0) {
+      feed.push({
+        type: 'upgradeAd',
+        key: 'upgrade-ad-top',
+      });
+    }
+
     // Build the feed
     artworkChunks.forEach((chunk, index) => {
       // Add artwork chunk
@@ -789,8 +801,8 @@ export default function CountryScreen({ navigation }) {
           });
         }
 
-        // Randomly add an ad card (30% chance after each section)
-        if (Math.random() < 0.3) {
+        // Randomly add an ad card (30% chance after each section) - only after upgrade ad has been shown
+        if (Math.random() < 0.3 && (index > 0 || !showUpgradeAd)) {
           feed.push({
             type: 'ad',
             key: `ad-${index}-${Date.now()}`,
@@ -801,7 +813,7 @@ export default function CountryScreen({ navigation }) {
     });
 
     return feed;
-  }, [searchFilteredArtwork, searchFilteredPosts, searchFilteredUsers, exploreFilters]);
+  }, [searchFilteredArtwork, searchFilteredPosts, searchFilteredUsers, exploreFilters, userProfile?.subscriptionPlan]);
 
   const showingPersonalized = userProfile?.country && userProfile?.province && personalCities.length > 0 && exploreFilters.showNearbyCities;
   const listData = showingPersonalized ? personalFiltered : paginated;
@@ -1128,6 +1140,18 @@ export default function CountryScreen({ navigation }) {
                               contentContainerStyle={styles.horizontalList}
                             />
                           </View>
+                        );
+                      }
+
+                      if (feedItem.type === 'upgradeAd') {
+                        return (
+                          <SubscriptionUpgradeAd
+                            key={feedItem.key}
+                            onPress={(planId) => {
+                              haptics.light();
+                              navigation.navigate('Subscription', { preselectedPlan: planId });
+                            }}
+                          />
                         );
                       }
 
