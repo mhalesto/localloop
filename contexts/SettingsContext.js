@@ -1332,6 +1332,28 @@ export function SettingsProvider({ children }) {
   }, [accentKey, premiumAccentBrightness, premiumAccentEnabled, premiumAccentShade]);
   const themeColors = isDarkMode ? darkColors : lightColors;
 
+  // Filter premium themes based on user's subscription plan
+  const availablePremiumAccents = useMemo(() => {
+    const plan = userProfile?.subscriptionPlan || 'basic';
+
+    // Basic users get no premium themes
+    if (plan === 'basic') {
+      return [];
+    }
+
+    // Premium (Go) and Gold (Premium) users get all premium tier themes
+    // Gold (ultimate) users get premium + gold tier themes
+    if (plan === 'premium' || plan === 'gold') {
+      return premiumAccentPresets.filter(preset => preset.tier === 'premium');
+    }
+
+    if (plan === 'ultimate') {
+      return premiumAccentPresets; // Gold users get all premium themes
+    }
+
+    return [];
+  }, [userProfile?.subscriptionPlan]);
+
   const value = useMemo(
     () => ({
       showAddShortcut,
@@ -1344,7 +1366,7 @@ export function SettingsProvider({ children }) {
       setAccentKey: updateAccentKey,
       accentPreset,
       accentOptions: baseAccentPresets,
-      premiumAccentOptions: premiumAccentPresets,
+      premiumAccentOptions: availablePremiumAccents,
       premiumAccentEnabled,
       setPremiumAccentEnabled: updatePremiumAccentEnabled,
       premiumAccentKey,
@@ -1390,6 +1412,7 @@ export function SettingsProvider({ children }) {
       accentKey,
       updateAccentKey,
       accentPreset,
+      availablePremiumAccents,
       premiumAccentEnabled,
       updatePremiumAccentEnabled,
       premiumAccentKey,
