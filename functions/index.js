@@ -881,7 +881,7 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
 
       console.log(`[payFastWebhook] Updated subscription for user ${userId} to ${planId}`);
 
-      // Map internal planId to user-facing tier names
+      // Map internal planId to user-facing tier names and benefits
       const tierNames = {
         'premium': 'Go',
         'gold': 'Premium',
@@ -889,14 +889,39 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
       };
       const tierName = tierNames[planId] || 'Premium';
 
-      // Send notification to user
+      // Define benefits for each tier
+      const tierBenefits = {
+        'premium': [
+          '✨ Unlimited posts & statuses',
+          '🎨 15+ premium themes',
+          '💬 Priority comment suggestions',
+        ],
+        'gold': [
+          '🚀 Everything in Go',
+          '⭐ Premium badge on profile',
+          '🎯 Advanced AI features',
+          '📊 Analytics & insights',
+        ],
+        'ultimate': [
+          '👑 Everything in Premium',
+          '🤖 GPT-4o AI features',
+          '🎨 AI cartoon generator (20/month)',
+          '✍️ Smart post composer',
+        ],
+      };
+
+      const benefits = tierBenefits[planId] || ['Unlimited features'];
+      const benefitsText = benefits.join('\n');
+
+      // Send notification to user with benefits
       await sendNotificationToUser(userId, {
-        title: 'Subscription Activated! 🎉',
-        body: `Your ${tierName} subscription is now active. Enjoy unlimited features!`,
+        title: `Welcome to ${tierName}! 🎉`,
+        body: `Your subscription is now active!\n\n${benefitsText}\n\nTap to explore your new features!`,
         data: {
           type: 'subscription_activated',
           planId: planId,
-          screen: 'Settings',
+          screen: 'Subscription',
+          upgradedPlan: planId,
         },
         channelId: 'default',
       });

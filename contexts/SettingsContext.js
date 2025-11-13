@@ -803,7 +803,8 @@ const STORAGE_KEYS = {
 const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
-  const isDevBuild = __DEV__ === true;
+  // TESTING: Disable dev build bypass to test subscription gating in Expo Go
+  const isDevBuild = false; // __DEV__ === true;
   const defaultPremiumAccentKey = premiumAccentPresets[0]?.key ?? baseAccentPresets[0].key;
   const [showAddShortcut, setShowAddShortcut] = useState(true);
   const [showDiscoveryOnExplore, setShowDiscoveryOnExplore] = useState(true);

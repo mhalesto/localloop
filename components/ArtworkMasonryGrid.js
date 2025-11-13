@@ -134,7 +134,9 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
             onError={(error) => {
               console.error('[ArtworkMasonryGrid] Grid image load error:', artwork.id, error?.nativeEvent);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
+              // Silently fail - image will show as blank with loading state removed
             }}
+            defaultSource={require('../assets/icon.png')}
           />
           {/* Loading overlay with broom animation */}
           {loadingImages[artwork.id] && (

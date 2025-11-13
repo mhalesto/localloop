@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import CustomSplashScreen from './components/SplashScreen';
 import { useAlert } from './contexts/AlertContext';
 
@@ -56,31 +57,87 @@ import { OnboardingProvider } from './contexts/OnboardingContext';
 
 const Stack = createNativeStackNavigator();
 
+// Component to handle notification taps
+function NotificationHandler() {
+  const navigation = useNavigation();
+  const [notificationListener, setNotificationListener] = useState(null);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      console.log('[NotificationHandler] Notification tapped:', data);
+
+      // Handle different notification types
+      if (data.type === 'subscription_activated' && data.upgradedPlan) {
+        // Navigate to Subscription screen with the upgraded plan
+        navigation.navigate('Subscription', { upgradedPlan: data.upgradedPlan });
+      } else if (data.screen) {
+        // Generic screen navigation
+        navigation.navigate(data.screen, data);
+      }
+    });
+
+    setNotificationListener(subscription);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [navigation]);
+
+  return null;
+}
+
 // Component to handle deep links with access to AlertContext
 function DeepLinkHandler() {
   const navigation = useNavigation();
   const { showAlert } = useAlert();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const handleDeepLink = (event) => {
+    const handleDeepLink = async (event) => {
       const url = event.url;
       console.log('[App] Deep link received:', url);
 
       if (url.includes('payment-success')) {
-        // Payment successful - navigate to subscription screen
-        showAlert(
-          'Payment Processing',
-          'Your payment was successful! Your subscription will be activated shortly.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.navigate('Subscription');
+        // Payment successful - get user's current plan and navigate to subscription screen
+        try {
+          // Wait a moment for webhook to update user profile
+          await new Promise(resolve => setTimeout(resolve, 1500));
+
+          // Import getUserProfile dynamically
+          const { getUserProfile } = await import('./services/userProfileService');
+          const profile = await getUserProfile(user?.uid);
+          const upgradedPlan = profile?.subscriptionPlan || null;
+
+          showAlert(
+            'Payment Processing',
+            'Your payment was successful! Your subscription will be activated shortly.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Subscription', { upgradedPlan });
+                },
               },
-            },
-          ],
-          { type: 'success' }
-        );
+            ],
+            { type: 'success' }
+          );
+        } catch (error) {
+          console.error('[App] Error fetching profile after payment:', error);
+          showAlert(
+            'Payment Processing',
+            'Your payment was successful! Your subscription will be activated shortly.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.navigate('Subscription');
+                },
+              },
+            ],
+            { type: 'success' }
+          );
+        }
       } else if (url.includes('payment-cancelled')) {
         // Payment cancelled
         showAlert(
@@ -112,7 +169,7 @@ function DeepLinkHandler() {
     return () => {
       subscription.remove();
     };
-  }, [navigation, showAlert]);
+  }, [navigation, showAlert, user]);
 
   return null; // This component doesn't render anything
 }
@@ -228,6 +285,7 @@ export default function App() {
                         <NavigationContainer linking={linking}>
                           <StatusBar style="light" />
                           <DeepLinkHandler />
+                          <NotificationHandler />
                           <AuthGate />
                         </NavigationContainer>
                       </SafeAreaProvider>

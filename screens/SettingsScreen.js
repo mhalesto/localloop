@@ -282,7 +282,8 @@ export default function SettingsScreen({ navigation }) {
     return `Ghost #${Math.floor(Math.random() * 999)}`;
   }, [userProfile.nickname]);
 
-  const isDevBuild = __DEV__ === true;
+  // TESTING: Disable dev build bypass to test subscription gating in Expo Go
+  const isDevBuild = false; // __DEV__ === true;
   const accentSwitchColor = accentPreset.buttonBackground ?? themeColors.primaryDark;
   const inactiveTrackColor = isDarkMode ? '#3D3561' : '#d1d5db';
   const inactiveThumbColor = isDarkMode ? '#252047' : '#f4f3f4';

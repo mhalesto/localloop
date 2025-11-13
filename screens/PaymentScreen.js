@@ -15,12 +15,14 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { updateUserProfile } from '../services/userProfileService';
 import { useAlert } from '../contexts/AlertContext';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 export default function PaymentScreen({ route, navigation }) {
   const { planId, planName, price, currency, interval } = route.params;
   const { themeColors, accentPreset } = useSettings();
   const { user } = useAuth();
   const { showAlert } = useAlert();
+  const { sendLocalNotification } = useNotifications();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
@@ -107,6 +109,51 @@ export default function PaymentScreen({ route, navigation }) {
             : Date.now() + 30 * 24 * 60 * 60 * 1000,
       });
 
+      // Define tier name and benefits for notification
+      const tierNames = {
+        'premium': 'Go',
+        'gold': 'Premium',
+        'ultimate': 'Gold'
+      };
+      const tierName = tierNames[planId] || planName;
+
+      const tierBenefits = {
+        'premium': [
+          '✨ Unlimited posts & statuses',
+          '🎨 15+ premium themes',
+          '💬 Priority comment suggestions',
+        ],
+        'gold': [
+          '🚀 Everything in Go',
+          '⭐ Premium badge on profile',
+          '🎯 Advanced AI features',
+          '📊 Analytics & insights',
+        ],
+        'ultimate': [
+          '👑 Everything in Premium',
+          '🤖 GPT-4o AI features',
+          '🎨 AI cartoon generator (20/month)',
+          '✍️ Smart post composer',
+        ],
+      };
+
+      const benefits = tierBenefits[planId] || ['Unlimited features'];
+      const benefitsText = benefits.join('\n');
+
+      // Send local notification with benefits (simulating webhook notification)
+      await sendLocalNotification({
+        title: `Welcome to ${tierName}! 🎉`,
+        body: `Your subscription is now active!\n\n${benefitsText}\n\nTap to explore your new features!`,
+        data: {
+          type: 'subscription_activated',
+          planId: planId,
+          screen: 'Subscription',
+          upgradedPlan: planId,
+        },
+        delay: 2000, // 2 second delay to simulate webhook
+        channelId: 'default',
+      });
+
       setIsProcessing(false);
 
       showAlert(
@@ -115,7 +162,7 @@ export default function PaymentScreen({ route, navigation }) {
         [
           {
             text: 'Great!',
-            onPress: () => navigation.navigate('Settings'),
+            onPress: () => navigation.navigate('Subscription', { upgradedPlan: planId }),
           },
         ],
         { icon: 'checkmark-circle', iconColor: '#34C759' }

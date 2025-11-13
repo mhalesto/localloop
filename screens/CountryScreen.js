@@ -762,16 +762,10 @@ export default function CountryScreen({ navigation }) {
       artworkChunks.push(searchFilteredArtwork.slice(i, i + ARTWORKS_PER_CHUNK));
     }
 
-    // Prioritize upgrade ad at the beginning (if not on highest plan)
+    // Check if user is eligible for upgrade ad (not on highest plan)
     const currentPlan = userProfile?.subscriptionPlan || 'basic';
     const showUpgradeAd = currentPlan !== 'ultimate'; // Show to basic, premium, and gold users
-
-    if (showUpgradeAd && feed.length === 0) {
-      feed.push({
-        type: 'upgradeAd',
-        key: 'upgrade-ad-top',
-      });
-    }
+    let upgradeAdShown = false; // Track if we've already shown the upgrade ad
 
     // Build the feed
     artworkChunks.forEach((chunk, index) => {
@@ -801,8 +795,16 @@ export default function CountryScreen({ navigation }) {
           });
         }
 
-        // Randomly add an ad card (30% chance after each section) - only after upgrade ad has been shown
-        if (Math.random() < 0.3 && (index > 0 || !showUpgradeAd)) {
+        // Randomly insert ads with prioritization for upgrade ad
+        // Upgrade ad: 65% chance (if not yet shown and eligible)
+        // Regular ad: 30% chance
+        if (showUpgradeAd && !upgradeAdShown && Math.random() < 0.65) {
+          feed.push({
+            type: 'upgradeAd',
+            key: `upgrade-ad-${index}`,
+          });
+          upgradeAdShown = true; // Only show once per feed
+        } else if (Math.random() < 0.3) {
           feed.push({
             type: 'ad',
             key: `ad-${index}-${Date.now()}`,

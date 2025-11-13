@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import ScreenLayout from '../components/ScreenLayout';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +16,7 @@ import { SUBSCRIPTION_PLANS, formatPrice, getPlanById } from '../config/subscrip
 import { getUserProfile, updateUserProfile } from '../services/userProfileService';
 import { useAlert } from '../contexts/AlertContext';
 
-export default function SubscriptionScreen({ navigation }) {
+export default function SubscriptionScreen({ navigation, route }) {
   const { themeColors, accentPreset } = useSettings();
   const { user } = useAuth();
   const { showAlert } = useAlert();
@@ -23,6 +24,8 @@ export default function SubscriptionScreen({ navigation }) {
   const [selectedPlan, setSelectedPlan] = useState('basic');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+  const [upgradedPlan, setUpgradedPlan] = useState(null);
 
   // Load user profile with subscription data
   useEffect(() => {
@@ -45,6 +48,16 @@ export default function SubscriptionScreen({ navigation }) {
 
     loadUserProfile();
   }, [user]);
+
+  // Detect successful upgrade from route params
+  useEffect(() => {
+    if (route?.params?.upgradedPlan) {
+      setUpgradedPlan(route.params.upgradedPlan);
+      setShowWelcomeBanner(true);
+      // Clear the route param
+      navigation.setParams({ upgradedPlan: null });
+    }
+  }, [route?.params?.upgradedPlan]);
 
   const handleSelectPlan = async (planId) => {
     if (planId === userProfile?.subscriptionPlan) {
@@ -122,8 +135,64 @@ export default function SubscriptionScreen({ navigation }) {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Welcome Banner for Newly Upgraded Plans */}
+        {!isLoading && showWelcomeBanner && upgradedPlan && (() => {
+          const plan = getPlanById(upgradedPlan);
+          const gradientColors = upgradedPlan === 'premium'
+            ? ['#10b981', '#059669']
+            : upgradedPlan === 'gold'
+            ? ['#f59e0b', '#d97706']
+            : ['#8b5cf6', '#7c3aed'];
+
+          return (
+            <View style={styles.welcomeBannerContainer}>
+              <LinearGradient
+                colors={gradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.welcomeBanner}
+              >
+                <TouchableOpacity
+                  style={styles.dismissButton}
+                  onPress={() => setShowWelcomeBanner(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={20} color="#fff" />
+                </TouchableOpacity>
+
+                <View style={styles.welcomeHeader}>
+                  <Ionicons name="checkmark-circle" size={32} color="#fff" />
+                  <Text style={styles.welcomeTitle}>Welcome to {plan?.name}!</Text>
+                </View>
+
+                <Text style={styles.welcomeSubtitle}>
+                  You now have access to these premium features:
+                </Text>
+
+                <View style={styles.benefitsList}>
+                  {plan?.features.slice(0, 4).map((feature, idx) => {
+                    const featureText = typeof feature === 'string' ? feature : feature.text;
+                    return (
+                      <View key={idx} style={styles.benefitRow}>
+                        <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                        <Text style={styles.benefitText}>{featureText}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.celebrationFooter}>
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                  <Text style={styles.celebrationText}>Enjoy your upgraded experience!</Text>
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                </View>
+              </LinearGradient>
+            </View>
+          );
+        })()}
+
         {/* Current Subscription Status */}
-        {!isLoading && isSubscribed && (
+        {!isLoading && isSubscribed && !showWelcomeBanner && (
           <View style={[styles.statusBanner, { backgroundColor: `${accentPreset?.buttonBackground || themeColors.primary}15` }]}>
             <View style={styles.statusHeader}>
               <Ionicons
@@ -472,5 +541,71 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     flex: 1,
+  },
+  welcomeBannerContainer: {
+    marginBottom: 24,
+  },
+  welcomeBanner: {
+    borderRadius: 20,
+    padding: 24,
+    position: 'relative',
+  },
+  dismissButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  welcomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  welcomeSubtitle: {
+    fontSize: 15,
+    color: '#fff',
+    opacity: 0.9,
+    marginBottom: 16,
+  },
+  benefitsList: {
+    gap: 10,
+    marginBottom: 20,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  benefitText: {
+    fontSize: 15,
+    color: '#fff',
+    flex: 1,
+    lineHeight: 20,
+  },
+  celebrationFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  celebrationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
