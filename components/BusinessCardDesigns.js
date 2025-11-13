@@ -185,6 +185,8 @@ export const CorporateCard = ({
       flex: 1,
       justifyContent: 'space-between',
       paddingRight: 15,
+      alignSelf: 'stretch',
+      gap: 16,
     },
     backRightSide: {
       alignItems: 'center',
@@ -419,6 +421,7 @@ export const CorporateCard = ({
                 showMeta={false}
                 showHeader={false}
                 frameless
+                qrSizeOverride={105}
               />
             </View>
             <Text style={styles.qrLabel}>Scan to Connect</Text>
@@ -557,6 +560,8 @@ export const GeometricCard = ({
       flex: 1,
       justifyContent: 'space-between',
       paddingRight: 15,
+      alignSelf: 'stretch',
+      gap: 16,
     },
     backRightGeometric: {
       alignItems: 'center',
@@ -775,6 +780,7 @@ export const GeometricCard = ({
                 showMeta={false}
                 showHeader={false}
                 frameless
+                qrSizeOverride={105}
               />
             </View>
             <Text style={styles.qrLabelGeometric}>SCAN ME</Text>
@@ -857,8 +863,10 @@ export const MinimalistCard = ({
     },
     backLeftMinimal: {
       flex: 1.2,
-      justifyContent: 'center',
+      justifyContent: 'space-between',
       paddingRight: 15,
+      alignSelf: 'stretch',
+      gap: 20,
     },
     backRightMinimal: {
       flex: 1,
@@ -1015,6 +1023,7 @@ export const MinimalistCard = ({
               showMeta={false}
               showHeader={false}
               frameless
+              qrSizeOverride={105}
             />
           </View>
           <Text style={styles.minimalQrLabel}>SCAN TO CONNECT</Text>
@@ -1146,8 +1155,10 @@ export const LuxuryCard = ({
     },
     backLeftLuxury: {
       flex: 1.2,
-      justifyContent: 'center',
+      justifyContent: 'space-between',
       paddingRight: 20,
+      alignSelf: 'stretch',
+      gap: 20,
     },
     backRightLuxury: {
       flex: 1,
@@ -1351,6 +1362,7 @@ export const LuxuryCard = ({
                 showMeta={false}
                 showHeader={false}
                 frameless
+                qrSizeOverride={105}
               />
             </View>
             <Text style={styles.luxuryQrLabel}>Exclusive Access</Text>

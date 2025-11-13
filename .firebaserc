@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "share-your-story-1": {
+      "hosting": {
+        "auth": [
+          "share-your-story-1"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

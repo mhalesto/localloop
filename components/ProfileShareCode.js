@@ -125,6 +125,7 @@ export default function ProfileShareCode({
   showMeta = true,
   showHeader = true,
   frameless = false,
+  qrSizeOverride,
 }) {
   const palette = VARIANT_PRESETS[variant] || VARIANT_PRESETS.light;
   const overlayColor = variant === 'dark' ? 'rgba(15,23,42,0.65)' : 'rgba(255,255,255,0.45)';
@@ -150,8 +151,11 @@ export default function ProfileShareCode({
   const placeholderMatrix = useMemo(() => buildPlaceholderMatrix(slug), [slug]);
   const isCompact = size === 'compact';
   const isInline = size === 'inline';
-  const qrSize = isInline ? 118 : isCompact ? 150 : 220;
-  const badgeSize = isInline ? 50 : isCompact ? 60 : 72;
+  const baseQrSize = isInline ? 118 : isCompact ? 150 : 220;
+  const qrSize = qrSizeOverride || baseQrSize;
+  const sizeRatio = qrSize / baseQrSize;
+  const baseBadgeSize = isInline ? 50 : isCompact ? 60 : 72;
+  const badgeSize = baseBadgeSize * sizeRatio;
   const avatarSize = badgeSize - 8;
   const baseContainerPadding = isInline ? 6 : isCompact ? 12 : 16;
   const baseContainerGap = isInline ? 6 : isCompact ? 12 : 16;

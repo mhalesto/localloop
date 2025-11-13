@@ -4,6 +4,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
+    "site": "share-your-story-1",
     "public": "public",
     "ignore": [
       "firebase.json",
@@ -14,6 +15,18 @@
       {
         "source": "/__/auth/action",
         "destination": "/auth-action.html"
+      }
+    ],
+    "appAssociation": "AUTO",
+    "headers": [
+      {
+        "source": "/__/auth/action",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
       }
     ]
   },

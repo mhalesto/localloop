@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
+  onIdTokenChanged,
   signInWithCredential,
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
@@ -271,15 +272,77 @@ export function AuthProvider({ children }) {
       setInitializing(false);
       return;
     }
-    const unsub = onAuthStateChanged(auth, (u) => {
-      log('onAuthStateChanged user:', !!u, u?.uid);
-      setFirebaseUser(u);
-      if (u) hydrateProfile(u);
-      else setProfile(null);
+    // Use onIdTokenChanged instead of onAuthStateChanged
+    // This will fire when email verification status changes
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      log('onIdTokenChanged user:', !!u, u?.uid, 'emailVerified:', u?.emailVerified);
+
+      // Force reload to get latest verification status
+      if (u && !u.emailVerified) {
+        try {
+          await u.reload();
+          const refreshedUser = auth.currentUser;
+          log('User reloaded, emailVerified:', refreshedUser?.emailVerified);
+          setFirebaseUser(refreshedUser);
+          if (refreshedUser) hydrateProfile(refreshedUser);
+        } catch (error) {
+          log('Error reloading user:', error);
+          setFirebaseUser(u);
+          if (u) hydrateProfile(u);
+        }
+      } else {
+        setFirebaseUser(u);
+        if (u) hydrateProfile(u);
+        else setProfile(null);
+      }
       setInitializing(false);
     });
     return unsub;
   }, [auth, hydrateProfile]);
+
+  // ---------- polling for email verification ----------
+  useEffect(() => {
+    if (!auth || !firebaseUser || firebaseUser.emailVerified) {
+      return;
+    }
+
+    // Check if user is an email/password user (not Google)
+    const isGoogleUser = firebaseUser.providerData?.some(
+      provider => provider.providerId === 'google.com'
+    );
+    if (isGoogleUser) {
+      return;
+    }
+
+    log('Starting email verification polling for:', firebaseUser.email);
+
+    // Poll every 5 seconds for email verification
+    const interval = setInterval(async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await currentUser.reload();
+          const refreshedUser = auth.currentUser;
+
+          if (refreshedUser?.emailVerified) {
+            log('Email verified! Updating state.');
+            setFirebaseUser(refreshedUser);
+            hydrateProfile(refreshedUser);
+            clearInterval(interval);
+          } else {
+            log('Email still not verified, continuing to poll...');
+          }
+        }
+      } catch (error) {
+        log('Error polling for verification:', error);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => {
+      log('Stopping email verification polling');
+      clearInterval(interval);
+    };
+  }, [auth, firebaseUser, hydrateProfile]);
 
   // ---------- handle OAuth response ----------
   useEffect(() => {
@@ -429,6 +492,7 @@ export function AuthProvider({ children }) {
         // Send email verification
         try {
           const actionCodeSettings = {
+            // This URL is where users land AFTER verification completes
             url: 'https://share-your-story-1.web.app/email-verified.html',
             handleCodeInApp: false,
           };
@@ -480,6 +544,34 @@ export function AuthProvider({ children }) {
       }
     },
     [auth, firebaseUser]
+  );
+
+  const checkEmailVerification = useCallback(
+    async () => {
+      if (!auth || !firebaseUser) {
+        return { ok: false, error: 'not_authenticated' };
+      }
+
+      try {
+        // Reload the user to get the latest verification status
+        await firebaseUser.reload();
+        const refreshedUser = auth.currentUser;
+
+        if (refreshedUser?.emailVerified) {
+          log('Email verified! Updating state.');
+          setFirebaseUser(refreshedUser);
+          hydrateProfile(refreshedUser);
+          return { ok: true, verified: true, message: 'Email is verified!' };
+        } else {
+          log('Email not yet verified');
+          return { ok: true, verified: false, message: 'Email not yet verified' };
+        }
+      } catch (error) {
+        warn('Failed to check email verification', error);
+        return { ok: false, error: error.code ?? error.message };
+      }
+    },
+    [auth, firebaseUser, hydrateProfile]
   );
 
   const sendResetEmail = useCallback(
@@ -677,6 +769,7 @@ export function AuthProvider({ children }) {
       signUpWithEmail,
       sendPasswordReset: sendResetEmail,
       resendVerificationEmail,
+      checkEmailVerification,
       isResettingPassword: resetInFlight,
       awardEngagementPoints,
       isAdmin,
@@ -703,6 +796,7 @@ export function AuthProvider({ children }) {
       signUpWithEmail,
       sendResetEmail,
       resendVerificationEmail,
+      checkEmailVerification,
       awardEngagementPoints,
       isAdmin,
       signOut,

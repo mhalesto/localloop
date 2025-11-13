@@ -165,8 +165,10 @@ export const TechCard = ({
     backLeftTech: {
       flex: 1.2,
       paddingRight: 15,
-      justifyContent: 'flex-start',
+      justifyContent: 'space-between',
       paddingTop: 10,
+      alignSelf: 'stretch',
+      gap: 16,
     },
     backRightTech: {
       flex: 1,
@@ -495,8 +497,10 @@ export const CreativeCard = ({
     backLeftCreative: {
       flex: 1.2,
       paddingRight: 15,
-      justifyContent: 'flex-start',
+      justifyContent: 'space-between',
       paddingTop: 10,
+      alignSelf: 'stretch',
+      gap: 16,
     },
     backRightCreative: {
       flex: 1,
@@ -845,7 +849,9 @@ export const ElegantCard = ({
     backLeftElegant: {
       flex: 1.2,
       paddingRight: 20,
-      justifyContent: 'center',
+      justifyContent: 'space-between',
+      alignSelf: 'stretch',
+      gap: 18,
     },
     backRightElegant: {
       flex: 1,
@@ -1152,8 +1158,10 @@ export const GradientBoldCard = ({
     backLeftGradient: {
       flex: 1.2,
       paddingRight: 20,
-      justifyContent: 'center',
+      justifyContent: 'space-between',
+      alignSelf: 'stretch',
       zIndex: 10,
+      gap: 18,
     },
     backRightGradient: {
       flex: 1,
@@ -1343,10 +1351,223 @@ export const GradientBoldCard = ({
   );
 };
 
+// Freeform Creative Theme
+export const FreeformCreativeCard = ({
+  profile,
+  side = 'front',
+  primaryColor = '#7C3AED',
+  cardWidth,
+}) => {
+  const { width: resolvedWidth, height: resolvedHeight } = resolveCardDimensions(cardWidth);
+  const pastelShapes = ['#FEE4A8', '#C7D2FE', '#FBCFE8', '#BAE6FD'];
+
+  const Shape = ({ size = 90, top, left, rotate = '0deg', color }) => (
+    <View
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size * 0.7,
+        borderRadius: size,
+        backgroundColor: color,
+        opacity: 0.35,
+        top,
+        left,
+        transform: [{ rotate }],
+      }}
+    />
+  );
+
+  const Front = () => (
+    <View style={styles.container}>
+      <View style={styles.shapeCanvas}>
+        <Shape size={140} top={-20} left={-20} rotate="25deg" color={pastelShapes[0]} />
+        <Shape size={90} top={20} left={resolvedWidth / 2} rotate="-35deg" color={pastelShapes[1]} />
+        <Shape size={110} top={resolvedHeight / 3} left={resolvedWidth / 2.4} rotate="10deg" color={pastelShapes[2]} />
+      </View>
+      <View style={styles.frontContent}>
+        <View style={styles.emojiBadge}>
+          <Ionicons name="color-palette-outline" size={22} color={primaryColor} />
+        </View>
+        <Text style={styles.nameText}>{profile.displayName || profile.username}</Text>
+        <Text style={[styles.roleText, { color: primaryColor }]}>
+          {profile.profession || 'Creative Director'}
+        </Text>
+        <Text style={styles.companyText}>{profile.company || 'Studio Nova'}</Text>
+        {profile.bio && (
+          <Text style={styles.quoteText}>"{profile.bio.slice(0, 80)}"</Text>
+        )}
+      </View>
+    </View>
+  );
+
+  const Back = () => (
+    <View style={styles.container}>
+      <View style={styles.shapeCanvas}>
+        <Shape size={150} top={resolvedHeight / 4} left={-40} rotate="-20deg" color={pastelShapes[1]} />
+        <Shape size={120} top={-30} left={resolvedWidth / 2} rotate="30deg" color={pastelShapes[3]} />
+      </View>
+      <View style={styles.backContent}>
+        <View style={styles.backLeft}>
+          <View>
+            <Text style={styles.sectionLabel}>CONTACT</Text>
+            <View style={styles.contactRow}>
+              <Ionicons name="mail-outline" size={14} color={primaryColor} />
+              <Text style={styles.contactText}>{profile.contactEmail || 'hello@studio.com'}</Text>
+            </View>
+            <View style={styles.contactRow}>
+              <Ionicons name="call-outline" size={14} color={primaryColor} />
+              <Text style={styles.contactText}>{profile.contactPhone || '+27 123 456 789'}</Text>
+            </View>
+            <View style={styles.contactRow}>
+              <Ionicons name="location-outline" size={14} color={primaryColor} />
+              <Text style={styles.contactText}>{profile.location || 'Cape Town, SA'}</Text>
+            </View>
+          </View>
+          {profile.skills && (
+            <View>
+              <Text style={styles.sectionLabel}>FOCUS</Text>
+              <Text style={styles.focusText}>
+                {profile.skills.split(',').slice(0, 3).join(' • ')}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.backRight}>
+          <View style={styles.qrWrapper}>
+            <ProfileShareCode
+              profile={profile}
+              primaryColor={primaryColor}
+              variant="minimal"
+              size="compact"
+              showMeta={false}
+              showHeader={false}
+              frameless
+              qrSizeOverride={140}
+            />
+          </View>
+          <Text style={styles.scanLabel}>SCAN TO CONNECT</Text>
+          <Text style={styles.handleText}>@{profile.username || 'creative'}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const styles = StyleSheet.create({
+    container: {
+      width: resolvedWidth,
+      height: resolvedHeight,
+      borderRadius: 18,
+      backgroundColor: '#FFF',
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    shapeCanvas: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    frontContent: {
+      flex: 1,
+      padding: 28,
+      justifyContent: 'center',
+      gap: 6,
+    },
+    emojiBadge: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: `${primaryColor}12`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    nameText: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: '#1F2933',
+    },
+    roleText: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    companyText: {
+      fontSize: 13,
+      color: '#6B7280',
+    },
+    quoteText: {
+      fontSize: 13,
+      color: '#4B5563',
+      fontStyle: 'italic',
+      marginTop: 10,
+    },
+    backContent: {
+      flex: 1,
+      flexDirection: 'row',
+      padding: 24,
+      gap: 24,
+    },
+    backLeft: {
+      flex: 1.2,
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#9CA3AF',
+      letterSpacing: 1.5,
+      marginBottom: 8,
+    },
+    contactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 8,
+    },
+    contactText: {
+      fontSize: 13,
+      color: '#374151',
+      flex: 1,
+    },
+    focusText: {
+      fontSize: 13,
+      color: '#4B5563',
+      fontWeight: '600',
+    },
+    backRight: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    qrWrapper: {
+      padding: 6,
+      borderRadius: 24,
+      backgroundColor: '#F3F4F6',
+    },
+    scanLabel: {
+      fontSize: 11,
+      color: '#9CA3AF',
+      letterSpacing: 1,
+      marginTop: 12,
+    },
+    handleText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: primaryColor,
+      marginTop: 4,
+    },
+  });
+
+  return side === 'front' ? <Front /> : <Back />;
+};
+
 // Export all extended card designs
 export default {
   TechCard,
   CreativeCard,
   ElegantCard,
   GradientBoldCard,
+  FreeformCreativeCard,
 };

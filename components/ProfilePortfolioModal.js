@@ -35,6 +35,7 @@ import {
   CreativeCard,
   ElegantCard,
   GradientBoldCard,
+  FreeformCreativeCard,
 } from './BusinessCardDesignsExtended';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -95,6 +96,12 @@ const CARD_STYLES = {
     name: 'Bold Gradient',
     icon: 'color-palette-outline',
     Component: GradientBoldCard,
+  },
+  freeformCreative: {
+    id: 'freeformCreative',
+    name: 'Free Creative',
+    icon: 'sparkles-outline',
+    Component: FreeformCreativeCard,
   },
   // Legacy designs (kept for backward compatibility)
   modern: {
