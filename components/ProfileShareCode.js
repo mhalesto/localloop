@@ -80,11 +80,11 @@ function componentToHex(value) {
   return hex.length === 1 ? `0${hex}` : hex;
 }
 
-function buildQrUrl(payload, { dark, light, size = 480 }) {
+function buildQrUrl(payload, { dark, light, size = 480, margin = 12 }) {
   const params = [
     `text=${encodeURIComponent(payload)}`,
     `size=${size}`,
-    `margin=12`,
+    `margin=${margin}`,
     `format=png`,
     `dark=${encodeURIComponent(dark)}`,
     `light=${encodeURIComponent(light)}`,
@@ -124,19 +124,22 @@ export default function ProfileShareCode({
   size = 'large',
   showMeta = true,
   showHeader = true,
+  frameless = false,
 }) {
   const palette = VARIANT_PRESETS[variant] || VARIANT_PRESETS.light;
   const overlayColor = variant === 'dark' ? 'rgba(15,23,42,0.65)' : 'rgba(255,255,255,0.45)';
   const normalizedColor = useMemo(() => normalizeColor(primaryColor), [primaryColor]);
   const { slug, deepLink, webUrl } = useMemo(() => getShareTarget(profile), [profile]);
   const qrPayload = `${deepLink}?card=1`;
+  const qrMargin = frameless ? 0 : 12;
   const qrImageUri = useMemo(
     () =>
       buildQrUrl(qrPayload, {
         dark: normalizedColor.noHash,
         light: (palette.lightColor || '#FFFFFF').replace('#', ''),
+        margin: qrMargin,
       }),
-    [qrPayload, normalizedColor.noHash, palette.lightColor]
+    [qrPayload, normalizedColor.noHash, palette.lightColor, qrMargin]
   );
   const [qrReady, setQrReady] = useState(false);
   const [qrFailed, setQrFailed] = useState(false);
@@ -150,10 +153,18 @@ export default function ProfileShareCode({
   const qrSize = isInline ? 118 : isCompact ? 150 : 220;
   const badgeSize = isInline ? 50 : isCompact ? 60 : 72;
   const avatarSize = badgeSize - 8;
-  const containerPadding = isInline ? 6 : isCompact ? 12 : 16;
-  const containerGap = isInline ? 6 : isCompact ? 12 : 16;
-  const framePadding = isInline ? 4 : isCompact ? 8 : 12;
-  const frameRadius = isInline ? 14 : isCompact ? 18 : 20;
+  const baseContainerPadding = isInline ? 6 : isCompact ? 12 : 16;
+  const baseContainerGap = isInline ? 6 : isCompact ? 12 : 16;
+  const baseFramePadding = isInline ? 4 : isCompact ? 8 : 12;
+  const baseFrameRadius = isInline ? 14 : isCompact ? 18 : 20;
+  const containerPadding = frameless ? 0 : baseContainerPadding;
+  const containerGap = frameless ? 0 : baseContainerGap;
+  const framePadding = frameless ? 0 : baseFramePadding;
+  const frameRadius = frameless ? 0 : baseFrameRadius;
+  const containerBg = frameless ? 'transparent' : palette.background;
+  const containerBorder = frameless ? 'transparent' : palette.border;
+  const frameBorderColor = frameless ? 'transparent' : palette.frameBorder;
+  const frameColors = frameless ? ['transparent', 'transparent'] : palette.frameGradient;
 
   return (
     <View
@@ -161,9 +172,10 @@ export default function ProfileShareCode({
         styles.container,
         isCompact && styles.compactContainer,
         isInline && styles.inlineContainer,
+        frameless && styles.framelessContainer,
         {
-          backgroundColor: palette.background,
-          borderColor: palette.border,
+          backgroundColor: containerBg,
+          borderColor: containerBorder,
           padding: containerPadding,
           gap: containerGap,
         },
@@ -199,13 +211,14 @@ export default function ProfileShareCode({
       )}
 
       <LinearGradient
-        colors={palette.frameGradient}
+        colors={frameColors}
         style={[
           styles.qrFrame,
           (isCompact || isInline) && styles.compactQrFrame,
           isInline && styles.inlineQrFrame,
+          frameless && styles.framelessFrame,
           {
-            borderColor: palette.frameBorder,
+            borderColor: frameBorderColor,
             padding: framePadding,
             borderRadius: frameRadius,
           },
@@ -309,6 +322,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 10,
   },
+  framelessContainer: {
+    borderWidth: 0,
+    borderRadius: 0,
+    padding: 0,
+    gap: 0,
+    backgroundColor: 'transparent',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,6 +375,13 @@ const styles = StyleSheet.create({
   inlineQrFrame: {
     borderRadius: 14,
     padding: 6,
+  },
+  framelessFrame: {
+    borderWidth: 0,
+    borderRadius: 0,
+    padding: 0,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   qrImage: {
     width: '100%',

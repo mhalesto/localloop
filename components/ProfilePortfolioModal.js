@@ -24,31 +24,96 @@ import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
 import ProfileShareCode from './ProfileShareCode';
+import {
+  CorporateCard,
+  GeometricCard,
+  MinimalistCard,
+  LuxuryCard,
+} from './BusinessCardDesigns';
+import {
+  TechCard,
+  CreativeCard,
+  ElegantCard,
+  GradientBoldCard,
+} from './BusinessCardDesignsExtended';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PORTFOLIO_WIDTH = SCREEN_WIDTH - 40; // 20px padding on each side
+const CARD_ASPECT_RATIO = 0.56;
+const CARD_CANVAS_WIDTH = SCREEN_WIDTH - 40;
+const CARD_CANVAS_HEIGHT = CARD_CANVAS_WIDTH * CARD_ASPECT_RATIO;
+const CARD_EXPORT_SCALE = 3;
+const CARD_EXPORT_WIDTH = CARD_CANVAS_WIDTH * CARD_EXPORT_SCALE;
+const CARD_EXPORT_HEIGHT = CARD_CANVAS_HEIGHT * CARD_EXPORT_SCALE;
 
-// Business Card Styles
+// Business Card Styles - Extended with new designs
 const CARD_STYLES = {
-  modern: {
-    id: 'modern',
-    name: 'Modern Wave',
-    icon: 'water-outline',
+  corporate: {
+    id: 'corporate',
+    name: 'Corporate Professional',
+    icon: 'briefcase-outline',
+    Component: CorporateCard,
   },
-  minimal: {
-    id: 'minimal',
-    name: 'Classic Minimal',
-    icon: 'square-outline',
+  geometric: {
+    id: 'geometric',
+    name: 'Modern Geometric',
+    icon: 'shapes-outline',
+    Component: GeometricCard,
   },
-  gradient: {
-    id: 'gradient',
-    name: 'Bold Gradient',
-    icon: 'color-palette-outline',
+  minimalist: {
+    id: 'minimalist',
+    name: 'Clean Minimalist',
+    icon: 'remove-outline',
+    Component: MinimalistCard,
+  },
+  luxury: {
+    id: 'luxury',
+    name: 'Luxury Gold',
+    icon: 'diamond-outline',
+    Component: LuxuryCard,
+  },
+  tech: {
+    id: 'tech',
+    name: 'Tech Modern',
+    icon: 'code-slash-outline',
+    Component: TechCard,
+  },
+  creative: {
+    id: 'creative',
+    name: 'Creative Studio',
+    icon: 'brush-outline',
+    Component: CreativeCard,
   },
   elegant: {
     id: 'elegant',
-    name: 'Elegant Professional',
-    icon: 'diamond-outline',
+    name: 'Elegant Classic',
+    icon: 'rose-outline',
+    Component: ElegantCard,
+  },
+  gradientBold: {
+    id: 'gradientBold',
+    name: 'Bold Gradient',
+    icon: 'color-palette-outline',
+    Component: GradientBoldCard,
+  },
+  // Legacy designs (kept for backward compatibility)
+  modern: {
+    id: 'modern',
+    name: 'Modern Wave (Legacy)',
+    icon: 'water-outline',
+    Component: null, // Will use legacy renderModernCard
+  },
+  minimal: {
+    id: 'minimal',
+    name: 'Classic Minimal (Legacy)',
+    icon: 'square-outline',
+    Component: null, // Will use legacy renderMinimalCard
+  },
+  gradient: {
+    id: 'gradient',
+    name: 'Gradient (Legacy)',
+    icon: 'color-wand-outline',
+    Component: null, // Will use legacy renderGradientCard
   },
 };
 
@@ -62,7 +127,8 @@ export default function ProfilePortfolioModal({
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [viewMode, setViewMode] = useState('portfolio'); // 'portfolio' or 'card'
-  const [cardStyle, setCardStyle] = useState('modern'); // Business card style
+  const [cardStyle, setCardStyle] = useState('corporate'); // Business card style - default to corporate
+  const [cardSide, setCardSide] = useState('front'); // 'front' or 'back' - for card flip
   const [stylePickerVisible, setStylePickerVisible] = useState(false);
   const viewShotRef = useRef(null);
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
@@ -155,6 +221,21 @@ export default function ProfilePortfolioModal({
 
   // Render Business Card View based on selected style
   const renderBusinessCard = () => {
+    const style = CARD_STYLES[cardStyle];
+
+    // If it's a new design with a Component
+    if (style && style.Component) {
+      const CardComponent = style.Component;
+      return (
+        <CardComponent
+          profile={profile}
+          side={cardSide}
+          primaryColor={primaryColor}
+        />
+      );
+    }
+
+    // Fall back to legacy designs
     switch (cardStyle) {
       case 'modern':
         return renderModernCard();
@@ -165,7 +246,14 @@ export default function ProfilePortfolioModal({
       case 'elegant':
         return renderElegantCard();
       default:
-        return renderModernCard();
+        // Default to Corporate card if no match
+        return (
+          <CorporateCard
+            profile={profile}
+            side={cardSide}
+            primaryColor={primaryColor}
+          />
+        );
     }
   };
 
@@ -655,6 +743,29 @@ export default function ProfilePortfolioModal({
     },
     scrollViewContent: {
       flexGrow: 1,
+    },
+    cardScrollContent: {
+      flexGrow: 0,
+      alignItems: 'center',
+      paddingVertical: 32,
+      paddingHorizontal: 10,
+    },
+    cardPreviewWrapper: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    cardViewShot: {
+      alignSelf: 'center',
+      width: CARD_CANVAS_WIDTH,
+    },
+    cardPreviewCanvas: {
+      width: CARD_CANVAS_WIDTH,
+      minHeight: CARD_CANVAS_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
     },
     portfolioContainer: {
       backgroundColor: '#fff',
@@ -1504,20 +1615,38 @@ export default function ProfilePortfolioModal({
               <Ionicons name="close" size={28} color={themeColors.textPrimary} />
             </TouchableOpacity>
             <Text style={localStyles.headerTitle}>
-              {viewMode === 'portfolio' ? 'Portfolio' : 'Business Card'}
+              {viewMode === 'portfolio' ? 'Portfolio' : `Business Card (${cardSide === 'front' ? 'Front' : 'Back'})`}
             </Text>
           </View>
 
           {/* Content */}
-          <ScrollView
-            style={localStyles.scrollView}
-            contentContainerStyle={localStyles.scrollViewContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
-              {viewMode === 'card' ? (
-                renderBusinessCard()
-              ) : (
+          {viewMode === 'card' ? (
+            <View style={localStyles.cardPreviewWrapper}>
+              <ViewShot
+                ref={viewShotRef}
+                options={{
+                  format: 'png',
+                  quality: 1.0,
+                  width: CARD_EXPORT_WIDTH,
+                  height: CARD_EXPORT_HEIGHT,
+                }}
+                style={[
+                  localStyles.cardViewShot,
+                  { width: CARD_CANVAS_WIDTH, height: CARD_CANVAS_HEIGHT },
+                ]}
+              >
+                <View style={localStyles.cardPreviewCanvas}>
+                  {renderBusinessCard()}
+                </View>
+              </ViewShot>
+            </View>
+          ) : (
+            <ScrollView
+              style={localStyles.scrollView}
+              contentContainerStyle={localStyles.scrollViewContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
                 <View style={localStyles.portfolioContainer}>
                 {/* Header Section */}
                 <View style={localStyles.portfolioHeader}>
@@ -1625,10 +1754,10 @@ export default function ProfilePortfolioModal({
                     <Text style={localStyles.appName}>LocalLoop</Text>
                   </View>
                 </View>
-              </View>
-              )}
-            </ViewShot>
-          </ScrollView>
+                </View>
+              </ViewShot>
+            </ScrollView>
+          )}
 
           {/* Action Buttons Footer */}
           <View style={localStyles.actionsFooter}>
@@ -1655,17 +1784,32 @@ export default function ProfilePortfolioModal({
 
               {/* Style Picker Button (only in card mode) */}
               {viewMode === 'card' && (
-                <TouchableOpacity
-                  onPress={() => setStylePickerVisible(true)}
-                  style={[localStyles.footerIconButton, { backgroundColor: themeColors.background, borderColor: themeColors.divider }]}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={CARD_STYLES[cardStyle].icon}
-                    size={22}
-                    color={themeColors.textPrimary}
-                  />
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    onPress={() => setStylePickerVisible(true)}
+                    style={[localStyles.footerIconButton, { backgroundColor: themeColors.background, borderColor: themeColors.divider }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={CARD_STYLES[cardStyle].icon}
+                      size={22}
+                      color={themeColors.textPrimary}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Card Flip Button */}
+                  <TouchableOpacity
+                    onPress={() => setCardSide(cardSide === 'front' ? 'back' : 'front')}
+                    style={[localStyles.footerIconButton, { backgroundColor: `${primaryColor}10`, borderColor: primaryColor }]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="refresh-outline"
+                      size={22}
+                      color={primaryColor}
+                    />
+                  </TouchableOpacity>
+                </>
               )}
 
               {/* Spacer to push download/share to the right */}
@@ -1717,56 +1861,58 @@ export default function ProfilePortfolioModal({
                 </TouchableOpacity>
               </View>
 
-              <View style={localStyles.stylePickerGrid}>
-                {Object.values(CARD_STYLES).map((style) => (
-                  <TouchableOpacity
-                    key={style.id}
-                    onPress={() => {
-                      setCardStyle(style.id);
-                      setStylePickerVisible(false);
-                    }}
-                    style={[
-                      localStyles.stylePickerOption,
-                      {
-                        backgroundColor: themeColors.background,
-                        borderColor: cardStyle === style.id ? primaryColor : themeColors.divider,
-                      },
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <View
+              <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+                <View style={localStyles.stylePickerGrid}>
+                  {Object.values(CARD_STYLES).filter(style => !style.name.includes('Legacy')).map((style) => (
+                    <TouchableOpacity
+                      key={style.id}
+                      onPress={() => {
+                        setCardStyle(style.id);
+                        setStylePickerVisible(false);
+                      }}
                       style={[
-                        localStyles.stylePickerIcon,
+                        localStyles.stylePickerOption,
                         {
-                          backgroundColor: cardStyle === style.id ? `${primaryColor}20` : themeColors.card,
+                          backgroundColor: themeColors.background,
+                          borderColor: cardStyle === style.id ? primaryColor : themeColors.divider,
                         },
                       ]}
+                      activeOpacity={0.7}
                     >
-                      <Ionicons
-                        name={style.icon}
-                        size={28}
-                        color={cardStyle === style.id ? primaryColor : themeColors.textSecondary}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        localStyles.stylePickerName,
-                        {
-                          color: cardStyle === style.id ? primaryColor : themeColors.textPrimary,
-                          fontWeight: cardStyle === style.id ? '700' : '600',
-                        },
-                      ]}
-                    >
-                      {style.name}
-                    </Text>
-                    {cardStyle === style.id && (
-                      <View style={[localStyles.stylePickerCheck, { backgroundColor: primaryColor }]}>
-                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      <View
+                        style={[
+                          localStyles.stylePickerIcon,
+                          {
+                            backgroundColor: cardStyle === style.id ? `${primaryColor}20` : themeColors.card,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={style.icon}
+                          size={28}
+                          color={cardStyle === style.id ? primaryColor : themeColors.textSecondary}
+                        />
                       </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text
+                        style={[
+                          localStyles.stylePickerName,
+                          {
+                            color: cardStyle === style.id ? primaryColor : themeColors.textPrimary,
+                            fontWeight: cardStyle === style.id ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {style.name}
+                      </Text>
+                      {cardStyle === style.id && (
+                        <View style={[localStyles.stylePickerCheck, { backgroundColor: primaryColor }]}>
+                          <Ionicons name="checkmark" size={14} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
           </View>
         )}
