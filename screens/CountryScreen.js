@@ -266,9 +266,10 @@ export default function CountryScreen({ navigation }) {
   }, [haptics]);
 
   const loadFilteredContent = useCallback(async () => {
-    if (!userProfile?.city) return;
+    // Use user's city if set, otherwise use a default city for new users
+    const cityToUse = userProfile?.city || 'Johannesburg'; // Default to Johannesburg for new users
 
-    const cacheKey = `${EXPLORE_CONTENT_CACHE_KEY}_${userProfile.city}`;
+    const cacheKey = `${EXPLORE_CONTENT_CACHE_KEY}_${cityToUse}`;
     let hasValidCache = false;
 
     // Try to load from cache first
@@ -305,7 +306,7 @@ export default function CountryScreen({ navigation }) {
       // Load posts if filter is enabled
       if (exploreFilters.showPostsFromCurrentCity) {
         promises.push(
-          getPostsFromCity(userProfile.city, 10).then((posts) => {
+          getPostsFromCity(cityToUse, 10).then((posts) => {
             freshData.posts = posts;
             if (isMounted.current) setFilteredPosts(posts);
           })
@@ -317,7 +318,7 @@ export default function CountryScreen({ navigation }) {
       // Load AI artwork if filter is enabled
       if (exploreFilters.showAIArtGallery) {
         promises.push(
-          getAIArtworkFromCity(userProfile.city, 20).then((artworks) => {
+          getAIArtworkFromCity(cityToUse, 20).then((artworks) => {
             freshData.artwork = artworks;
             if (isMounted.current) setFilteredArtwork(artworks);
           })
@@ -329,7 +330,7 @@ export default function CountryScreen({ navigation }) {
       // Load users if filter is enabled
       if (exploreFilters.showLocalUsers) {
         promises.push(
-          getLocalUsers(userProfile.city, currentUser?.uid, 20).then((users) => {
+          getLocalUsers(cityToUse, currentUser?.uid, 20).then((users) => {
             freshData.users = users;
             if (isMounted.current) {
               setFilteredUsers(users);
@@ -460,7 +461,8 @@ export default function CountryScreen({ navigation }) {
       // Reload artwork gallery to show the new cartoon
       if (exploreFilters.showAIArtGallery) {
         try {
-          const artworks = await getAIArtworkFromCity(userProfile.city, 20);
+          const cityToUse = userProfile?.city || 'Johannesburg';
+          const artworks = await getAIArtworkFromCity(cityToUse, 20);
           setFilteredArtwork(artworks);
         } catch (artworkError) {
           console.warn('[CountryScreen] Failed to reload artwork:', artworkError);
@@ -1025,7 +1027,7 @@ export default function CountryScreen({ navigation }) {
               )}
 
               {/* Mixed Feed: Artworks, Posts, Users, and Ads */}
-              {exploreFilters.showAIArtGallery && userProfile?.city && (
+              {exploreFilters.showAIArtGallery && (
                 <View style={styles.mixedFeedContainer}>
                   {loadingFilteredContent ? (
                     <>
@@ -1080,13 +1082,13 @@ export default function CountryScreen({ navigation }) {
                           <View key={feedItem.key} style={styles.filteredSection}>
                             <View style={styles.filteredHeader}>
                               <View>
-                                <Text style={styles.filteredTitle}>Posts from {userProfile.city}</Text>
-                                <Text style={styles.filteredSubtitle}>Latest updates in your city</Text>
+                                <Text style={styles.filteredTitle}>Posts from {userProfile?.city || 'Johannesburg'}</Text>
+                                <Text style={styles.filteredSubtitle}>Latest updates {userProfile?.city ? 'in your city' : 'to explore'}</Text>
                               </View>
                               {searchFilteredPosts.length > 0 && (
                                 <TouchableOpacity
                                   style={styles.seeAllButton}
-                                  onPress={() => navigation.navigate('Room', { city: userProfile.city })}
+                                  onPress={() => navigation.navigate('Room', { city: userProfile?.city || 'Johannesburg' })}
                                   activeOpacity={0.85}
                                 >
                                   <Text style={styles.seeAllText}>See all</Text>
@@ -1124,8 +1126,8 @@ export default function CountryScreen({ navigation }) {
                           <View key={feedItem.key} style={styles.filteredSection}>
                             <View style={styles.filteredHeader}>
                               <View>
-                                <Text style={styles.filteredTitle}>Local users in {userProfile.city}</Text>
-                                <Text style={styles.filteredSubtitle}>Connect with people nearby</Text>
+                                <Text style={styles.filteredTitle}>Local users in {userProfile?.city || 'Johannesburg'}</Text>
+                                <Text style={styles.filteredSubtitle}>Connect with people {userProfile?.city ? 'nearby' : 'to explore'}</Text>
                               </View>
                             </View>
                             <FlatList
