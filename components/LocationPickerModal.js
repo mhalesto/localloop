@@ -12,6 +12,8 @@ import {
   ScrollView,
   TextInput,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
@@ -383,10 +385,14 @@ export default function LocationPickerModal({
       transparent
       onRequestClose={handleCancel}
     >
-      <View style={localStyles.modalOverlay}>
-        <View style={localStyles.modalContainer}>
-          {/* Header */}
-          <View style={localStyles.header}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={localStyles.modalOverlay}>
+          <View style={localStyles.modalContainer}>
+            {/* Header */}
+            <View style={localStyles.header}>
             <View style={localStyles.headerActions}>
               {step !== 'country' && (
                 <TouchableOpacity
@@ -594,7 +600,8 @@ export default function LocationPickerModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
