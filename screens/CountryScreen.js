@@ -309,9 +309,10 @@ export default function CountryScreen({ navigation }) {
       const freshData = { posts: [], artwork: [], users: [] };
 
       // Load posts if filter is enabled (from all cities, prioritized by user's city)
+      // Using higher limits (100) for better content discovery without pagination
       if (exploreFilters.showPostsFromCurrentCity) {
         promises.push(
-          getPostsFromAllCities(userCity, 30).then((posts) => {
+          getPostsFromAllCities(userCity, 100).then((posts) => {
             freshData.posts = posts;
             if (isMounted.current) setFilteredPosts(posts);
           })
@@ -321,9 +322,10 @@ export default function CountryScreen({ navigation }) {
       }
 
       // Load AI artwork if filter is enabled (from all cities, prioritized by user's city)
+      // Using higher limit (120) for rich visual content feed
       if (exploreFilters.showAIArtGallery) {
         promises.push(
-          getAIArtworkFromAllCities(userCity, 40).then((artworks) => {
+          getAIArtworkFromAllCities(userCity, 120).then((artworks) => {
             freshData.artwork = artworks;
             if (isMounted.current) setFilteredArtwork(artworks);
           })
@@ -333,9 +335,10 @@ export default function CountryScreen({ navigation }) {
       }
 
       // Load users if filter is enabled (from all cities, prioritized by user's city)
+      // Using higher limit (100) for better user discovery
       if (exploreFilters.showLocalUsers) {
         promises.push(
-          getUsersFromAllCities(userCity, currentUser?.uid, 30).then((users) => {
+          getUsersFromAllCities(userCity, currentUser?.uid, 100).then((users) => {
             freshData.users = users;
             if (isMounted.current) {
               setFilteredUsers(users);
@@ -467,7 +470,7 @@ export default function CountryScreen({ navigation }) {
       if (exploreFilters.showAIArtGallery) {
         try {
           const userCity = userProfile?.city || null;
-          const artworks = await getAIArtworkFromAllCities(userCity, 40);
+          const artworks = await getAIArtworkFromAllCities(userCity, 120);
           setFilteredArtwork(artworks);
         } catch (artworkError) {
           console.warn('[CountryScreen] Failed to reload artwork:', artworkError);

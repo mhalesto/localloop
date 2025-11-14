@@ -3,7 +3,7 @@
  * Fetch filtered content for the Explore screen
  */
 
-import { getFirestore, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, query, where, orderBy, limit, getDocs, startAfter } from 'firebase/firestore';
 import { app } from '../api/firebaseConfig';
 
 const db = getFirestore(app);
@@ -25,12 +25,12 @@ const normalizeTimestamp = (value) => {
  * Get posts from all cities (global feed)
  * If userCity is provided, prioritizes posts from that city first
  * @param {string|null} userCity - Optional user's city for prioritization
- * @param {number} maxResults - Maximum number of posts to return
+ * @param {number} maxResults - Maximum number of posts to return (default: 100 for better UX)
  * @returns {Promise<Array>}
  */
-export async function getPostsFromAllCities(userCity = null, maxResults = 30) {
+export async function getPostsFromAllCities(userCity = null, maxResults = 100) {
   try {
-    // Get all recent public posts
+    // Get a large batch of recent posts for good content discovery
     const postsQuery = query(
       collection(db, 'publicPosts'),
       limit(maxResults * 2) // Get more to allow for prioritization
@@ -129,10 +129,10 @@ export async function getPostsFromCity(city, maxResults = 10) {
  * Get AI artwork from all cities (global feed)
  * If userCity is provided, prioritizes artwork from that city first
  * @param {string|null} userCity - Optional user's city for prioritization
- * @param {number} maxResults - Maximum number of artworks to return
+ * @param {number} maxResults - Maximum number of artworks to return (default: 120 for better UX)
  * @returns {Promise<Array>}
  */
-export async function getAIArtworkFromAllCities(userCity = null, maxResults = 40) {
+export async function getAIArtworkFromAllCities(userCity = null, maxResults = 120) {
   try {
     // Get all users with public profiles who have cartoon pictures
     const usersQuery = query(
@@ -248,10 +248,10 @@ export async function getAIArtworkFromCity(city, maxResults = 20) {
  * If userCity is provided, prioritizes users from that city first
  * @param {string|null} userCity - Optional user's city for prioritization
  * @param {string} currentUserId - Current user ID to exclude
- * @param {number} maxResults - Maximum number of users to return
+ * @param {number} maxResults - Maximum number of users to return (default: 100 for better UX)
  * @returns {Promise<Array>}
  */
-export async function getUsersFromAllCities(userCity = null, currentUserId, maxResults = 30) {
+export async function getUsersFromAllCities(userCity = null, currentUserId, maxResults = 100) {
   try {
     const usersQuery = query(
       collection(db, 'users'),
