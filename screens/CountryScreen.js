@@ -35,7 +35,12 @@ import { useSensors } from '../contexts/SensorsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAlert } from '../contexts/AlertContext';
 import { fetchCountries, fetchCities } from '../services/locationService';
-import { getPostsFromCity, getAIArtworkFromCity, getLocalUsers } from '../services/exploreContentService';
+import {
+  getPostsFromAllCities,
+  getAIArtworkFromAllCities,
+  getUsersFromAllCities,
+  getAIArtworkFromCity
+} from '../services/exploreContentService';
 import { generateCartoonProfile } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
@@ -266,10 +271,10 @@ export default function CountryScreen({ navigation }) {
   }, [haptics]);
 
   const loadFilteredContent = useCallback(async () => {
-    // Use user's city if set, otherwise use a default city for new users
-    const cityToUse = userProfile?.city || 'Johannesburg'; // Default to Johannesburg for new users
+    // Use user's city for prioritization if set, otherwise show global content
+    const userCity = userProfile?.city || null;
 
-    const cacheKey = `${EXPLORE_CONTENT_CACHE_KEY}_${cityToUse}`;
+    const cacheKey = `${EXPLORE_CONTENT_CACHE_KEY}_${userCity || 'global'}`;
     let hasValidCache = false;
 
     // Try to load from cache first
@@ -303,10 +308,10 @@ export default function CountryScreen({ navigation }) {
       const promises = [];
       const freshData = { posts: [], artwork: [], users: [] };
 
-      // Load posts if filter is enabled
+      // Load posts if filter is enabled (from all cities, prioritized by user's city)
       if (exploreFilters.showPostsFromCurrentCity) {
         promises.push(
-          getPostsFromCity(cityToUse, 10).then((posts) => {
+          getPostsFromAllCities(userCity, 30).then((posts) => {
             freshData.posts = posts;
             if (isMounted.current) setFilteredPosts(posts);
           })
@@ -315,10 +320,10 @@ export default function CountryScreen({ navigation }) {
         setFilteredPosts([]);
       }
 
-      // Load AI artwork if filter is enabled
+      // Load AI artwork if filter is enabled (from all cities, prioritized by user's city)
       if (exploreFilters.showAIArtGallery) {
         promises.push(
-          getAIArtworkFromCity(cityToUse, 20).then((artworks) => {
+          getAIArtworkFromAllCities(userCity, 40).then((artworks) => {
             freshData.artwork = artworks;
             if (isMounted.current) setFilteredArtwork(artworks);
           })
@@ -327,10 +332,10 @@ export default function CountryScreen({ navigation }) {
         setFilteredArtwork([]);
       }
 
-      // Load users if filter is enabled
+      // Load users if filter is enabled (from all cities, prioritized by user's city)
       if (exploreFilters.showLocalUsers) {
         promises.push(
-          getLocalUsers(cityToUse, currentUser?.uid, 20).then((users) => {
+          getUsersFromAllCities(userCity, currentUser?.uid, 30).then((users) => {
             freshData.users = users;
             if (isMounted.current) {
               setFilteredUsers(users);
@@ -461,8 +466,8 @@ export default function CountryScreen({ navigation }) {
       // Reload artwork gallery to show the new cartoon
       if (exploreFilters.showAIArtGallery) {
         try {
-          const cityToUse = userProfile?.city || 'Johannesburg';
-          const artworks = await getAIArtworkFromCity(cityToUse, 20);
+          const userCity = userProfile?.city || null;
+          const artworks = await getAIArtworkFromAllCities(userCity, 40);
           setFilteredArtwork(artworks);
         } catch (artworkError) {
           console.warn('[CountryScreen] Failed to reload artwork:', artworkError);
@@ -1082,13 +1087,22 @@ export default function CountryScreen({ navigation }) {
                           <View key={feedItem.key} style={styles.filteredSection}>
                             <View style={styles.filteredHeader}>
                               <View>
-                                <Text style={styles.filteredTitle}>Posts from {userProfile?.city || 'Johannesburg'}</Text>
-                                <Text style={styles.filteredSubtitle}>Latest updates {userProfile?.city ? 'in your city' : 'to explore'}</Text>
+                                <Text style={styles.filteredTitle}>
+                                  {userProfile?.city ? `Posts from ${userProfile.city}` : 'Global Posts'}
+                                </Text>
+                                <Text style={styles.filteredSubtitle}>
+                                  {userProfile?.city ? 'Your city first, then nearby' : 'Latest updates from everywhere'}
+                                </Text>
                               </View>
                               {searchFilteredPosts.length > 0 && (
                                 <TouchableOpacity
                                   style={styles.seeAllButton}
-                                  onPress={() => navigation.navigate('Room', { city: userProfile?.city || 'Johannesburg' })}
+                                  onPress={() => {
+                                    if (userProfile?.city) {
+                                      navigation.navigate('Room', { city: userProfile.city });
+                                    }
+                                  }}
+                                  disabled={!userProfile?.city}
                                   activeOpacity={0.85}
                                 >
                                   <Text style={styles.seeAllText}>See all</Text>
@@ -1126,8 +1140,12 @@ export default function CountryScreen({ navigation }) {
                           <View key={feedItem.key} style={styles.filteredSection}>
                             <View style={styles.filteredHeader}>
                               <View>
-                                <Text style={styles.filteredTitle}>Local users in {userProfile?.city || 'Johannesburg'}</Text>
-                                <Text style={styles.filteredSubtitle}>Connect with people {userProfile?.city ? 'nearby' : 'to explore'}</Text>
+                                <Text style={styles.filteredTitle}>
+                                  {userProfile?.city ? `Users in ${userProfile.city}` : 'Users Worldwide'}
+                                </Text>
+                                <Text style={styles.filteredSubtitle}>
+                                  {userProfile?.city ? 'Your city first, then others' : 'Connect with people everywhere'}
+                                </Text>
                               </View>
                             </View>
                             <FlatList
