@@ -19,7 +19,7 @@ import ScreenLayout from '../components/ScreenLayout';
 import InterestsSelectorModal from '../components/InterestsSelectorModal';
 import LinksManagerModal from '../components/LinksManagerModal';
 import PronounsPicker from '../components/PronounsPicker';
-import LocationPickerModal from '../components/LocationPickerModal';
+import ShareLocationModal from '../components/ShareLocationModal';
 import { ALL_INTERESTS, LINK_TYPES, DEFAULT_PRIVACY_SETTINGS } from '../constants/profileConstants';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -87,57 +87,22 @@ export default function ProfileSetupScreen({ navigation, route }) {
   const [linksModalVisible, setLinksModalVisible] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
 
-  // Location data
-  const countries = {
-    'ZA': 'South Africa',
-    'US': 'United States',
-    'GB': 'United Kingdom',
-    'NG': 'Nigeria',
-    'KE': 'Kenya',
-  };
-
-  const provinces = {
-    'ZA': ['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Free State', 'Limpopo', 'Mpumalanga', 'Northern Cape', 'North West'],
-    'US': ['California', 'Texas', 'Florida', 'New York', 'Pennsylvania', 'Illinois', 'Ohio', 'Georgia', 'North Carolina', 'Michigan'],
-    'GB': ['England', 'Scotland', 'Wales', 'Northern Ireland'],
-    'NG': ['Lagos', 'Kano', 'Rivers', 'Oyo', 'Kaduna', 'Abuja'],
-    'KE': ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret'],
-  };
-
-  const getAvailableProvinces = () => {
-    return country ? (provinces[country] || []) : [];
-  };
-
-  // Reset province and city when country changes
-  const handleCountryChange = (value) => {
-    setCountry(value);
-    setProvince('');
-    setCity('');
-  };
-
-  // Reset city when province changes
-  const handleProvinceChange = (value) => {
-    setProvince(value);
-    setCity('');
-  };
-
-  // Handle location modal save
-  const handleLocationSave = (selectedCountry, selectedProvince, selectedCity) => {
+  // Handle location modal save - ShareLocationModal callback signature
+  const handleLocationSave = (cityName, meta) => {
     console.log('[ProfileSetup] Location saved:', {
-      country: selectedCountry,
-      province: selectedProvince,
-      city: selectedCity,
+      city: cityName,
+      country: meta.country,
+      province: meta.province,
     });
-    setCountry(selectedCountry);
-    setProvince(selectedProvince);
-    setCity(selectedCity);
+    setCity(cityName);
+    setCountry(meta.country || '');
+    setProvince(meta.province || '');
   };
 
   // Get location display text
   const getLocationDisplayText = () => {
     if (!country) return 'Select your location...';
-    const countryName = countries[country];
-    const parts = [countryName];
+    const parts = [country]; // ShareLocationModal returns full country name
     if (province) parts.push(province);
     if (city) parts.push(city);
     return parts.join(', ');
@@ -336,7 +301,7 @@ export default function ProfileSetupScreen({ navigation, route }) {
         country: country || '',
         province: province || '',
         city: city || '',
-        countryName: country ? countries[country] : '',
+        countryName: country || '', // ShareLocationModal returns full country name
         followersCount: userProfile?.followersCount || 0,
         followingCount: userProfile?.followingCount || 0,
         publicPostsCount: userProfile?.publicPostsCount || 0,
@@ -1196,13 +1161,18 @@ export default function ProfileSetupScreen({ navigation, route }) {
         onSave={setLinks}
       />
 
-      <LocationPickerModal
+      <ShareLocationModal
         visible={locationModalVisible}
         onClose={() => setLocationModalVisible(false)}
-        currentCountry={country}
-        currentProvince={province}
-        currentCity={city}
-        onSave={handleLocationSave}
+        onSelectCity={(cityName, meta) => {
+          handleLocationSave(cityName, meta);
+          setLocationModalVisible(false);
+        }}
+        originCity={city}
+        initialCountry={country}
+        initialProvince={province}
+        accentColor={primaryColor}
+        title="Choose your location"
       />
     </ScreenLayout>
   );

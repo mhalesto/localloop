@@ -385,12 +385,8 @@ export default function LocationPickerModal({
       transparent
       onRequestClose={handleCancel}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <View style={localStyles.modalOverlay}>
-          <View style={localStyles.modalContainer}>
+      <View style={localStyles.modalOverlay}>
+        <View style={localStyles.modalContainer}>
             {/* Header */}
             <View style={localStyles.header}>
             <View style={localStyles.headerActions}>
@@ -436,11 +432,49 @@ export default function LocationPickerModal({
           )}
 
           {/* Content */}
-          <ScrollView
-            style={localStyles.scrollView}
-            contentContainerStyle={localStyles.scrollViewContent}
-            showsVerticalScrollIndicator={false}
-          >
+          {step === 'city' ? (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={localStyles.scrollView}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+              <ScrollView
+                contentContainerStyle={localStyles.scrollViewContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {selectedCountry && (
+                  <View style={localStyles.selectedInfo}>
+                    <Text style={localStyles.selectedInfoTitle}>Location</Text>
+                    <Text style={localStyles.selectedInfoText}>
+                      {COUNTRIES[selectedCountry]?.emoji} {COUNTRIES[selectedCountry]?.name}
+                      {selectedProvince && `, ${selectedProvince}`}
+                    </Text>
+                  </View>
+                )}
+                <View style={localStyles.cityInputContainer}>
+                  <Text style={localStyles.label}>City</Text>
+                  <TextInput
+                    style={localStyles.cityInput}
+                    placeholder="Enter your city..."
+                    placeholderTextColor={themeColors.textSecondary}
+                    value={selectedCity}
+                    onChangeText={setSelectedCity}
+                    autoCapitalize="words"
+                    maxLength={50}
+                    autoFocus
+                  />
+                  <Text style={localStyles.hint}>
+                    This helps neighbors find you and improves local recommendations
+                  </Text>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          ) : (
+            <ScrollView
+              style={localStyles.scrollView}
+              contentContainerStyle={localStyles.scrollViewContent}
+              showsVerticalScrollIndicator={false}
+            >
             {/* Country Selection */}
             {step === 'country' && (
               <>
@@ -523,38 +557,8 @@ export default function LocationPickerModal({
                 )}
               </>
             )}
-
-            {/* City Input */}
-            {step === 'city' && (
-              <>
-                {selectedCountry && (
-                  <View style={localStyles.selectedInfo}>
-                    <Text style={localStyles.selectedInfoTitle}>Location</Text>
-                    <Text style={localStyles.selectedInfoText}>
-                      {COUNTRIES[selectedCountry]?.emoji} {COUNTRIES[selectedCountry]?.name}
-                      {selectedProvince && `, ${selectedProvince}`}
-                    </Text>
-                  </View>
-                )}
-                <View style={localStyles.cityInputContainer}>
-                  <Text style={localStyles.label}>City</Text>
-                  <TextInput
-                    style={localStyles.cityInput}
-                    placeholder="Enter your city..."
-                    placeholderTextColor={themeColors.textSecondary}
-                    value={selectedCity}
-                    onChangeText={setSelectedCity}
-                    autoCapitalize="words"
-                    maxLength={50}
-                    autoFocus
-                  />
-                  <Text style={localStyles.hint}>
-                    This helps neighbors find you and improves local recommendations
-                  </Text>
-                </View>
-              </>
-            )}
           </ScrollView>
+          )}
 
           {/* Footer */}
           <View style={localStyles.footer}>
@@ -600,8 +604,7 @@ export default function LocationPickerModal({
             </TouchableOpacity>
           </View>
         </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
