@@ -1383,14 +1383,9 @@ export function SettingsProvider({ children }) {
       return [];
     }
 
-    // Premium (Go) and Gold (Premium) users get all premium tier themes
-    // Gold (ultimate) users get premium + gold tier themes
-    if (plan === 'premium' || plan === 'gold') {
+    // Go (internal ID: 'premium'), Premium (internal ID: 'gold'), and Gold (internal ID: 'ultimate') users all get premium tier themes
+    if (plan === 'premium' || plan === 'gold' || plan === 'ultimate') {
       return premiumAccentPresets.filter(preset => preset.tier === 'premium');
-    }
-
-    if (plan === 'ultimate') {
-      return premiumAccentPresets; // Gold users get all premium themes
     }
 
     return [];

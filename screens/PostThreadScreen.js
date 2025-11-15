@@ -3465,7 +3465,7 @@ export default function PostThreadScreen({ route, navigation }) {
                       <SentimentBadge
                         sentiment={post.sentiment}
                         size="small"
-                        style={{ marginTop: 6 }}
+                        style={{ marginTop: 6, marginBottom: 16  }}
                       />
                     ) : null}
 

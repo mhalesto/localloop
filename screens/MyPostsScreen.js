@@ -75,7 +75,7 @@ function Section({ title, items, emptyMessage, onOpenPost, highlightId }) {
               <ContentWarningList warnings={post.contentWarnings} size="small" maxDisplay={2} style={styles.tagList} />
             ) : null}
             {post.sentiment ? (
-              <SentimentBadge sentiment={post.sentiment} size="small" style={{ marginTop: 4 }} />
+              <SentimentBadge sentiment={post.sentiment} size="small" style={{ marginTop: 4, marginBottom: 4 }} />
             ) : null}
             {post.message ? (
               <Text style={styles.messageText} numberOfLines={3}>

@@ -849,9 +849,8 @@ exports.payFastWebhook = functions.https.onRequest(async (req, res) => {
     console.log('[payFastWebhook] Calculated signature:', signature);
 
     if (signature !== pfData.signature) {
-      console.warn('[payFastWebhook] Signature mismatch - proceeding anyway for debugging');
-      // TEMPORARY: Don't reject for debugging purposes
-      // return res.status(400).send('Invalid signature');
+      console.error('[payFastWebhook] Signature mismatch - rejecting request');
+      return res.status(400).send('Invalid signature');
     }
 
     // Check payment status

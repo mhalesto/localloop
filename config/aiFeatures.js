@@ -224,8 +224,8 @@ export function isFeatureEnabled(featureName, isPremium = false, userPreferences
     return true;
   }
 
-  // Check Gold requirement
-  if (feature.requiresGold && subscriptionPlan !== 'gold') {
+  // Check Gold requirement (Premium tier = 'gold' ID, Gold tier = 'ultimate' ID)
+  if (feature.requiresGold && subscriptionPlan !== 'gold' && subscriptionPlan !== 'ultimate') {
     return false;
   }
 

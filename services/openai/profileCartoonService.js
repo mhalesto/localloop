@@ -207,12 +207,12 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     await new Promise(resolve => setTimeout(resolve, waitTime));
   }
 
-  // Check GPT-4 Vision limit for Gold users
+  // Check GPT-4 Vision limit for Gold/Ultimate users (Premium tier = 'gold', Gold tier = 'ultimate')
   let actualModel = model;
   const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
   const gpt4Limit = limits.gpt4VisionMonthly || 0;
 
-  if (subscriptionPlan === 'gold' && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
+  if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
     console.log(`[profileCartoonService] GPT-4 Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}), falling back to GPT-3.5`);
     actualModel = 'gpt-3.5-turbo';
   }
@@ -238,8 +238,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         personalizedDescription = await analyzePhotoForCartoon(imageUrl, visionModel);
         console.log('[profileCartoonService] Vision analysis complete:', personalizedDescription);
 
-        // Only track GPT-4 usage for Gold users using the full GPT-4 model
-        if (subscriptionPlan === 'gold' && actualModel === 'gpt-4') {
+        // Only track GPT-4 usage for Gold/Ultimate users using the full GPT-4 model
+        if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && actualModel === 'gpt-4') {
           usedGpt4 = true;
         }
       }
@@ -294,8 +294,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
       try {
         console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
-        // Gold users get HD quality for better results
-        const imageQuality = subscriptionPlan === 'gold' ? 'hd' : 'standard';
+        // Gold/Ultimate users get HD quality for better results (Premium tier = 'gold', Gold tier = 'ultimate')
+        const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
         console.log(`[profileCartoonService] Using ${imageQuality} quality (${subscriptionPlan} plan)`);
 
         const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {

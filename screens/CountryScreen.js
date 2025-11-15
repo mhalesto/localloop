@@ -710,6 +710,13 @@ export default function CountryScreen({ navigation }) {
     loadFilteredContent();
   }, [loadFilteredContent]);
 
+  // Reload content when screen comes into focus (e.g., after creating a post)
+  useFocusEffect(
+    useCallback(() => {
+      loadFilteredContent();
+    }, [loadFilteredContent])
+  );
+
   const personalFiltered = useMemo(() => {
     if (!query.trim()) return personalCities;
     const lower = query.trim().toLowerCase();

@@ -417,11 +417,11 @@ Instructions:
 }
 
 /**
- * Check if user has Gold subscription
- * Helper function to verify Gold tier access
+ * Check if user has Gold/Ultimate subscription
+ * Helper function to verify Gold tier access (Premium tier = 'gold', Gold tier = 'ultimate')
  */
 export function isGoldUser(userProfile) {
-  return userProfile?.subscriptionPlan === 'gold';
+  return userProfile?.subscriptionPlan === 'gold' || userProfile?.subscriptionPlan === 'ultimate';
 }
 
 /**
