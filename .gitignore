@@ -58,3 +58,6 @@ coverage/
 backend/models/
 backend/uploads/
 serviceAccountKey.json
+
+# Website (moved to separate repo)
+localloop-site/
