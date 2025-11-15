@@ -1551,14 +1551,24 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
       users.push({id: doc.id, ...doc.data()});
     });
 
-    // Get all posts (last 90 days)
+    // Get all posts from both collections (last 90 days)
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    // Fetch private posts
     const postsSnapshot = await db.collection('posts')
         .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
         .get();
     const posts = [];
     postsSnapshot.forEach((doc) => {
-      posts.push({id: doc.id, ...doc.data()});
+      posts.push({id: doc.id, type: 'private', ...doc.data()});
+    });
+
+    // Fetch public posts
+    const publicPostsSnapshot = await db.collection('publicPosts')
+        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+        .get();
+    publicPostsSnapshot.forEach((doc) => {
+      posts.push({id: doc.id, type: 'public', ...doc.data()});
     });
 
     // Calculate user growth (last 30 days, grouped by day)
