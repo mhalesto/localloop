@@ -934,6 +934,20 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
 
+    // Check if profile photo is uploaded to cloud storage (required for Vision analysis)
+    if (needsProfilePhoto && userProfile?.profilePhoto) {
+      const isCloudUrl = userProfile.profilePhoto.startsWith('https://');
+      if (!isCloudUrl) {
+        showAlert(
+          'Photo Uploading',
+          'Your profile photo is still uploading to cloud storage. Please wait a few seconds and try again.\n\nVision AI needs the photo to be fully uploaded to analyze your features accurately.',
+          [],
+          { type: 'info', icon: 'cloud-upload' }
+        );
+        return;
+      }
+    }
+
     // Validate Gold users for custom prompts
     if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold' && !isAdmin) {
       showAlert('Premium Feature', 'Custom prompts and custom images are exclusive to Gold members. Upgrade to Gold to unlock unlimited creative generation!', [], { type: 'warning' });

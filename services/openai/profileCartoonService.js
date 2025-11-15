@@ -228,15 +228,19 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
     try {
       // Check if we have a valid public URL
       if (!imageUrl.startsWith('https://')) {
-        console.log('[profileCartoonService] Skipping Vision analysis - profile photo not yet uploaded to cloud storage (local file path)');
+        console.warn('[profileCartoonService] ⚠️ SKIPPING Vision analysis - profile photo not yet uploaded to cloud storage');
+        console.warn('[profileCartoonService] Photo URL:', imageUrl.substring(0, 50) + '...');
+        console.warn('[profileCartoonService] This will result in a generic cartoon that may not resemble the user');
+        throw new Error('Profile photo must be uploaded to cloud storage before generating cartoon. Please wait a few seconds for upload to complete.');
       } else {
         // Use GPT-4o mini for all users (cost-effective and accurate vision analysis)
         const visionModel = 'gpt-4o-mini';
-        console.log(`[profileCartoonService] Analyzing photo with ${visionModel} Vision for personalized cartoon (ALL users)`);
+        console.log(`[profileCartoonService] ✅ Analyzing photo with ${visionModel} Vision for personalized cartoon (ALL users)`);
+        console.log(`[profileCartoonService] Photo URL: ${imageUrl.substring(0, 80)}...`);
 
         // Use Vision analysis for ALL users to ensure accurate likeness
         personalizedDescription = await analyzePhotoForCartoon(imageUrl, visionModel);
-        console.log('[profileCartoonService] Vision analysis complete:', personalizedDescription);
+        console.log('[profileCartoonService] ✅ Vision analysis complete:', personalizedDescription);
 
         // Only track GPT-4 usage for Gold/Ultimate users using the full GPT-4 model
         if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && actualModel === 'gpt-4') {
@@ -244,8 +248,14 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         }
       }
     } catch (visionError) {
-      console.warn('[profileCartoonService] Vision analysis failed:', visionError.message);
-      // Continue without personalization - fallback to gender-based prompt
+      console.error('[profileCartoonService] ❌ Vision analysis failed:', visionError.message);
+      console.error('[profileCartoonService] Stack:', visionError.stack);
+      // Re-throw the error if it's about cloud storage URL
+      if (visionError.message.includes('cloud storage') || visionError.message.includes('uploaded')) {
+        throw visionError;
+      }
+      // For other errors, continue without personalization - fallback to gender-based prompt
+      console.warn('[profileCartoonService] Falling back to generic prompt without Vision analysis');
     }
   }
 
