@@ -57,3 +57,4 @@ coverage/
 # Specific project dirs
 backend/models/
 backend/uploads/
+serviceAccountKey.json

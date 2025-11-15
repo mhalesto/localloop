@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -12,14 +12,18 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
 
 export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigation }) {
-  const { themeColors, userProfile } = useSettings();
+  const { themeColors, userProfile, accentPreset } = useSettings();
   const { currentUser, isAdmin } = useAuth();
   const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
   const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '', prompt: '' });
+  const [showFullScreenPrompt, setShowFullScreenPrompt] = useState(false); // Toggle prompt card in full screen
   const [downloadLimits, setDownloadLimits] = useState({ allowed: true, remaining: -1, limit: -1 });
   const [isDownloading, setIsDownloading] = useState(false);
   const [loadingImages, setLoadingImages] = useState({}); // Track loading state for grid images
   const [fullScreenLoading, setFullScreenLoading] = useState(true); // Track loading for full screen image
+  const [likedArtworks, setLikedArtworks] = useState({}); // Track which artworks user has liked
+  const [heartAnimations, setHeartAnimations] = useState({}); // Track heart animation state
+  const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
   // Check download limits on mount and when modal opens
   useEffect(() => {
@@ -98,6 +102,38 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
     }
   };
 
+  const handleLikeArtwork = (artworkId) => {
+    const isLiked = likedArtworks[artworkId];
+
+    // Toggle like state
+    setLikedArtworks(prev => ({
+      ...prev,
+      [artworkId]: !isLiked,
+    }));
+
+    // Trigger heart bounce animation
+    if (!isLiked) {
+      setHeartAnimations(prev => ({
+        ...prev,
+        [artworkId]: true,
+      }));
+
+      // Reset animation after animation completes
+      setTimeout(() => {
+        setHeartAnimations(prev => ({
+          ...prev,
+          [artworkId]: false,
+        }));
+      }, 400);
+    }
+
+    // TODO: In production, send like to Firestore
+    // await updateDoc(doc(db, 'aiArtwork', artworkId), {
+    //   likes: increment(isLiked ? -1 : 1),
+    //   likedBy: isLiked ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid),
+    // });
+  };
+
   // Split artworks into two columns for masonry layout
   const leftColumn = [];
   const rightColumn = [];
@@ -164,32 +200,52 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
           )}
         </TouchableOpacity>
 
-        {/* Artist Info - goes to profile */}
-        <TouchableOpacity
-          style={styles.artworkInfo}
-          activeOpacity={0.7}
-          onPress={() => onArtworkPress(artwork)}
-        >
-          {artwork.style && (
-            <View style={[styles.styleBadge, { backgroundColor: `${themeColors.primary}20` }]}>
-              <Text style={[styles.styleText, { color: themeColors.primary }]} numberOfLines={1}>
-                {artwork.style}
+        {/* Artist Info and Heart Reaction Row */}
+        <View style={styles.artworkInfo}>
+          <TouchableOpacity
+            style={styles.artistInfoTouchable}
+            activeOpacity={0.7}
+            onPress={() => onArtworkPress(artwork)}
+          >
+            {artwork.style && (
+              <View style={[styles.styleBadge, { backgroundColor: `${themeColors.primary}20` }]}>
+                <Text style={[styles.styleText, { color: themeColors.primary }]} numberOfLines={1}>
+                  {artwork.style}
+                </Text>
+              </View>
+            )}
+            <View style={styles.artistInfo}>
+              {artwork.profilePhoto && (
+                <Image
+                  source={{ uri: artwork.profilePhoto }}
+                  style={styles.artistPhoto}
+                  cache="force-cache"
+                />
+              )}
+              <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
+                {artwork.displayName || artwork.username}
               </Text>
             </View>
-          )}
-          <View style={styles.artistInfo}>
-            {artwork.profilePhoto && (
-              <Image
-                source={{ uri: artwork.profilePhoto }}
-                style={styles.artistPhoto}
-                cache="force-cache"
+          </TouchableOpacity>
+
+          {/* Heart Reaction - on the right */}
+          <TouchableOpacity
+            style={styles.heartButton}
+            onPress={() => handleLikeArtwork(artwork.id)}
+            activeOpacity={0.7}
+          >
+            <View style={heartAnimations[artwork.id] && styles.heartAnimationContainer}>
+              <Ionicons
+                name={likedArtworks[artwork.id] ? "heart" : "heart-outline"}
+                size={20}
+                color={likedArtworks[artwork.id] ? primaryColor : themeColors.textSecondary}
               />
-            )}
-            <Text style={[styles.artistName, { color: themeColors.textSecondary }]} numberOfLines={1}>
-              {artwork.displayName || artwork.username}
+            </View>
+            <Text style={[styles.likeCount, { color: themeColors.textSecondary }]}>
+              {(artwork.likes || 0) + (likedArtworks[artwork.id] ? 1 : 0)}
             </Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -271,10 +327,10 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
               {fullScreenImage.prompt && (
                 <TouchableOpacity
                   style={styles.infoButtonFullScreen}
-                  onPress={() => setPromptModal({ visible: true, prompt: fullScreenImage.prompt, style: fullScreenImage.style })}
+                  onPress={() => setShowFullScreenPrompt(!showFullScreenPrompt)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.infoIconContainerFullScreen}>
+                  <View style={[styles.infoIconContainerFullScreen, showFullScreenPrompt && { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
                     <Ionicons name="information" size={24} color="#fff" />
                   </View>
                 </TouchableOpacity>
@@ -300,6 +356,25 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
                 <Ionicons name="download-outline" size={14} color="#fff" />
                 <Text style={styles.downloadCounterText}>
                   {downloadLimits.remaining}/{downloadLimits.limit} left today
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Prompt Card - Toggleable */}
+          {showFullScreenPrompt && fullScreenImage.prompt && (
+            <View style={styles.fullScreenPromptCard}>
+              <View style={[styles.promptCardInner, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
+                <View style={styles.promptCardHeader}>
+                  <View style={[styles.promptCardIcon, { backgroundColor: `${themeColors.primary}20` }]}>
+                    <Ionicons name="sparkles" size={18} color={themeColors.primary} />
+                  </View>
+                  <Text style={[styles.promptCardTitle, { color: themeColors.textPrimary }]}>
+                    {fullScreenImage.style} Style
+                  </Text>
+                </View>
+                <Text style={[styles.promptCardText, { color: themeColors.textSecondary }]}>
+                  {fullScreenImage.prompt}
                 </Text>
               </View>
             </View>
@@ -407,6 +482,12 @@ const styles = StyleSheet.create({
   },
   artworkInfo: {
     padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  artistInfoTouchable: {
+    flex: 1,
   },
   styleBadge: {
     alignSelf: 'flex-start',
@@ -605,5 +686,57 @@ const styles = StyleSheet.create({
   fullScreenLoadingAnimation: {
     width: 150,
     height: 150,
+  },
+  fullScreenPromptCard: {
+    position: 'absolute',
+    top: 110,
+    left: 20,
+    right: 20,
+    zIndex: 11,
+  },
+  promptCardInner: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  promptCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  promptCardIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  promptCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+  },
+  promptCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  heartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 8,
+  },
+  heartAnimationContainer: {
+    transform: [{ scale: 1.4 }],
+  },
+  likeCount: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

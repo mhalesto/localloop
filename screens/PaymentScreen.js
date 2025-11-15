@@ -142,16 +142,20 @@ export default function PaymentScreen({ route, navigation }) {
 
       // Send local notification with benefits (simulating webhook notification)
       await sendLocalNotification({
-        title: `Welcome to ${tierName}! 🎉`,
-        body: `Your subscription is now active!\n\n${benefitsText}\n\nTap to explore your new features!`,
+        title: `Subscription Activated! 🎉`,
+        body: `Your ${tierName} subscription is now active. Enjoy unlimited features!`,
+        subtitle: benefitsText, // iOS will show this in expanded notification
         data: {
           type: 'subscription_activated',
           planId: planId,
           screen: 'Subscription',
           upgradedPlan: planId,
+          benefits: benefits, // Store benefits in data for custom handling
         },
         delay: 2000, // 2 second delay to simulate webhook
-        channelId: 'default',
+        channelId: 'subscription',
+        sound: true,
+        badge: 1,
       });
 
       setIsProcessing(false);

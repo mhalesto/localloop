@@ -59,11 +59,11 @@ export const SUBSCRIPTION_PLANS = {
   GO: {
     id: 'premium', // Internal ID remains 'premium' for backwards compatibility
     name: 'Go',
-    price: 79.99,
+    price: 5.00,
     currency: 'ZAR',
     interval: 'month',
-    yearlyPrice: 799,
-    yearlySavings: 'Save R160 (17%)',
+    yearlyPrice: 50,
+    yearlySavings: 'Save R10 (17%)',
     popular: false,
     description: 'Perfect for active community members',
     features: [
@@ -119,11 +119,11 @@ export const SUBSCRIPTION_PLANS = {
   PREMIUM: {
     id: 'gold', // Internal ID remains 'gold' for backwards compatibility
     name: 'Premium',
-    price: 149.99,
+    price: 10.00,
     currency: 'ZAR',
     interval: 'month',
-    yearlyPrice: 1499,
-    yearlySavings: 'Save R300 (17%)',
+    yearlyPrice: 100,
+    yearlySavings: 'Save R20 (17%)',
     description: 'GPT-4o powered AI + VIP experience',
     popular: true,
     features: [
@@ -194,11 +194,11 @@ export const SUBSCRIPTION_PLANS = {
   GOLD: {
     id: 'ultimate',
     name: 'Gold',
-    price: 249.99,
+    price: 15.00,
     currency: 'ZAR',
     interval: 'month',
-    yearlyPrice: 2499,
-    yearlySavings: 'Save R500 (17%)',
+    yearlyPrice: 150,
+    yearlySavings: 'Save R30 (17%)',
     description: 'Ultimate power user experience with 3x limits',
     popular: false,
     features: [

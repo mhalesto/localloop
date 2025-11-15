@@ -5,8 +5,18 @@ import { useSettings } from '../contexts/SettingsContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// 5 different ad templates with Ionicons fallback
+// Ad templates with Ionicons fallback
 const AD_TEMPLATES = [
+  {
+    id: 'blackfriday',
+    icon: 'pricetag',
+    title: '🔥 Black Friday Sale!',
+    subtitle: '50% OFF All Premium Plans',
+    description: 'Limited time offer - Deal resets daily at midnight',
+    colors: { primary: '#000000', secondary: '#FFD700' },
+    animatedIcon: 'gift',
+    isBlackFriday: true,
+  },
   {
     id: 'restaurant',
     icon: 'restaurant',

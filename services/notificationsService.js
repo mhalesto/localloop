@@ -125,9 +125,12 @@ export async function configureAndroidChannel() {
 export async function scheduleLocalNotification({
   title,
   body,
+  subtitle = null,
   data = {},
   delay = 0,
   channelId = 'default',
+  sound = true,
+  badge = null,
 }) {
   try {
     const hasPermission = await requestNotificationPermissions();
@@ -135,15 +138,27 @@ export async function scheduleLocalNotification({
       return null;
     }
 
+    const content = {
+      title,
+      body,
+      data,
+      sound,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+      categoryIdentifier: channelId,
+    };
+
+    // Add subtitle for iOS (shows in expanded notification)
+    if (subtitle) {
+      content.subtitle = subtitle;
+    }
+
+    // Add badge count if specified
+    if (badge !== null) {
+      content.badge = badge;
+    }
+
     const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data,
-        sound: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        categoryIdentifier: channelId,
-      },
+      content,
       trigger: delay > 0 ? { seconds: delay } : null,
     });
 

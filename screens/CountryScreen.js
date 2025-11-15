@@ -1193,8 +1193,12 @@ export default function CountryScreen({ navigation }) {
                             key={feedItem.key}
                             adIndex={feedItem.adIndex}
                             onPress={() => {
-                              // TODO: Navigate to sponsored content or open external link
-                              console.log('Ad clicked:', feedItem.adIndex);
+                              // Black Friday ad (index 0) navigates to subscription with special flag
+                              if (feedItem.adIndex === 0) {
+                                navigation.navigate('Subscription', { fromBlackFriday: true });
+                              } else {
+                                console.log('Ad clicked:', feedItem.adIndex);
+                              }
                             }}
                           />
                         );

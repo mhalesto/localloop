@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenLayout from '../components/ScreenLayout';
+import BlackFridayCountdown from '../components/BlackFridayCountdown';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SUBSCRIPTION_PLANS, formatPrice, getPlanById } from '../config/subscriptionPlans';
@@ -26,6 +27,10 @@ export default function SubscriptionScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [upgradedPlan, setUpgradedPlan] = useState(null);
+
+  // Black Friday promotion flag
+  const isBlackFriday = route.params?.fromBlackFriday || false;
+  const [showActiveSubscription, setShowActiveSubscription] = useState(!isBlackFriday);
 
   // Load user profile with subscription data
   useEffect(() => {
@@ -65,47 +70,50 @@ export default function SubscriptionScreen({ navigation, route }) {
       return;
     }
 
+    // Prevent downgrades
+    const currentPlanName = userProfile?.subscriptionPlan || 'basic';
+    const planHierarchy = ['basic', 'premium', 'gold', 'ultimate'];
+    const currentLevel = planHierarchy.indexOf(currentPlanName);
+    const targetLevel = planHierarchy.indexOf(planId);
+
+    if (targetLevel < currentLevel && targetLevel !== -1) {
+      showAlert(
+        'Cannot Downgrade',
+        `You are currently on the ${currentPlan?.name} plan. To avoid losing your premium features, downgrades are not allowed. Contact support if you need assistance.`,
+        [{ text: 'OK' }],
+        { icon: 'alert-circle', iconColor: '#FF9500' }
+      );
+      return;
+    }
+
     setSelectedPlan(planId);
     const plan = getPlanById(planId);
 
     if (plan.price === 0) {
-      // Free plan - immediate activation
-      try {
-        setIsProcessing(true);
-        await updateUserProfile(user.uid, {
-          subscriptionPlan: planId,
-          premiumUnlocked: false,
-        });
-
-        // Reload profile
-        const updatedProfile = await getUserProfile(user.uid);
-        setUserProfile(updatedProfile);
-
+      // Free plan - only allow if user is currently on Basic
+      if (currentPlanName !== 'basic') {
         showAlert(
-          'Success',
-          'You are now on the Basic plan.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }],
-          { icon: 'checkmark-circle', iconColor: '#34C759' }
-        );
-      } catch (error) {
-        console.error('[SubscriptionScreen] Error updating plan:', error);
-        showAlert(
-          'Error',
-          'Failed to update plan. Please try again.',
+          'Cannot Downgrade',
+          'You cannot switch to the Basic plan while you have an active subscription. Please contact support to cancel your subscription first.',
           [{ text: 'OK' }],
-          { icon: 'alert-circle', iconColor: '#FF3B30' }
+          { icon: 'alert-circle', iconColor: '#FF9500' }
         );
-      } finally {
-        setIsProcessing(false);
+        return;
       }
+
+      // User is already on Basic - this shouldn't happen, but handle it
+      showAlert('Already on Basic', 'You are already on the Basic plan.', [{ text: 'OK' }]);
+      return;
     } else {
       // Paid plan - navigate to payment
+      const finalPrice = isBlackFriday ? plan.price / 2 : plan.price;
       navigation.navigate('Payment', {
         planId,
         planName: plan.name,
-        price: plan.price,
+        price: finalPrice,
         currency: plan.currency,
         interval: plan.interval,
+        isBlackFriday,
       });
     }
   };
@@ -122,6 +130,12 @@ export default function SubscriptionScreen({ navigation, route }) {
   const isSubscribed = userProfile?.premiumUnlocked && (currentPlanName === 'premium' || currentPlanName === 'gold' || currentPlanName === 'ultimate');
   const subscriptionEndDate = userProfile?.subscriptionEndDate;
 
+  // Plan hierarchy for comparison (higher index = higher tier)
+  const planHierarchy = ['basic', 'premium', 'gold', 'ultimate'];
+  const getCurrentPlanLevel = () => planHierarchy.indexOf(currentPlanName);
+  const getPlanLevel = (planId) => planHierarchy.indexOf(planId);
+  const isDowngrade = (planId) => getPlanLevel(planId) < getCurrentPlanLevel();
+
   return (
     <ScreenLayout
       title="Choose Your Plan"
@@ -135,6 +149,11 @@ export default function SubscriptionScreen({ navigation, route }) {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Black Friday Countdown Timer */}
+        {isBlackFriday && (
+          <BlackFridayCountdown style={{ marginBottom: 16 }} />
+        )}
+
         {/* Welcome Banner for Newly Upgraded Plans */}
         {!isLoading && showWelcomeBanner && upgradedPlan && (() => {
           const plan = getPlanById(upgradedPlan);
@@ -193,24 +212,66 @@ export default function SubscriptionScreen({ navigation, route }) {
 
         {/* Current Subscription Status */}
         {!isLoading && isSubscribed && !showWelcomeBanner && (
-          <View style={[styles.statusBanner, { backgroundColor: `${accentPreset?.buttonBackground || themeColors.primary}15` }]}>
-            <View style={styles.statusHeader}>
-              <Ionicons
-                name="checkmark-circle"
-                size={24}
-                color={accentPreset?.buttonBackground || themeColors.primary}
-              />
-              <Text style={[styles.statusTitle, { color: themeColors.textPrimary }]}>
-                Active Subscription
-              </Text>
-            </View>
-            <Text style={[styles.statusText, { color: themeColors.textSecondary }]}>
-              You're on the <Text style={{ fontWeight: '700' }}>{currentPlan?.name}</Text> plan
-              {subscriptionEndDate && (
-                <Text> • Renews {new Date(subscriptionEndDate).toLocaleDateString()}</Text>
-              )}
-            </Text>
-          </View>
+          <>
+            {/* Toggle button when Black Friday is active and card is collapsed */}
+            {isBlackFriday && !showActiveSubscription && (
+              <TouchableOpacity
+                style={[styles.toggleSubscriptionButton, {
+                  backgroundColor: themeColors.card,
+                  borderColor: themeColors.divider,
+                }]}
+                onPress={() => setShowActiveSubscription(true)}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={accentPreset?.buttonBackground || themeColors.primary}
+                />
+                <Text style={[styles.toggleButtonText, { color: themeColors.textPrimary }]}>
+                  View Active Subscription
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={themeColors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Active Subscription Card */}
+            {showActiveSubscription && (
+              <View style={[styles.statusBanner, { backgroundColor: `${accentPreset?.buttonBackground || themeColors.primary}15` }]}>
+                <View style={styles.statusHeader}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={accentPreset?.buttonBackground || themeColors.primary}
+                  />
+                  <Text style={[styles.statusTitle, { color: themeColors.textPrimary }]}>
+                    Active Subscription
+                  </Text>
+                  {isBlackFriday && (
+                    <TouchableOpacity
+                      onPress={() => setShowActiveSubscription(false)}
+                      style={styles.collapseButton}
+                    >
+                      <Ionicons
+                        name="chevron-up"
+                        size={20}
+                        color={themeColors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={[styles.statusText, { color: themeColors.textSecondary }]}>
+                  You're on the <Text style={{ fontWeight: '700' }}>{currentPlan?.name}</Text> plan
+                  {subscriptionEndDate && (
+                    <Text> • Renews {new Date(subscriptionEndDate).toLocaleDateString()}</Text>
+                  )}
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
         {/* Loading State */}
@@ -224,6 +285,7 @@ export default function SubscriptionScreen({ navigation, route }) {
         {!isLoading && plans.map((plan, index) => {
           const isCurrentPlan = userProfile?.subscriptionPlan === plan.id;
           const isSelected = selectedPlan === plan.id;
+          const isLowerTier = isDowngrade(plan.id);
           const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
           return (
@@ -268,24 +330,57 @@ export default function SubscriptionScreen({ navigation, route }) {
 
               {/* Price */}
               <View style={styles.priceContainer}>
-                <View style={styles.priceRow}>
-                  <Text style={[styles.price, { color: themeColors.textPrimary }]}>
-                    {formatPrice(plan)}
-                  </Text>
-                </View>
-                {plan.yearlyPrice && (
-                  <View style={styles.yearlyPriceRow}>
-                    <Text style={[styles.yearlyPrice, { color: themeColors.textSecondary }]}>
-                      R{plan.yearlyPrice}/year{' '}
-                    </Text>
-                    {plan.yearlySavings && (
-                      <View style={[styles.savingsBadge, { backgroundColor: `${primaryColor}20` }]}>
-                        <Text style={[styles.savings, { color: primaryColor }]}>
-                          {plan.yearlySavings}
+                {isBlackFriday && plan.price > 0 ? (
+                  <>
+                    <View style={styles.blackFridayBanner}>
+                      <Text style={styles.blackFridayText}>🔥 BLACK FRIDAY: 50% OFF</Text>
+                    </View>
+                    <View style={styles.priceRow}>
+                      <Text style={[styles.originalPrice, { color: themeColors.textSecondary }]}>
+                        R{plan.price.toFixed(2)}
+                      </Text>
+                      <Text style={[styles.price, { color: '#FFD700' }]}>
+                        R{(plan.price / 2).toFixed(2)}/{plan.interval}
+                      </Text>
+                    </View>
+                    {plan.yearlyPrice && (
+                      <View style={styles.yearlyPriceRow}>
+                        <Text style={[styles.originalPrice, { color: themeColors.textSecondary, fontSize: 12 }]}>
+                          R{plan.yearlyPrice}
                         </Text>
+                        <Text style={[styles.yearlyPrice, { color: themeColors.textSecondary }]}>
+                          R{(plan.yearlyPrice / 2).toFixed(0)}/year{' '}
+                        </Text>
+                        <View style={[styles.savingsBadge, { backgroundColor: '#FFD70020' }]}>
+                          <Text style={[styles.savings, { color: '#FFD700' }]}>
+                            Extra 67% OFF!
+                          </Text>
+                        </View>
                       </View>
                     )}
-                  </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.priceRow}>
+                      <Text style={[styles.price, { color: themeColors.textPrimary }]}>
+                        {formatPrice(plan)}
+                      </Text>
+                    </View>
+                    {plan.yearlyPrice && (
+                      <View style={styles.yearlyPriceRow}>
+                        <Text style={[styles.yearlyPrice, { color: themeColors.textSecondary }]}>
+                          R{plan.yearlyPrice}/year{' '}
+                        </Text>
+                        {plan.yearlySavings && (
+                          <View style={[styles.savingsBadge, { backgroundColor: `${primaryColor}20` }]}>
+                            <Text style={[styles.savings, { color: primaryColor }]}>
+                              {plan.yearlySavings}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
 
@@ -323,7 +418,7 @@ export default function SubscriptionScreen({ navigation, route }) {
               </View>
 
               {/* Select Button */}
-              {!isCurrentPlan && (
+              {!isCurrentPlan && !isLowerTier && (
                 <TouchableOpacity
                   style={[
                     styles.selectButton,
@@ -350,6 +445,26 @@ export default function SubscriptionScreen({ navigation, route }) {
                   )}
                 </TouchableOpacity>
               )}
+
+              {/* Current Plan Badge */}
+              {isCurrentPlan && (
+                <View style={[styles.currentPlanBadge, { backgroundColor: `${primaryColor}15` }]}>
+                  <Ionicons name="checkmark-circle" size={18} color={primaryColor} />
+                  <Text style={[styles.currentPlanText, { color: primaryColor }]}>
+                    Current Plan
+                  </Text>
+                </View>
+              )}
+
+              {/* Lower Tier - Not Available */}
+              {isLowerTier && !isCurrentPlan && (
+                <View style={[styles.unavailableBadge, { backgroundColor: themeColors.divider }]}>
+                  <Ionicons name="lock-closed" size={16} color={themeColors.textSecondary} />
+                  <Text style={[styles.unavailableText, { color: themeColors.textSecondary }]}>
+                    Downgrade Not Available
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -359,7 +474,7 @@ export default function SubscriptionScreen({ navigation, route }) {
         <View style={styles.footerInfo}>
           <Ionicons name="information-circle-outline" size={16} color={themeColors.textSecondary} />
           <Text style={[styles.footerText, { color: themeColors.textSecondary }]}>
-            You can upgrade, downgrade, or cancel your subscription at any time from your profile settings.
+            You can upgrade or cancel your subscription at any time. To protect your premium features, downgrades are not allowed. Contact support for assistance.
           </Text>
         </View>
         )}
@@ -386,6 +501,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     marginBottom: 8,
+  },
+  toggleSubscriptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
+  collapseButton: {
+    marginLeft: 'auto',
+    padding: 4,
   },
   statusTitle: {
     fontSize: 18,
@@ -456,9 +592,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
   },
+  blackFridayBanner: {
+    backgroundColor: '#000',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  blackFridayText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    gap: 12,
+  },
+  originalPrice: {
+    fontSize: 18,
+    fontWeight: '600',
+    textDecorationLine: 'line-through',
   },
   price: {
     fontSize: 32,
@@ -528,6 +686,32 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  currentPlanBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  currentPlanText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  unavailableBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  unavailableText: {
+    fontSize: 14,
     fontWeight: '600',
   },
   footerInfo: {

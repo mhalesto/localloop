@@ -153,7 +153,7 @@ export function NotificationsProvider({ children }) {
   }, []);
 
   const sendLocalNotification = useCallback(
-    async ({ title, body, data = {}, delay = 0, channelId = 'default' }) => {
+    async ({ title, body, subtitle = null, data = {}, delay = 0, channelId = 'default', sound = true, badge = null }) => {
       if (!permissionGranted) {
         console.warn('[NotificationsContext] No permission to send notification');
         return null;
@@ -162,9 +162,12 @@ export function NotificationsProvider({ children }) {
       const identifier = await scheduleLocalNotification({
         title,
         body,
+        subtitle,
         data,
         delay,
         channelId,
+        sound,
+        badge,
       });
 
       return identifier;
