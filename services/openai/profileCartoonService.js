@@ -112,7 +112,7 @@ export const USAGE_LIMITS = {
     gpt4VisionMonthly: 0, // No GPT-4 Vision for Premium
   },
   gold: {
-    monthly: 20, // Gold users get 20 generations per month
+    monthly: 70, // TEMPORARY: Increased to 40 for testing (normally 20)
     lifetime: null, // Unlimited lifetime
     historyLimit: 20, // Gold users can save 20 cartoons in history
     gpt4VisionMonthly: 5, // Gold users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
@@ -282,7 +282,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
     if (personalizedDescription) {
       // ALL users: Use personalized Vision description for accurate likeness
-      prompt = `Create a portrait ${style.prompt} of this person: ${personalizedDescription}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive. IMPORTANT: Match the person's gender, hair color, hair style, and facial features accurately.`;
+      prompt = `Create a ${style.prompt} portrait avatar based on this description: ${personalizedDescription}. Match the hairstyle, facial features, expression, clothing colors/patterns, and accessories exactly as described. High quality, detailed, suitable for a profile picture.`;
       console.log('[profileCartoonService] Using predefined style with Vision personalization (ALL users)');
     } else {
       // Fallback: Use generic prompt (only if Vision failed)

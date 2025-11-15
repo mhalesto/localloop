@@ -4,7 +4,7 @@
  */
 
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { app } from '../api/firebaseConfig';
 import { getHistoryLimit } from './openai/profileCartoonService';
 
@@ -126,17 +126,31 @@ export async function uploadTemporaryCustomImage(userId, imageAsset) {
   try {
     console.log('[cartoonProfileService] Uploading temporary custom image');
 
+    // First, clean up any old temp images for this user to prevent accumulation
+    try {
+      const tempFolderRef = ref(storage, `temp-custom-images/${userId}`);
+      const oldFiles = await listAll(tempFolderRef);
+      const deletePromises = oldFiles.items.map(item => deleteObject(item));
+      await Promise.all(deletePromises);
+      console.log(`[cartoonProfileService] Cleaned up ${oldFiles.items.length} old temp images`);
+    } catch (cleanupError) {
+      // Don't fail if cleanup fails - just log
+      console.warn('[cartoonProfileService] Could not clean up old temp images:', cleanupError);
+    }
+
     // Fetch the local image file
     const response = await fetch(imageAsset.uri);
     const blob = await response.blob();
 
-    // Upload to temp folder in Firebase Storage
+    // Upload to temp folder with unique timestamp + random string for cache busting
     const timestamp = Date.now();
-    const filename = `temp-custom-images/${userId}/temp-${timestamp}.jpg`;
+    const random = Math.random().toString(36).substring(2, 8);
+    const filename = `temp-custom-images/${userId}/temp-${timestamp}-${random}.jpg`;
     const storageRef = ref(storage, filename);
 
     await uploadBytes(storageRef, blob, {
       contentType: 'image/jpeg',
+      cacheControl: 'no-cache, no-store, must-revalidate', // Prevent caching
       customMetadata: {
         temporary: 'true',
         uploadedAt: new Date().toISOString(),
@@ -144,8 +158,12 @@ export async function uploadTemporaryCustomImage(userId, imageAsset) {
     });
 
     // Get public download URL for GPT Vision access
-    const downloadURL = await getDownloadURL(storageRef);
-    console.log('[cartoonProfileService] Temporary image uploaded:', downloadURL);
+    let downloadURL = await getDownloadURL(storageRef);
+
+    // Add cache-busting query parameter to prevent OpenAI from using cached version
+    downloadURL = `${downloadURL}&cacheBust=${timestamp}`;
+
+    console.log('[cartoonProfileService] Temporary image uploaded with cache busting:', downloadURL);
 
     return {
       url: downloadURL,

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1070,17 +1071,39 @@ export function SettingsProvider({ children }) {
     AsyncStorage.setItem(STORAGE_KEYS.LOCATION_PERMISSION_STATUS, locationPermissionStatus);
   }, [locationPermissionStatus, isLoadingSettings]);
 
+  // Track previous premium status to detect actual downgrades (not initial loads)
+  const prevPremiumStatus = useRef(hasActivePremium);
+
   useEffect(() => {
-    if (hasActivePremium || isDevBuild) {
+    // Don't run during initial settings load to prevent resetting saved premium preferences
+    if (isLoadingSettings) {
       return;
     }
 
-    // Disable all premium features
+    // Allow premium or dev users to use premium features
+    if (hasActivePremium || isDevBuild) {
+      prevPremiumStatus.current = hasActivePremium;
+      return;
+    }
+
+    // Only reset if this is an actual downgrade (was premium before, now not)
+    // Don't reset on initial load when hasActivePremium might be false before auth loads
+    const wasActivePremium = prevPremiumStatus.current;
+    if (!wasActivePremium) {
+      // Never had premium or still loading, don't reset saved preferences
+      prevPremiumStatus.current = hasActivePremium;
+      return;
+    }
+
+    console.log('[SettingsContext] Premium subscription expired - disabling premium features');
+
+    // Disable all premium features (only runs when premium actually expires)
     setPremiumAccentEnabled(false);
     setPremiumTypographyEnabled(false);
     setPremiumTitleFontSizeEnabled(false);
     setPremiumDescriptionFontSizeEnabled(false);
     setPremiumSummariesEnabled(false);
+    setPremiumAccentBrightness(PREMIUM_ACCENT_BRIGHTNESS_RANGE.min); // Also reset brightness
     setPremiumAccentShade(0);
 
     // Check if current accent is premium, if so reset to first basic theme
@@ -1096,7 +1119,9 @@ export function SettingsProvider({ children }) {
       AsyncStorage.setItem(STORAGE_KEYS.ACCENT_KEY, firstBasicTheme);
       console.log('[SettingsContext] Premium downgraded: Reset theme from', accentKey, 'to', firstBasicTheme);
     }
-  }, [hasActivePremium, isDevBuild, accentKey]);
+
+    prevPremiumStatus.current = hasActivePremium;
+  }, [hasActivePremium, isDevBuild, accentKey, isLoadingSettings]);
 
   // [PUBLIC-MODE] Load user profile from Firebase
   const loadProfileFromFirebase = useCallback(async () => {

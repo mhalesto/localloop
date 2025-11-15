@@ -94,17 +94,17 @@ export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
           content: [
             {
               type: 'text',
-              text: `Describe the visual characteristics in this photo for creating a cartoon avatar. Focus on artistic details:
+              text: `Analyze this specific photo and describe exactly what you see for creating an accurate cartoon avatar. Be precise and literal about THIS person:
 
-Hair: style, length, color, texture
-Face: shape, features, expression
-Eyes: color, size, shape
-Skin: tone and complexion
-Clothing: style and colors visible
-Accessories: glasses, jewelry, headwear
-Overall style: mood and vibe
+1. HAIRSTYLE: Describe the exact hairstyle visible - braids, natural hair, locs, straight, curly, etc. Is hair covered or visible? If covered, what type of covering (head wrap, hat, scarf)? What colors?
 
-Provide a concise, detailed description that captures the key visual elements. Be specific about colors and features.`,
+2. FACIAL FEATURES: Face shape, nose shape and size, lip fullness and shape, eye shape and color, eyebrow shape, cheek structure, skin tone (be specific about the exact tone you see).
+
+3. EXPRESSION: Describe the exact expression - big smile showing teeth, gentle closed-mouth smile, neutral, etc. Eye direction and emotion.
+
+4. CLOTHING & ACCESSORIES: Describe the exact clothing visible - colors, patterns (floral, geometric, solid, abstract), neckline style. List any visible jewelry (earrings, necklaces, rings) or accessories (glasses, sunglasses, watches).
+
+CRITICAL: Only describe what you actually see in THIS photo. Don't assume or add elements that aren't visible. Be specific about colors, patterns, and styles unique to this person.`,
             },
             {
               type: 'image_url',
