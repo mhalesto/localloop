@@ -1552,11 +1552,12 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
     });
 
     // Get all posts from both collections (last 90 days)
+    // Note: Posts use 'createdAt' field, not 'timestamp'
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     // Fetch private posts
     const postsSnapshot = await db.collection('posts')
-        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+        .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
         .get();
     const posts = [];
     postsSnapshot.forEach((doc) => {
@@ -1565,7 +1566,7 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
 
     // Fetch public posts
     const publicPostsSnapshot = await db.collection('publicPosts')
-        .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
+        .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
         .get();
     publicPostsSnapshot.forEach((doc) => {
       posts.push({id: doc.id, type: 'public', ...doc.data()});
@@ -1600,11 +1601,11 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
     // Post activity by hour (last 7 days)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const hourlyActivity = Array(24).fill(0);
-    
+
     posts.forEach((post) => {
-      const timestamp = post.timestamp?.toDate();
-      if (timestamp && timestamp >= sevenDaysAgo) {
-        const hour = timestamp.getHours();
+      const createdAt = post.createdAt?.toDate();
+      if (createdAt && createdAt >= sevenDaysAgo) {
+        const hour = createdAt.getHours();
         hourlyActivity[hour]++;
       }
     });
@@ -1616,8 +1617,8 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
     }).length;
 
     const recentPosts = posts.filter((post) => {
-      const timestamp = post.timestamp?.toDate();
-      return timestamp && timestamp >= thirtyDaysAgo;
+      const createdAt = post.createdAt?.toDate();
+      return createdAt && createdAt >= thirtyDaysAgo;
     }).length;
 
     const engagement = activeUsers > 0 ? Math.round((recentPosts / activeUsers) * 100) : 0;
