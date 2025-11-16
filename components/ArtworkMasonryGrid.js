@@ -56,11 +56,16 @@ export default function ArtworkMasonryGrid({
   const [preloadedImages, setPreloadedImages] = useState(new Set()); // Track preloaded full-screen images
   const scrollViewRef = useRef(null); // Reference to ScrollView for programmatic scrolling
   const [heartAnimations, setHeartAnimations] = useState({}); // Track heart animation state
-  const [isZooming, setIsZooming] = useState(false); // Disable swiping while pinch-zooming
+  const [isZooming, setIsZooming] = useState(false); // True when actively zoomed in
+  const [zoomModeEnabled, setZoomModeEnabled] = useState(false); // True when user long-presses to enable zoom mode
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const handleZoomStateChange = useCallback((zooming) => {
     setIsZooming((prev) => (prev === zooming ? prev : zooming));
   }, []);
+  const handleZoomModeChange = useCallback((enabled) => {
+    setZoomModeEnabled((prev) => (prev === enabled ? prev : enabled));
+  }, []);
+  const hideFullScreenChrome = zoomModeEnabled || isZooming;
 
   // Check download limits on mount and when modal opens
   useEffect(() => {
@@ -122,8 +127,15 @@ export default function ArtworkMasonryGrid({
   useEffect(() => {
     if (!fullScreenImage.visible) {
       setIsZooming(false);
+      setZoomModeEnabled(false);
     }
   }, [fullScreenImage.visible]);
+
+  useEffect(() => {
+    if (zoomModeEnabled && showFullScreenPrompt) {
+      setShowFullScreenPrompt(false);
+    }
+  }, [zoomModeEnabled, showFullScreenPrompt]);
 
   const checkDownloadLimits = async () => {
     const planId = userProfile?.subscriptionPlan || 'basic';
@@ -567,36 +579,38 @@ export default function ArtworkMasonryGrid({
         <View style={styles.fullScreenContainer}>
           {/* Top buttons */}
           <View style={styles.topButtonsContainer}>
-            <View style={styles.leftButtonsContainer}>
-              {/* Download button */}
-              <TouchableOpacity
-                style={styles.downloadButtonFullScreen}
-                onPress={handleDownload}
-                activeOpacity={0.7}
-                disabled={isDownloading}
-              >
-                <View style={styles.downloadIconContainer}>
-                  {isDownloading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="download" size={24} color="#fff" />
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              {/* Info button */}
-              {fullScreenImage.prompt && (
+            {!hideFullScreenChrome && (
+              <View style={styles.leftButtonsContainer}>
+                {/* Download button */}
                 <TouchableOpacity
-                  style={styles.infoButtonFullScreen}
-                  onPress={() => setShowFullScreenPrompt(!showFullScreenPrompt)}
+                  style={styles.downloadButtonFullScreen}
+                  onPress={handleDownload}
                   activeOpacity={0.7}
+                  disabled={isDownloading}
                 >
-                  <View style={[styles.infoIconContainerFullScreen, showFullScreenPrompt && { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
-                    <Ionicons name="information" size={24} color="#fff" />
+                  <View style={styles.downloadIconContainer}>
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="download" size={24} color="#fff" />
+                    )}
                   </View>
                 </TouchableOpacity>
-              )}
-            </View>
+
+                {/* Info button */}
+                {fullScreenImage.prompt && (
+                  <TouchableOpacity
+                    style={styles.infoButtonFullScreen}
+                    onPress={() => setShowFullScreenPrompt(!showFullScreenPrompt)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.infoIconContainerFullScreen, showFullScreenPrompt && { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
+                      <Ionicons name="information" size={24} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {/* Close button */}
             <TouchableOpacity
@@ -619,7 +633,7 @@ export default function ArtworkMasonryGrid({
           </View>
 
           {/* Download counter */}
-          {downloadLimits.limit !== -1 && (
+          {!hideFullScreenChrome && downloadLimits.limit !== -1 && (
             <View style={styles.downloadCounterContainer}>
               <View style={styles.downloadCounter}>
                 <Ionicons name="download-outline" size={14} color="#fff" />
@@ -631,7 +645,7 @@ export default function ArtworkMasonryGrid({
           )}
 
           {/* Prompt Card - Toggleable */}
-          {showFullScreenPrompt && fullScreenImage.prompt && (
+          {!hideFullScreenChrome && showFullScreenPrompt && fullScreenImage.prompt && (
             <View style={styles.fullScreenPromptCard}>
               <View style={[styles.promptCardInner, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
                 <View style={styles.promptCardHeader}>
@@ -655,7 +669,7 @@ export default function ArtworkMasonryGrid({
               ref={scrollViewRef}
               horizontal
               pagingEnabled
-              scrollEnabled={!isZooming}
+              scrollEnabled={!zoomModeEnabled && !isZooming}
               showsHorizontalScrollIndicator={false}
               style={styles.fullScreenScrollView}
               onScroll={(event) => {
@@ -679,6 +693,8 @@ export default function ArtworkMasonryGrid({
                     resizeMode="contain"
                     imageProps={{ cache: 'force-cache' }}
                     onZoomStateChange={handleZoomStateChange}
+                    onZoomModeChange={handleZoomModeChange}
+                    zoomModeEnabled={zoomModeEnabled}
                     viewportWidth={SCREEN_WIDTH}
                     viewportHeight={SCREEN_HEIGHT}
                   />
@@ -693,6 +709,8 @@ export default function ArtworkMasonryGrid({
               resizeMode="contain"
               imageProps={{ cache: 'force-cache' }}
               onZoomStateChange={handleZoomStateChange}
+              onZoomModeChange={handleZoomModeChange}
+              zoomModeEnabled={zoomModeEnabled}
               viewportWidth={SCREEN_WIDTH}
               viewportHeight={SCREEN_HEIGHT}
             />
@@ -711,26 +729,28 @@ export default function ArtworkMasonryGrid({
           )}
 
           {/* Info badges at bottom */}
-          <View style={styles.fullScreenInfo}>
-            {fullScreenImage.style && (
-              <View style={styles.fullScreenBadge}>
-                <Ionicons name="brush" size={16} color="#fff" />
-                <Text style={styles.fullScreenStyleText}>
-                  {fullScreenImage.style} Style
-                </Text>
-              </View>
-            )}
+          {!hideFullScreenChrome && (
+            <View style={styles.fullScreenInfo}>
+              {fullScreenImage.style && (
+                <View style={styles.fullScreenBadge}>
+                  <Ionicons name="brush" size={16} color="#fff" />
+                  <Text style={styles.fullScreenStyleText}>
+                    {fullScreenImage.style} Style
+                  </Text>
+                </View>
+              )}
 
-            {/* Image counter for Story Teller */}
-            {fullScreenImage.isStory && fullScreenImage.images.length > 1 && (
-              <View style={[styles.fullScreenBadge, styles.imageCounterBadge]}>
-                <Ionicons name="images" size={16} color="#fff" />
-                <Text style={styles.fullScreenStyleText}>
-                  {fullScreenImage.currentIndex + 1}/{fullScreenImage.images.length}
-                </Text>
-              </View>
-            )}
-          </View>
+              {/* Image counter for Story Teller */}
+              {fullScreenImage.isStory && fullScreenImage.images.length > 1 && (
+                <View style={[styles.fullScreenBadge, styles.imageCounterBadge]}>
+                  <Ionicons name="images" size={16} color="#fff" />
+                  <Text style={styles.fullScreenStyleText}>
+                    {fullScreenImage.currentIndex + 1}/{fullScreenImage.images.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </Modal>
     </>
@@ -743,12 +763,15 @@ function ZoomableImage({
   resizeMode = 'contain',
   imageProps = {},
   onZoomStateChange,
+  onZoomModeChange,
+  zoomModeEnabled,
   viewportWidth = SCREEN_WIDTH,
   viewportHeight = SCREEN_HEIGHT,
 }) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const zoomActive = useSharedValue(0);
+  const allowZoom = useSharedValue(zoomModeEnabled ? 1 : 0);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const panStartX = useSharedValue(0);
@@ -757,6 +780,16 @@ function ZoomableImage({
   const notifyZoomStateChange = useCallback((active) => {
     onZoomStateChange?.(active);
   }, [onZoomStateChange]);
+  const notifyZoomModeChange = useCallback((active) => {
+    onZoomModeChange?.(active);
+  }, [onZoomModeChange]);
+
+  const setZoomModeJS = useCallback((value) => {
+    notifyZoomModeChange(value);
+  }, [notifyZoomModeChange]);
+  const setZoomStateJS = useCallback((value) => {
+    notifyZoomStateChange(value);
+  }, [notifyZoomStateChange]);
 
   useEffect(() => {
     scale.value = 1;
@@ -765,7 +798,8 @@ function ZoomableImage({
     translateX.value = 0;
     translateY.value = 0;
     notifyZoomStateChange(false);
-  }, [uri, scale, savedScale, zoomActive, translateX, translateY, notifyZoomStateChange]);
+    allowZoom.value = zoomModeEnabled ? 1 : 0;
+  }, [uri, zoomModeEnabled, scale, savedScale, zoomActive, translateX, translateY, notifyZoomStateChange, allowZoom]);
 
   if (!uri) {
     return null;
@@ -774,10 +808,15 @@ function ZoomableImage({
   const pinchGesture = Gesture.Pinch()
     .onStart(() => {
       'worklet';
+      if (!allowZoom.value) {
+        allowZoom.value = 1;
+        runOnJS(setZoomModeJS)(true);
+      }
       savedScale.value = scale.value;
     })
     .onUpdate((event) => {
       'worklet';
+      if (!allowZoom.value) return;
       const nextScale = clampValue(savedScale.value * event.scale, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
       scale.value = nextScale;
       translateX.value = clampTranslation(translateX.value, viewportWidth, nextScale);
@@ -785,15 +824,17 @@ function ZoomableImage({
       const nextActive = nextScale > ZOOM_THRESHOLD ? 1 : 0;
       if (zoomActive.value !== nextActive) {
         zoomActive.value = nextActive;
-        runOnJS(notifyZoomStateChange)(!!nextActive);
+        runOnJS(setZoomStateJS)(!!nextActive);
       }
     })
     .onEnd(() => {
       'worklet';
+      if (!allowZoom.value) return;
       savedScale.value = clampValue(scale.value, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
     })
     .onFinalize(() => {
       'worklet';
+      if (!allowZoom.value) return;
       if (scale.value < MIN_ZOOM_SCALE) {
         scale.value = withTiming(MIN_ZOOM_SCALE);
         savedScale.value = MIN_ZOOM_SCALE;
@@ -806,22 +847,30 @@ function ZoomableImage({
       if (scale.value <= MIN_ZOOM_SCALE) {
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
+        zoomActive.value = 0;
+        runOnJS(setZoomStateJS)(false);
+        allowZoom.value = 0;
+        runOnJS(setZoomModeJS)(false);
       }
       const nextActive = scale.value > ZOOM_THRESHOLD ? 1 : 0;
       if (zoomActive.value !== nextActive) {
         zoomActive.value = nextActive;
-        runOnJS(notifyZoomStateChange)(!!nextActive);
+        runOnJS(setZoomStateJS)(!!nextActive);
       }
-    });
+    })
+    .enabled(true);
 
   const panGesture = Gesture.Pan()
+    .minPointers(2)
     .onStart(() => {
       'worklet';
+      if (!allowZoom.value) return;
       panStartX.value = translateX.value;
       panStartY.value = translateY.value;
     })
     .onUpdate((event) => {
       'worklet';
+      if (!allowZoom.value) return;
       if (scale.value <= ZOOM_THRESHOLD) {
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
@@ -833,27 +882,79 @@ function ZoomableImage({
       translateY.value = nextY;
       if (zoomActive.value === 0) {
         zoomActive.value = 1;
-        runOnJS(notifyZoomStateChange)(true);
+        runOnJS(setZoomStateJS)(true);
       }
     })
     .onEnd(() => {
       'worklet';
+      if (!allowZoom.value) return;
       translateX.value = clampTranslation(translateX.value, viewportWidth, scale.value);
       translateY.value = clampTranslation(translateY.value, viewportHeight, scale.value);
     })
     .onFinalize(() => {
       'worklet';
+      if (!zoomModeEnabled) return;
       if (scale.value <= MIN_ZOOM_SCALE) {
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
         if (zoomActive.value !== 0) {
           zoomActive.value = 0;
-          runOnJS(notifyZoomStateChange)(false);
+          runOnJS(setZoomStateJS)(false);
         }
+        allowZoom.value = 0;
+        runOnJS(setZoomModeJS)(false);
+      }
+    })
+    .enabled(true);
+
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(700)
+    .maxDistance(40)
+    .onStart(() => {
+      'worklet';
+      if (!zoomModeEnabled) {
+        allowZoom.value = 1;
+        runOnJS(setZoomModeJS)(true);
+      }
+    })
+    .onEnd(() => {
+      'worklet';
+      if (scale.value <= MIN_ZOOM_SCALE && zoomActive.value === 0) {
+        allowZoom.value = 0;
+        runOnJS(setZoomModeJS)(false);
       }
     });
 
-  const combinedGesture = Gesture.Simultaneous(pinchGesture, panGesture);
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDelay(250)
+    .onStart(() => {
+      'worklet';
+      if (!zoomModeEnabled) {
+        allowZoom.value = 1;
+        runOnJS(setZoomModeJS)(true);
+      }
+      if (scale.value > ZOOM_THRESHOLD) {
+        scale.value = withTiming(1);
+        savedScale.value = 1;
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        zoomActive.value = 0;
+        runOnJS(setZoomStateJS)(false);
+        allowZoom.value = 0;
+        runOnJS(setZoomModeJS)(false);
+      } else {
+        scale.value = withTiming(2);
+        savedScale.value = 2;
+        zoomActive.value = 1;
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        runOnJS(setZoomStateJS)(true);
+      }
+    })
+    .enabled(!!zoomModeEnabled);
+
+  const composedGesture = Gesture.Simultaneous(doubleTapGesture, longPressGesture, pinchGesture, panGesture);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -864,7 +965,7 @@ function ZoomableImage({
   }));
 
   return (
-    <GestureDetector gesture={combinedGesture}>
+    <GestureDetector gesture={composedGesture}>
       <Animated.Image
         source={{ uri }}
         style={[style, animatedStyle]}
