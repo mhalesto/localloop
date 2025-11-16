@@ -3,7 +3,7 @@
  * Manages cartoon profile picture generation, usage tracking, and history
  */
 
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { app } from '../api/firebaseConfig';
 import { getHistoryLimit } from './openai/profileCartoonService';
@@ -76,6 +76,98 @@ export async function checkAndResetMonthlyUsage(userId) {
   }
 
   return data;
+}
+
+/**
+ * Save Story Teller collection to Firestore
+ * @param {string} userId - User ID
+ * @param {Array} images - Array of image objects with urls and metadata
+ * @param {string} style - Style used for generation
+ * @param {string} prompt - Custom prompt if used
+ * @returns {Promise<string>} Story collection ID
+ */
+export async function saveStoryCollection(userId, images, style, prompt = null) {
+  try {
+    console.log('[cartoonProfileService] 📝 Saving Story Teller collection:', {
+      userId,
+      imageCount: images.length,
+      style,
+      hasPrompt: !!prompt,
+      images: images.map((img, idx) => ({
+        index: idx,
+        id: img.id,
+        hasUrl: !!img.url,
+        urlLength: img.url ? img.url.length : 0,
+        variation: img.variation || 'no variation'
+      }))
+    });
+
+    const storyData = {
+      userId,
+      images,
+      style,
+      prompt,
+      imageCount: images.length,
+      createdAt: serverTimestamp(),
+      type: 'story',
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      isPublic: false, // Can be toggled later
+    };
+
+    // Save to user's story collections subcollection
+    const userStoriesRef = collection(db, 'users', userId, 'storyCollections');
+    const docRef = await addDoc(userStoriesRef, storyData);
+    console.log('[cartoonProfileService] ✅ Saved to user subcollection:', docRef.id);
+
+    // Also save to global stories collection for feed
+    const globalStoriesRef = collection(db, 'cartoonStories');
+    await setDoc(doc(globalStoriesRef, docRef.id), {
+      ...storyData,
+      storyId: docRef.id,
+    });
+    console.log('[cartoonProfileService] ✅ Saved to global collection:', docRef.id);
+
+    console.log('[cartoonProfileService] ✅ Story collection saved successfully with ID:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('[cartoonProfileService] Error saving story collection:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get user's Story Teller collections
+ * @param {string} userId - User ID
+ * @returns {Promise<Array>} Array of story collections
+ */
+export async function getUserStoryCollections(userId) {
+  try {
+    const userStoriesRef = collection(db, 'users', userId, 'storyCollections');
+    const snapshot = await getDocs(userStoriesRef);
+
+    const stories = [];
+    snapshot.forEach((doc) => {
+      stories.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    // Sort by creation date (newest first)
+    stories.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis() || 0;
+      const timeB = b.createdAt?.toMillis() || 0;
+      return timeB - timeA;
+    });
+
+    console.log('[cartoonProfileService] Retrieved', stories.length, 'story collections');
+    return stories;
+  } catch (error) {
+    console.error('[cartoonProfileService] Error getting story collections:', error);
+    return [];
+  }
 }
 
 /**

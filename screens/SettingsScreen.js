@@ -45,7 +45,7 @@ import CartoonHistoryModal from '../components/CartoonHistoryModal';
 import CartoonSuccessModal from '../components/CartoonSuccessModal';
 import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
 import EmailVerificationBanner from '../components/EmailVerificationBanner';
-import { generateCartoonProfile, getUsageStatsText } from '../services/openai/profileCartoonService';
+import { generateCartoonProfile, generateStoryTellerBatch, getUsageStatsText } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
@@ -57,6 +57,7 @@ import {
   clearCartoonHistory,
   uploadTemporaryCustomImage,
   deleteTemporaryCustomImage,
+  saveStoryCollection,
 } from '../services/cartoonProfileService';
 import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
@@ -185,6 +186,14 @@ export default function SettingsScreen({ navigation }) {
   const [showGenerationProgress, setShowGenerationProgress] = useState(false);
   const [currentGenerationStyle, setCurrentGenerationStyle] = useState('AI Avatar');
   const [currentGenerationNotify, setCurrentGenerationNotify] = useState(false);
+
+  // Story Teller progress state
+  const [storyTellerProgress, setStoryTellerProgress] = useState({
+    isStoryTeller: false,
+    totalImages: 1,
+    currentImage: 1,
+    completedImages: 0,
+  });
 
   // Upgrade modal state
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
@@ -911,6 +920,14 @@ export default function SettingsScreen({ navigation }) {
 
   // Handle style selection and generation
   const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
+    console.log('[SettingsScreen] 🚨🚨🚨 handleGenerateCartoon called with:', {
+      styleId,
+      hasCustomPrompt: !!customPrompt,
+      generationOptions,
+      generationOptionsKeys: Object.keys(generationOptions),
+      storyMode: generationOptions?.storyMode,
+      quantity: generationOptions?.quantity
+    });
     // Check email verification first (required for all AI features to prevent abuse)
     // Google users are automatically verified by Google
     const isGoogleUser = user?.providerData?.some(provider => provider.providerId === 'google.com');
@@ -991,30 +1008,146 @@ export default function SettingsScreen({ navigation }) {
         console.log('[SettingsScreen] Text-only generation (ignoring profile picture)');
       }
 
-      // Generate cartoon using OpenAI with selected model
-      const result = await generateCartoonProfile(
-        imageUrlToUse,
-        styleId,
-        userProfile.gender || 'neutral',
-        customPrompt, // Pass custom prompt for Gold users
-        userProfile?.subscriptionPlan || 'basic', // Pass subscription plan for Vision analysis
-        model, // Pass selected GPT model
-        cartoonUsageData?.gpt4VisionUsage || 0 // Pass current GPT-4 Vision usage
-      );
+      // Log generation options to debug
+      console.log('[SettingsScreen] 🎯 Generation Options:', {
+        storyMode: generationOptions?.storyMode,
+        quantity: generationOptions?.quantity,
+        model: generationOptions?.model,
+        hasCustomImage: !!generationOptions?.customImage,
+        ignoreProfilePicture: generationOptions?.ignoreProfilePicture,
+        willGenerateStoryTeller: generationOptions?.storyMode && generationOptions?.quantity > 1
+      });
 
-      // Upload to Firebase Storage
-      const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+      // Check if Story Teller mode (multiple images)
+      if (generationOptions?.storyMode && generationOptions?.quantity > 1) {
+        console.log('[SettingsScreen] 🎨🎨🎨 Story Teller mode: generating', generationOptions.quantity, 'variations');
 
-      // Record generation and update history (use 'custom' as style if custom prompt)
-      await recordCartoonGeneration(
-        user.uid,
-        storageUrl,
-        styleId === 'custom' ? 'custom' : styleId,
-        isAdmin,
-        userPlan,
-        result.usedGpt4,
-        customPrompt || null // Save the prompt if provided
-      );
+        // Initialize Story Teller progress
+        setStoryTellerProgress({
+          isStoryTeller: true,
+          totalImages: generationOptions.quantity,
+          currentImage: 1,
+          completedImages: 0,
+        });
+
+        // Generate batch of variations
+        const results = await generateStoryTellerBatch(
+          imageUrlToUse,
+          styleId,
+          generationOptions.quantity,
+          userProfile.gender || 'neutral',
+          customPrompt,
+          userProfile?.subscriptionPlan || 'basic',
+          model,
+          cartoonUsageData?.gpt4VisionUsage || 0,
+          (progress) => {
+            console.log('[SettingsScreen] Story Teller progress:', progress.current, '/', progress.total);
+            // Update progress UI
+            setStoryTellerProgress({
+              isStoryTeller: true,
+              totalImages: progress.total,
+              currentImage: progress.current,
+              completedImages: progress.current - 1,
+            });
+          }
+        );
+
+        // Create a story collection
+        const storyId = `story-${Date.now()}`;
+        const storyImages = [];
+
+        console.log('[SettingsScreen] 📸 Story Teller: Processing', results.length, 'generated images');
+
+        // Upload all images and record each generation
+        for (const [index, result] of results.entries()) {
+          console.log(`[SettingsScreen] 📸 Uploading image ${index + 1}/${results.length}:`, {
+            variation: result.variation,
+            hasImageUrl: !!result.imageUrl,
+            imageUrlPreview: result.imageUrl ? result.imageUrl.substring(0, 50) + '...' : 'No URL',
+          });
+
+          const storageUrl = await uploadCartoonToStorage(
+            user.uid,
+            result.imageUrl,
+            `${styleId}-story-${index}`
+          );
+
+          console.log(`[SettingsScreen] ✅ Image ${index + 1} uploaded to:`, storageUrl);
+
+          storyImages.push({
+            id: `${storyId}-${index}`,
+            url: storageUrl,
+            variation: result.variation,
+            variationPrompt: result.variationPrompt,
+          });
+
+          // Record each generation (counts against usage)
+          await recordCartoonGeneration(
+            user.uid,
+            storageUrl,
+            styleId === 'custom' ? 'custom' : styleId,
+            isAdmin,
+            userPlan,
+            result.usedGpt4,
+            `${customPrompt || ''} ${result.variationPrompt || ''}`.trim()
+          );
+        }
+
+        console.log('[SettingsScreen] 📸 All images uploaded. Story collection:', {
+          storyId,
+          imageCount: storyImages.length,
+          images: storyImages.map(img => ({
+            id: img.id,
+            hasUrl: !!img.url,
+            urlPreview: img.url ? img.url.substring(0, 50) + '...' : 'No URL',
+            variation: img.variation
+          }))
+        });
+
+        // Save story collection to database
+        const storyCollectionId = await saveStoryCollection(
+          user.uid,
+          storyImages,
+          styleId === 'custom' ? 'custom' : styleId,
+          customPrompt || null
+        );
+
+        console.log('[SettingsScreen] ✅ Story Teller complete:', storyImages.length, 'images generated');
+        console.log('[SettingsScreen] ✅ Story collection saved with ID:', storyCollectionId);
+        console.log('[SettingsScreen] 📊 Final story data:', {
+          collectionId: storyCollectionId,
+          userId: user.uid,
+          style: styleId,
+          imageCount: storyImages.length,
+          timestamp: new Date().toISOString()
+        });
+
+      } else {
+        // Single image generation (original flow)
+        const result = await generateCartoonProfile(
+          imageUrlToUse,
+          styleId,
+          userProfile.gender || 'neutral',
+          customPrompt,
+          userProfile?.subscriptionPlan || 'basic',
+          model,
+          cartoonUsageData?.gpt4VisionUsage || 0
+        );
+
+        // Upload to Firebase Storage
+        const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+
+        // Record generation and update history
+        await recordCartoonGeneration(
+          user.uid,
+          storageUrl,
+          styleId === 'custom' ? 'custom' : styleId,
+          isAdmin,
+          userPlan,
+          result.usedGpt4,
+          customPrompt || null
+        );
+      }
 
       // Delete temporary custom image if it was used
       if (tempImageData) {
@@ -1028,6 +1161,14 @@ export default function SettingsScreen({ navigation }) {
       // Close progress indicator
       setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
+
+      // Reset Story Teller progress
+      setStoryTellerProgress({
+        isStoryTeller: false,
+        totalImages: 1,
+        currentImage: 1,
+        completedImages: 0,
+      });
 
       // Wait for progress to close
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -1051,6 +1192,14 @@ export default function SettingsScreen({ navigation }) {
       // Close progress indicator
       setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
+
+      // Reset Story Teller progress on error
+      setStoryTellerProgress({
+        isStoryTeller: false,
+        totalImages: 1,
+        currentImage: 1,
+        completedImages: 0,
+      });
 
       // Wait for progress to close
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -2461,6 +2610,10 @@ export default function SettingsScreen({ navigation }) {
         }}
         styleName={currentGenerationStyle}
         notifyWhenDone={currentGenerationNotify}
+        isStoryTeller={storyTellerProgress.isStoryTeller}
+        totalImages={storyTellerProgress.totalImages}
+        currentImage={storyTellerProgress.currentImage}
+        completedImages={storyTellerProgress.completedImages}
       />
     </ScreenLayout>
   );

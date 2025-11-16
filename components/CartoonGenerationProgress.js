@@ -26,12 +26,30 @@ export default function CartoonGenerationProgress({
   onComplete,
   styleName = 'AI Avatar',
   notifyWhenDone = false,
+  isStoryTeller = false,
+  totalImages = 1,
+  currentImage = 1,
+  completedImages = 0,
 }) {
   const { themeColors } = useSettings();
   const [isMinimized, setIsMinimized] = useState(false);
   const [generationComplete, setGenerationComplete] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // Debug logging
+  useEffect(() => {
+    if (visible) {
+      console.log('[CartoonGenerationProgress] 🎯 Progress modal visible with:', {
+        isStoryTeller,
+        totalImages,
+        currentImage,
+        completedImages,
+        styleName,
+      });
+    }
+  }, [visible, isStoryTeller, totalImages, currentImage, completedImages]);
 
   // Animate minimize/maximize
   useEffect(() => {
@@ -49,6 +67,19 @@ export default function CartoonGenerationProgress({
       friction: 8,
     }).start();
   }, [isMinimized]);
+
+  // Animate progress bar
+  useEffect(() => {
+    if (isStoryTeller && totalImages > 0) {
+      const progress = completedImages / totalImages;
+      Animated.spring(progressAnim, {
+        toValue: progress,
+        useNativeDriver: false,
+        tension: 50,
+        friction: 8,
+      }).start();
+    }
+  }, [completedImages, totalImages, isStoryTeller]);
 
   const handleMinimize = () => {
     setIsMinimized(true);
@@ -114,7 +145,7 @@ export default function CartoonGenerationProgress({
           </View>
           <View style={styles.minimizedTextContainer}>
             <Text style={[styles.minimizedTitle, { color: themeColors.textPrimary }]}>
-              Generating...
+              {isStoryTeller ? `${completedImages}/${totalImages} images` : 'Generating...'}
             </Text>
             <Text style={[styles.minimizedSubtitle, { color: themeColors.textSecondary }]}>
               Tap to expand
@@ -180,12 +211,74 @@ export default function CartoonGenerationProgress({
 
           {/* Progress text */}
           <View style={styles.textContainer}>
-            <Text style={[styles.progressTitle, { color: themeColors.textPrimary }]}>
-              Creating your AI avatar...
-            </Text>
-            <Text style={[styles.progressSubtitle, { color: themeColors.textSecondary }]}>
-              This usually takes 10-30 seconds
-            </Text>
+            {isStoryTeller ? (
+              <>
+                <Text style={[styles.progressTitle, { color: themeColors.textPrimary }]}>
+                  Generating image {currentImage} of {totalImages}
+                </Text>
+                <Text style={[styles.progressSubtitle, { color: themeColors.textSecondary }]}>
+                  Creating your Story Teller collection...
+                </Text>
+
+                {/* Progress Bar */}
+                <View style={styles.progressBarContainer}>
+                  <View style={[styles.progressBarTrack, { backgroundColor: themeColors.divider }]}>
+                    <Animated.View
+                      style={[
+                        styles.progressBarFill,
+                        {
+                          backgroundColor: themeColors.primary,
+                          width: progressAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0%', '100%'],
+                          }),
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.progressPercentage, { color: themeColors.textSecondary }]}>
+                    {Math.round((completedImages / totalImages) * 100)}%
+                  </Text>
+                </View>
+
+                {/* Individual Image Status */}
+                <View style={styles.imageStatusContainer}>
+                  {Array.from({ length: totalImages }).map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.imageStatusDot,
+                        {
+                          backgroundColor:
+                            index < completedImages
+                              ? '#4CAF50'
+                              : index === completedImages
+                              ? themeColors.primary
+                              : themeColors.divider,
+                        },
+                      ]}
+                    >
+                      {index < completedImages && (
+                        <Ionicons name="checkmark" size={12} color="#FFF" />
+                      )}
+                      {index === completedImages && !generationComplete && (
+                        <View style={styles.pulsingDot} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.progressTitle, { color: themeColors.textPrimary }]}>
+                  Creating your AI avatar...
+                </Text>
+                <Text style={[styles.progressSubtitle, { color: themeColors.textSecondary }]}>
+                  This usually takes 10-30 seconds
+                </Text>
+              </>
+            )}
+
             {notifyWhenDone && (
               <View style={styles.notificationBadge}>
                 <Ionicons name="notifications" size={14} color="#6C4DF4" />
@@ -353,5 +446,47 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Story Teller progress styles
+  progressBarContainer: {
+    marginTop: 20,
+    marginBottom: 16,
+    width: '100%',
+  },
+  progressBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressPercentage: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  imageStatusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 12,
+  },
+  imageStatusDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  pulsingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFF',
   },
 });

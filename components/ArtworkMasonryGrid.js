@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator, Animated } from 'react-native';
+import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator, Animated, ScrollView, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -7,6 +7,7 @@ import LottieView from 'lottie-react-native';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
+import StoryTellerCard from './StoryTellerCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
@@ -15,13 +16,24 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
   const { themeColors, userProfile, accentPreset } = useSettings();
   const { currentUser, isAdmin } = useAuth();
   const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
-  const [fullScreenImage, setFullScreenImage] = useState({ visible: false, url: '', style: '', prompt: '' });
+  const [fullScreenImage, setFullScreenImage] = useState({
+    visible: false,
+    url: '',
+    style: '',
+    prompt: '',
+    // Story Teller support
+    isStory: false,
+    images: [],
+    currentIndex: 0,
+  });
   const [showFullScreenPrompt, setShowFullScreenPrompt] = useState(false); // Toggle prompt card in full screen
   const [downloadLimits, setDownloadLimits] = useState({ allowed: true, remaining: -1, limit: -1 });
   const [isDownloading, setIsDownloading] = useState(false);
   const [loadingImages, setLoadingImages] = useState({}); // Track loading state for grid images
   const [fullScreenLoading, setFullScreenLoading] = useState(true); // Track loading for full screen image
   const [likedArtworks, setLikedArtworks] = useState({}); // Track which artworks user has liked
+  const [preloadedImages, setPreloadedImages] = useState(new Set()); // Track preloaded full-screen images
+  const scrollViewRef = useRef(null); // Reference to ScrollView for programmatic scrolling
   const [heartAnimations, setHeartAnimations] = useState({}); // Track heart animation state
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
 
@@ -30,9 +42,57 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
     checkDownloadLimits();
   }, [fullScreenImage.visible, isAdmin, userProfile?.subscriptionPlan]);
 
+  // Preload all Story images when modal opens + scroll to correct position
+  useEffect(() => {
+    if (fullScreenImage.visible && fullScreenImage.isStory && fullScreenImage.images.length > 0) {
+      console.log('[ArtworkMasonryGrid] 🖼️ Preloading Story images:', fullScreenImage.images.length);
+
+      // Preload all images in the background
+      const preloadPromises = fullScreenImage.images.map((image, index) => {
+        return Image.prefetch(image.url)
+          .then(() => {
+            console.log(`[ArtworkMasonryGrid] ✅ Preloaded image ${index + 1}/${fullScreenImage.images.length}`);
+            setPreloadedImages(prev => new Set([...prev, image.url]));
+          })
+          .catch(error => {
+            console.warn(`[ArtworkMasonryGrid] ⚠️ Failed to preload image ${index + 1}:`, error);
+          });
+      });
+
+      Promise.all(preloadPromises).then(() => {
+        console.log('[ArtworkMasonryGrid] 🎉 All Story images preloaded');
+      });
+
+      // Scroll to initial position after a short delay
+      setTimeout(() => {
+        if (scrollViewRef.current && fullScreenImage.currentIndex > 0) {
+          scrollViewRef.current.scrollTo({
+            x: fullScreenImage.currentIndex * SCREEN_WIDTH,
+            y: 0,
+            animated: false,
+          });
+        }
+      }, 100);
+    }
+
+    // Clear preloaded cache when modal closes
+    return () => {
+      if (!fullScreenImage.visible) {
+        setPreloadedImages(new Set());
+      }
+    };
+  }, [fullScreenImage.visible, fullScreenImage.isStory]);
+
   // Reset full-screen loading when image changes with timeout fallback
   useEffect(() => {
     if (fullScreenImage.visible && fullScreenImage.url) {
+      // Check if image is already preloaded
+      if (preloadedImages.has(fullScreenImage.url)) {
+        console.log('[ArtworkMasonryGrid] Image already cached, skipping loading state');
+        setFullScreenLoading(false);
+        return;
+      }
+
       console.log('[ArtworkMasonryGrid] Full-screen image changed, setting loading state');
       setFullScreenLoading(true);
 
@@ -44,7 +104,7 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
 
       return () => clearTimeout(timeout);
     }
-  }, [fullScreenImage.url, fullScreenImage.visible]);
+  }, [fullScreenImage.url, fullScreenImage.visible, preloadedImages]);
 
   const checkDownloadLimits = async () => {
     const planId = userProfile?.subscriptionPlan || 'basic';
@@ -134,11 +194,136 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
     // });
   };
 
-  // Split artworks into two columns for masonry layout
+  const handleCommentPress = (story) => {
+    // TODO: Open comments modal or navigate to comments screen
+    Alert.alert(
+      'Comments',
+      `View and add comments for this Story Teller collection.\n\nCurrent comments: ${story.comments || 0}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'View Comments', onPress: () => console.log('Navigate to comments') },
+      ]
+    );
+  };
+
+  const handleSharePress = async (story) => {
+    try {
+      const message = `Check out this amazing Story Teller collection with ${story.images?.length || 0} variations!\n\nStyle: ${story.style}\n${story.prompt ? `\nPrompt: ${story.prompt}` : ''}`;
+
+      await Share.share({
+        message,
+        title: 'Story Teller Collection',
+      });
+    } catch (error) {
+      console.error('[ArtworkMasonryGrid] Error sharing story:', error);
+    }
+  };
+
+  const handlePromptPress = (story) => {
+    if (story.prompt) {
+      Alert.alert(
+        'AI Prompt',
+        story.prompt,
+        [
+          { text: 'Close', style: 'cancel' },
+          {
+            text: 'Copy',
+            onPress: () => {
+              // TODO: Copy to clipboard
+              console.log('Copy prompt to clipboard');
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleDownloadAll = async (story) => {
+    if (!story.images || story.images.length === 0) {
+      Alert.alert('Error', 'No images to download');
+      return;
+    }
+
+    try {
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to save images to your photo library.');
+        return;
+      }
+
+      setIsDownloading(true);
+      console.log('[ArtworkMasonryGrid] Downloading', story.images.length, 'images from Story collection');
+
+      let successCount = 0;
+      let failCount = 0;
+
+      // Download each image
+      for (const [index, image] of story.images.entries()) {
+        try {
+          console.log(`[ArtworkMasonryGrid] Downloading image ${index + 1}/${story.images.length}`);
+
+          const filename = `story-${story.style}-${index + 1}-${Date.now()}.jpg`;
+          const fileUri = documentDirectory + filename;
+
+          const downloadResult = await downloadAsync(image.url, fileUri);
+
+          // Save to media library
+          await MediaLibrary.createAssetAsync(downloadResult.uri);
+          successCount++;
+
+          console.log(`[ArtworkMasonryGrid] ✅ Downloaded image ${index + 1}`);
+        } catch (error) {
+          console.error(`[ArtworkMasonryGrid] ❌ Failed to download image ${index + 1}:`, error);
+          failCount++;
+        }
+      }
+
+      setIsDownloading(false);
+
+      // Show result
+      if (successCount > 0 && failCount === 0) {
+        Alert.alert(
+          'Success! 🎉',
+          `All ${successCount} images saved to your photo library!`
+        );
+      } else if (successCount > 0 && failCount > 0) {
+        Alert.alert(
+          'Partial Success',
+          `${successCount} images saved successfully.\n${failCount} images failed to download.`
+        );
+      } else {
+        Alert.alert(
+          'Download Failed',
+          'Unable to save images. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('[ArtworkMasonryGrid] Download all error:', error);
+      setIsDownloading(false);
+      Alert.alert('Download Failed', 'Unable to save images. Please try again.');
+    }
+  };
+
+  // Process and categorize items (stories vs regular artworks)
+  const processedItems = [];
+  const storyCollections = [];
+
+  artworks.forEach((item) => {
+    if (item.type === 'story' && item.images && item.images.length > 1) {
+      // This is a Story Teller collection
+      storyCollections.push(item);
+    } else {
+      // Regular artwork
+      processedItems.push(item);
+    }
+  });
+
+  // Split regular artworks into two columns for masonry layout
   const leftColumn = [];
   const rightColumn = [];
 
-  artworks.forEach((artwork, index) => {
+  processedItems.forEach((artwork, index) => {
     if (index % 2 === 0) {
       leftColumn.push(artwork);
     } else {
@@ -152,13 +337,22 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
         {/* Artwork Image - opens full screen */}
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => setFullScreenImage({ visible: true, url: artwork.url, style: artwork.style, prompt: artwork.prompt })}
+          onPress={() => setFullScreenImage({
+            visible: true,
+            url: artwork.url,
+            style: artwork.style,
+            prompt: artwork.prompt,
+            isStory: false,
+            images: [],
+            currentIndex: 0,
+          })}
         >
           <Image
             source={{ uri: artwork.url }}
             style={styles.artworkImage}
             resizeMode="cover"
             cache="force-cache"
+            timeout={30000}
             onLoadStart={() => {
               console.log('[ArtworkMasonryGrid] Grid image loading started:', artwork.id);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: true }));
@@ -253,11 +447,58 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.column}>
-          {leftColumn.map(renderArtworkItem)}
-        </View>
-        <View style={styles.column}>
-          {rightColumn.map(renderArtworkItem)}
+        {/* Story Teller Collections - Full Width Cards */}
+        {storyCollections.length > 0 && (
+          <View style={styles.storySection}>
+            {storyCollections.map((story) => (
+              <StoryTellerCard
+                key={story.id}
+                story={story}
+                onImagePress={(image, index) => {
+                  // Open full screen view with all story images for swiping
+                  setFullScreenImage({
+                    visible: true,
+                    url: image.url,
+                    style: story.style,
+                    prompt: story.prompt,
+                    isStory: true,
+                    images: story.images || [],
+                    currentIndex: index,
+                  });
+                }}
+                onLikePress={(storyId) => handleLikeArtwork(storyId)}
+                isLiked={likedArtworks[story.id]}
+                onCommentPress={handleCommentPress}
+                onSharePress={handleSharePress}
+                onPromptPress={handlePromptPress}
+                onMenuPress={() => {
+                  // Handle menu actions (download, share, etc.)
+                  Alert.alert(
+                    'Story Actions',
+                    'What would you like to do?',
+                    [
+                      {
+                        text: `Download All (${story.images?.length || 0} images)`,
+                        onPress: () => handleDownloadAll(story)
+                      },
+                      { text: 'Share', onPress: () => handleSharePress(story) },
+                      { text: 'Cancel', style: 'cancel' },
+                    ]
+                  );
+                }}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Regular Artworks - Masonry Grid */}
+        <View style={styles.gridColumns}>
+          <View style={styles.column}>
+            {leftColumn.map(renderArtworkItem)}
+          </View>
+          <View style={styles.column}>
+            {rightColumn.map(renderArtworkItem)}
+          </View>
         </View>
       </View>
 
@@ -340,7 +581,15 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
             {/* Close button */}
             <TouchableOpacity
               style={styles.closeButtonFullScreen}
-              onPress={() => setFullScreenImage({ visible: false, url: '', style: '', prompt: '' })}
+              onPress={() => setFullScreenImage({
+                visible: false,
+                url: '',
+                style: '',
+                prompt: '',
+                isStory: false,
+                images: [],
+                currentIndex: 0,
+              })}
               activeOpacity={0.7}
             >
               <View style={styles.closeIconContainer}>
@@ -380,12 +629,62 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
             </View>
           )}
 
-          {fullScreenImage.url ? (
+          {fullScreenImage.isStory && fullScreenImage.images.length > 0 ? (
+            // Story Teller: Swipeable gallery with preloaded images
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.fullScreenScrollView}
+              onScroll={(event) => {
+                const offsetX = event.nativeEvent.contentOffset.x;
+                const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+                if (newIndex !== fullScreenImage.currentIndex && newIndex >= 0 && newIndex < fullScreenImage.images.length) {
+                  setFullScreenImage(prev => ({
+                    ...prev,
+                    currentIndex: newIndex,
+                    url: prev.images[newIndex]?.url || prev.url,
+                  }));
+                }
+              }}
+              scrollEventThrottle={16}
+            >
+              {fullScreenImage.images.map((image, index) => (
+                <View key={image.id || index} style={styles.fullScreenImageContainer}>
+                  <Image
+                    source={{ uri: image.url }}
+                    style={styles.fullScreenImage}
+                    resizeMode="contain"
+                    cache="force-cache"
+                    onLoadEnd={() => {
+                      // Mark as loaded when image finishes loading
+                      if (!preloadedImages.has(image.url)) {
+                        setPreloadedImages(prev => new Set([...prev, image.url]));
+                      }
+                      // Hide loading indicator if this is the current image
+                      if (index === fullScreenImage.currentIndex) {
+                        setFullScreenLoading(false);
+                      }
+                    }}
+                    onError={(error) => {
+                      console.error(`[ArtworkMasonryGrid] Image ${index + 1} load error:`, error?.nativeEvent);
+                      if (index === fullScreenImage.currentIndex) {
+                        setFullScreenLoading(false);
+                      }
+                    }}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          ) : fullScreenImage.url ? (
+            // Single image
             <Image
               source={{ uri: fullScreenImage.url }}
               style={styles.fullScreenImage}
               resizeMode="contain"
               cache="force-cache"
+              timeout={30000}
               onLoadStart={() => {
                 if (fullScreenImage.visible && fullScreenImage.url) {
                   console.log('[ArtworkMasonryGrid] Full-screen image loading started');
@@ -407,8 +706,8 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
             />
           ) : null}
 
-          {/* Loading overlay with broom animation */}
-          {fullScreenLoading && (
+          {/* Loading overlay with broom animation - only for non-preloaded images */}
+          {fullScreenLoading && !preloadedImages.has(fullScreenImage.url) && (
             <View style={styles.fullScreenLoadingOverlay}>
               <LottieView
                 source={require('../assets/broom.json')}
@@ -419,16 +718,27 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
             </View>
           )}
 
-          {fullScreenImage.style && (
-            <View style={styles.fullScreenInfo}>
+          {/* Info badges at bottom */}
+          <View style={styles.fullScreenInfo}>
+            {fullScreenImage.style && (
               <View style={styles.fullScreenBadge}>
                 <Ionicons name="brush" size={16} color="#fff" />
                 <Text style={styles.fullScreenStyleText}>
                   {fullScreenImage.style} Style
                 </Text>
               </View>
-            </View>
-          )}
+            )}
+
+            {/* Image counter for Story Teller */}
+            {fullScreenImage.isStory && fullScreenImage.images.length > 1 && (
+              <View style={[styles.fullScreenBadge, styles.imageCounterBadge]}>
+                <Ionicons name="images" size={16} color="#fff" />
+                <Text style={styles.fullScreenStyleText}>
+                  {fullScreenImage.currentIndex + 1}/{fullScreenImage.images.length}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </Modal>
     </>
@@ -437,9 +747,17 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    paddingBottom: 20,
+  },
+  storySection: {
+    paddingHorizontal: 8,
+    marginBottom: 16,
+  },
+  gridColumns: {
     flexDirection: 'row',
     gap: 8,
-    paddingBottom: 20,
+    paddingHorizontal: 4,
   },
   column: {
     flex: 1,
@@ -643,7 +961,10 @@ const styles = StyleSheet.create({
     bottom: 50,
     left: 20,
     right: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
   },
   fullScreenBadge: {
     flexDirection: 'row',
@@ -654,10 +975,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
   },
+  imageCounterBadge: {
+    backgroundColor: 'rgba(108, 77, 244, 0.9)',
+  },
   fullScreenStyleText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  fullScreenScrollView: {
+    flex: 1,
+  },
+  fullScreenImageContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   gridLoadingOverlay: {
     position: 'absolute',

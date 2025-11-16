@@ -112,7 +112,7 @@ export const USAGE_LIMITS = {
     gpt4VisionMonthly: 0, // No GPT-4 Vision for Premium
   },
   gold: {
-    monthly: 70, // TEMPORARY: Increased to 40 for testing (normally 20)
+    monthly: 100, // TEMPORARY: Increased to 100 for testing (normally 20)
     lifetime: null, // Unlimited lifetime
     historyLimit: 20, // Gold users can save 20 cartoons in history
     gpt4VisionMonthly: 5, // Gold users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
@@ -181,6 +181,210 @@ async function analyzeProfilePicture(imageUrl, apiKey) {
 // Track last request time to prevent rate limiting
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
+
+/**
+ * Generate multiple cartoon variations (Story Teller mode)
+ * @param {string} imageUrl - URL of the original image
+ * @param {string} styleId - Style ID or 'custom'
+ * @param {number} quantity - Number of variations to generate (2-5)
+ * @param {string} gender - Gender hint
+ * @param {string} customPrompt - Custom prompt for variations
+ * @param {string} subscriptionPlan - User's plan
+ * @param {string} model - AI model to use
+ * @param {number} gpt4VisionUsage - GPT-4 usage count
+ * @param {function} onProgress - Progress callback ({current, total, image})
+ * @returns {Promise<Array>} Array of generated image URLs and metadata
+ */
+export async function generateStoryTellerBatch(
+  imageUrl,
+  styleId = 'pixar',
+  quantity = 3,
+  gender = 'neutral',
+  customPrompt = null,
+  subscriptionPlan = 'gold',
+  model = 'gpt-3.5-turbo',
+  gpt4VisionUsage = 0,
+  onProgress = null
+) {
+  if (quantity < 2 || quantity > 5) {
+    throw new Error('Story Teller mode requires 2-5 images');
+  }
+
+  console.log(`[profileCartoonService] 🎨 Starting Story Teller batch generation:`, {
+    quantity,
+    styleId,
+    hasCustomPrompt: !!customPrompt,
+    subscriptionPlan,
+    model
+  });
+
+  const results = [];
+
+  // STEP 1: Generate the first reference image and extract its revised prompt
+  console.log('[profileCartoonService] 🎨 Generating first image as reference...');
+
+  let firstImagePrompt = null;
+  let baseCharacterDescription = null;
+
+  // Get Vision description if available
+  if (imageUrl) {
+    try {
+      console.log('[profileCartoonService] 🔍 Analyzing image for character details...');
+      baseCharacterDescription = await analyzePhotoWithVision(imageUrl, model, gpt4VisionUsage);
+      console.log('[profileCartoonService] ✅ Vision analysis complete');
+    } catch (error) {
+      console.warn('[profileCartoonService] Vision analysis failed, will use generic description');
+    }
+  }
+
+  // Generate first image and capture DALL-E's revised prompt
+  let firstPrompt;
+  if (styleId === 'custom' && customPrompt) {
+    if (baseCharacterDescription) {
+      firstPrompt = `Create a cartoon avatar: ${customPrompt}. Based on this person: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.`;
+    } else {
+      firstPrompt = `${customPrompt}. Looking directly at camera. High quality, detailed, professional illustration.`;
+    }
+  } else {
+    const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
+    if (baseCharacterDescription) {
+      firstPrompt = `Create a ${style.prompt} portrait avatar based on: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.`;
+    } else {
+      const genderHint = gender !== 'neutral' ? `${gender} ` : '';
+      firstPrompt = `Create a ${genderHint}${style.prompt} portrait. Looking directly at camera. High quality, detailed, profile picture.`;
+    }
+  }
+
+  const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
+
+  const firstGeneration = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
+    model: 'dall-e-3',
+    prompt: firstPrompt,
+    n: 1,
+    size: '1024x1024',
+    quality: imageQuality,
+    style: 'vivid',
+  });
+
+  const firstImage = {
+    imageUrl: firstGeneration.data[0].url,
+    usedGpt4: false,
+    revised_prompt: firstGeneration.data[0].revised_prompt,
+  };
+
+  // Extract DALL-E's interpretation from the revised prompt
+  firstImagePrompt = firstGeneration.data[0].revised_prompt;
+  console.log('[profileCartoonService] ✅ First image generated, DALL-E revised prompt:', firstImagePrompt.substring(0, 150) + '...');
+
+  results.push({
+    ...firstImage,
+    variation: 0,
+    variationPrompt: '',
+  });
+
+  // Report progress for first image
+  if (onProgress) {
+    onProgress({
+      current: 1,
+      total: quantity,
+      image: firstImage,
+    });
+  }
+
+  // STEP 2: Define pose/expression variations
+  const poseVariations = [
+    'looking directly at the camera with a neutral expression',
+    'turned slightly to the left with a warm, genuine smile',
+    'facing right with eyes full of wonder and curiosity',
+    'laughing joyfully with bright, sparkling eyes',
+    'thoughtful and contemplative, gazing slightly upward',
+  ];
+
+  // STEP 3: Generate remaining variations using DALL-E's revised prompt
+  // Use the EXACT character description DALL-E generated for the first image
+  for (let i = 1; i < quantity; i++) {
+    try {
+      console.log(`[profileCartoonService] 🎨 Generating variation ${i + 1}/${quantity}...`);
+
+      // Use DALL-E's own revised prompt as the character description
+      // This ensures maximum consistency since we're using DALL-E's exact interpretation
+      const finalPrompt = `${firstImagePrompt}
+
+IMPORTANT: Keep the EXACT SAME character, clothing, hairstyle, colors, and art style as described above.
+ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
+
+      console.log(`[profileCartoonService] 🎨 Variation ${i + 1}:`, {
+        pose: poseVariations[i - 1],
+        usingRevisedPrompt: true,
+        revisedPromptPreview: firstImagePrompt.substring(0, 100) + '...',
+        promptLength: finalPrompt.length
+      });
+
+      // Generate directly with DALL-E using the final prompt
+      const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
+
+      const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
+        model: 'dall-e-3',
+        prompt: finalPrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: imageQuality,
+        style: 'vivid',
+      });
+
+      const result = {
+        imageUrl: data.data[0].url,
+        usedGpt4: false, // Not using GPT-4 for generation, only for initial Vision
+        revised_prompt: data.data[0].revised_prompt || null,
+      };
+
+      console.log(`[profileCartoonService] ✅ Image ${i + 1} generated:`, {
+        hasImageUrl: !!result.imageUrl,
+        imageUrlPreview: result.imageUrl ? result.imageUrl.substring(0, 50) + '...' : 'No URL',
+        usedGpt4: result.usedGpt4,
+      });
+
+      results.push({
+        ...result,
+        variation: i,
+        variationPrompt: poseVariations[i - 1],
+      });
+
+      // Report progress
+      if (onProgress) {
+        onProgress({
+          current: i + 1,
+          total: quantity,
+          image: result,
+        });
+      }
+
+      console.log(`[profileCartoonService] 📊 Story Teller progress: ${i + 1}/${quantity} completed, ${results.length} results collected`);
+
+      // Add delay between requests to avoid rate limiting
+      if (i < quantity - 1) {
+        console.log(`[profileCartoonService] ⏳ Waiting 2s before next generation...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      console.error(`[profileCartoonService] ❌ Failed to generate variation ${i + 1}:`, error);
+      throw new Error(`Failed to generate variation ${i + 1}: ${error.message}`);
+    }
+  }
+
+  console.log(`[profileCartoonService] 🎉 Story Teller batch complete:`, {
+    requestedQuantity: quantity,
+    actualResults: results.length,
+    allHaveUrls: results.every(r => !!r.imageUrl),
+    resultSummary: results.map((r, idx) => ({
+      index: idx,
+      hasUrl: !!r.imageUrl,
+      variation: r.variation
+    }))
+  });
+
+  return results;
+}
 
 /**
  * Generate a cartoon version of a profile picture

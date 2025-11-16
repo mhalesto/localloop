@@ -45,6 +45,8 @@ export default function CartoonStyleModal({
   const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
   const [useCustomImage, setUseCustomImage] = useState(false); // Toggle for using custom image vs profile pic
   const [ignoreProfilePicture, setIgnoreProfilePicture] = useState(false); // Gold feature: generate without profile pic
+  const [quantity, setQuantity] = useState(1); // Gold feature: Story Teller - generate multiple images
+  const [storyMode, setStoryMode] = useState(false); // Gold feature: Story Teller mode
   // Expandable sections
   const [professionalExpanded, setProfessionalExpanded] = useState(true);
   const [naturalExpanded, setNaturalExpanded] = useState(false);
@@ -67,8 +69,21 @@ export default function CartoonStyleModal({
   };
 
   const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
-  const isGoldUser = subscriptionPlan === 'gold' || isAdmin; // Admin has Gold features
+  console.log('[CartoonStyleModal] 🔑 User subscription:', {
+    subscriptionPlan,
+    isAdmin,
+    userProfilePlan: userProfile?.subscriptionPlan
+  });
+
+  // Fixed: Enable Story Teller for Premium users too
+  // 'gold' in database = Premium tier display
+  // 'ultimate' in database = Gold tier display
+  const isPremiumOrHigher = subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate' || isAdmin;
+  const isGoldUser = subscriptionPlan === 'ultimate' || isAdmin; // True Gold features
   const isUltimateUser = subscriptionPlan === 'ultimate' || isAdmin; // Ultimate tier
+
+  // For Story Teller: Allow Premium users to use it
+  const canUseStoryTeller = isPremiumOrHigher;
 
   // Map subscription plan to user-facing tier name
   const tierName = subscriptionPlan === 'ultimate' ? 'Gold' : subscriptionPlan === 'gold' ? 'Premium' : 'Go';
@@ -135,7 +150,7 @@ export default function CartoonStyleModal({
   };
 
   const handleToggleCustomPrompt = () => {
-    if (!isGoldUser || !canGenerate) return;
+    if (!isPremiumOrHigher || !canGenerate) return;
     setUseCustomPrompt(!useCustomPrompt);
     if (!useCustomPrompt) {
       setSelectedStyle(null); // Clear style selection when using custom prompt
@@ -200,18 +215,33 @@ export default function CartoonStyleModal({
   const handleGenerate = () => {
     if (!canGenerate) return;
 
+    console.log('[CartoonStyleModal] 🎯 Generation triggered with:', {
+      isGoldUser,
+      storyMode,
+      quantity,
+      selectedModel,
+      useCustomPrompt,
+      selectedStyle
+    });
+
     const generationOptions = {
       model: isGoldUser ? selectedModel : 'gpt-3.5-turbo',
       notifyWhenDone,
       customImage: useCustomImage && customImage ? customImage : null,
       ignoreProfilePicture: isGoldUser ? ignoreProfilePicture : false,
+      quantity: canUseStoryTeller && storyMode ? quantity : 1,
+      storyMode: canUseStoryTeller && storyMode && quantity > 1,
     };
+
+    console.log('[CartoonStyleModal] 📦 Generation options prepared:', generationOptions);
 
     if (useCustomPrompt && customPrompt.trim()) {
       // Send custom prompt for Gold users
+      console.log('[CartoonStyleModal] 🎨 Sending custom prompt generation');
       onStyleSelect('custom', customPrompt.trim(), generationOptions);
     } else if (selectedStyle) {
       // Send predefined style
+      console.log('[CartoonStyleModal] 🎨 Sending style generation:', selectedStyle);
       onStyleSelect(selectedStyle, null, generationOptions);
     }
   };
@@ -303,8 +333,8 @@ export default function CartoonStyleModal({
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-          {/* Gold Custom Prompt Option */}
-          {isGoldUser && (
+          {/* Custom Prompt Option (Premium & Gold) */}
+          {isPremiumOrHigher && (
             <View style={[localStyles.customPromptSection, { paddingHorizontal: 20, paddingBottom: 8 }]}>
               <TouchableOpacity
                 style={[
@@ -567,6 +597,67 @@ export default function CartoonStyleModal({
                 <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary }]}>
                   Create anything with text or custom image only
                 </Text>
+              )}
+            </View>
+          )}
+
+          {/* Story Teller Mode (Premium & Gold) */}
+          {canUseStoryTeller && (
+            <View style={[localStyles.notificationSection, { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 0 }]}>
+              <View style={localStyles.notificationToggle}>
+                <View style={localStyles.notificationTextContainer}>
+                  <Ionicons name="images" size={20} color="#FFD700" />
+                  <Text style={[localStyles.notificationLabel, { color: themeColors.textPrimary }]}>
+                    Story Teller Mode
+                  </Text>
+                </View>
+                <Switch
+                  value={storyMode}
+                  onValueChange={setStoryMode}
+                  trackColor={{ false: themeColors.divider, true: `${primaryColor}80` }}
+                  thumbColor={storyMode ? primaryColor : '#f4f3f4'}
+                  disabled={isGenerating}
+                />
+              </View>
+              {storyMode && (
+                <>
+                  <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary, marginBottom: 12 }]}>
+                    Generate multiple variations of the same scene
+                  </Text>
+                  <View style={localStyles.quantitySection}>
+                    <Text style={[localStyles.quantityLabel, { color: themeColors.textPrimary }]}>
+                      Number of images:
+                    </Text>
+                    <View style={localStyles.quantityButtons}>
+                      {[2, 3, 4, 5].map((num) => (
+                        <TouchableOpacity
+                          key={num}
+                          style={[
+                            localStyles.quantityButton,
+                            {
+                              backgroundColor: quantity === num ? primaryColor : themeColors.card,
+                              borderColor: quantity === num ? primaryColor : themeColors.divider,
+                            }
+                          ]}
+                          onPress={() => setQuantity(num)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              localStyles.quantityButtonText,
+                              { color: quantity === num ? '#fff' : themeColors.textPrimary }
+                            ]}
+                          >
+                            {num}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary, marginTop: 8 }]}>
+                      Each image uses 1 generation credit
+                    </Text>
+                  </View>
+                </>
               )}
             </View>
           )}
@@ -1214,6 +1305,31 @@ const localStyles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 30,
     fontStyle: 'italic',
+  },
+  quantitySection: {
+    marginTop: 12,
+    paddingLeft: 30,
+  },
+  quantityLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  quantityButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  quantityButton: {
+    width: 50,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   customImageSection: {
     marginTop: 16,

@@ -269,6 +269,39 @@ service cloud.firestore {
     }
 
     // Event Chats
+    // Cartoon Stories collection for Story Teller feature
+    match /cartoonStories/{storyId} {
+      // Anyone can read cartoon stories (public feed)
+      allow read: if true;
+
+      // Only the owner can create their stories
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      // Owner can update their stories
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+
+      // Owner or admin can delete stories
+      allow delete: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // User story collections subcollection
+    match /users/{userId}/storyCollections/{storyId} {
+      // Owner can read their own story collections
+      allow read: if isOwner(userId);
+
+      // Owner can create their own story collections
+      allow create: if isOwner(userId);
+
+      // Owner can update their own story collections
+      allow update: if isOwner(userId);
+
+      // Owner can delete their own story collections
+      allow delete: if isOwner(userId);
+    }
+
     match /eventChats/{eventId} {
       // Participants and organizer can read
       // Also allow reading non-existent documents (returns null anyway)

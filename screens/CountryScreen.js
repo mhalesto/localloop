@@ -41,7 +41,7 @@ import {
   getUsersFromAllCities,
   getAIArtworkFromCity
 } from '../services/exploreContentService';
-import { generateCartoonProfile } from '../services/openai/profileCartoonService';
+import { generateCartoonProfile, generateStoryTellerBatch } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
@@ -50,6 +50,7 @@ import {
   recordCartoonGeneration,
   uploadTemporaryCustomImage,
   deleteTemporaryCustomImage,
+  saveStoryCollection,
 } from '../services/cartoonProfileService';
 
 const INITIAL_VISIBLE = 40;
@@ -133,6 +134,14 @@ export default function CountryScreen({ navigation }) {
   const [currentGenerationStyle, setCurrentGenerationStyle] = useState('AI Avatar');
   const [currentGenerationNotify, setCurrentGenerationNotify] = useState(false);
   const [aiAvatarBannerDismissed, setAiAvatarBannerDismissed] = useState(false);
+
+  // Story Teller progress state
+  const [storyTellerProgress, setStoryTellerProgress] = useState({
+    isStoryTeller: false,
+    totalImages: 1,
+    currentImage: 1,
+    completedImages: 0,
+  });
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -400,6 +409,15 @@ export default function CountryScreen({ navigation }) {
 
   // Handle cartoon generation
   const handleGenerateCartoon = async (styleId, customPrompt = null, generationOptions = {}) => {
+    console.log('[CountryScreen] 🎯 handleGenerateCartoon called with:', {
+      styleId,
+      hasCustomPrompt: !!customPrompt,
+      generationOptions,
+      storyMode: generationOptions?.storyMode,
+      quantity: generationOptions?.quantity,
+      willGenerateStoryTeller: generationOptions?.storyMode && generationOptions?.quantity > 1
+    });
+
     const { customImage, ignoreProfilePicture } = generationOptions;
     const needsProfilePhoto = !customImage && !ignoreProfilePicture;
 
@@ -437,27 +455,110 @@ export default function CountryScreen({ navigation }) {
         imageUrlToUse = userProfile.profilePhoto;
       }
 
-      const result = await generateCartoonProfile(
-        imageUrlToUse,
-        styleId,
-        userProfile.gender || 'neutral',
-        customPrompt,
-        userPlan,
-        model,
-        cartoonUsageData?.gpt4VisionUsage || 0
-      );
+      // Check if Story Teller mode (multiple images)
+      if (generationOptions?.storyMode && generationOptions?.quantity > 1) {
+        console.log('[CountryScreen] 🎨🎨🎨 Story Teller mode: generating', generationOptions.quantity, 'variations');
 
-      const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+        // Initialize Story Teller progress
+        setStoryTellerProgress({
+          isStoryTeller: true,
+          totalImages: generationOptions.quantity,
+          currentImage: 1,
+          completedImages: 0,
+        });
 
-      await recordCartoonGeneration(
-        user.uid,
-        storageUrl,
-        styleId === 'custom' ? 'custom' : styleId,
-        isAdmin,
-        userPlan,
-        result.usedGpt4,
-        customPrompt || null
-      );
+        // Generate batch of variations
+        const results = await generateStoryTellerBatch(
+          imageUrlToUse,
+          styleId,
+          generationOptions.quantity,
+          userProfile.gender || 'neutral',
+          customPrompt,
+          userPlan,
+          model,
+          cartoonUsageData?.gpt4VisionUsage || 0,
+          (progress) => {
+            console.log('[CountryScreen] Story Teller progress:', progress);
+            // Update progress UI
+            setStoryTellerProgress({
+              isStoryTeller: true,
+              totalImages: progress.total,
+              currentImage: progress.current,
+              completedImages: progress.current - 1,
+            });
+          }
+        );
+
+        // Create a story collection
+        const storyId = `story-${Date.now()}`;
+        const storyImages = [];
+
+        console.log('[CountryScreen] 📸 Story Teller: Processing', results.length, 'generated images');
+
+        // Upload all images and record each generation
+        for (const [index, result] of results.entries()) {
+          console.log(`[CountryScreen] 📸 Uploading image ${index + 1}/${results.length}`);
+
+          const storageUrl = await uploadCartoonToStorage(
+            user.uid,
+            result.imageUrl,
+            `${styleId}-story-${index}`
+          );
+
+          storyImages.push({
+            id: `${storyId}-${index}`,
+            url: storageUrl,
+            variation: result.variation,
+            variationPrompt: result.variationPrompt,
+          });
+
+          // Record each generation (counts against usage)
+          await recordCartoonGeneration(
+            user.uid,
+            storageUrl,
+            styleId === 'custom' ? 'custom' : styleId,
+            isAdmin,
+            userPlan,
+            result.usedGpt4,
+            `${customPrompt || ''} ${result.variationPrompt || ''}`.trim()
+          );
+        }
+
+        // Save story collection to database
+        const storyCollectionId = await saveStoryCollection(
+          user.uid,
+          storyImages,
+          styleId === 'custom' ? 'custom' : styleId,
+          customPrompt || null
+        );
+
+        console.log('[CountryScreen] ✅ Story Teller complete:', storyImages.length, 'images generated');
+        console.log('[CountryScreen] ✅ Story collection saved with ID:', storyCollectionId);
+
+      } else {
+        // Single image generation (original flow)
+        const result = await generateCartoonProfile(
+          imageUrlToUse,
+          styleId,
+          userProfile.gender || 'neutral',
+          customPrompt,
+          userPlan,
+          model,
+          cartoonUsageData?.gpt4VisionUsage || 0
+        );
+
+        const storageUrl = await uploadCartoonToStorage(user.uid, result.imageUrl, styleId);
+
+        await recordCartoonGeneration(
+          user.uid,
+          storageUrl,
+          styleId === 'custom' ? 'custom' : styleId,
+          isAdmin,
+          userPlan,
+          result.usedGpt4,
+          customPrompt || null
+        );
+      }
 
       if (tempImageData) {
         await deleteTemporaryCustomImage(tempImageData.storagePath);
@@ -480,6 +581,14 @@ export default function CountryScreen({ navigation }) {
       setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
 
+      // Reset Story Teller progress
+      setStoryTellerProgress({
+        isStoryTeller: false,
+        totalImages: 1,
+        currentImage: 1,
+        completedImages: 0,
+      });
+
       await new Promise(resolve => setTimeout(resolve, 300));
 
       if (notifyWhenDone) {
@@ -497,6 +606,14 @@ export default function CountryScreen({ navigation }) {
 
       setShowGenerationProgress(false);
       setIsGeneratingCartoon(false);
+
+      // Reset Story Teller progress on error
+      setStoryTellerProgress({
+        isStoryTeller: false,
+        totalImages: 1,
+        currentImage: 1,
+        completedImages: 0,
+      });
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -1338,6 +1455,10 @@ export default function CountryScreen({ navigation }) {
         }}
         styleName={currentGenerationStyle}
         notifyWhenDone={currentGenerationNotify}
+        isStoryTeller={storyTellerProgress.isStoryTeller}
+        totalImages={storyTellerProgress.totalImages}
+        currentImage={storyTellerProgress.currentImage}
+        completedImages={storyTellerProgress.completedImages}
       />
     </ScreenLayout>
   );

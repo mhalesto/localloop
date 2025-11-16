@@ -128,12 +128,150 @@ export async function getPostsFromCity(city, maxResults = 10) {
 /**
  * Get AI artwork from all cities (global feed)
  * If userCity is provided, prioritizes artwork from that city first
+ * Includes both individual artworks and Story Teller collections
  * @param {string|null} userCity - Optional user's city for prioritization
  * @param {number} maxResults - Maximum number of artworks to return (default: 120 for better UX)
  * @returns {Promise<Array>}
  */
 export async function getAIArtworkFromAllCities(userCity = null, maxResults = 120) {
   try {
+    const allItems = [];
+
+    // First, get Story Teller collections from cartoonStories collection
+    try {
+      console.log('[exploreContentService] 🔍 Fetching Story Teller collections...');
+
+      const storiesQuery = query(
+        collection(db, 'cartoonStories'),
+        limit(50) // Get recent story collections
+      );
+
+      const storiesSnapshot = await getDocs(storiesQuery);
+      console.log('[exploreContentService] 📚 Found', storiesSnapshot.size, 'documents in cartoonStories collection');
+
+      for (const doc of storiesSnapshot.docs) {
+        const data = doc.data();
+
+        console.log('[exploreContentService] 📄 Processing story:', {
+          docId: doc.id,
+          hasImages: !!data.images,
+          isArray: Array.isArray(data.images),
+          imageCount: data.images ? data.images.length : 0,
+          type: data.type,
+          userId: data.userId
+        });
+
+        // Only include stories with multiple images
+        if (data.images && Array.isArray(data.images) && data.images.length > 1) {
+          console.log('[exploreContentService] ✅ Story qualifies for display:', {
+            id: doc.id,
+            imageCount: data.images.length,
+            images: data.images.map((img, idx) => ({
+              index: idx,
+              hasUrl: !!img.url,
+              id: img.id
+            }))
+          });
+          // Get user info for the story
+          let userInfo = {
+            username: 'Unknown',
+            displayName: 'Unknown User',
+            profilePhoto: null,
+            city: null
+          };
+
+          try {
+            const userDoc = await getDocs(query(
+              collection(db, 'users'),
+              where('__name__', '==', data.userId),
+              limit(1)
+            ));
+
+            if (!userDoc.empty) {
+              const userData = userDoc.docs[0].data();
+              userInfo = {
+                username: userData.username,
+                displayName: userData.displayName,
+                profilePhoto: userData.profilePhoto,
+                city: userData.city
+              };
+            }
+          } catch (userError) {
+            console.warn('[exploreContentService] Could not fetch user info for story:', userError);
+          }
+
+          // Format timestamp for display
+          const timestamp = normalizeTimestamp(data.createdAt);
+          const date = new Date(timestamp);
+          const now = new Date();
+          const diffMs = now - date;
+          const diffMins = Math.floor(diffMs / 60000);
+          const diffHours = Math.floor(diffMs / 3600000);
+          const diffDays = Math.floor(diffMs / 86400000);
+
+          let formattedTime;
+          if (diffMins < 1) {
+            formattedTime = 'just now';
+          } else if (diffMins < 60) {
+            formattedTime = `${diffMins}m ago`;
+          } else if (diffHours < 24) {
+            formattedTime = `${diffHours}h ago`;
+          } else if (diffDays < 7) {
+            formattedTime = `${diffDays}d ago`;
+          } else {
+            formattedTime = date.toLocaleDateString();
+          }
+
+          allItems.push({
+            id: doc.id,
+            type: 'story',
+            images: data.images,
+            style: data.style || 'Story',
+            title: data.style || 'Story Collection',
+            createdAt: timestamp,
+            createdAtFormatted: formattedTime, // Add formatted time for display
+            userId: data.userId,
+            username: userInfo.username,
+            displayName: userInfo.displayName,
+            profilePhoto: userInfo.profilePhoto,
+            prompt: data.prompt || null,
+            city: userInfo.city,
+            likes: data.likes || 0,
+            comments: data.comments || 0,
+          });
+        }
+      }
+    } catch (storiesError) {
+      console.warn('[exploreContentService] ❌ Could not fetch story collections:', storiesError);
+      // Continue even if stories fail
+    }
+
+    // Log summary of story collections found
+    const storyCollections = allItems.filter(item => item.type === 'story');
+    console.log('[exploreContentService] 📊 Story collection summary:', {
+      totalStoryCollections: storyCollections.length,
+      storyDetails: storyCollections.map(s => ({
+        id: s.id,
+        imageCount: s.images ? s.images.length : 0,
+        style: s.style
+      }))
+    });
+
+    // Create a Set of all image URLs that are part of Story collections
+    // to avoid showing them as individual images (prevent duplicates)
+    const storyImageUrls = new Set();
+    storyCollections.forEach(story => {
+      if (story.images && Array.isArray(story.images)) {
+        story.images.forEach(img => {
+          if (img.url) {
+            storyImageUrls.add(img.url);
+          }
+        });
+      }
+    });
+
+    console.log('[exploreContentService] 🚫 Excluding', storyImageUrls.size, 'story images from individual display');
+
     // Get all users with public profiles who have cartoon pictures
     const usersQuery = query(
       collection(db, 'users'),
@@ -142,7 +280,6 @@ export async function getAIArtworkFromAllCities(userCity = null, maxResults = 12
     );
 
     const snapshot = await getDocs(usersQuery);
-    const artworks = [];
 
     for (const doc of snapshot.docs) {
       const data = doc.data();
@@ -150,8 +287,9 @@ export async function getAIArtworkFromAllCities(userCity = null, maxResults = 12
       // Check if user has cartoon picture history
       if (data.cartoonPictureHistory && Array.isArray(data.cartoonPictureHistory)) {
         data.cartoonPictureHistory.forEach((cartoon) => {
-          if (cartoon.url) {
-            artworks.push({
+          // Only add if the image URL is NOT part of a Story collection
+          if (cartoon.url && !storyImageUrls.has(cartoon.url)) {
+            allItems.push({
               id: cartoon.id || `${doc.id}-${cartoon.createdAt}`,
               url: cartoon.url,
               style: cartoon.style || 'Unknown',
@@ -169,7 +307,7 @@ export async function getAIArtworkFromAllCities(userCity = null, maxResults = 12
     }
 
     // Sort: user's city first, then by recency
-    artworks.sort((a, b) => {
+    allItems.sort((a, b) => {
       if (userCity) {
         const aIsUserCity = a.city === userCity;
         const bIsUserCity = b.city === userCity;
@@ -181,7 +319,7 @@ export async function getAIArtworkFromAllCities(userCity = null, maxResults = 12
       return (b.createdAt || 0) - (a.createdAt || 0);
     });
 
-    return artworks.slice(0, maxResults);
+    return allItems.slice(0, maxResults);
   } catch (error) {
     console.error('[exploreContentService] Error getting AI artwork from all cities:', error);
     return [];
