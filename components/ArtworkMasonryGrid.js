@@ -16,9 +16,16 @@ const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding 
 const MAX_STORY_CARDS_PER_SECTION = 2;
 const MIN_ZOOM_SCALE = 1;
 const MAX_ZOOM_SCALE = 4;
+const ZOOM_THRESHOLD = 1.01;
 const clampValue = (value, min = MIN_ZOOM_SCALE, max = MAX_ZOOM_SCALE) => {
   'worklet';
   return Math.min(Math.max(value, min), max);
+};
+const clampTranslation = (value, dimension, scaleValue) => {
+  'worklet';
+  const bound = ((scaleValue - 1) * dimension) / 2;
+  if (bound <= 0 || Number.isNaN(bound)) return 0;
+  return Math.min(Math.max(value, -bound), bound);
 };
 
 export default function ArtworkMasonryGrid({
@@ -672,6 +679,8 @@ export default function ArtworkMasonryGrid({
                     resizeMode="contain"
                     imageProps={{ cache: 'force-cache' }}
                     onZoomStateChange={handleZoomStateChange}
+                    viewportWidth={SCREEN_WIDTH}
+                    viewportHeight={SCREEN_HEIGHT}
                   />
                 </View>
               ))}
@@ -684,6 +693,8 @@ export default function ArtworkMasonryGrid({
               resizeMode="contain"
               imageProps={{ cache: 'force-cache' }}
               onZoomStateChange={handleZoomStateChange}
+              viewportWidth={SCREEN_WIDTH}
+              viewportHeight={SCREEN_HEIGHT}
             />
           ) : null}
 
@@ -726,10 +737,22 @@ export default function ArtworkMasonryGrid({
   );
 }
 
-function ZoomableImage({ uri, style, resizeMode = 'contain', imageProps = {}, onZoomStateChange }) {
+function ZoomableImage({
+  uri,
+  style,
+  resizeMode = 'contain',
+  imageProps = {},
+  onZoomStateChange,
+  viewportWidth = SCREEN_WIDTH,
+  viewportHeight = SCREEN_HEIGHT,
+}) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const zoomActive = useSharedValue(0);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const panStartX = useSharedValue(0);
+  const panStartY = useSharedValue(0);
 
   const notifyZoomStateChange = useCallback((active) => {
     onZoomStateChange?.(active);
@@ -739,19 +762,27 @@ function ZoomableImage({ uri, style, resizeMode = 'contain', imageProps = {}, on
     scale.value = 1;
     savedScale.value = 1;
     zoomActive.value = 0;
+    translateX.value = 0;
+    translateY.value = 0;
     notifyZoomStateChange(false);
-  }, [uri, scale, savedScale, zoomActive, notifyZoomStateChange]);
+  }, [uri, scale, savedScale, zoomActive, translateX, translateY, notifyZoomStateChange]);
 
   if (!uri) {
     return null;
   }
 
   const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      'worklet';
+      savedScale.value = scale.value;
+    })
     .onUpdate((event) => {
       'worklet';
       const nextScale = clampValue(savedScale.value * event.scale, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
       scale.value = nextScale;
-      const nextActive = nextScale > 1.01 ? 1 : 0;
+      translateX.value = clampTranslation(translateX.value, viewportWidth, nextScale);
+      translateY.value = clampTranslation(translateY.value, viewportHeight, nextScale);
+      const nextActive = nextScale > ZOOM_THRESHOLD ? 1 : 0;
       if (zoomActive.value !== nextActive) {
         zoomActive.value = nextActive;
         runOnJS(notifyZoomStateChange)(!!nextActive);
@@ -770,19 +801,70 @@ function ZoomableImage({ uri, style, resizeMode = 'contain', imageProps = {}, on
         scale.value = withTiming(MAX_ZOOM_SCALE);
         savedScale.value = MAX_ZOOM_SCALE;
       }
-      const nextActive = scale.value > 1.01 ? 1 : 0;
+      translateX.value = clampTranslation(translateX.value, viewportWidth, scale.value);
+      translateY.value = clampTranslation(translateY.value, viewportHeight, scale.value);
+      if (scale.value <= MIN_ZOOM_SCALE) {
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+      }
+      const nextActive = scale.value > ZOOM_THRESHOLD ? 1 : 0;
       if (zoomActive.value !== nextActive) {
         zoomActive.value = nextActive;
         runOnJS(notifyZoomStateChange)(!!nextActive);
       }
     });
 
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      'worklet';
+      panStartX.value = translateX.value;
+      panStartY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      'worklet';
+      if (scale.value <= ZOOM_THRESHOLD) {
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        return;
+      }
+      const nextX = clampTranslation(panStartX.value + event.translationX, viewportWidth, scale.value);
+      const nextY = clampTranslation(panStartY.value + event.translationY, viewportHeight, scale.value);
+      translateX.value = nextX;
+      translateY.value = nextY;
+      if (zoomActive.value === 0) {
+        zoomActive.value = 1;
+        runOnJS(notifyZoomStateChange)(true);
+      }
+    })
+    .onEnd(() => {
+      'worklet';
+      translateX.value = clampTranslation(translateX.value, viewportWidth, scale.value);
+      translateY.value = clampTranslation(translateY.value, viewportHeight, scale.value);
+    })
+    .onFinalize(() => {
+      'worklet';
+      if (scale.value <= MIN_ZOOM_SCALE) {
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        if (zoomActive.value !== 0) {
+          zoomActive.value = 0;
+          runOnJS(notifyZoomStateChange)(false);
+        }
+      }
+    });
+
+  const combinedGesture = Gesture.Simultaneous(pinchGesture, panGesture);
+
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
   }));
 
   return (
-    <GestureDetector gesture={pinchGesture}>
+    <GestureDetector gesture={combinedGesture}>
       <Animated.Image
         source={{ uri }}
         style={[style, animatedStyle]}
