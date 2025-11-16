@@ -579,38 +579,37 @@ export default function ArtworkMasonryGrid({
         <View style={styles.fullScreenContainer}>
           {/* Top buttons */}
           <View style={styles.topButtonsContainer}>
-            {!hideFullScreenChrome && (
-              <View style={styles.leftButtonsContainer}>
-                {/* Download button */}
+            <View style={[styles.leftButtonsContainer, hideFullScreenChrome && styles.hiddenLeftButtons]}>
+              {/* Download button */}
+              <TouchableOpacity
+                style={styles.downloadButtonFullScreen}
+                onPress={handleDownload}
+                activeOpacity={0.7}
+                disabled={isDownloading || hideFullScreenChrome}
+              >
+                <View style={styles.downloadIconContainer}>
+                  {isDownloading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="download" size={24} color="#fff" />
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              {/* Info button */}
+              {fullScreenImage.prompt && (
                 <TouchableOpacity
-                  style={styles.downloadButtonFullScreen}
-                  onPress={handleDownload}
+                  style={styles.infoButtonFullScreen}
+                  onPress={() => setShowFullScreenPrompt(!showFullScreenPrompt)}
                   activeOpacity={0.7}
-                  disabled={isDownloading}
+                  disabled={hideFullScreenChrome}
                 >
-                  <View style={styles.downloadIconContainer}>
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Ionicons name="download" size={24} color="#fff" />
-                    )}
+                  <View style={[styles.infoIconContainerFullScreen, showFullScreenPrompt && { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
+                    <Ionicons name="information" size={24} color="#fff" />
                   </View>
                 </TouchableOpacity>
-
-                {/* Info button */}
-                {fullScreenImage.prompt && (
-                  <TouchableOpacity
-                    style={styles.infoButtonFullScreen}
-                    onPress={() => setShowFullScreenPrompt(!showFullScreenPrompt)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.infoIconContainerFullScreen, showFullScreenPrompt && { backgroundColor: 'rgba(255, 255, 255, 0.3)' }]}>
-                      <Ionicons name="information" size={24} color="#fff" />
-                    </View>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+              )}
+            </View>
 
             {/* Close button */}
             <TouchableOpacity
@@ -1127,6 +1126,10 @@ const styles = StyleSheet.create({
   leftButtonsContainer: {
     flexDirection: 'row',
     gap: 12,
+  },
+  hiddenLeftButtons: {
+    opacity: 0,
+    pointerEvents: 'none',
   },
   downloadButtonFullScreen: {
     // Left side
