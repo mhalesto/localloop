@@ -11,8 +11,14 @@ import StoryTellerCard from './StoryTellerCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
+const MAX_STORY_CARDS_PER_SECTION = 2;
 
-export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigation }) {
+export default function ArtworkMasonryGrid({
+  artworks = [],
+  onArtworkPress,
+  navigation,
+  storyCollections: storyCollectionsProp = [],
+}) {
   const { themeColors, userProfile, accentPreset } = useSettings();
   const { currentUser, isAdmin } = useAuth();
   const [promptModal, setPromptModal] = useState({ visible: false, prompt: '', style: '' });
@@ -293,19 +299,14 @@ export default function ArtworkMasonryGrid({ artworks, onArtworkPress, navigatio
     }
   };
 
-  // Process and categorize items (stories vs regular artworks)
-  const processedItems = [];
-  const storyCollections = [];
-
-  artworks.forEach((item) => {
-    if (item.type === 'story' && item.images && item.images.length > 1) {
-      // This is a Story Teller collection
-      storyCollections.push(item);
-    } else {
-      // Regular artwork
-      processedItems.push(item);
-    }
-  });
+  const isStoryCollection = (item) => item?.type === 'story' && item.images && item.images.length > 1;
+  const derivedStoryCollections = storyCollectionsProp.length > 0
+    ? storyCollectionsProp
+    : artworks.filter(isStoryCollection);
+  const processedItems = storyCollectionsProp.length > 0
+    ? artworks
+    : artworks.filter((item) => !isStoryCollection(item));
+  const storyCollections = derivedStoryCollections.slice(0, MAX_STORY_CARDS_PER_SECTION);
 
   // Split regular artworks into two columns for masonry layout
   const leftColumn = [];

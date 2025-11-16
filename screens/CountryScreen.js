@@ -889,11 +889,22 @@ export default function CountryScreen({ navigation }) {
 
     const feed = [];
     const ARTWORKS_PER_CHUNK = 6;
-    const artworkChunks = [];
+    const STORY_TELLERS_PER_SECTION = 2;
+    const isStoryCollection = (item) => item?.type === 'story' && item.images && item.images.length > 1;
 
-    // Split artworks into chunks of 6
-    for (let i = 0; i < searchFilteredArtwork.length; i += ARTWORKS_PER_CHUNK) {
-      artworkChunks.push(searchFilteredArtwork.slice(i, i + ARTWORKS_PER_CHUNK));
+    const storyCollections = searchFilteredArtwork.filter(isStoryCollection);
+    const regularArtworks = searchFilteredArtwork.filter((item) => !isStoryCollection(item));
+    const artworkChunks = [];
+    const storyChunks = [];
+
+    // Split regular artworks into chunks
+    for (let i = 0; i < regularArtworks.length; i += ARTWORKS_PER_CHUNK) {
+      artworkChunks.push(regularArtworks.slice(i, i + ARTWORKS_PER_CHUNK));
+    }
+
+    // Split story collections into groups of two
+    for (let i = 0; i < storyCollections.length; i += STORY_TELLERS_PER_SECTION) {
+      storyChunks.push(storyCollections.slice(i, i + STORY_TELLERS_PER_SECTION));
     }
 
     // Check if user is eligible for upgrade ad (not on highest plan)
@@ -903,11 +914,14 @@ export default function CountryScreen({ navigation }) {
 
     // Build the feed
     artworkChunks.forEach((chunk, index) => {
+      const storyChunk = storyChunks[index] || [];
+
       // Add artwork chunk
       feed.push({
         type: 'artworkChunk',
         key: `artwork-chunk-${index}`,
         data: chunk,
+        stories: storyChunk,
       });
 
       // After each chunk, add a section (alternating between posts and users)
@@ -947,6 +961,17 @@ export default function CountryScreen({ navigation }) {
         }
       }
     });
+
+    // Add any remaining story chunks that didn't pair with an artwork section
+    if (storyChunks.length > artworkChunks.length) {
+      for (let i = artworkChunks.length; i < storyChunks.length; i += 1) {
+        feed.push({
+          type: 'storyChunk',
+          key: `story-chunk-${i}`,
+          stories: storyChunks[i],
+        });
+      }
+    }
 
     return feed;
   }, [searchFilteredArtwork, searchFilteredPosts, searchFilteredUsers, exploreFilters, userProfile?.subscriptionPlan]);
@@ -1197,11 +1222,12 @@ export default function CountryScreen({ navigation }) {
                     </>
                   ) : mixedFeed.length > 0 ? (
                     mixedFeed.map((feedItem) => {
-                      if (feedItem.type === 'artworkChunk') {
+                      if (feedItem.type === 'artworkChunk' || feedItem.type === 'storyChunk') {
                         return (
                           <View key={feedItem.key} style={styles.artworkChunkContainer}>
                             <ArtworkMasonryGrid
-                              artworks={feedItem.data}
+                              artworks={feedItem.data || []}
+                              storyCollections={feedItem.stories || []}
                               onArtworkPress={(artwork) => navigation.navigate('PublicProfile', { userId: artwork.userId })}
                               navigation={navigation}
                             />
