@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator, Animated, ScrollView, Share } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, StatusBar, Alert, ActivityIndicator, ScrollView, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import LottieView from 'lottie-react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
@@ -12,6 +14,12 @@ import StoryTellerCard from './StoryTellerCard';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
 const MAX_STORY_CARDS_PER_SECTION = 2;
+const MIN_ZOOM_SCALE = 1;
+const MAX_ZOOM_SCALE = 4;
+const clampValue = (value, min = MIN_ZOOM_SCALE, max = MAX_ZOOM_SCALE) => {
+  'worklet';
+  return Math.min(Math.max(value, min), max);
+};
 
 export default function ArtworkMasonryGrid({
   artworks = [],
@@ -41,7 +49,11 @@ export default function ArtworkMasonryGrid({
   const [preloadedImages, setPreloadedImages] = useState(new Set()); // Track preloaded full-screen images
   const scrollViewRef = useRef(null); // Reference to ScrollView for programmatic scrolling
   const [heartAnimations, setHeartAnimations] = useState({}); // Track heart animation state
+  const [isZooming, setIsZooming] = useState(false); // Disable swiping while pinch-zooming
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
+  const handleZoomStateChange = useCallback((zooming) => {
+    setIsZooming((prev) => (prev === zooming ? prev : zooming));
+  }, []);
 
   // Check download limits on mount and when modal opens
   useEffect(() => {
@@ -99,6 +111,12 @@ export default function ArtworkMasonryGrid({
       return () => clearTimeout(minDisplayTimeout);
     }
   }, [fullScreenImage.visible]); // Only trigger on modal open/close, not on URL change (swipe)
+
+  useEffect(() => {
+    if (!fullScreenImage.visible) {
+      setIsZooming(false);
+    }
+  }, [fullScreenImage.visible]);
 
   const checkDownloadLimits = async () => {
     const planId = userProfile?.subscriptionPlan || 'basic';
@@ -630,6 +648,7 @@ export default function ArtworkMasonryGrid({
               ref={scrollViewRef}
               horizontal
               pagingEnabled
+              scrollEnabled={!isZooming}
               showsHorizontalScrollIndicator={false}
               style={styles.fullScreenScrollView}
               onScroll={(event) => {
@@ -647,22 +666,24 @@ export default function ArtworkMasonryGrid({
             >
               {fullScreenImage.images.map((image, index) => (
                 <View key={image.id || index} style={styles.fullScreenImageContainer}>
-                  <Image
-                    source={{ uri: image.url }}
+                  <ZoomableImage
+                    uri={image.url}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
-                    cache="force-cache"
+                    imageProps={{ cache: 'force-cache' }}
+                    onZoomStateChange={handleZoomStateChange}
                   />
                 </View>
               ))}
             </ScrollView>
           ) : fullScreenImage.url ? (
             // Single image
-            <Image
-              source={{ uri: fullScreenImage.url }}
+            <ZoomableImage
+              uri={fullScreenImage.url}
               style={styles.fullScreenImage}
               resizeMode="contain"
-              cache="force-cache"
+              imageProps={{ cache: 'force-cache' }}
+              onZoomStateChange={handleZoomStateChange}
             />
           ) : null}
 
@@ -702,6 +723,73 @@ export default function ArtworkMasonryGrid({
         </View>
       </Modal>
     </>
+  );
+}
+
+function ZoomableImage({ uri, style, resizeMode = 'contain', imageProps = {}, onZoomStateChange }) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const zoomActive = useSharedValue(0);
+
+  const notifyZoomStateChange = useCallback((active) => {
+    onZoomStateChange?.(active);
+  }, [onZoomStateChange]);
+
+  useEffect(() => {
+    scale.value = 1;
+    savedScale.value = 1;
+    zoomActive.value = 0;
+    notifyZoomStateChange(false);
+  }, [uri, scale, savedScale, zoomActive, notifyZoomStateChange]);
+
+  if (!uri) {
+    return null;
+  }
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      'worklet';
+      const nextScale = clampValue(savedScale.value * event.scale, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+      scale.value = nextScale;
+      const nextActive = nextScale > 1.01 ? 1 : 0;
+      if (zoomActive.value !== nextActive) {
+        zoomActive.value = nextActive;
+        runOnJS(notifyZoomStateChange)(!!nextActive);
+      }
+    })
+    .onEnd(() => {
+      'worklet';
+      savedScale.value = clampValue(scale.value, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+    })
+    .onFinalize(() => {
+      'worklet';
+      if (scale.value < MIN_ZOOM_SCALE) {
+        scale.value = withTiming(MIN_ZOOM_SCALE);
+        savedScale.value = MIN_ZOOM_SCALE;
+      } else if (scale.value > MAX_ZOOM_SCALE) {
+        scale.value = withTiming(MAX_ZOOM_SCALE);
+        savedScale.value = MAX_ZOOM_SCALE;
+      }
+      const nextActive = scale.value > 1.01 ? 1 : 0;
+      if (zoomActive.value !== nextActive) {
+        zoomActive.value = nextActive;
+        runOnJS(notifyZoomStateChange)(!!nextActive);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={pinchGesture}>
+      <Animated.Image
+        source={{ uri }}
+        style={[style, animatedStyle]}
+        resizeMode={resizeMode}
+        {...imageProps}
+      />
+    </GestureDetector>
   );
 }
 
