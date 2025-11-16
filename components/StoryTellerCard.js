@@ -32,6 +32,7 @@ export default function StoryTellerCard({
   onCommentPress,
   onSharePress,
   onPromptPress,
+  onImageLoad, // Callback when image loads for caching
 }) {
   const { themeColors, accentPreset } = useSettings();
   const [loadingStates, setLoadingStates] = useState({});
@@ -42,8 +43,12 @@ export default function StoryTellerCard({
     setLoadingStates(prev => ({ ...prev, [imageId]: true }));
   };
 
-  const handleImageLoadEnd = (imageId) => {
+  const handleImageLoadEnd = (imageId, imageUrl) => {
     setLoadingStates(prev => ({ ...prev, [imageId]: false }));
+    // Notify parent for cache optimization
+    if (onImageLoad) {
+      onImageLoad(imageUrl);
+    }
   };
 
   const handleScroll = (event) => {
@@ -97,7 +102,7 @@ export default function StoryTellerCard({
               style={styles.image}
               resizeMode="cover"
               onLoadStart={() => handleImageLoadStart(image.id)}
-              onLoadEnd={() => handleImageLoadEnd(image.id)}
+              onLoadEnd={() => handleImageLoadEnd(image.id, image.url)}
             />
             {loadingStates[image.id] && (
               <View style={styles.loadingOverlay}>
