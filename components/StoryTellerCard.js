@@ -114,15 +114,16 @@ export default function StoryTellerCard({
                 />
               </View>
             )}
-            {/* Image number badge */}
-            <View style={[styles.imageBadge, { backgroundColor: themeColors.card + 'E6' }]}>
-              <Text style={[styles.imageBadgeText, { color: themeColors.textPrimary }]}>
-                {index + 1}/{story.images.length}
-              </Text>
-            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Fixed image counter */}
+      <View style={[styles.fixedCounter, { backgroundColor: themeColors.card + 'E6' }]}>
+        <Text style={[styles.fixedCounterText, { color: themeColors.textPrimary }]}>
+          {currentIndex + 1}/{story.images.length}
+        </Text>
+      </View>
 
       {/* Page Indicators */}
       <View style={styles.indicators}>
@@ -216,6 +217,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
   },
   header: {
     flexDirection: 'row',
@@ -271,17 +273,20 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
   },
-  imageBadge: {
+  fixedCounter: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: 56,
+    right: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    minWidth: 56,
+    alignItems: 'center',
+    zIndex: 10,
   },
-  imageBadgeText: {
+  fixedCounterText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   indicators: {
     flexDirection: 'row',
