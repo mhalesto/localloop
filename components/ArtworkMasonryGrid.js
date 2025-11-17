@@ -12,6 +12,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canDownloadArtwork, recordArtworkDownload } from '../utils/subscriptionUtils';
 import StoryTellerCard from './StoryTellerCard';
+import ProgressiveImage from './ProgressiveImage';
+import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
@@ -44,6 +46,8 @@ export default function ArtworkMasonryGrid({
     url: '',
     style: '',
     prompt: '',
+    thumbnail: null,
+    blurhash: null,
     // Story Teller support
     isStory: false,
     images: [],
@@ -76,6 +80,20 @@ export default function ArtworkMasonryGrid({
     setZoomModeEnabled((prev) => (prev === enabled ? prev : enabled));
   }, []);
   const hideFullScreenChrome = zoomModeEnabled || isZooming;
+  const buildImageMeta = useCallback((url, thumbnail, blurhash) => {
+    if (!url) {
+      return {
+        url: '',
+        thumbnail: null,
+        blurhash: null,
+      };
+    }
+    return {
+      url,
+      thumbnail: thumbnail || getThumbnailUrl(url, 600, 70),
+      blurhash: blurhash || getBlurhash(url),
+    };
+  }, []);
 
   // Check download limits on mount and when modal opens
   useEffect(() => {
@@ -485,28 +503,33 @@ export default function ArtworkMasonryGrid({
     }
   });
 
-  const renderArtworkItem = (artwork) => (
-    <View key={artwork.id} style={styles.artworkContainer}>
+  const renderArtworkItem = (artwork) => {
+    const imageMeta = buildImageMeta(artwork.url, artwork.thumbnailUrl, artwork.blurhash);
+    return (
+      <View key={artwork.id} style={styles.artworkContainer}>
       <View style={[styles.artworkCard, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}>
         {/* Artwork Image - opens full screen */}
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setFullScreenImage({
             visible: true,
-            url: artwork.url,
+            url: imageMeta.url,
             style: artwork.style,
             prompt: artwork.prompt,
+            thumbnail: imageMeta.thumbnail,
+            blurhash: imageMeta.blurhash,
             isStory: false,
             images: [],
             currentIndex: 0,
           })}
         >
-          <Image
-            source={{ uri: artwork.url }}
+          <ProgressiveImage
+            source={imageMeta.url}
+            thumbnail={imageMeta.thumbnail}
+            blurhash={imageMeta.blurhash}
             style={styles.artworkImage}
-            resizeMode="cover"
-            cache="force-cache"
-            timeout={30000}
+            contentFit="cover"
+            transition={200}
             onLoadStart={() => {
               console.log('[ArtworkMasonryGrid] Grid image loading started:', artwork.id);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: true }));
@@ -514,15 +537,13 @@ export default function ArtworkMasonryGrid({
             onLoadEnd={() => {
               console.log('[ArtworkMasonryGrid] Grid image loaded:', artwork.id);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
-              // Add to preloaded cache for instant full-screen display
-              setPreloadedImages(prev => new Set([...prev, artwork.url]));
+              setPreloadedImages(prev => new Set([...prev, imageMeta.url]));
             }}
             onError={(error) => {
               console.error('[ArtworkMasonryGrid] Grid image load error:', artwork.id, error?.nativeEvent);
               setLoadingImages(prev => ({ ...prev, [artwork.id]: false }));
               // Silently fail - image will show as blank with loading state removed
             }}
-            defaultSource={require('../assets/icon.png')}
           />
           {/* Loading overlay with broom animation */}
           {loadingImages[artwork.id] && (
@@ -599,6 +620,7 @@ export default function ArtworkMasonryGrid({
       </View>
     </View>
   );
+  };
 
   return (
     <>
@@ -611,14 +633,24 @@ export default function ArtworkMasonryGrid({
                 key={story.id}
                 story={story}
                 onImagePress={(image, index) => {
+                  const normalizedImages = (story.images || []).map(img => ({
+                    ...img,
+                    ...buildImageMeta(img.url, img.thumbnail, img.blurhash),
+                  }));
+                  const selectedImage = normalizedImages[index] || {
+                    ...image,
+                    ...buildImageMeta(image.url, image.thumbnail, image.blurhash),
+                  };
                   // Open full screen view with all story images for swiping
                   setFullScreenImage({
                     visible: true,
-                    url: image.url,
+                    url: selectedImage.url,
                     style: story.style,
                     prompt: story.prompt,
+                    thumbnail: selectedImage.thumbnail,
+                    blurhash: selectedImage.blurhash,
                     isStory: true,
-                    images: story.images || [],
+                    images: normalizedImages,
                     currentIndex: index,
                   });
                 }}
@@ -775,7 +807,7 @@ export default function ArtworkMasonryGrid({
         visible={fullScreenImage.visible}
         transparent={false}
         animationType="fade"
-        onRequestClose={() => setFullScreenImage({ visible: false, url: '', style: '', prompt: '' })}
+        onRequestClose={() => setFullScreenImage({ visible: false, url: '', style: '', prompt: '', thumbnail: null, blurhash: null, isStory: false, images: [], currentIndex: 0 })}
       >
         <StatusBar hidden />
         <View style={styles.fullScreenContainer}>
@@ -893,11 +925,16 @@ export default function ArtworkMasonryGrid({
                 const offsetX = event.nativeEvent.contentOffset.x;
                 const newIndex = Math.round(offsetX / SCREEN_WIDTH);
                 if (newIndex !== fullScreenImage.currentIndex && newIndex >= 0 && newIndex < fullScreenImage.images.length) {
-                  setFullScreenImage(prev => ({
-                    ...prev,
-                    currentIndex: newIndex,
-                    url: prev.images[newIndex]?.url || prev.url,
-                  }));
+                  setFullScreenImage(prev => {
+                    const nextImage = prev.images[newIndex] || {};
+                    return {
+                      ...prev,
+                      currentIndex: newIndex,
+                      url: nextImage.url || prev.url,
+                      thumbnail: nextImage.thumbnail || prev.thumbnail,
+                      blurhash: nextImage.blurhash || prev.blurhash,
+                    };
+                  });
                 }
               }}
               scrollEventThrottle={16}
@@ -908,7 +945,8 @@ export default function ArtworkMasonryGrid({
                     uri={image.url}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
-                    imageProps={{ cache: 'force-cache' }}
+                    thumbnail={image.thumbnail}
+                    blurhash={image.blurhash}
                     onZoomStateChange={handleZoomStateChange}
                     onZoomModeChange={handleZoomModeChange}
                     zoomModeEnabled={zoomModeEnabled}
@@ -924,7 +962,8 @@ export default function ArtworkMasonryGrid({
               uri={fullScreenImage.url}
               style={styles.fullScreenImage}
               resizeMode="contain"
-              imageProps={{ cache: 'force-cache' }}
+              thumbnail={fullScreenImage.thumbnail}
+              blurhash={fullScreenImage.blurhash}
               onZoomStateChange={handleZoomStateChange}
               onZoomModeChange={handleZoomModeChange}
               zoomModeEnabled={zoomModeEnabled}
@@ -978,7 +1017,8 @@ function ZoomableImage({
   uri,
   style,
   resizeMode = 'contain',
-  imageProps = {},
+  thumbnail,
+  blurhash,
   onZoomStateChange,
   onZoomModeChange,
   zoomModeEnabled,
@@ -1183,12 +1223,17 @@ function ZoomableImage({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.Image
-        source={{ uri }}
-        style={[style, animatedStyle]}
-        resizeMode={resizeMode}
-        {...imageProps}
-      />
+      <Animated.View style={[style, animatedStyle]}>
+        <ProgressiveImage
+          source={uri}
+          thumbnail={thumbnail}
+          blurhash={blurhash}
+          style={StyleSheet.absoluteFill}
+          contentFit={resizeMode === 'contain' ? 'contain' : 'cover'}
+          transition={120}
+          priority="high"
+        />
+      </Animated.View>
     </GestureDetector>
   );
 }
@@ -1244,7 +1289,6 @@ const styles = StyleSheet.create({
   artworkImage: {
     width: '100%',
     height: COLUMN_WIDTH * 1.2, // Slightly taller than wide
-    resizeMode: 'cover',
   },
   artworkInfo: {
     padding: 10,

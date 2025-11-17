@@ -8,7 +8,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import LottieView from 'lottie-react-native';
+import ProgressiveImage from './ProgressiveImage';
+import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.75; // Each image takes 75% of screen width
@@ -90,32 +91,44 @@ export default function StoryTellerCard({
         scrollEventThrottle={16}
         style={styles.scrollView}
       >
-        {story.images.map((image, index) => (
-          <TouchableOpacity
-            key={image.id}
-            activeOpacity={0.95}
-            onPress={() => onImagePress(image, index)}
-            style={styles.imageContainer}
-          >
-            <Image
-              source={{ uri: image.url }}
-              style={styles.image}
-              resizeMode="cover"
-              onLoadStart={() => handleImageLoadStart(image.id)}
-              onLoadEnd={() => handleImageLoadEnd(image.id, image.url)}
-            />
-            {loadingStates[image.id] && (
-              <View style={styles.loadingOverlay}>
-                <LottieView
-                  source={require('../assets/broom.json')}
-                  autoPlay
-                  loop
-                  style={styles.loadingAnimation}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+        {story.images.map((image, index) => {
+          const imageKey = image.id ?? `${story.id}-${index}`;
+          const imageMeta = {
+            ...image,
+            thumbnail: getThumbnailUrl(image.url, 400, 60),
+            blurhash: image.blurhash || getBlurhash(image.url),
+          };
+
+          return (
+            <TouchableOpacity
+              key={imageKey}
+              activeOpacity={0.95}
+              onPress={() => onImagePress(imageMeta, index)}
+              style={styles.imageContainer}
+            >
+              <ProgressiveImage
+                source={imageMeta.url}
+                thumbnail={imageMeta.thumbnail}
+                blurhash={imageMeta.blurhash}
+                style={styles.image}
+                contentFit="cover"
+                transition={180}
+                onLoadStart={() => handleImageLoadStart(imageKey)}
+                onLoadEnd={() => handleImageLoadEnd(imageKey, imageMeta.url)}
+              />
+              {loadingStates[imageKey] && (
+                <View style={styles.loadingOverlay}>
+                  <LottieView
+                    source={require('../assets/broom.json')}
+                    autoPlay
+                    loop
+                    style={styles.loadingAnimation}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {/* Fixed image counter */}
