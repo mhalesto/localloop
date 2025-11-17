@@ -6,6 +6,7 @@
 
 import { doc, updateDoc, increment, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../api/firebaseClient';
+import { USAGE_LIMITS, normalizeSubscriptionPlan } from './openai/profileCartoonService';
 
 /**
  * Track feature usage
@@ -137,16 +138,19 @@ export async function canUseGoldFeature(userId, feature) {
     const userDoc = await getDoc(doc(db, 'users', userId));
     const userData = userDoc.data();
 
-    // Check if user has Gold subscription
-    if (userData?.subscriptionPlan !== 'gold') {
+    // Check if user has Gold subscription ('ultimate' = Gold tier, 'gold' = legacy naming)
+    const userPlan = normalizeSubscriptionPlan(userData?.subscriptionPlan || 'basic');
+    if (userPlan !== 'gold' && userPlan !== 'ultimate') {
       return false;
     }
 
     // For most features, Gold has unlimited usage
-    // Only cartoons have monthly limits (20/month)
+    // Only cartoons have monthly limits (currently 200/month)
     if (feature === 'cartoon') {
       const monthlyCount = userData?.goldUsage?.cartoon?.monthlyCount || 0;
-      return monthlyCount < 20;
+      const planLimits = USAGE_LIMITS[userPlan] || USAGE_LIMITS.ultimate || USAGE_LIMITS.gold;
+      const goldCartoonLimit = planLimits?.monthly || 0;
+      return goldCartoonLimit === 0 ? true : monthlyCount < goldCartoonLimit;
     }
 
     return true; // Unlimited for other features

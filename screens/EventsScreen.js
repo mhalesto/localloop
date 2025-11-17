@@ -70,7 +70,7 @@ const OPTIONAL_EVENT_FIELDS = [
   { id: 'maxCapacity', label: 'Max Capacity', icon: 'people-outline', placeholder: 'Select number of people' },
 ];
 
-export default function EventsScreenRedesign({ navigation }) {
+export default function EventsScreenRedesign({ navigation, route }) {
   const { themeColors, accentPreset, userProfile } = useSettings();
   const { user } = useAuth();
   const haptics = useHaptics();
@@ -102,6 +102,13 @@ export default function EventsScreenRedesign({ navigation }) {
       [eventId]: !prev[eventId]
     }));
   };
+
+  useEffect(() => {
+    if (route?.params?.openCreateEvent) {
+      setShowAddModal(true);
+      navigation.setParams({ openCreateEvent: false });
+    }
+  }, [route?.params?.openCreateEvent, navigation]);
 
   // Generate week days
   const getWeekDays = () => {

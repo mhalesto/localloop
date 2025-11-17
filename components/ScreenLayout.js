@@ -350,8 +350,12 @@ export default function ScreenLayout({
   const handleFooterShortcut = () => {
     // If custom FAB action provided (e.g., for Events screen), use it
     if (onFabPress) {
-      onFabPress();
-      return;
+      const handled = onFabPress({
+        openPostComposer: () => setComposerVisible(true),
+      });
+      if (handled) {
+        return;
+      }
     }
     // Open composer modal immediately (no loading delay)
     setComposerVisible(true);

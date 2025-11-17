@@ -97,6 +97,13 @@ export const CARTOON_STYLES = {
   },
 };
 
+const GOLD_LIMITS = {
+  monthly: 200, // Gold users can generate 200 cartoons per month
+  lifetime: null, // Unlimited lifetime
+  historyLimit: 20, // Gold users can save 20 cartoons in history
+  gpt4VisionMonthly: 200, // Gold users get 200 GPT-4 Vision generations per month
+};
+
 // Usage limits per subscription plan
 export const USAGE_LIMITS = {
   basic: {
@@ -111,13 +118,17 @@ export const USAGE_LIMITS = {
     historyLimit: 10, // Premium users can save 10 cartoons in history
     gpt4VisionMonthly: 0, // No GPT-4 Vision for Premium
   },
-  gold: {
-    monthly: 100, // TEMPORARY: Increased to 100 for testing (normally 20)
-    lifetime: null, // Unlimited lifetime
-    historyLimit: 20, // Gold users can save 20 cartoons in history
-    gpt4VisionMonthly: 5, // Gold users get 5 GPT-4 Vision generations per month (rest use GPT-3.5)
-  },
+  gold: GOLD_LIMITS, // Legacy name for Premium tier in some configs
+  ultimate: GOLD_LIMITS, // Actual Gold plan (user-facing "Gold")
 };
+
+export function normalizeSubscriptionPlan(plan = 'basic') {
+  if (!plan) {
+    return 'basic';
+  }
+  const normalized = typeof plan === 'string' ? plan.toLowerCase() : String(plan).toLowerCase();
+  return USAGE_LIMITS[normalized] ? normalized : 'basic';
+}
 
 /**
  * Analyze profile picture using Vision API
@@ -206,6 +217,9 @@ export async function generateStoryTellerBatch(
   gpt4VisionUsage = 0,
   onProgress = null
 ) {
+  const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
+  const isGoldTier = normalizedPlan === 'gold' || normalizedPlan === 'ultimate';
+
   if (quantity < 2 || quantity > 5) {
     throw new Error('Story Teller mode requires 2-5 images');
   }
@@ -214,7 +228,7 @@ export async function generateStoryTellerBatch(
     quantity,
     styleId,
     hasCustomPrompt: !!customPrompt,
-    subscriptionPlan,
+    subscriptionPlan: normalizedPlan,
     model
   });
 
@@ -255,7 +269,7 @@ export async function generateStoryTellerBatch(
     }
   }
 
-  const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
+  const imageQuality = isGoldTier ? 'hd' : 'standard';
 
   const firstGeneration = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
     model: 'dall-e-3',
@@ -321,7 +335,7 @@ ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
       });
 
       // Generate directly with DALL-E using the final prompt
-      const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
+      const imageQuality = isGoldTier ? 'hd' : 'standard';
 
       const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
         model: 'dall-e-3',
@@ -401,6 +415,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
+  const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
+  const isGoldTier = normalizedPlan === 'gold' || normalizedPlan === 'ultimate';
 
   // Rate limiting: ensure minimum time between requests
   const now = Date.now();
@@ -413,10 +429,10 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
   // Check GPT-4 Vision limit for Gold/Ultimate users (Premium tier = 'gold', Gold tier = 'ultimate')
   let actualModel = model;
-  const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  const limits = USAGE_LIMITS[normalizedPlan] || USAGE_LIMITS.basic;
   const gpt4Limit = limits.gpt4VisionMonthly || 0;
 
-  if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
+  if (isGoldTier && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
     console.log(`[profileCartoonService] GPT-4 Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}), falling back to GPT-3.5`);
     actualModel = 'gpt-3.5-turbo';
   }
@@ -447,7 +463,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         console.log('[profileCartoonService] ✅ Vision analysis complete:', personalizedDescription);
 
         // Only track GPT-4 usage for Gold/Ultimate users using the full GPT-4 model
-        if ((subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') && actualModel === 'gpt-4') {
+        if (isGoldTier && actualModel === 'gpt-4') {
           usedGpt4 = true;
         }
       }
@@ -509,8 +525,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         console.log(`[profileCartoonService] Attempt ${attempt}/2: Generating with DALL-E 3`);
 
         // Gold/Ultimate users get HD quality for better results (Premium tier = 'gold', Gold tier = 'ultimate')
-        const imageQuality = (subscriptionPlan === 'gold' || subscriptionPlan === 'ultimate') ? 'hd' : 'standard';
-        console.log(`[profileCartoonService] Using ${imageQuality} quality (${subscriptionPlan} plan)`);
+        const imageQuality = isGoldTier ? 'hd' : 'standard';
+        console.log(`[profileCartoonService] Using ${imageQuality} quality (${normalizedPlan} plan)`);
 
         const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
           model: 'dall-e-3',
@@ -544,7 +560,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
           revisedPrompt: data.data[0].revised_prompt,
           enhanced: personalizedDescription !== null, // Indicates Vision analysis was used
           quality: imageQuality,
-          subscriptionPlan,
+          subscriptionPlan: normalizedPlan,
           usedGpt4, // Track if GPT-4 Vision was used
         };
 
@@ -581,7 +597,7 @@ export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeU
     };
   }
 
-  const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
+  const subscriptionPlan = normalizeSubscriptionPlan(userProfile?.subscriptionPlan || 'basic');
   const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
 
   // Check lifetime limit (for basic plan)
@@ -614,9 +630,10 @@ export function canGenerateCartoon(userProfile, currentMonthUsage = 0, lifetimeU
  * @returns {string}
  */
 export function getUsageStatsText(subscriptionPlan = 'basic', currentMonthUsage = 0, lifetimeUsage = 0) {
-  const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
+  const limits = USAGE_LIMITS[normalizedPlan] || USAGE_LIMITS.basic;
 
-  if (subscriptionPlan === 'basic') {
+  if (normalizedPlan === 'basic') {
     return lifetimeUsage >= limits.lifetime
       ? `Used all ${limits.lifetime} generations. Upgrade to Go for ${USAGE_LIMITS.premium.monthly} generations/month!`
       : `${lifetimeUsage}/${limits.lifetime} lifetime generations used`;
@@ -631,6 +648,7 @@ export function getUsageStatsText(subscriptionPlan = 'basic', currentMonthUsage 
  * @returns {number}
  */
 export function getHistoryLimit(subscriptionPlan = 'basic') {
-  const limits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
+  const limits = USAGE_LIMITS[normalizedPlan] || USAGE_LIMITS.basic;
   return limits.historyLimit;
 }

@@ -5,7 +5,9 @@ import {
   StyleSheet,
   FlatList,
   View,
-  ActivityIndicator
+  ActivityIndicator,
+  InteractionManager,
+  Modal
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,7 +43,7 @@ import {
   getUsersFromAllCities,
   getAIArtworkFromCity
 } from '../services/exploreContentService';
-import { generateCartoonProfile, generateStoryTellerBatch } from '../services/openai/profileCartoonService';
+import { generateCartoonProfile, generateStoryTellerBatch, normalizeSubscriptionPlan } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
@@ -83,6 +85,13 @@ const FALLBACK_COUNTRIES = [
   { name: 'Russia', iso2: 'RU', iso3: 'RUS' },
   { name: 'Mexico', iso2: 'MX', iso3: 'MEX' }
 ];
+
+const waitForModalTransition = () =>
+  new Promise(resolve => {
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(resolve, 0);
+    });
+  });
 
 export default function CountryScreen({ navigation }) {
   const [query, setQuery] = useState('');
@@ -142,6 +151,8 @@ export default function CountryScreen({ navigation }) {
     currentImage: 1,
     completedImages: 0,
   });
+  const [shortcutModalVisible, setShortcutModalVisible] = useState(false);
+  const fabHelpersRef = useRef(null);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -426,7 +437,9 @@ export default function CountryScreen({ navigation }) {
       return;
     }
 
-    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold' && !isAdmin) {
+    const normalizedPlan = normalizeSubscriptionPlan(userProfile?.subscriptionPlan || 'basic');
+
+    if (styleId === 'custom' && normalizedPlan !== 'gold' && normalizedPlan !== 'ultimate' && !isAdmin) {
       showAlert('Premium Feature', 'Custom prompts and custom images are exclusive to Gold members. Upgrade to Gold to unlock unlimited creative generation!', [], { type: 'warning' });
       return;
     }
@@ -445,7 +458,7 @@ export default function CountryScreen({ navigation }) {
 
     try {
       const { model = 'gpt-3.5-turbo' } = generationOptions;
-      const userPlan = userProfile?.subscriptionPlan || 'basic';
+      const userPlan = normalizedPlan;
 
       let imageUrlToUse = null;
       if (customImage) {
@@ -589,7 +602,7 @@ export default function CountryScreen({ navigation }) {
         completedImages: 0,
       });
 
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       if (notifyWhenDone) {
         const notifyStyleName = styleId === 'custom' ? 'custom' : styleId;
@@ -615,7 +628,7 @@ export default function CountryScreen({ navigation }) {
         completedImages: 0,
       });
 
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.', [], { type: 'error' });
     }
@@ -692,6 +705,71 @@ export default function CountryScreen({ navigation }) {
   }, [navigation, haptics]);
 
   const styles = useMemo(() => createStyles(themeColors, { isDarkMode }), [themeColors, isDarkMode]);
+  const accentColor = themeColors.primary;
+  const shortcutOptions = useMemo(
+    () => [
+      {
+        key: 'artwork',
+        title: 'Generate Artwork',
+        subtitle: 'AI cartoons, Story Teller, HD exports',
+        icon: 'color-wand',
+      },
+      {
+        key: 'post',
+        title: 'Create Post',
+        subtitle: 'Share long-form stories with everyone',
+        icon: 'create-outline',
+      },
+      {
+        key: 'status',
+        title: 'Share Status',
+        subtitle: 'Quick 24h updates for your neighbours',
+        icon: 'flash-outline',
+      },
+      {
+        key: 'event',
+        title: 'Create Event',
+        subtitle: 'Plan meetups, drop-ins, or workshops',
+        icon: 'calendar-outline',
+      },
+    ],
+    []
+  );
+
+  const handleCloseShortcutModal = useCallback(() => {
+    setShortcutModalVisible(false);
+  }, []);
+
+  const handleFabShortcutPress = useCallback((helpers = {}) => {
+    fabHelpersRef.current = helpers;
+    setShortcutModalVisible(true);
+    return true;
+  }, []);
+
+  const handleShortcutSelect = useCallback(
+    (actionKey) => {
+      handleCloseShortcutModal();
+      setTimeout(() => {
+        switch (actionKey) {
+          case 'artwork':
+            setCartoonModalVisible(true);
+            break;
+          case 'post':
+            fabHelpersRef.current?.openPostComposer?.();
+            break;
+          case 'status':
+            handleAddStatusPress();
+            break;
+          case 'event':
+            navigation?.navigate('Events', { openCreateEvent: true });
+            break;
+          default:
+            break;
+        }
+      }, 200);
+    },
+    [handleCloseShortcutModal, handleAddStatusPress, navigation]
+  );
 
   const renderCarouselItem = useCallback(
     ({ item }) => {
@@ -1017,6 +1095,7 @@ export default function CountryScreen({ navigation }) {
       activeTab="home"
       rightIcon="options"
       onRightPress={handleOpenFilterModal}
+      onFabPress={handleFabShortcutPress}
     >
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -1446,6 +1525,50 @@ export default function CountryScreen({ navigation }) {
           onRefresh={handleRefresh}
         />
       )}
+
+      <Modal
+        visible={shortcutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseShortcutModal}
+      >
+        <View style={styles.shortcutOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={handleCloseShortcutModal}
+          />
+          <View style={[styles.shortcutSheet, { backgroundColor: themeColors.card }]}>
+            <Text style={[styles.shortcutTitle, { color: themeColors.textPrimary }]}>
+              Create something new
+            </Text>
+            <Text style={[styles.shortcutSubtitle, { color: themeColors.textSecondary }]}>
+              Pick what you’d like to start with
+            </Text>
+            {shortcutOptions.map(option => (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.shortcutOption, { borderColor: themeColors.divider }]}
+                activeOpacity={0.85}
+                onPress={() => handleShortcutSelect(option.key)}
+              >
+                <View style={[styles.shortcutIcon, { backgroundColor: `${accentColor}20` }]}>
+                  <Ionicons name={option.icon} size={22} color={accentColor} />
+                </View>
+                <View style={styles.shortcutTextContainer}>
+                  <Text style={[styles.shortcutActionTitle, { color: themeColors.textPrimary }]}>
+                    {option.title}
+                  </Text>
+                  <Text style={[styles.shortcutActionSubtitle, { color: themeColors.textSecondary }]}>
+                    {option.subtitle}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       {/* Explore Filter Modal */}
       <ExploreFilterModal
@@ -1894,5 +2017,54 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    shortcutOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+      justifyContent: 'flex-end',
+    },
+    shortcutSheet: {
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 20,
+      paddingTop: 24,
+      paddingBottom: 36,
+      gap: 12,
+    },
+    shortcutTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    shortcutSubtitle: {
+      fontSize: 14,
+      marginBottom: 4,
+    },
+    shortcutOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 6,
+    },
+    shortcutIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    shortcutTextContainer: {
+      flex: 1,
+    },
+    shortcutActionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    shortcutActionSubtitle: {
+      fontSize: 13,
+      marginTop: 2,
     },
   });

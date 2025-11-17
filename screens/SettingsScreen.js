@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  ActivityIndicator
+  ActivityIndicator,
+  InteractionManager
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,7 +46,7 @@ import CartoonHistoryModal from '../components/CartoonHistoryModal';
 import CartoonSuccessModal from '../components/CartoonSuccessModal';
 import CartoonGenerationProgress from '../components/CartoonGenerationProgress';
 import EmailVerificationBanner from '../components/EmailVerificationBanner';
-import { generateCartoonProfile, generateStoryTellerBatch, getUsageStatsText } from '../services/openai/profileCartoonService';
+import { generateCartoonProfile, generateStoryTellerBatch, getUsageStatsText, normalizeSubscriptionPlan } from '../services/openai/profileCartoonService';
 import { scheduleCartoonReadyNotification } from '../services/notificationService';
 import {
   getCartoonProfileData,
@@ -64,6 +65,13 @@ import LottieView from 'lottie-react-native';
 import { buildDreamyAccent } from '../utils/dreamyPalette';
 
 const GOLD_BADGE_ANIMATION = require('../assets/premium-gold-badge.json');
+
+const waitForModalTransition = () =>
+  new Promise(resolve => {
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(resolve, 0);
+    });
+  });
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -211,6 +219,7 @@ export default function SettingsScreen({ navigation }) {
 
   // Get user's current plan
   const userPlan = userProfile?.subscriptionPlan || 'basic';
+  const normalizedPlan = normalizeSubscriptionPlan(userPlan);
   const isGoldMember = userPlan === 'gold'; // Premium tier
   const isUltimateMember = userPlan === 'ultimate'; // Gold/Ultimate tier
   const isPremiumOrAbove = userPlan === 'gold' || userPlan === 'ultimate'; // Premium or Gold tier
@@ -965,8 +974,10 @@ export default function SettingsScreen({ navigation }) {
       }
     }
 
+    const normalizedPlan = normalizeSubscriptionPlan(userProfile?.subscriptionPlan || 'basic');
+
     // Validate Gold users for custom prompts
-    if (styleId === 'custom' && userProfile?.subscriptionPlan !== 'gold' && !isAdmin) {
+    if (styleId === 'custom' && normalizedPlan !== 'gold' && normalizedPlan !== 'ultimate' && !isAdmin) {
       showAlert('Premium Feature', 'Custom prompts and custom images are exclusive to Gold members. Upgrade to Gold to unlock unlimited creative generation!', [], { type: 'warning' });
       return;
     }
@@ -1037,7 +1048,7 @@ export default function SettingsScreen({ navigation }) {
           generationOptions.quantity,
           userProfile.gender || 'neutral',
           customPrompt,
-          userProfile?.subscriptionPlan || 'basic',
+          normalizedPlan,
           model,
           cartoonUsageData?.gpt4VisionUsage || 0,
           (progress) => {
@@ -1087,7 +1098,7 @@ export default function SettingsScreen({ navigation }) {
             storageUrl,
             styleId === 'custom' ? 'custom' : styleId,
             isAdmin,
-            userPlan,
+            normalizedPlan,
             result.usedGpt4,
             `${customPrompt || ''} ${result.variationPrompt || ''}`.trim()
           );
@@ -1129,7 +1140,7 @@ export default function SettingsScreen({ navigation }) {
           styleId,
           userProfile.gender || 'neutral',
           customPrompt,
-          userProfile?.subscriptionPlan || 'basic',
+          normalizedPlan,
           model,
           cartoonUsageData?.gpt4VisionUsage || 0
         );
@@ -1143,7 +1154,7 @@ export default function SettingsScreen({ navigation }) {
           storageUrl,
           styleId === 'custom' ? 'custom' : styleId,
           isAdmin,
-          userPlan,
+          normalizedPlan,
           result.usedGpt4,
           customPrompt || null
         );
@@ -1171,7 +1182,7 @@ export default function SettingsScreen({ navigation }) {
       });
 
       // Wait for progress to close
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       // Send notification if requested
       if (notifyWhenDone) {
@@ -1202,7 +1213,7 @@ export default function SettingsScreen({ navigation }) {
       });
 
       // Wait for progress to close
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       showAlert('Error', error.message || 'Failed to generate cartoon. Please try again.', [], { type: 'error' });
     }
@@ -1219,7 +1230,7 @@ export default function SettingsScreen({ navigation }) {
 
     try {
       // Wait for modal to fully close
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       await setAsProfilePicture(user.uid, pictureUrl);
       await reloadProfile();
@@ -1259,7 +1270,7 @@ export default function SettingsScreen({ navigation }) {
 
     try {
       // Wait for modal to close
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForModalTransition();
 
       await clearCartoonHistory(user.uid);
       await loadCartoonData();
@@ -2463,7 +2474,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.profileSummary}>
               Transform your profile into a fun cartoon avatar using AI. {'\n'}
               {getUsageStatsText(
-                userProfile?.subscriptionPlan || 'basic',
+          normalizedPlan,
                 cartoonUsageData?.monthlyUsage || 0,
                 cartoonUsageData?.lifetimeUsage || 0
               )}

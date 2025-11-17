@@ -22,7 +22,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
-import { CARTOON_STYLES, canGenerateCartoon, getUsageStatsText } from '../services/openai/profileCartoonService';
+import { CARTOON_STYLES, USAGE_LIMITS, canGenerateCartoon, getUsageStatsText, normalizeSubscriptionPlan } from '../services/openai/profileCartoonService';
 import { requestNotificationPermission, areNotificationsEnabled } from '../services/notificationService';
 
 export default function CartoonStyleModal({
@@ -68,7 +68,7 @@ export default function CartoonStyleModal({
     }
   };
 
-  const subscriptionPlan = userProfile?.subscriptionPlan || 'basic';
+  const subscriptionPlan = normalizeSubscriptionPlan(userProfile?.subscriptionPlan || 'basic');
   console.log('[CartoonStyleModal] 🔑 User subscription:', {
     subscriptionPlan,
     isAdmin,
@@ -88,17 +88,27 @@ export default function CartoonStyleModal({
   // Map subscription plan to user-facing tier name
   const tierName = subscriptionPlan === 'ultimate' ? 'Gold' : subscriptionPlan === 'gold' ? 'Premium' : 'Go';
 
+  const monthlyUsage = usageData?.monthlyUsage || 0;
+  const lifetimeUsage = usageData?.lifetimeUsage || 0;
+  const gpt4VisionUsage = usageData?.gpt4VisionUsage || 0;
+
+  const currentPlanLimits = USAGE_LIMITS[subscriptionPlan] || USAGE_LIMITS.basic;
+  const goldPlanLimits = USAGE_LIMITS.ultimate || USAGE_LIMITS.gold || currentPlanLimits;
+  const goldMonthlyLimit = goldPlanLimits?.monthly || 0;
+  const goldGpt4Limit = goldPlanLimits?.gpt4VisionMonthly || 0;
+  const goldMonthlyRemaining = Math.max(goldMonthlyLimit - monthlyUsage, 0);
+
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,
-    usageData?.monthlyUsage || 0,
-    usageData?.lifetimeUsage || 0,
+    monthlyUsage,
+    lifetimeUsage,
     isAdmin
   );
 
   const usageText = getUsageStatsText(
     subscriptionPlan,
-    usageData?.monthlyUsage || 0,
-    usageData?.lifetimeUsage || 0
+    monthlyUsage,
+    lifetimeUsage
   );
 
   const styles = Object.values(CARTOON_STYLES);
@@ -490,7 +500,7 @@ export default function CartoonStyleModal({
                       },
                     ]}
                   >
-                    {20 - (usageData?.monthlyUsage || 0)} left
+                    {goldMonthlyRemaining} left
                   </Text>
                 </TouchableOpacity>
 
@@ -534,7 +544,7 @@ export default function CartoonStyleModal({
                       },
                     ]}
                   >
-                    {usageData?.gpt4VisionUsage || 0}/5 used
+                    {gpt4VisionUsage}/{goldGpt4Limit} used
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -544,7 +554,7 @@ export default function CartoonStyleModal({
                 <View style={[localStyles.gpt4UsageHint, { backgroundColor: `${primaryColor}10` }]}>
                   <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
                   <Text style={[localStyles.gpt4UsageText, { color: themeColors.textSecondary }]}>
-                    GPT-4 Vision: {usageData?.gpt4VisionUsage || 0}/5 used this month
+                    GPT-4 Vision: {gpt4VisionUsage}/{goldGpt4Limit} used this month
                   </Text>
                 </View>
               )}

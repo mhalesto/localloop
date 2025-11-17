@@ -3,6 +3,8 @@ import { View, Image, StyleSheet, TouchableOpacity, Text, Dimensions, Modal, Sta
 import { Ionicons } from '@expo/vector-icons';
 import { downloadAsync, documentDirectory } from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import LottieView from 'lottie-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -58,6 +60,14 @@ export default function ArtworkMasonryGrid({
   const [heartAnimations, setHeartAnimations] = useState({}); // Track heart animation state
   const [isZooming, setIsZooming] = useState(false); // True when actively zoomed in
   const [zoomModeEnabled, setZoomModeEnabled] = useState(false); // True when user long-presses to enable zoom mode
+  const [isSharingImage, setIsSharingImage] = useState(false);
+  const [shareCaptionModal, setShareCaptionModal] = useState({
+    visible: false,
+    caption: '',
+    hashtags: [],
+    combinedText: '',
+    style: '',
+  });
   const primaryColor = accentPreset?.buttonBackground || themeColors.primary;
   const handleZoomStateChange = useCallback((zooming) => {
     setIsZooming((prev) => (prev === zooming ? prev : zooming));
@@ -266,6 +276,124 @@ export default function ArtworkMasonryGrid({
           },
         ]
       );
+    }
+  };
+
+  const formatHashtag = useCallback((text = '') => {
+    const cleaned = text.replace(/[^a-z0-9 ]/gi, ' ').trim();
+    if (!cleaned) return null;
+    return (
+      '#' +
+      cleaned
+        .split(/\s+/)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join('')
+    );
+  }, []);
+
+  const generateHashtags = useCallback(
+    (style, promptText = '') => {
+      const fallbackTags = [
+        '#LocalLoopAI',
+        '#AICartoon',
+        '#AIAvatar',
+        '#DigitalArt',
+        '#CartoonCreator',
+        '#CreativeAI',
+        '#GoldMember',
+        '#StoryTeller',
+        '#MadeWithLocalLoop',
+      ];
+      const hashtags = [];
+      const styleTag = formatHashtag(style ? `${style} Style` : 'Cartoon Avatar');
+      if (styleTag) {
+        hashtags.push(styleTag);
+      }
+
+      const stopWords = new Set(['with', 'that', 'this', 'your', 'from', 'into', 'their', 'have', 'some', 'using', 'make', 'made']);
+      const wordMatches = (promptText.toLowerCase().match(/\b[a-z0-9]{4,}\b/g) || []);
+      wordMatches.forEach(word => {
+        if (stopWords.has(word)) return;
+        const tag = formatHashtag(word);
+        if (tag && !hashtags.some(existing => existing.toLowerCase() === tag.toLowerCase())) {
+          hashtags.push(tag);
+        }
+      });
+
+      fallbackTags.forEach(tag => {
+        if (!hashtags.some(existing => existing.toLowerCase() === tag.toLowerCase())) {
+          hashtags.push(tag);
+        }
+      });
+
+      while (hashtags.length < 7) {
+        hashtags.push(fallbackTags[hashtags.length % fallbackTags.length]);
+      }
+
+      return hashtags.slice(0, 10);
+    },
+    [formatHashtag]
+  );
+
+  const handleShareButtonPress = () => {
+    const promptText = (fullScreenImage.prompt && fullScreenImage.prompt.trim()) ||
+      `Just created this ${fullScreenImage.style || 'cartoon'} avatar with LocalLoop!`;
+    const hashtags = generateHashtags(fullScreenImage.style, promptText);
+    const combinedText = `${promptText}\n\n${hashtags.join(' ')}`;
+    setShareCaptionModal({
+      visible: true,
+      caption: promptText,
+      hashtags,
+      combinedText,
+      style: fullScreenImage.style || 'Cartoon',
+    });
+  };
+
+  const handleCopyShareCaption = async () => {
+    try {
+      if (!shareCaptionModal.combinedText) return;
+      await Clipboard.setStringAsync(shareCaptionModal.combinedText);
+      Alert.alert('Copied', 'Caption and hashtags copied to your clipboard.');
+    } catch (error) {
+      console.error('[ArtworkMasonryGrid] Error copying caption:', error);
+      Alert.alert('Copy Failed', 'Unable to copy text. Please try again.');
+    }
+  };
+
+  const closeShareCaptionModal = () => {
+    setShareCaptionModal(prev => ({ ...prev, visible: false }));
+  };
+
+  const handleShareCurrentImage = async () => {
+    try {
+      const imageUrl = fullScreenImage.isStory && fullScreenImage.images.length > 0
+        ? fullScreenImage.images[fullScreenImage.currentIndex]?.url
+        : fullScreenImage.url;
+
+      if (!imageUrl) {
+        return;
+      }
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Sharing Not Supported', 'Your device does not support sharing images. Please update your OS or try again later.');
+        return;
+      }
+
+      setIsSharingImage(true);
+      const filename = `localloop-share-${Date.now()}.jpg`;
+      const fileUri = `${documentDirectory}${filename}`;
+      const downloadResult = await downloadAsync(imageUrl, fileUri);
+
+      await Sharing.shareAsync(downloadResult.uri, {
+        mimeType: 'image/jpeg',
+        dialogTitle: 'Share your cartoon on Instagram',
+        UTI: 'public.jpeg',
+      });
+    } catch (error) {
+      console.error('[ArtworkMasonryGrid] Error sharing image:', error);
+      Alert.alert('Share Failed', 'Unable to share this image. Please try again.');
+    } finally {
+      setIsSharingImage(false);
     }
   };
 
@@ -568,6 +696,80 @@ export default function ArtworkMasonryGrid({
         </TouchableOpacity>
       </Modal>
 
+      {/* Share Caption Modal */}
+      <Modal
+        visible={shareCaptionModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeShareCaptionModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeShareCaptionModal}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.shareCaptionCard, { backgroundColor: themeColors.card, borderColor: themeColors.divider }]}
+            onPress={() => {}}
+          >
+            <View style={styles.shareCaptionHeader}>
+              <View>
+                <Text style={[styles.shareCaptionTitle, { color: themeColors.textPrimary }]}>
+                  Ready for Instagram?
+                </Text>
+                <Text style={[styles.shareCaptionSubtitle, { color: themeColors.textSecondary }]}>
+                  Copy the description and hashtags below before sharing.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={closeShareCaptionModal}>
+                <Ionicons name="close" size={22} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.shareCaptionPromptBox, { backgroundColor: themeColors.background, borderColor: themeColors.divider }]}>
+              <Text style={[styles.shareCaptionPromptText, { color: themeColors.textPrimary }]}>
+                {shareCaptionModal.caption}
+              </Text>
+            </View>
+
+            <View style={styles.shareHashtagContainer}>
+              {shareCaptionModal.hashtags.map(tag => (
+                <View key={tag} style={[styles.shareHashtagChip, { backgroundColor: `${primaryColor}15` }]}>
+                  <Text style={[styles.shareHashtagText, { color: primaryColor }]}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.shareCaptionButton, { borderColor: primaryColor }]}
+              onPress={handleCopyShareCaption}
+            >
+              <Ionicons name="copy-outline" size={18} color={primaryColor} />
+              <Text style={[styles.shareCaptionButtonText, { color: primaryColor }]}>
+                Copy description + hashtags
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sharePrimaryButton, { backgroundColor: primaryColor }]}
+              onPress={handleShareCurrentImage}
+              disabled={isSharingImage}
+              activeOpacity={0.8}
+            >
+              {isSharingImage ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="logo-instagram" size={20} color="#fff" />
+                  <Text style={styles.sharePrimaryButtonText}>Share Image</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Full Screen Image Modal */}
       <Modal
         visible={fullScreenImage.visible}
@@ -580,6 +782,22 @@ export default function ArtworkMasonryGrid({
           {/* Top buttons */}
           <View style={styles.topButtonsContainer}>
             <View style={[styles.leftButtonsContainer, hideFullScreenChrome && styles.hiddenLeftButtons]}>
+              {/* Share button */}
+              <TouchableOpacity
+                style={styles.shareButtonFullScreen}
+                onPress={handleShareButtonPress}
+                activeOpacity={0.7}
+                disabled={isSharingImage || hideFullScreenChrome}
+              >
+                <View style={styles.shareIconContainer}>
+                  {isSharingImage ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="logo-instagram" size={22} color="#fff" />
+                  )}
+                </View>
+              </TouchableOpacity>
+
               {/* Download button */}
               <TouchableOpacity
                 style={styles.downloadButtonFullScreen}
@@ -1131,6 +1349,17 @@ const styles = StyleSheet.create({
     opacity: 0,
     pointerEvents: 'none',
   },
+  shareButtonFullScreen: {
+    // Left side share
+  },
+  shareIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   downloadButtonFullScreen: {
     // Left side
   },
@@ -1292,6 +1521,79 @@ const styles = StyleSheet.create({
   promptCardText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  shareCaptionCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+  },
+  shareCaptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  shareCaptionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  shareCaptionSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  shareCaptionPromptBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  shareCaptionPromptText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  shareHashtagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  shareHashtagChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  shareHashtagText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  shareCaptionButton: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  shareCaptionButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sharePrimaryButton: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  sharePrimaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   heartButton: {
     flexDirection: 'row',
