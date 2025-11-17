@@ -153,6 +153,8 @@ export default function CountryScreen({ navigation }) {
   });
   const [shortcutModalVisible, setShortcutModalVisible] = useState(false);
   const fabHelpersRef = useRef(null);
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const lastScrollOffset = useRef(0);
 
   const isMounted = useRef(true);
   const countriesRef = useRef(0);
@@ -771,6 +773,26 @@ export default function CountryScreen({ navigation }) {
     [handleCloseShortcutModal, handleAddStatusPress, navigation]
   );
 
+  const handleMainListScroll = useCallback(
+    (event) => {
+      const current = event.nativeEvent.contentOffset.y;
+      const diff = current - lastScrollOffset.current;
+      lastScrollOffset.current = current;
+
+      if (current <= 0 && headerHidden) {
+        setHeaderHidden(false);
+        return;
+      }
+
+      if (diff > 8 && !headerHidden && current > 40) {
+        setHeaderHidden(true);
+      } else if (diff < -8 && headerHidden) {
+        setHeaderHidden(false);
+      }
+    },
+    [headerHidden]
+  );
+
   const renderCarouselItem = useCallback(
     ({ item }) => {
       if (item.type === 'cta') {
@@ -1096,6 +1118,7 @@ export default function CountryScreen({ navigation }) {
       rightIcon="options"
       onRightPress={handleOpenFilterModal}
       onFabPress={handleFabShortcutPress}
+      headerHidden={headerHidden}
     >
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -1523,6 +1546,8 @@ export default function CountryScreen({ navigation }) {
           onEndReachedThreshold={showingPersonalized ? undefined : 0.3}
           refreshing={refreshing}
           onRefresh={handleRefresh}
+          onScroll={handleMainListScroll}
+          scrollEventThrottle={16}
         />
       )}
 

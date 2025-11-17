@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, Modal, Pressable, Animated, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,6 +45,7 @@ export default function ScreenLayout({
   enableHeaderOverlap = false,
   profilePhoto,
   onFabPress, // Custom FAB action (e.g., for Events screen)
+  headerHidden = false,
 }) {
   const {
     showAddShortcut,
@@ -78,6 +79,17 @@ export default function ScreenLayout({
   const [composerVisible, setComposerVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const HEADER_HEIGHT = 130;
+  const [headerHeight, setHeaderHeight] = useState(HEADER_HEIGHT);
+
+  useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue: headerHidden ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [headerHidden, headerAnim]);
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
   const [postLimitInfo, setPostLimitInfo] = useState({ count: 0, limit: 5, remaining: 5 });
 
@@ -474,11 +486,16 @@ export default function ScreenLayout({
     [themeColors, isDarkMode, enableHeaderOverlap]
   );
 
+  const safeBackground = headerHidden
+    ? accentPreset?.buttonBackground ?? themeColors.primary
+    : themeColors.background;
+
   return (
     // IMPORTANT:
     // - We do NOT paint the safe area with the header color anymore.
     // - We let AppHeader handle the top inset and background so shapes can bleed into the status bar.
     <SafeAreaView style={[styles.safe, { backgroundColor: themeColors.background }]} edges={['bottom']}>
+    {/* <SafeAreaView style={[styles.safe, { backgroundColor: safeBackground }]} edges={['bottom']}> */}
       {/* Translucent status bar so the header's background/shapes are visible underneath */}
       <StatusBar style={statusStyle} translucent backgroundColor="transparent" hidden={!showHeaderBar} />
 
@@ -488,25 +505,63 @@ export default function ScreenLayout({
           <Animated.View pointerEvents="none" style={[styles.headerBackground, headerBackgroundStyle]} />
         ) : null}
 
-        <AppHeader
-          title={title}
-          subtitle={subtitle}
-          onBack={onBack}
-          onMenu={!onBack && showDrawerButton ? handleMenuPress : undefined}
-          rightIcon={defaultRightIcon}
-          onRightPress={handleHeaderRightPress}
-          rightBadgeCount={headerBadgeCount}
-          secondRightIcon={rightIcon ? notificationIcon : undefined}
-          onSecondRightPress={rightIcon ? handleNotificationsPress : undefined}
-          secondRightBadgeCount={secondIconBadgeCount}
-          showSearch={showSearch}
-          searchPlaceholder={searchPlaceholder}
-          searchValue={searchValue}
-          onSearchChange={onSearchChange}
-          wrapperStyle={headerStyle}
-          accent={accentPreset}
-          profilePhoto={profilePhoto}
-        />
+        <Animated.View
+          style={[
+            styles.headerContainer,
+            {
+              height: headerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [headerHeight || HEADER_HEIGHT, 0],
+              }),
+            },
+          ]}
+        >
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  translateY: headerAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -(headerHeight || HEADER_HEIGHT)],
+                  }),
+                },
+              ],
+              opacity: headerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+          >
+            <View
+              onLayout={(event) => {
+                const measuredHeight = event.nativeEvent.layout.height;
+                if (measuredHeight && Math.abs(measuredHeight - headerHeight) > 1) {
+                  setHeaderHeight(measuredHeight);
+                }
+              }}
+            >
+              <AppHeader
+                title={title}
+                subtitle={subtitle}
+                onBack={onBack}
+                onMenu={!onBack && showDrawerButton ? handleMenuPress : undefined}
+                rightIcon={defaultRightIcon}
+                onRightPress={handleHeaderRightPress}
+                rightBadgeCount={headerBadgeCount}
+                secondRightIcon={rightIcon ? notificationIcon : undefined}
+                onSecondRightPress={rightIcon ? handleNotificationsPress : undefined}
+                secondRightBadgeCount={secondIconBadgeCount}
+                showSearch={showSearch}
+                searchPlaceholder={searchPlaceholder}
+                searchValue={searchValue}
+                onSearchChange={onSearchChange}
+                wrapperStyle={headerStyle}
+                accent={accentPreset}
+                profilePhoto={profilePhoto}
+              />
+            </View>
+          </Animated.View>
+        </Animated.View>
 
         <View style={[styles.content, contentStyle]}>{children}</View>
 
@@ -610,6 +665,9 @@ const createStyles = (palette, { isDarkMode, enableHeaderOverlap } = {}) =>
       left: 0,
       right: 0,
       zIndex: 0,
+    },
+    headerContainer: {
+      overflow: 'hidden',
     },
     content: {
       flex: 1,
