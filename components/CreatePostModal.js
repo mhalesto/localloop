@@ -158,63 +158,67 @@ export default function CreatePostModal({
   const [pollModalVisible, setPollModalVisible] = useState(false);
   const pollPreviewMeta = useMemo(() => describePollPreviewMeta(pollData), [pollData]);
 
-  useEffect(() => {
-    if (visible) {
-      const nextTitle = initialTitle ?? '';
-      const nextMessage = initialMessage ?? '';
-      setTitle(nextTitle);
-      setMessage(nextMessage);
-      setSelectedColor(initialAccentKey ?? accentPresets[0].key);
-      setSelectedLocation(initialLocation?.city ? {
-        city: initialLocation.city,
-        province: initialLocation.province ?? '',
-        country: initialLocation.country ?? ''
-      } : null);
-      const shouldEnableAdvanced = Boolean(initialHighlightDescription) || hasRichFormatting(nextMessage);
-      setAdvancedEnabled(shouldEnableAdvanced);
-      setHighlightDescription(initialHighlightDescription ?? false);
-      const caret = nextMessage.length;
-      setMessageSelection({ start: caret, end: caret });
+const wasVisibleRef = useRef(false);
 
-      // [PUBLIC-MODE] Reset to user's preferred mode
-      setPostingMode(userProfile?.currentMode || 'anonymous');
+useEffect(() => {
+  if (visible && !wasVisibleRef.current) {
+    const nextTitle = initialTitle ?? '';
+    const nextMessage = initialMessage ?? '';
+    setTitle(nextTitle);
+    setMessage(nextMessage);
+    setSelectedColor(initialAccentKey ?? accentPresets[0].key);
+    setSelectedLocation(initialLocation?.city ? {
+      city: initialLocation.city,
+      province: initialLocation.province ?? '',
+      country: initialLocation.country ?? ''
+    } : null);
+    const shouldEnableAdvanced = Boolean(initialHighlightDescription) || hasRichFormatting(nextMessage);
+    setAdvancedEnabled(shouldEnableAdvanced);
+    setHighlightDescription(initialHighlightDescription ?? false);
+    const caret = nextMessage.length;
+    setMessageSelection({ start: caret, end: caret });
 
-      // Set poll data from initial value
-      setPollData(initialPoll);
-      setPollModalVisible(false);
+    // [PUBLIC-MODE] Reset to user's preferred mode
+    setPostingMode(userProfile?.currentMode || 'anonymous');
 
-      // [AI-SUMMARY] reset summary UI each open
-      setSummaryError('');
-      setIsSummarizing(false);
-      setSummaryText('');
-      setSummaryVisible(false);
-      setSummaryMeta(null);
-      setSummaryLength(premiumSummaryLength || 'balanced');
-      setSummaryQuality('best');        // default to best quality for HF API
-      summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
-      if (summarizationControllerRef.current) {
-        summarizationControllerRef.current.abort?.();
-        summarizationControllerRef.current = null;
-      }
-    } else {
-      setLocationModalVisible(false);
-      setAdvancedEnabled(false);
-      setHighlightDescription(false);
-      setMessageSelection({ start: 0, end: 0 });
+    // Set poll data from initial value
+    setPollData(initialPoll);
+    setPollModalVisible(false);
 
-      // [AI-SUMMARY] cleanup
-      setSummaryError('');
-      setIsSummarizing(false);
-      setSummaryText('');
-      setSummaryVisible(false);
-      setSummaryMeta(null);
-      summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
-      if (summarizationControllerRef.current) {
-        summarizationControllerRef.current.abort?.();
-        summarizationControllerRef.current = null;
-      }
+    // [AI-SUMMARY] reset summary UI each open
+    setSummaryError('');
+    setIsSummarizing(false);
+    setSummaryText('');
+    setSummaryVisible(false);
+    setSummaryMeta(null);
+    setSummaryLength(premiumSummaryLength || 'balanced');
+    setSummaryQuality('best');        // default to best quality for HF API
+    summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
+    if (summarizationControllerRef.current) {
+      summarizationControllerRef.current.abort?.();
+      summarizationControllerRef.current = null;
     }
-  }, [
+  } else if (!visible && wasVisibleRef.current) {
+    setLocationModalVisible(false);
+    setAdvancedEnabled(false);
+    setHighlightDescription(false);
+    setMessageSelection({ start: 0, end: 0 });
+
+    // [AI-SUMMARY] cleanup
+    setSummaryError('');
+    setIsSummarizing(false);
+    setSummaryText('');
+    setSummaryVisible(false);
+    setSummaryMeta(null);
+    summaryCacheRef.current = { ...SUMMARY_CACHE_DEFAULT };
+    if (summarizationControllerRef.current) {
+      summarizationControllerRef.current.abort?.();
+      summarizationControllerRef.current = null;
+    }
+  }
+
+  wasVisibleRef.current = visible;
+}, [
     visible,
     initialAccentKey,
     initialLocation,
