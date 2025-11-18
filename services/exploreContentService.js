@@ -151,6 +151,7 @@ export async function getAIArtworkFromAllCities(userCity = null, maxResults = 12
 
       for (const doc of storiesSnapshot.docs) {
         const data = doc.data();
+        console.log('[exploreContentService] 🧵 Story document', doc.id, 'raw images:', data.images);
 
         console.log('[exploreContentService] 📄 Processing story:', {
           docId: doc.id,

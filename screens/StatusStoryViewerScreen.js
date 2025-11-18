@@ -263,12 +263,14 @@ export default function StatusStoryViewerScreen({ route, navigation }) {
   }, [handleNext]);
 
   // compute displayed image size; make it smaller and centered
-  const availableW = winW * 0.85; // Reduce to 85% of screen width
-  const availableH = winH * 0.6; // Reduce to 60% of screen height for cleaner look
+  const headerSpace = insets.top + HEADER_TOUCH_EXCLUDE;
+  const footerSpace = 140 + insets.bottom; // reply box area
+  const availableW = winW;
+  const availableH = Math.max(0, winH - headerSpace - footerSpace);
   let displayW = availableW;
   let displayH = availableH;
   if (imgNatural.w && imgNatural.h) {
-    const scale = Math.min(0.9, availableW / imgNatural.w, availableH / imgNatural.h);
+    const scale = Math.min(1, availableW / imgNatural.w, availableH / imgNatural.h);
     displayW = Math.round(imgNatural.w * scale);
     displayH = Math.round(imgNatural.h * scale);
   }

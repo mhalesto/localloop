@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -17,8 +18,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../contexts/SettingsContext';
 import LottieView from 'lottie-react-native';
-import ProgressiveImage from './ProgressiveImage';
-import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.75; // Each image takes 75% of screen width
@@ -92,31 +91,29 @@ export default function StoryTellerCard({
         style={styles.scrollView}
       >
         {story.images.map((image, index) => {
-          const imageKey = image.id ?? `${story.id}-${index}`;
-          const imageMeta = {
-            ...image,
-            thumbnail: getThumbnailUrl(image.url, 400, 60),
-            blurhash: image.blurhash || getBlurhash(image.url),
-          };
-
+          if (!image?.url) {
+            console.warn('[StoryTellerCard] Missing image URL in story', story.id, 'index', index, image);
+            return (
+              <View key={`missing-${story.id}-${index}`} style={[styles.imageContainer, styles.missingImage]}>
+                <Text style={styles.missingText}>Image unavailable</Text>
+              </View>
+            );
+          }
           return (
             <TouchableOpacity
-              key={imageKey}
+              key={image.id || `${story.id}-${index}`}
               activeOpacity={0.95}
-              onPress={() => onImagePress(imageMeta, index)}
+              onPress={() => onImagePress(image, index)}
               style={styles.imageContainer}
             >
-              <ProgressiveImage
-                source={imageMeta.url}
-                thumbnail={imageMeta.thumbnail}
-                blurhash={imageMeta.blurhash}
+              <Image
+                source={{ uri: image.url }}
                 style={styles.image}
-                contentFit="cover"
-                transition={180}
-                onLoadStart={() => handleImageLoadStart(imageKey)}
-                onLoadEnd={() => handleImageLoadEnd(imageKey, imageMeta.url)}
+                resizeMode="cover"
+                onLoadStart={() => handleImageLoadStart(image.id)}
+                onLoadEnd={() => handleImageLoadEnd(image.id, image.url)}
               />
-              {loadingStates[imageKey] && (
+              {loadingStates[image.id] && (
                 <View style={styles.loadingOverlay}>
                   <LottieView
                     source={require('../assets/broom.json')}
@@ -275,6 +272,18 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  missingImage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 24,
+    padding: 16,
+  },
+  missingText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

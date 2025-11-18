@@ -80,8 +80,8 @@ export default function StatusComposerScreen({ navigation }) {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes,
-      allowsEditing: true,
-      quality: 0.7,
+      allowsEditing: false,
+      quality: 1,
       selectionLimit: 1,
     });
 
@@ -199,7 +199,7 @@ export default function StatusComposerScreen({ navigation }) {
 
             {imageUri ? (
               <View style={styles.previewBlock}>
-                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="contain" />
                 <TouchableOpacity
                   onPress={() => { setImageUri(null); setImageMimeType(null); }}
                   style={styles.removeImageButton}

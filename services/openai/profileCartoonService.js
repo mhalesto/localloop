@@ -100,7 +100,7 @@ export const CARTOON_STYLES = {
 const GOLD_LIMITS = {
   monthly: 200, // Gold users can generate 200 cartoons per month
   lifetime: null, // Unlimited lifetime
-  historyLimit: 20, // Gold users can save 20 cartoons in history
+  historyLimit: 100, // Gold users can save 100 cartoons in history
   gpt4VisionMonthly: 200, // Gold users get 200 GPT-4 Vision generations per month
 };
 
@@ -109,13 +109,13 @@ export const USAGE_LIMITS = {
   basic: {
     monthly: 0,
     lifetime: 5, // Free users get 5 lifetime generations
-    historyLimit: 3, // Basic users can save 3 cartoons in history
+    historyLimit: 10, // Free Go users can save 10 cartoons in history
     gpt4VisionMonthly: 0, // No GPT-4 Vision for Basic
   },
   premium: {
     monthly: 10, // Premium users get 10 generations per month
     lifetime: null, // Unlimited lifetime
-    historyLimit: 10, // Premium users can save 10 cartoons in history
+    historyLimit: 50, // Premium users can save 50 cartoons in history
     gpt4VisionMonthly: 0, // No GPT-4 Vision for Premium
   },
   gold: GOLD_LIMITS, // Legacy name for Premium tier in some configs
