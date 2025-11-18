@@ -104,6 +104,9 @@ const GOLD_LIMITS = {
   gpt4VisionMonthly: 200, // Gold users get 200 GPT-4 Vision generations per month
 };
 
+// Advanced models count against the GPT-4 Vision pool
+const ADVANCED_VISION_MODELS = ['gpt-4', 'gpt-5', 'gpt-5.1'];
+
 // Usage limits per subscription plan
 export const USAGE_LIMITS = {
   basic: {
@@ -201,7 +204,7 @@ const MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests
  * @param {string} gender - Gender hint
  * @param {string} customPrompt - Custom prompt for variations
  * @param {string} subscriptionPlan - User's plan
- * @param {string} model - AI model to use
+ * @param {string} model - AI model to use ('gpt-3.5-turbo' | 'gpt-4' | 'gpt-5.1')
  * @param {number} gpt4VisionUsage - GPT-4 usage count
  * @param {function} onProgress - Progress callback ({current, total, image})
  * @returns {Promise<Array>} Array of generated image URLs and metadata
@@ -219,6 +222,9 @@ export async function generateStoryTellerBatch(
 ) {
   const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
   const isGoldTier = normalizedPlan === 'gold' || normalizedPlan === 'ultimate';
+  const limits = USAGE_LIMITS[normalizedPlan] || USAGE_LIMITS.basic;
+  const gpt4Limit = limits.gpt4VisionMonthly || 0;
+  let actualModel = model;
 
   if (quantity < 2 || quantity > 5) {
     throw new Error('Story Teller mode requires 2-5 images');
@@ -229,10 +235,15 @@ export async function generateStoryTellerBatch(
     styleId,
     hasCustomPrompt: !!customPrompt,
     subscriptionPlan: normalizedPlan,
-    model
+    model: actualModel
   });
 
   const results = [];
+
+  if (isGoldTier && ADVANCED_VISION_MODELS.includes(model) && gpt4Limit && gpt4VisionUsage >= gpt4Limit) {
+    console.log(`[profileCartoonService] Advanced Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}) for ${model}, falling back to GPT-3.5 for Story Teller`);
+    actualModel = 'gpt-3.5-turbo';
+  }
 
   // STEP 1: Generate the first reference image and extract its revised prompt
   console.log('[profileCartoonService] 🎨 Generating first image as reference...');
@@ -244,7 +255,7 @@ export async function generateStoryTellerBatch(
   if (imageUrl) {
     try {
       console.log('[profileCartoonService] 🔍 Analyzing image for character details...');
-      baseCharacterDescription = await analyzePhotoWithVision(imageUrl, model, gpt4VisionUsage);
+      baseCharacterDescription = await analyzePhotoForCartoon(imageUrl, actualModel);
       console.log('[profileCartoonService] ✅ Vision analysis complete');
     } catch (error) {
       console.warn('[profileCartoonService] Vision analysis failed, will use generic description');
@@ -282,7 +293,7 @@ export async function generateStoryTellerBatch(
 
   const firstImage = {
     imageUrl: firstGeneration.data[0].url,
-    usedGpt4: false,
+    usedGpt4: isGoldTier && ADVANCED_VISION_MODELS.includes(actualModel),
     revised_prompt: firstGeneration.data[0].revised_prompt,
   };
 
@@ -348,7 +359,7 @@ ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
 
       const result = {
         imageUrl: data.data[0].url,
-        usedGpt4: false, // Not using GPT-4 for generation, only for initial Vision
+        usedGpt4: isGoldTier && ADVANCED_VISION_MODELS.includes(actualModel),
         revised_prompt: data.data[0].revised_prompt || null,
       };
 
@@ -407,7 +418,7 @@ ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
  * @param {string} gender - Optional gender hint (male/female/neutral)
  * @param {string} customPrompt - Optional custom prompt for Gold users (only used if styleId is 'custom')
  * @param {string} subscriptionPlan - User's subscription plan ('basic' | 'premium' | 'gold')
- * @param {string} model - AI model to use ('gpt-3.5-turbo' | 'gpt-4')
+ * @param {string} model - AI model to use ('gpt-3.5-turbo' | 'gpt-4' | 'gpt-5.1')
  * @param {number} gpt4VisionUsage - Current GPT-4 Vision usage this month
  * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean, usedGpt4: boolean}>}
  */
@@ -432,8 +443,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   const limits = USAGE_LIMITS[normalizedPlan] || USAGE_LIMITS.basic;
   const gpt4Limit = limits.gpt4VisionMonthly || 0;
 
-  if (isGoldTier && model === 'gpt-4' && gpt4VisionUsage >= gpt4Limit) {
-    console.log(`[profileCartoonService] GPT-4 Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}), falling back to GPT-3.5`);
+  if (isGoldTier && ADVANCED_VISION_MODELS.includes(model) && gpt4Limit && gpt4VisionUsage >= gpt4Limit) {
+    console.log(`[profileCartoonService] Advanced Vision limit reached (${gpt4VisionUsage}/${gpt4Limit}) for ${model}, falling back to GPT-3.5`);
     actualModel = 'gpt-3.5-turbo';
   }
 
@@ -453,8 +464,8 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         console.warn('[profileCartoonService] This will result in a generic cartoon that may not resemble the user');
         throw new Error('Profile photo must be uploaded to cloud storage before generating cartoon. Please wait a few seconds for upload to complete.');
       } else {
-        // Use GPT-4o mini for all users (cost-effective and accurate vision analysis)
-        const visionModel = 'gpt-4o-mini';
+        // Use requested advanced model when available, otherwise fall back to GPT-4o mini
+        const visionModel = actualModel === 'gpt-4' ? 'gpt-4' : actualModel === 'gpt-5.1' ? 'gpt-5.1' : 'gpt-3.5-turbo';
         console.log(`[profileCartoonService] ✅ Analyzing photo with ${visionModel} Vision for personalized cartoon (ALL users)`);
         console.log(`[profileCartoonService] Photo URL: ${imageUrl.substring(0, 80)}...`);
 
@@ -463,7 +474,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         console.log('[profileCartoonService] ✅ Vision analysis complete:', personalizedDescription);
 
         // Only track GPT-4 usage for Gold/Ultimate users using the full GPT-4 model
-        if (isGoldTier && actualModel === 'gpt-4') {
+        if (isGoldTier && ADVANCED_VISION_MODELS.includes(actualModel)) {
           usedGpt4 = true;
         }
       }
@@ -561,7 +572,7 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
           enhanced: personalizedDescription !== null, // Indicates Vision analysis was used
           quality: imageQuality,
           subscriptionPlan: normalizedPlan,
-          usedGpt4, // Track if GPT-4 Vision was used
+          usedGpt4, // Track if GPT-4/GPT-5 Vision was used
         };
 
       } catch (error) {

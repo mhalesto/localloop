@@ -39,7 +39,7 @@ export default function CartoonStyleModal({
   const [selectedStyle, setSelectedStyle] = useState(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo'); // GPT-3.5 or GPT-4
+  const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo'); // GPT-3.5, GPT-4, or GPT-5.1
   const [notifyWhenDone, setNotifyWhenDone] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const [customImage, setCustomImage] = useState(null); // Gold feature: upload custom image
@@ -97,6 +97,8 @@ export default function CartoonStyleModal({
   const goldMonthlyLimit = goldPlanLimits?.monthly || 0;
   const goldGpt4Limit = goldPlanLimits?.gpt4VisionMonthly || 0;
   const goldMonthlyRemaining = Math.max(goldMonthlyLimit - monthlyUsage, 0);
+
+  const isAdvancedModelSelected = selectedModel === 'gpt-4' || selectedModel === 'gpt-5.1';
 
   const { canGenerate, reason } = canGenerateCartoon(
     userProfile,
@@ -459,7 +461,7 @@ export default function CartoonStyleModal({
               <Text style={[localStyles.sectionLabel, { color: themeColors.textSecondary }]}>
                 AI Model ({tierName} Exclusive)
               </Text>
-              <View style={localStyles.modelButtons}>
+              <View style={[localStyles.modelButtons, { flexWrap: 'wrap' }]}>
                 <TouchableOpacity
                   style={[
                     localStyles.modelButton,
@@ -547,14 +549,57 @@ export default function CartoonStyleModal({
                     {gpt4VisionUsage}/{goldGpt4Limit} used
                   </Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    localStyles.modelButton,
+                    {
+                      backgroundColor: selectedModel === 'gpt-5.1' ? primaryColor : themeColors.background,
+                      borderColor: selectedModel === 'gpt-5.1' ? primaryColor : themeColors.divider,
+                    },
+                  ]}
+                  onPress={() => setSelectedModel('gpt-5.1')}
+                  disabled={isGenerating}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      localStyles.modelButtonText,
+                      {
+                        color: selectedModel === 'gpt-5.1' ? '#fff' : themeColors.textPrimary,
+                      },
+                    ]}
+                  >
+                    GPT-5.1
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonSubtext,
+                      {
+                        color: selectedModel === 'gpt-5.1' ? '#fff' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    Ultra Quality
+                  </Text>
+                  <Text
+                    style={[
+                      localStyles.modelButtonUsage,
+                      {
+                        color: selectedModel === 'gpt-5.1' ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {gpt4VisionUsage}/{goldGpt4Limit} used
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* GPT-4 Usage Info */}
-              {selectedModel === 'gpt-4' && (
+              {isAdvancedModelSelected && (
                 <View style={[localStyles.gpt4UsageHint, { backgroundColor: `${primaryColor}10` }]}>
                   <Ionicons name="information-circle-outline" size={16} color={primaryColor} />
                   <Text style={[localStyles.gpt4UsageText, { color: themeColors.textSecondary }]}>
-                    GPT-4 Vision: {gpt4VisionUsage}/{goldGpt4Limit} used this month
+                    Advanced Vision Usage: {gpt4VisionUsage}/{goldGpt4Limit} used this month
                   </Text>
                 </View>
               )}

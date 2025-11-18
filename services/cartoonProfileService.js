@@ -293,7 +293,7 @@ export async function deleteTemporaryCustomImage(storagePath) {
  * @param {string} styleId - Style used
  * @param {boolean} isAdmin - Whether the user is an admin
  * @param {string} planId - User's subscription plan ('basic', 'premium', 'gold')
- * @param {boolean} usedGpt4 - Whether GPT-4 Vision was used for this generation
+ * @param {boolean} usedGpt4 - Whether an advanced (GPT-4/GPT-5) Vision model was used for this generation
  * @param {string} prompt - Optional prompt used to generate the image
  * @returns {Promise<void>}
  */

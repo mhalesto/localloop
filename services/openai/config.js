@@ -19,6 +19,7 @@ export function isOpenAIConfigured() {
  */
 export const OPENAI_ENDPOINTS = {
   CHAT: '/v1/chat/completions',
+  RESPONSES: '/v1/responses',
   MODERATION: '/v1/moderations',
   EMBEDDINGS: '/v1/embeddings',
   IMAGES: '/v1/images/generations',

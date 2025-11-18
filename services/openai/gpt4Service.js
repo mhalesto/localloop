@@ -74,6 +74,8 @@ export async function summarizeWithGPT4o(text, options = {}) {
  * @param {string} imageUrl - URL of the profile picture (must be publicly accessible https://)
  * @returns {Promise<string>} Detailed description of the person
  */
+const GPT5_MODELS = ['gpt-5', 'gpt-5.1', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-pro'];
+
 export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
   try {
     // Validate that we have a publicly accessible URL
@@ -81,20 +83,22 @@ export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
       throw new Error('Vision analysis requires a publicly accessible HTTPS URL. Local file paths are not supported.');
     }
 
-    // Map user-friendly model names to vision-capable models
-    const visionModel = model === 'gpt-3.5-turbo' ? 'gpt-4o-mini' : model === 'gpt-4' ? 'gpt-4o' : 'gpt-4o';
+    const normalizedModel = (model || 'gpt-4o').toLowerCase();
+    const isGpt5 = GPT5_MODELS.includes(normalizedModel);
+    const visionModel =
+      normalizedModel === 'gpt-3.5-turbo'
+        ? 'gpt-4o-mini'
+        : normalizedModel === 'gpt-4' || normalizedModel === 'gpt-4o'
+          ? 'gpt-4o'
+          : normalizedModel === 'gpt-4o-mini'
+            ? 'gpt-4o-mini'
+            : normalizedModel.startsWith('gpt-5')
+              ? normalizedModel
+              : normalizedModel;
 
     console.log(`[GPT Vision] Analyzing profile photo using ${visionModel}`);
 
-    const response = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
-      model: visionModel,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this specific photo and describe exactly what you see for creating an accurate cartoon avatar. Be precise and literal about THIS person:
+    const visionPrompt = `Analyze this specific photo and describe exactly what you see for creating an accurate cartoon avatar. Be precise and literal about THIS person:
 
 1. HAIRSTYLE: Describe the exact hairstyle visible - braids, natural hair, locs, straight, curly, etc. Is hair covered or visible? If covered, what type of covering (head wrap, hat, scarf)? What colors?
 
@@ -104,31 +108,88 @@ export async function analyzePhotoForCartoon(imageUrl, model = 'gpt-4o') {
 
 4. CLOTHING & ACCESSORIES: Describe the exact clothing visible - colors, patterns (floral, geometric, solid, abstract), neckline style. List any visible jewelry (earrings, necklaces, rings) or accessories (glasses, sunglasses, watches).
 
-CRITICAL: Only describe what you actually see in THIS photo. Don't assume or add elements that aren't visible. Be specific about colors, patterns, and styles unique to this person.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageUrl,
-                detail: 'high', // High detail for Gold users
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 400,
-    });
+CRITICAL: Only describe what you actually see in THIS photo. Don't assume or add elements that aren't visible. Be specific about colors, patterns, and styles unique to this person.`;
 
-    const description = response.choices[0]?.message?.content?.trim();
+    let description;
+
+    if (isGpt5) {
+      const response = await callOpenAI(OPENAI_ENDPOINTS.RESPONSES, {
+        model: visionModel,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: visionPrompt,
+              },
+              {
+                type: 'input_image',
+                image_url: imageUrl,
+              },
+            ],
+          },
+        ],
+        max_output_tokens: 600,
+      });
+
+      const outputTexts = [];
+      if (Array.isArray(response?.output_text) && response.output_text.length > 0) {
+        outputTexts.push(response.output_text.join('\n'));
+      } else if (typeof response?.output_text === 'string') {
+        outputTexts.push(response.output_text);
+      }
+      if (Array.isArray(response?.output)) {
+        response.output.forEach(block => {
+          if (Array.isArray(block?.content)) {
+            block.content.forEach(segment => {
+              if (segment?.type === 'output_text' && typeof segment?.text === 'string') {
+                outputTexts.push(segment.text);
+              } else if (segment?.type === 'text' && typeof segment?.text === 'string') {
+                outputTexts.push(segment.text);
+              }
+            });
+          }
+        });
+      }
+
+      description = outputTexts.join('\n').trim();
+    } else {
+      const response = await callOpenAI(OPENAI_ENDPOINTS.CHAT, {
+        model: visionModel,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: visionPrompt,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl,
+                  detail: 'high', // High detail for Gold users
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 400,
+      });
+
+      description = response.choices[0]?.message?.content?.trim();
+    }
+
     if (!description) {
       throw new Error('No description generated');
     }
 
-    console.log('[GPT-4o Vision] Generated personalized description:', description.substring(0, 100) + '...');
+    console.log('[GPT Vision] Generated personalized description:', description.substring(0, 100) + '...');
     return description;
 
   } catch (error) {
-    console.error('[GPT-4o Vision] Analysis error:', error);
+    console.error('[GPT Vision] Analysis error:', error);
     // Return a fallback but throw so caller knows it failed
     throw new Error(`Vision analysis failed: ${error.message}`);
   }
