@@ -482,7 +482,17 @@ export default function ArtworkMasonryGrid({
     }
   };
 
-  const isStoryCollection = (item) => item?.type === 'story' && item.images && item.images.length > 1;
+  const isStoryCollection = (item) => {
+    const result = item?.type === 'story' && item.images && item.images.length > 1;
+    console.log('[ArtworkMasonryGrid] 🔍 Checking if story:', {
+      id: item?.id,
+      type: item?.type,
+      hasImages: !!item?.images,
+      imageCount: item?.images?.length || 0,
+      isStory: result
+    });
+    return result;
+  };
   const derivedStoryCollections = storyCollectionsProp.length > 0
     ? storyCollectionsProp
     : artworks.filter(isStoryCollection);
@@ -490,6 +500,13 @@ export default function ArtworkMasonryGrid({
     ? artworks
     : artworks.filter((item) => !isStoryCollection(item));
   const storyCollections = derivedStoryCollections.slice(0, MAX_STORY_CARDS_PER_SECTION);
+
+  console.log('[ArtworkMasonryGrid] 📊 Feed breakdown:', {
+    totalArtworks: artworks.length,
+    storyCollections: storyCollections.length,
+    regularItems: processedItems.length,
+    maxStoryCards: MAX_STORY_CARDS_PER_SECTION
+  });
 
   // Split regular artworks into two columns for masonry layout
   const leftColumn = [];
