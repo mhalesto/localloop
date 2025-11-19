@@ -1,0 +1,2912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLoop Admin - Enhanced Dashboard</title>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6C4DF4;
+            --primary-dark: #5038c5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1a1a2e;
+            --sidebar-bg: #1e293b;
+            --bg: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: #334155;
+        }
+
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-bg);
+            color: white;
+            padding: 1.5rem;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo img {
+            width: 40px;
+            height: 40px;
+        }
+
+        .logo h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+        }
+
+        .nav-item i {
+            width: 20px;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-bar h1 {
+            font-size: 1.75rem;
+            color: var(--dark);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Geographic Filters */
+        .geo-filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .geo-filters h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        select, input {
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-icon.purple { background: #ede9fe; color: var(--primary); }
+        .stat-icon.green { background: #d1fae5; color: var(--success); }
+        .stat-icon.orange { background: #fed7aa; color: var(--warning); }
+        .stat-icon.red { background: #fee2e2; color: var(--danger); }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .stat-change {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .stat-change.positive {
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            color: var(--danger);
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .chart-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+            font-size: 1.1rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-card.clickable {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .chart-card.clickable:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 4px;
+        }
+
+        .chart-card.clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(19, 15, 64, 0.15);
+        }
+
+        .chart-hint {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .chart-hint::before {
+            content: '⤢';
+            font-size: 0.85rem;
+        }
+
+        .three-d-chart canvas,
+        canvas.is-3d {
+            transform: perspective(900px) rotateX(15deg);
+            filter: drop-shadow(0px 20px 25px rgba(15,23,42,0.25));
+            transition: transform 0.3s ease;
+        }
+
+        .chart-card.clickable:hover canvas.is-3d {
+            transform: perspective(900px) rotateX(12deg) scale(1.01);
+        }
+
+        .chart-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.65);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            z-index: 1000;
+        }
+
+        .chart-modal.visible {
+            display: flex;
+        }
+
+        .chart-modal-card {
+            background: white;
+            border-radius: 18px;
+            width: min(1100px, 100%);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 30px 80px rgba(15,23,42,0.25);
+            animation: fadeIn 0.25s ease;
+        }
+
+        .chart-modal-header {
+            padding: 1.5rem 1.75rem 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chart-modal-title {
+            font-size: 1.4rem;
+            color: var(--dark);
+        }
+
+        .chart-modal-filters {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .chart-modal-filters label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #94a3b8;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .chart-modal-filters select {
+            padding: 0.45rem 2rem 0.45rem 0.75rem;
+            border: 1px solid #cfd8e3;
+            border-radius: 8px;
+            background: #f8fafc;
+            font-size: 0.85rem;
+            min-width: 160px;
+        }
+
+        .chart-modal-body {
+            padding: 1rem 1.5rem 1.75rem;
+            flex: 1;
+        }
+
+        .chart-modal-canvas {
+            width: 100%;
+            min-height: 380px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-modal-canvas canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 60vh;
+        }
+
+        .chart-modal-close {
+            appearance: none;
+            border: none;
+            background: rgba(15,23,42,0.05);
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .chart-modal-close:hover {
+            background: rgba(15,23,42,0.15);
+        }
+
+        /* Tables */
+        .table-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .table-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8fafc;
+        }
+
+        th {
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge.basic { background: #e5e7eb; color: #374151; }
+        .badge.premium { background: #d1fae5; color: #065f46; }
+        .badge.gold { background: #ede9fe; color: #5b21b6; }
+        .badge.ultimate { background: #fef3c7; color: #92400e; }
+
+        /* Page Content */
+        .page-content {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-content h2 {
+            color: var(--dark);
+            margin-bottom: 1.5rem;
+            font-size: 1.75rem;
+        }
+
+        .page-content h4 {
+            color: var(--dark);
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="logo.png" alt="LocalLoop">
+                <h2>LocalLoop Admin</h2>
+            </div>
+            
+            <nav>
+                <div class="nav-item active" data-page="overview">
+                    <i>📊</i>
+                    <span>Overview</span>
+                </div>
+                <div class="nav-item" data-page="users">
+                    <i>👥</i>
+                    <span>Users</span>
+                </div>
+                <div class="nav-item" data-page="posts">
+                    <i>📝</i>
+                    <span>Posts</span>
+                </div>
+                <div class="nav-item" data-page="geography">
+                    <i>🌍</i>
+                    <span>Geography</span>
+                </div>
+                <div class="nav-item" data-page="revenue">
+                    <i>💰</i>
+                    <span>Revenue</span>
+                </div>
+                <div class="nav-item" data-page="reports">
+                    <i>⚠️</i>
+                    <span>Reports</span>
+                </div>
+                <div class="nav-item" data-page="analytics">
+                    <i>📈</i>
+                    <span>Analytics</span>
+                </div>
+                <div class="nav-item" data-page="settings">
+                    <i>⚙️</i>
+                    <span>Settings</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <h1>Dashboard Overview</h1>
+                <div class="user-info">
+                    <span id="userEmail">Loading...</span>
+                    <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                    <button class="btn btn-danger" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <!-- Overview Page -->
+            <div id="overview-page" class="page-content">
+            <!-- Geographic Filters -->
+            <div class="geo-filters">
+                <h3>🌍 Geographic Filters</h3>
+                <div class="filter-row">
+                    <select id="countryFilter" onchange="updateProvinces()">
+                        <option value="all">All Countries</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="US">United States</option>
+                        <option value="GB">United Kingdom</option>
+                        <option value="NG">Nigeria</option>
+                        <option value="KE">Kenya</option>
+                    </select>
+                    
+                    <select id="provinceFilter" onchange="updateCities()">
+                        <option value="all">All Provinces/States</option>
+                    </select>
+                    
+                    <select id="cityFilter" onchange="applyFilters()">
+                        <option value="all">All Cities</option>
+                    </select>
+
+                    <select id="timeRangeFilter" onchange="applyFilters()">
+                        <option value="7">Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="365">Last Year</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Total Users</span>
+                        <div class="stat-icon purple">👥</div>
+                    </div>
+                    <div class="stat-value" id="totalUsers">0</div>
+                    <div class="stat-change positive" id="usersChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Active Users (30d)</span>
+                        <div class="stat-icon green">✅</div>
+                    </div>
+                    <div class="stat-value" id="activeUsers">0</div>
+                    <div class="stat-change positive" id="activeChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Total Posts</span>
+                        <div class="stat-icon orange">📝</div>
+                    </div>
+                    <div class="stat-value" id="totalPosts">0</div>
+                    <div class="stat-change positive" id="postsChange">+0% from last week</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Monthly Revenue</span>
+                        <div class="stat-icon green">💰</div>
+                    </div>
+                    <div class="stat-value" id="revenue">R0</div>
+                    <div class="stat-change positive" id="revenueChange">+0% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Go Users</span>
+                        <div class="stat-icon green">🚀</div>
+                    </div>
+                    <div class="stat-value" id="goUsers">0</div>
+                    <div class="stat-change" id="goChange">R79.99 plan</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Premium Users</span>
+                        <div class="stat-icon purple">👑</div>
+                    </div>
+                    <div class="stat-value" id="premiumUsers">0</div>
+                    <div class="stat-change positive" id="premiumChange">R149.99 plan</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Gold Users</span>
+                        <div class="stat-icon orange">💎</div>
+                    </div>
+                    <div class="stat-value" id="goldUsers">0</div>
+                    <div class="stat-change positive" id="goldChange">R249.99 plan</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Reports (Pending)</span>
+                        <div class="stat-icon red">⚠️</div>
+                    </div>
+                    <div class="stat-value" id="pendingReports">0</div>
+                    <div class="stat-change" id="reportsChange">Needs attention</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-label">Avg. Engagement</span>
+                        <div class="stat-icon green">📊</div>
+                    </div>
+                    <div class="stat-value" id="engagement">0%</div>
+                    <div class="stat-change positive" id="engagementChange">+0% from last week</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card clickable" data-chart-key="userGrowth" tabindex="0">
+                    <h3>User Growth (Last 30 Days)</h3>
+                    <div class="chart-container">
+                        <canvas id="userGrowthChart"></canvas>
+                    </div>
+                    <div class="chart-hint">Click to explore</div>
+                </div>
+
+                <div class="chart-card clickable three-d-chart" data-chart-key="subscription" tabindex="0">
+                    <h3>Subscription Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="subscriptionChart" class="is-3d"></canvas>
+                    </div>
+                    <div class="chart-hint">Interactive 3D view</div>
+                </div>
+
+                <div class="chart-card clickable" data-chart-key="activity" tabindex="0">
+                    <h3>Post Activity by Hour</h3>
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                    <div class="chart-hint">Inspect trends</div>
+                </div>
+
+                <div class="chart-card clickable" data-chart-key="revenue" tabindex="0">
+                    <h3>Revenue Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                    <div class="chart-hint">Drill deeper</div>
+                </div>
+            </div>
+
+            <!-- Top Cities Table -->
+            <div class="table-card">
+                <h3>🏙️ Top Cities by Users</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>City</th>
+                            <th>Province/State</th>
+                            <th>Country</th>
+                            <th>Users</th>
+                            <th>Active (30d)</th>
+                            <th>Growth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topCitiesTable">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Recent Users Table -->
+            <div class="table-card">
+                <h3>👥 Recent Users</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Location</th>
+                            <th>Plan</th>
+                            <th>Joined</th>
+                            <th>Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentUsersTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 2rem;">Loading data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            </div>
+            <!-- End Overview Page -->
+
+            <!-- Users Page -->
+            <div id="users-page" class="page-content" style="display: none;">
+                <h2>👥 User Management</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Users</span>
+                            <div class="stat-icon purple">👥</div>
+                        </div>
+                        <div class="stat-value" id="usersTotal">0</div>
+                        <div class="stat-change positive">All registered users</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Basic Plan</span>
+                            <div class="stat-icon green">📱</div>
+                        </div>
+                        <div class="stat-value" id="usersBasic">0</div>
+                        <div class="stat-change">Forever free</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Go Plan</span>
+                            <div class="stat-icon green">🚀</div>
+                        </div>
+                        <div class="stat-value" id="usersGo">0</div>
+                        <div class="stat-change">R79.99/month</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Premium Plan</span>
+                            <div class="stat-icon purple">⭐</div>
+                        </div>
+                        <div class="stat-value" id="usersPremium">0</div>
+                        <div class="stat-change">R149.99/month</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Gold Plan</span>
+                            <div class="stat-icon orange">🏆</div>
+                        </div>
+                        <div class="stat-value" id="usersGold">0</div>
+                        <div class="stat-change">R249.99/month</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>All Users</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Display Name</th>
+                                <th>Email</th>
+                                <th>Location</th>
+                                <th>Plan</th>
+                                <th>Joined</th>
+                                <th>Last Active</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allUsersTable">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 2rem;">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Users Page -->
+
+            <!-- Posts Page -->
+            <div id="posts-page" class="page-content" style="display: none;">
+                <h2>📝 Post Management</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Posts</span>
+                            <div class="stat-icon orange">📝</div>
+                        </div>
+                        <div class="stat-value" id="postsTotal">0</div>
+                        <div class="stat-change">All time</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">This Week</span>
+                            <div class="stat-icon green">📅</div>
+                        </div>
+                        <div class="stat-value" id="postsWeek">0</div>
+                        <div class="stat-change">Last 7 days</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">This Month</span>
+                            <div class="stat-icon purple">📆</div>
+                        </div>
+                        <div class="stat-value" id="postsMonth">0</div>
+                        <div class="stat-change">Last 30 days</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Avg. Per User</span>
+                            <div class="stat-icon green">📊</div>
+                        </div>
+                        <div class="stat-value" id="postsAvg">0</div>
+                        <div class="stat-change">Engagement rate</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>Recent Posts</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Author</th>
+                                <th>Content</th>
+                                <th>Comments</th>
+                                <th>Likes</th>
+                                <th>Location</th>
+                                <th>Posted</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allPostsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">Loading posts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Posts Page -->
+
+            <!-- Geography Page -->
+            <div id="geography-page" class="page-content" style="display: none;">
+                <h2>🌍 Geographic Analytics</h2>
+
+                <div class="geo-filters">
+                    <h3>🌍 Geographic Filters</h3>
+                    <div class="filter-row">
+                        <select id="geoCountryFilter" onchange="updateGeoData()">
+                            <option value="all">All Countries</option>
+                            <option value="ZA">South Africa</option>
+                            <option value="US">United States</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="NG">Nigeria</option>
+                            <option value="KE">Kenya</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Countries</span>
+                            <div class="stat-icon purple">🌏</div>
+                        </div>
+                        <div class="stat-value" id="geoCountries">0</div>
+                        <div class="stat-change">Total countries</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Provinces/States</span>
+                            <div class="stat-icon green">📍</div>
+                        </div>
+                        <div class="stat-value" id="geoProvinces">0</div>
+                        <div class="stat-change">Total regions</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Cities</span>
+                            <div class="stat-icon orange">🏙️</div>
+                        </div>
+                        <div class="stat-value" id="geoCities">0</div>
+                        <div class="stat-change">Total cities</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Top Location</span>
+                            <div class="stat-icon green">🎯</div>
+                        </div>
+                        <div class="stat-value" id="geoTop" style="font-size: 1.2rem;">-</div>
+                        <div class="stat-change">Most active</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>Users by Location</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>City</th>
+                                <th>Province</th>
+                                <th>Country</th>
+                                <th>Users</th>
+                                <th>Active</th>
+                                <th>Growth</th>
+                            </tr>
+                        </thead>
+                        <tbody id="geoTable">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 2rem;">Loading geographic data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Geography Page -->
+
+            <!-- Revenue Page -->
+            <div id="revenue-page" class="page-content" style="display: none;">
+                <h2>💰 Revenue Analytics</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Monthly Revenue</span>
+                            <div class="stat-icon green">💰</div>
+                        </div>
+                        <div class="stat-value" id="revenueTotal">R0</div>
+                        <div class="stat-change positive">Current month</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Go Revenue</span>
+                            <div class="stat-icon green">🚀</div>
+                        </div>
+                        <div class="stat-value" id="revenueGo">R0</div>
+                        <div class="stat-change">R79.99 × users</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Premium Revenue</span>
+                            <div class="stat-icon purple">⭐</div>
+                        </div>
+                        <div class="stat-value" id="revenuePremium">R0</div>
+                        <div class="stat-change">R149.99 × users</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Gold Revenue</span>
+                            <div class="stat-icon orange">💎</div>
+                        </div>
+                        <div class="stat-value" id="revenueGold">R0</div>
+                        <div class="stat-change">R249.99 × users</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Annual Projection</span>
+                            <div class="stat-icon green">📈</div>
+                        </div>
+                        <div class="stat-value" id="revenueProjection">R0</div>
+                        <div class="stat-change">12 month forecast</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Revenue Trend (6 Months)</h3>
+                        <div class="chart-container">
+                            <canvas id="revenueChartPage"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Revenue by Plan</h3>
+                        <div class="chart-container">
+                            <canvas id="revenuePieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>Subscription History</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Plan</th>
+                                <th>Amount</th>
+                                <th>Started</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subscriptionsTable">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 2rem;">Loading subscriptions...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Revenue Page -->
+
+            <!-- Reports Page -->
+            <div id="reports-page" class="page-content" style="display: none;">
+                <h2>⚠️ Reports & Moderation</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Pending Reports</span>
+                            <div class="stat-icon red">⚠️</div>
+                        </div>
+                        <div class="stat-value" id="reportsPending">0</div>
+                        <div class="stat-change">Needs review</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Resolved</span>
+                            <div class="stat-icon green">✅</div>
+                        </div>
+                        <div class="stat-value" id="reportsResolved">0</div>
+                        <div class="stat-change">This month</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Total Reports</span>
+                            <div class="stat-icon orange">📊</div>
+                        </div>
+                        <div class="stat-value" id="reportsTotal">0</div>
+                        <div class="stat-change">All time</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Response Time</span>
+                            <div class="stat-icon purple">⏱️</div>
+                        </div>
+                        <div class="stat-value" id="reportsResponseTime">0h</div>
+                        <div class="stat-change">Average</div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>Pending Reports</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Reporter</th>
+                                <th>Content Type</th>
+                                <th>Reason</th>
+                                <th>Reported User</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">No pending reports</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Reports Page -->
+
+            <!-- Analytics Page -->
+            <div id="analytics-page" class="page-content" style="display: none;">
+                <h2>📈 Advanced Analytics</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Engagement Rate</span>
+                            <div class="stat-icon green">📊</div>
+                        </div>
+                        <div class="stat-value" id="analyticsEngagement">0%</div>
+                        <div class="stat-change">Posts per active user</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Daily Active Users</span>
+                            <div class="stat-icon purple">👥</div>
+                        </div>
+                        <div class="stat-value" id="analyticsDAU">0</div>
+                        <div class="stat-change">Today</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Retention Rate</span>
+                            <div class="stat-icon orange">🔄</div>
+                        </div>
+                        <div class="stat-value" id="analyticsRetention">0%</div>
+                        <div class="stat-change">30-day retention</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-label">Conversion Rate</span>
+                            <div class="stat-icon green">💎</div>
+                        </div>
+                        <div class="stat-value" id="analyticsConversion">0%</div>
+                        <div class="stat-change">Free to paid</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>User Growth (30 Days)</h3>
+                        <div class="chart-container">
+                            <canvas id="analyticsGrowthChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Activity by Hour</h3>
+                        <div class="chart-container">
+                            <canvas id="analyticsActivityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <h3>Top Contributors</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>User</th>
+                                <th>Posts</th>
+                                <th>Comments</th>
+                                <th>Likes Received</th>
+                                <th>Engagement Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contributorsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">Loading analytics...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- End Analytics Page -->
+
+            <!-- Settings Page -->
+            <div id="settings-page" class="page-content" style="display: none;">
+                <h2>⚙️ Admin Settings</h2>
+
+                <div class="table-card">
+                    <h3>Admin Account</h3>
+                    <p style="margin-bottom: 1rem; color: #64748b;">Current admin: <strong id="settingsEmail">-</strong></p>
+
+                    <h4 style="margin-top: 2rem; margin-bottom: 1rem;">Grant Admin Access</h4>
+                    <p style="margin-bottom: 1rem; color: #64748b;">Use the admin setup page to grant admin access to additional users.</p>
+                    <a href="admin-setup.html" class="btn btn-primary" target="_blank">Open Admin Setup</a>
+                </div>
+
+                <div class="table-card">
+                    <h3>System Information</h3>
+                    <table>
+                        <tr>
+                            <th>Firebase Project</th>
+                            <td>share-your-story-1</td>
+                        </tr>
+                        <tr>
+                            <th>Dashboard Version</th>
+                            <td>2.0 - Enhanced</td>
+                        </tr>
+                        <tr>
+                            <th>Cloud Functions</th>
+                            <td>✅ Deployed</td>
+                        </tr>
+                        <tr>
+                            <th>Last Updated</th>
+                            <td id="settingsLastUpdate">-</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="table-card">
+                    <h3>Quick Actions</h3>
+                    <button class="btn btn-primary" onclick="loadDashboardData()">🔄 Refresh All Data</button>
+                    <button class="btn btn-danger" onclick="logout()" style="margin-left: 1rem;">🚪 Logout</button>
+                </div>
+
+                <div class="table-card">
+                    <h3 style="color: #ef4444;">⚠️ Database Cleanup</h3>
+                    <p style="margin-bottom: 1.5rem; color: #64748b;">
+                        <strong>Warning:</strong> These actions are permanent and cannot be undone. Use with extreme caution.
+                    </p>
+                    
+                    <div style="display: grid; gap: 1rem;">
+                        <div>
+                            <h4 style="margin-bottom: 0.5rem;">Clean Posts & Comments</h4>
+                            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Deletes all posts and their comments from Firestore. Users remain intact.
+                            </p>
+                            <button class="btn btn-danger" onclick="cleanupPosts()" style="width: 100%;">
+                                🗑️ Delete All Posts & Comments
+                            </button>
+                        </div>
+
+                        <div>
+                            <h4 style="margin-bottom: 0.5rem;">Clean Statuses</h4>
+                            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Deletes all statuses from Firestore. Users remain intact.
+                            </p>
+                            <button class="btn btn-danger" onclick="cleanupStatuses()" style="width: 100%;">
+                                🗑️ Delete All Statuses
+                            </button>
+                        </div>
+
+                        <div>
+                            <h4 style="margin-bottom: 0.5rem;">Clean Storage Files</h4>
+                            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Deletes all post images and status images from Firebase Storage.
+                            </p>
+                            <button class="btn btn-danger" onclick="cleanupStorage()" style="width: 100%;">
+                                🗑️ Delete All Storage Files
+                            </button>
+                        </div>
+
+                        <div style="border-top: 2px solid #fee2e2; padding-top: 1rem; margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem; color: #dc2626;">Complete Database Wipe</h4>
+                            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Deletes ALL data: posts, comments, statuses, and storage files. Users remain intact.
+                            </p>
+                            <button class="btn btn-danger" onclick="cleanupEverything()" style="width: 100%; background: #dc2626;">
+                                ⚠️ DELETE EVERYTHING (POSTS, STATUSES, STORAGE)
+                            </button>
+                        </div>
+
+                        <div id="cleanup-status" style="padding: 1rem; background: #f1f5f9; border-radius: 8px; display: none; margin-top: 1rem;">
+                            <p id="cleanup-message" style="margin: 0;"></p>
+                            <div id="cleanup-progress" style="margin-top: 0.5rem;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Settings Page -->
+
+        </main>
+    </div>
+
+    <div class="chart-modal" id="chartModal" aria-hidden="true">
+        <div class="chart-modal-card" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+            <div class="chart-modal-header">
+                <h3 class="chart-modal-title" id="chartModalTitle">Chart Insight</h3>
+                <div class="chart-modal-filters">
+                    <label id="modalRangeLabel">
+                        Range
+                        <select id="chartModalRange">
+                            <option value="7">Last 7 Days</option>
+                            <option value="30" selected>Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                            <option value="180">Last 6 Months</option>
+                            <option value="365">Last 12 Months</option>
+                        </select>
+                    </label>
+                    <label id="modalStyleLabel">
+                        Style
+                        <select id="chartModalStyle">
+                            <option value="doughnut" selected>Donut</option>
+                            <option value="bar">Bar</option>
+                            <option value="line">Line</option>
+                        </select>
+                    </label>
+                </div>
+                <button class="chart-modal-close" id="chartModalClose" aria-label="Close chart insights">✕</button>
+            </div>
+        <div class="chart-modal-body">
+            <div class="chart-modal-canvas" id="chartModalCanvasWrapper">
+                <canvas id="chartModalCanvas"></canvas>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+        import { getFirestore, collection, query, orderBy, limit, getDocs, doc, deleteDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getStorage, ref, listAll, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9ngUn2O-_TYYzPfEQpDcuNvv-aAMUcIY",
+            authDomain: "share-your-story-1.firebaseapp.com",
+            projectId: "share-your-story-1",
+            storageBucket: "share-your-story-1.firebasestorage.app",
+            messagingSenderId: "673056432219",
+            appId: "1:673056432219:web:8d54e53d9124fb6e441f7e",
+            measurementId: "G-75VDYJHL88"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Global variables
+        let charts = {};
+        let currentFilters = {
+            country: 'all',
+            province: 'all',
+            city: 'all',
+            timeRange: '30'
+        };
+
+        // Store chart instances globally
+        let chartInstances = {
+            userGrowth: null,
+            subscription: null,
+            activity: null,
+            revenue: null
+        };
+
+        // Loading state guard to prevent multiple simultaneous loads
+        let isLoading = false;
+        let isInitialized = false;
+        let latestAnalytics = null;
+
+        const modalState = {
+            chartKey: null,
+            chartInstance: null,
+            range: 30,
+            style: 'line',
+            three: {
+                renderer: null,
+                scene: null,
+                camera: null,
+                animationId: null,
+                container: null
+            }
+        };
+
+        const modalElements = {
+            root: document.getElementById('chartModal'),
+            title: document.getElementById('chartModalTitle'),
+            rangeLabel: document.getElementById('modalRangeLabel'),
+            styleLabel: document.getElementById('modalStyleLabel'),
+            rangeSelect: document.getElementById('chartModalRange'),
+            styleSelect: document.getElementById('chartModalStyle'),
+            closeBtn: document.getElementById('chartModalClose'),
+            canvasWrapper: document.getElementById('chartModalCanvasWrapper'),
+            canvas: document.getElementById('chartModalCanvas')
+        };
+
+        const modalChartConfigs = {
+            userGrowth: {
+                title: 'User Growth',
+                defaultRange: '30',
+                defaultStyle: 'line',
+                rangeOptions: [
+                    { value: '7', label: 'Last 7 Days' },
+                    { value: '30', label: 'Last 30 Days' },
+                    { value: '90', label: 'Last 90 Days' },
+                    { value: '180', label: 'Last 6 Months' },
+                    { value: '365', label: 'Last 12 Months' }
+                ],
+                styleOptions: [
+                    { value: 'line', label: 'Line' },
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'area', label: 'Area' }
+                ],
+                build: (analytics, state) => buildUserGrowthModal(analytics, state)
+            },
+            subscription: {
+                title: 'Subscription Breakdown',
+                defaultRange: null,
+                defaultStyle: 'doughnut',
+                rangeOptions: [],
+                styleOptions: [
+                    { value: 'doughnut', label: 'Donut' },
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'line', label: 'Line' }
+                ],
+                build: (analytics, state) => buildSubscriptionModal(analytics, state)
+            },
+            activity: {
+                title: 'Post Activity',
+                defaultRange: '24',
+                defaultStyle: 'bar',
+                rangeOptions: [
+                    { value: '24', label: '24 Hours' },
+                    { value: '12', label: '2-Hour Blocks' },
+                    { value: '6', label: '4-Hour Blocks' }
+                ],
+                styleOptions: [
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'line', label: 'Line' },
+                    { value: 'area', label: 'Area' }
+                ],
+                build: (analytics, state) => buildActivityModal(analytics, state)
+            },
+            revenue: {
+                title: 'Revenue Trend',
+                defaultRange: '6',
+                defaultStyle: 'line',
+                rangeOptions: [
+                    { value: '6', label: 'Last 6 Months' },
+                    { value: '12', label: 'Last 12 Months' }
+                ],
+                styleOptions: [
+                    { value: 'line', label: 'Line' },
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'area', label: 'Area' }
+                ],
+                build: (analytics, state) => buildRevenueModal(analytics, state)
+            }
+        };
+
+        const PLAN_METADATA = {
+            basic: { label: 'Basic', priceLabel: 'Free forever', monthlyPrice: 0, badgeClass: 'basic' },
+            premium: { label: 'Go', priceLabel: 'R79.99/month', monthlyPrice: 79.99, badgeClass: 'premium' },
+            gold: { label: 'Premium', priceLabel: 'R149.99/month', monthlyPrice: 149.99, badgeClass: 'gold' },
+            ultimate: { label: 'Gold', priceLabel: 'R249.99/month', monthlyPrice: 249.99, badgeClass: 'ultimate' }
+        };
+
+        const PLAN_ORDER = ['basic', 'premium', 'gold', 'ultimate'];
+
+        const normalizePlan = (planId = 'basic') => PLAN_ORDER.includes(planId) ? planId : 'basic';
+        const getPlanMeta = (planId) => PLAN_METADATA[normalizePlan(planId)];
+        const formatCurrency = (value = 0) => 'R' + Math.round(Number(value) || 0).toLocaleString();
+
+        function getPlanCounts(analytics = {}) {
+            const hasGoField = typeof analytics.goUsers === 'number';
+
+            const goUsers = hasGoField ? (analytics.goUsers ?? 0) : (analytics.premiumUsers ?? 0);
+            const premiumUsers = hasGoField ? (analytics.premiumUsers ?? 0) : (analytics.goldUsers ?? 0);
+            const goldUsers = hasGoField ? (analytics.goldUsers ?? 0) : 0;
+            const basicUsers = Math.max(
+                (analytics.totalUsers ?? 0) - goUsers - premiumUsers - goldUsers,
+                0
+            );
+
+            return { basicUsers, goUsers, premiumUsers, goldUsers };
+        }
+
+        // Page navigation system
+        function switchPage(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.style.display = 'none';
+            });
+
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // Show selected page
+            const targetPage = document.getElementById(`${pageName}-page`);
+            if (targetPage) {
+                targetPage.style.display = 'block';
+            }
+
+            // Add active class to clicked nav item
+            const navItem = document.querySelector(`.nav-item[data-page="${pageName}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+
+            // Load data for specific pages
+            if (pageName === 'users') {
+                loadUsersPage();
+            } else if (pageName === 'posts') {
+                loadPostsPage();
+            } else if (pageName === 'geography') {
+                loadGeographyPage();
+            } else if (pageName === 'revenue') {
+                loadRevenuePage();
+            } else if (pageName === 'reports') {
+                loadReportsPage();
+            } else if (pageName === 'analytics') {
+                loadAnalyticsPage();
+            } else if (pageName === 'settings') {
+                loadSettingsPage();
+            }
+        }
+
+        // Add click handlers to nav items
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const pageName = item.getAttribute('data-page');
+                    switchPage(pageName);
+                });
+            });
+
+            document.querySelectorAll('[data-chart-key]').forEach(card => {
+                card.addEventListener('click', () => openChartModal(card.getAttribute('data-chart-key')));
+                card.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openChartModal(card.getAttribute('data-chart-key'));
+                    }
+                });
+            });
+        });
+
+        if (modalElements.closeBtn) {
+            modalElements.closeBtn.addEventListener('click', closeChartModal);
+        }
+        if (modalElements.root) {
+            modalElements.root.addEventListener('click', (event) => {
+                if (event.target === modalElements.root) {
+                    closeChartModal();
+                }
+            });
+        }
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && modalElements.root && modalElements.root.classList.contains('visible')) {
+                closeChartModal();
+            }
+        });
+        if (modalElements.rangeSelect) {
+            modalElements.rangeSelect.addEventListener('change', (event) => {
+                modalState.range = event.target.value;
+                renderModalChart();
+            });
+        }
+        if (modalElements.styleSelect) {
+            modalElements.styleSelect.addEventListener('change', (event) => {
+                modalState.style = event.target.value;
+                renderModalChart();
+            });
+        }
+
+        function openChartModal(chartKey) {
+            if (!latestAnalytics) {
+                alert('Load dashboard data first, then try again.');
+                return;
+            }
+
+            const config = modalChartConfigs[chartKey];
+            if (!config) {
+                return;
+            }
+
+            modalState.chartKey = chartKey;
+            modalState.range = config.defaultRange ?? modalState.range;
+            modalState.style = config.defaultStyle ?? modalState.style;
+
+            configureModalFilters(config);
+            renderModalChart();
+
+            modalElements.root.classList.add('visible');
+            modalElements.root.setAttribute('aria-hidden', 'false');
+            setTimeout(() => modalElements.closeBtn.focus(), 40);
+        }
+
+        function closeChartModal() {
+            if (modalElements.root) {
+                modalElements.root.classList.remove('visible');
+                modalElements.root.setAttribute('aria-hidden', 'true');
+            }
+            if (modalState.chartInstance) {
+                modalState.chartInstance.destroy();
+                modalState.chartInstance = null;
+            }
+            modalState.chartKey = null;
+        }
+
+        function configureModalFilters(config) {
+            modalElements.title.textContent = config.title;
+
+            if (modalElements.rangeLabel && modalElements.rangeSelect) {
+                if (config.rangeOptions.length) {
+                    modalElements.rangeLabel.style.display = 'flex';
+                    modalElements.rangeSelect.disabled = false;
+                    modalElements.rangeSelect.innerHTML = config.rangeOptions
+                        .map(option => `<option value="${option.value}">${option.label}</option>`)
+                        .join('');
+                    modalElements.rangeSelect.value = config.defaultRange ?? config.rangeOptions[0].value;
+                    modalState.range = modalElements.rangeSelect.value;
+                } else {
+                    modalElements.rangeLabel.style.display = 'none';
+                    modalElements.rangeSelect.disabled = true;
+                    modalState.range = null;
+                }
+            }
+
+            if (modalElements.styleLabel && modalElements.styleSelect) {
+                if (config.styleOptions.length) {
+                    modalElements.styleLabel.style.display = 'flex';
+                    modalElements.styleSelect.disabled = false;
+                    modalElements.styleSelect.innerHTML = config.styleOptions
+                        .map(option => `<option value="${option.value}">${option.label}</option>`)
+                        .join('');
+                    modalElements.styleSelect.value = config.defaultStyle ?? config.styleOptions[0].value;
+                    modalState.style = modalElements.styleSelect.value;
+                } else {
+                    modalElements.styleLabel.style.display = 'none';
+                    modalElements.styleSelect.disabled = true;
+                    modalState.style = null;
+                }
+            }
+        }
+
+        function renderModalChart() {
+            if (!modalState.chartKey) {
+                return;
+            }
+
+            const config = modalChartConfigs[modalState.chartKey];
+            if (!config) {
+                return;
+            }
+
+            const payload = config.build(latestAnalytics, modalState);
+            if (!payload) {
+                return;
+            }
+
+            if (modalState.chartInstance) {
+                modalState.chartInstance.destroy();
+                modalState.chartInstance = null;
+            }
+
+            const ctx = modalElements.canvas.getContext('2d');
+            modalState.chartInstance = new Chart(ctx, {
+                type: payload.type,
+                data: {
+                    labels: payload.labels,
+                    datasets: payload.datasets
+                },
+                options: payload.options || {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        // Page-specific load functions
+        async function loadUsersPage() {
+            try {
+                const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(usersQuery);
+
+                const users = [];
+                snapshot.forEach(doc => {
+                    users.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Update stats
+                let basicCount = 0;
+                let goCount = 0;
+                let premiumCount = 0;
+                let goldCount = 0;
+
+                users.forEach(user => {
+                    const planId = normalizePlan(user.subscriptionPlan || 'basic');
+                    if (planId === 'basic') basicCount++;
+                    else if (planId === 'premium') goCount++;
+                    else if (planId === 'gold') premiumCount++;
+                    else if (planId === 'ultimate') goldCount++;
+                });
+
+                document.getElementById('usersTotal').textContent = users.length;
+                document.getElementById('usersBasic').textContent = basicCount;
+                document.getElementById('usersGo').textContent = goCount;
+                document.getElementById('usersPremium').textContent = premiumCount;
+                document.getElementById('usersGold').textContent = goldCount;
+
+                // Update table
+                const tbody = document.getElementById('allUsersTable');
+                if (users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No users found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(user => {
+                    const planId = normalizePlan(user.subscriptionPlan || 'basic');
+                    const planInfo = getPlanMeta(planId);
+                    const location = user.city ? `${user.city}, ${user.province || user.country}` : (user.province || user.country || 'Not set');
+                    const lastActive = user.lastActive ? new Date(user.lastActive.toDate()).toLocaleDateString() : 'Never';
+                    const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+                    const status = lastActive !== 'Never' && (new Date() - new Date(user.lastActive.toDate())) < 7*24*60*60*1000 ? '🟢 Active' : '⚪ Inactive';
+
+                    return `
+                        <tr>
+                            <td><strong>${user.displayName || 'Anonymous'}</strong></td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${location}</td>
+                            <td><span class="badge ${planInfo.badgeClass}">${planInfo.label}</span></td>
+                            <td>${joined}</td>
+                            <td>${lastActive}</td>
+                            <td>${status}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading users page:', error);
+            }
+        }
+
+        async function loadPostsPage() {
+            try {
+                const postsQuery = query(collection(db, 'posts'), orderBy('timestamp', 'desc'), limit(50));
+                const snapshot = await getDocs(postsQuery);
+
+                const posts = [];
+                snapshot.forEach(doc => {
+                    posts.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Calculate stats
+                const now = new Date();
+                const weekAgo = new Date(now.getTime() - 7*24*60*60*1000);
+                const monthAgo = new Date(now.getTime() - 30*24*60*60*1000);
+
+                const postsWeek = posts.filter(p => p.timestamp && p.timestamp.toDate() > weekAgo).length;
+                const postsMonth = posts.filter(p => p.timestamp && p.timestamp.toDate() > monthAgo).length;
+
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const usersCount = usersSnapshot.size;
+                const avgPosts = usersCount > 0 ? (posts.length / usersCount).toFixed(1) : 0;
+
+                document.getElementById('postsTotal').textContent = posts.length;
+                document.getElementById('postsWeek').textContent = postsWeek;
+                document.getElementById('postsMonth').textContent = postsMonth;
+                document.getElementById('postsAvg').textContent = avgPosts;
+
+                // Update table
+                const tbody = document.getElementById('allPostsTable');
+                if (posts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No posts found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = posts.slice(0, 20).map(post => {
+                    const author = post.author?.displayName || post.author?.nickname || 'Anonymous';
+                    const content = post.content ? (post.content.substring(0, 100) + (post.content.length > 100 ? '...' : '')) : '';
+                    const comments = post.commentCount || 0;
+                    const likes = post.likeCount || 0;
+                    const location = post.location || 'Unknown';
+                    const posted = post.timestamp ? new Date(post.timestamp.toDate()).toLocaleDateString() : 'Unknown';
+
+                    return `
+                        <tr>
+                            <td><strong>${author}</strong></td>
+                            <td>${content}</td>
+                            <td>${comments}</td>
+                            <td>${likes}</td>
+                            <td>${location}</td>
+                            <td>${posted}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading posts page:', error);
+            }
+        }
+
+        async function loadGeographyPage() {
+            try {
+                const getGeographicStats = httpsCallable(functions, 'getGeographicStats');
+                const result = await getGeographicStats({ country: null, province: null, timeRange: 'all' });
+                const geoStats = result.data;
+
+                // Update stats
+                document.getElementById('geoCountries').textContent = geoStats.topCountries?.length || 0;
+                document.getElementById('geoProvinces').textContent = geoStats.topProvinces?.length || 0;
+                document.getElementById('geoCities').textContent = geoStats.topCities?.length || 0;
+
+                if (geoStats.topCities && geoStats.topCities.length > 0) {
+                    const topCity = geoStats.topCities[0];
+                    document.getElementById('geoTop').textContent = `${topCity.city}, ${topCity.country}`;
+                }
+
+                // Update table
+                updateTopCitiesTable(geoStats.topCities || []);
+
+                // Copy to geoTable
+                const geoTableBody = document.getElementById('geoTable');
+                geoTableBody.innerHTML = document.getElementById('topCitiesTable').innerHTML;
+            } catch (error) {
+                console.error('Error loading geography page:', error);
+            }
+        }
+
+        async function loadRevenuePage() {
+            try {
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const users = [];
+                usersSnapshot.forEach(doc => {
+                    users.push({ id: doc.id, ...doc.data() });
+                });
+
+                const goCount = users.filter(u => normalizePlan(u.subscriptionPlan || 'basic') === 'premium').length;
+                const premiumCount = users.filter(u => normalizePlan(u.subscriptionPlan || 'basic') === 'gold').length;
+                const goldCount = users.filter(u => normalizePlan(u.subscriptionPlan || 'basic') === 'ultimate').length;
+
+                const goRevenue = goCount * PLAN_METADATA.premium.monthlyPrice;
+                const premiumRevenue = premiumCount * PLAN_METADATA.gold.monthlyPrice;
+                const goldRevenue = goldCount * PLAN_METADATA.ultimate.monthlyPrice;
+                const totalRevenue = goRevenue + premiumRevenue + goldRevenue;
+                const annualProjection = totalRevenue * 12;
+
+                document.getElementById('revenueTotal').textContent = formatCurrency(totalRevenue);
+                document.getElementById('revenueGo').textContent = formatCurrency(goRevenue);
+                document.getElementById('revenuePremium').textContent = formatCurrency(premiumRevenue);
+                document.getElementById('revenueGold').textContent = formatCurrency(goldRevenue);
+                document.getElementById('revenueProjection').textContent = formatCurrency(annualProjection);
+
+                // Update subscriptions table
+                const tbody = document.getElementById('subscriptionsTable');
+                const subscribedUsers = users.filter(u => {
+                    const planId = normalizePlan(u.subscriptionPlan || 'basic');
+                    return planId !== 'basic';
+                });
+
+                if (subscribedUsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No subscriptions yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = subscribedUsers.map(user => {
+                    const planId = normalizePlan(user.subscriptionPlan || 'basic');
+                    const planInfo = getPlanMeta(planId);
+                    const amount = planInfo.priceLabel;
+                    const started = user.subscriptionStartDate ? new Date(user.subscriptionStartDate).toLocaleDateString() : 'Unknown';
+                    const status = '✅ Active';
+
+                    return `
+                        <tr>
+                            <td><strong>${user.displayName || user.email}</strong></td>
+                            <td><span class="badge ${planInfo.badgeClass}">${planInfo.label}</span></td>
+                            <td>${amount}</td>
+                            <td>${started}</td>
+                            <td>${status}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading revenue page:', error);
+            }
+        }
+
+        async function loadReportsPage() {
+            try {
+                const reportsQuery = query(collection(db, 'reports'));
+                const snapshot = await getDocs(reportsQuery);
+
+                const reports = [];
+                snapshot.forEach(doc => {
+                    reports.push({ id: doc.id, ...doc.data() });
+                });
+
+                const pending = reports.filter(r => r.status === 'pending').length;
+                const resolved = reports.filter(r => r.status === 'resolved').length;
+
+                document.getElementById('reportsPending').textContent = pending;
+                document.getElementById('reportsResolved').textContent = resolved;
+                document.getElementById('reportsTotal').textContent = reports.length;
+                document.getElementById('reportsResponseTime').textContent = '2h';
+
+                // Update table
+                const tbody = document.getElementById('reportsTable');
+                const pendingReports = reports.filter(r => r.status === 'pending');
+
+                if (pendingReports.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No pending reports</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = pendingReports.map(report => {
+                    const reporter = report.reporterName || 'Anonymous';
+                    const contentType = report.contentType || 'Post';
+                    const reason = report.reason || 'Inappropriate content';
+                    const reportedUser = report.reportedUserName || 'Unknown';
+                    const date = report.timestamp ? new Date(report.timestamp.toDate()).toLocaleDateString() : 'Unknown';
+
+                    return `
+                        <tr>
+                            <td>${reporter}</td>
+                            <td>${contentType}</td>
+                            <td>${reason}</td>
+                            <td>${reportedUser}</td>
+                            <td>${date}</td>
+                            <td><button class="btn btn-primary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Review</button></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading reports page:', error);
+            }
+        }
+
+        async function loadAnalyticsPage() {
+            try {
+                const getAdminAnalytics = httpsCallable(functions, 'getAdminAnalytics');
+                const result = await getAdminAnalytics();
+                const analytics = result.data;
+
+                document.getElementById('analyticsEngagement').textContent = analytics.engagement + '%';
+                document.getElementById('analyticsDAU').textContent = Math.round(analytics.activeUsers * 0.3);
+                document.getElementById('analyticsRetention').textContent = '65%';
+
+                const planCounts = getPlanCounts(analytics);
+                const conversionRate = analytics.totalUsers > 0
+                    ? (((planCounts.goUsers + planCounts.premiumUsers + planCounts.goldUsers) / analytics.totalUsers) * 100).toFixed(1)
+                    : 0;
+                document.getElementById('analyticsConversion').textContent = conversionRate + '%';
+
+                // Charts would go here - reuse the overview charts
+            } catch (error) {
+                console.error('Error loading analytics page:', error);
+            }
+        }
+
+        function loadSettingsPage() {
+            const user = auth.currentUser;
+            if (user) {
+                document.getElementById('settingsEmail').textContent = user.email;
+            }
+            document.getElementById('settingsLastUpdate').textContent = new Date().toLocaleString();
+        }
+
+        // Make functions globally available
+        window.switchPage = switchPage;
+        window.updateGeoData = loadGeographyPage;
+
+        // Check authentication
+        onAuthStateChanged(auth, async (user) => {
+            // Prevent multiple initializations
+            if (isInitialized) {
+                return;
+            }
+
+            if (user) {
+                isInitialized = true;
+                document.getElementById('userEmail').textContent = user.email;
+
+                // Force token refresh to get latest custom claims
+                try {
+                    await user.getIdToken(true); // Force refresh
+                    const idTokenResult = await user.getIdTokenResult();
+
+                    // Check if user has admin claim
+                    if (!idTokenResult.claims.admin) {
+                        // Set flag to prevent redirect loop
+                        sessionStorage.setItem('redirecting', 'true');
+
+                        // Sign out completely
+                        await signOut(auth);
+
+                        // Small delay to ensure signOut completes
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        alert('Access Denied: You do not have admin privileges.\n\nPlease:\n1. Visit https://mhalesto.github.io/localloop/admin-setup.html\n2. Grant yourself admin access\n3. Then log in again');
+
+                        window.location.href = 'admin-firebase.html';
+                        return;
+                    }
+
+                    loadDashboardData();
+                } catch (error) {
+                    console.error('Token refresh error:', error);
+
+                    // Set flag to prevent redirect loop
+                    sessionStorage.setItem('redirecting', 'true');
+
+                    alert('Authentication error. Please log in again.\n\nError: ' + error.message);
+
+                    await signOut(auth);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    window.location.href = 'admin-firebase.html';
+                }
+            } else {
+                window.location.href = 'admin-firebase.html';
+            }
+        });
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            // Prevent multiple simultaneous loads
+            if (isLoading) {
+                console.log('Already loading dashboard data, skipping...');
+                return;
+            }
+
+            isLoading = true;
+            console.log('Loading dashboard data...');
+
+            try {
+                // Call Cloud Functions
+                const getAdminAnalytics = httpsCallable(functions, 'getAdminAnalytics');
+                const getGeographicStats = httpsCallable(functions, 'getGeographicStats');
+
+                // Get analytics
+                const analyticsResult = await getAdminAnalytics();
+                const analytics = analyticsResult.data;
+                latestAnalytics = analytics;
+
+                // Get geographic stats
+                const geoResult = await getGeographicStats({
+                    country: currentFilters.country !== 'all' ? currentFilters.country : null,
+                    province: currentFilters.province !== 'all' ? currentFilters.province : null,
+                    timeRange: currentFilters.timeRange
+                });
+                const geoStats = geoResult.data;
+
+                // Update stats cards
+                updateStatsCards(analytics, geoStats);
+
+                // Update charts
+                updateCharts(analytics);
+
+                // Update tables
+                updateTopCitiesTable(geoStats.topCities);
+                await updateRecentUsersTable();
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+
+                // Check if it's a permission error
+                if (error.code === 'functions/permission-denied') {
+                    alert('Access Denied: Only admins can access analytics.\n\nPlease:\n1. Make sure you have been granted admin access\n2. Log out and log back in to refresh your permissions');
+                    await signOut(auth);
+                    window.location.href = 'admin-firebase.html';
+                } else {
+                    alert('Error loading dashboard: ' + error.message + '\n\nPlease refresh the page or log out and try again.');
+                }
+            } finally {
+                isLoading = false;
+                console.log('Dashboard data load complete');
+            }
+        }
+
+        function updateStatsCards(analytics, geoStats) {
+            const totals = getPlanCounts(analytics);
+            document.getElementById('totalUsers').textContent = (analytics.totalUsers ?? 0).toLocaleString();
+            document.getElementById('activeUsers').textContent = (analytics.activeUsers ?? 0).toLocaleString();
+            document.getElementById('totalPosts').textContent = (analytics.totalPosts ?? 0).toLocaleString();
+            document.getElementById('revenue').textContent = formatCurrency(analytics.monthlyRevenue ?? 0);
+            document.getElementById('goUsers').textContent = totals.goUsers.toLocaleString();
+            document.getElementById('premiumUsers').textContent = totals.premiumUsers.toLocaleString();
+            document.getElementById('goldUsers').textContent = totals.goldUsers.toLocaleString();
+            document.getElementById('pendingReports').textContent = (analytics.pendingReports ?? 0).toLocaleString();
+            document.getElementById('engagement').textContent = (analytics.engagement ?? 0) + '%';
+        }
+
+        function updateTopCitiesTable(cities) {
+            const tbody = document.getElementById('topCitiesTable');
+            if (!cities || cities.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No data available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = cities.map((city, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${city.city}</strong></td>
+                    <td>${city.province}</td>
+                    <td>${city.country}</td>
+                    <td>${city.count}</td>
+                    <td>${city.active}</td>
+                    <td style="color: #10b981">+${Math.round((city.active / city.count) * 100)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        async function updateRecentUsersTable() {
+            try {
+                const usersQuery = query(
+                    collection(db, 'users'),
+                    orderBy('createdAt', 'desc'),
+                    limit(10)
+                );
+                const snapshot = await getDocs(usersQuery);
+
+                const tbody = document.getElementById('recentUsersTable');
+                if (snapshot.empty) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No users found</td></tr>';
+                    return;
+                }
+
+                const users = [];
+                snapshot.forEach(doc => {
+                    users.push({ id: doc.id, ...doc.data() });
+                });
+
+                tbody.innerHTML = users.map(user => {
+                    const planId = normalizePlan(user.subscriptionPlan || 'basic');
+                    const planInfo = getPlanMeta(planId);
+                    const location = user.city ? `${user.city}, ${user.province || user.country}` : (user.province || user.country || 'Not set');
+                    const lastActive = user.lastActive ? new Date(user.lastActive.toDate()).toLocaleDateString() : 'Never';
+                    const joined = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+
+                    return `
+                        <tr>
+                            <td><strong>${user.displayName || 'Anonymous'}</strong></td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${location}</td>
+                            <td><span class="badge ${planInfo.badgeClass}">${planInfo.label}</span></td>
+                            <td>${joined}</td>
+                            <td>${lastActive}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function updateCharts(analytics) {
+            // Destroy existing charts before creating new ones
+            Object.values(chartInstances).forEach(chart => {
+                if (chart) {
+                    chart.destroy();
+                }
+            });
+            initCharts(analytics);
+        }
+
+        // Make functions globally available
+        window.loadDashboardData = loadDashboardData;
+        window.refreshData = loadDashboardData;
+
+        window.logout = async () => {
+            if (confirm('Are you sure you want to logout?')) {
+                await signOut(auth);
+                window.location.href = 'admin-firebase.html';
+            }
+        };
+
+        window.applyFilters = () => {
+            currentFilters.country = document.getElementById('countryFilter').value;
+            currentFilters.province = document.getElementById('provinceFilter').value;
+            currentFilters.city = document.getElementById('cityFilter').value;
+            currentFilters.timeRange = document.getElementById('timeRangeFilter').value;
+            loadDashboardData();
+        };
+
+        window.updateProvinces = () => {
+            const country = document.getElementById('countryFilter').value;
+            currentFilters.country = country;
+            currentFilters.province = 'all';
+            currentFilters.city = 'all';
+
+            document.getElementById('provinceFilter').value = 'all';
+            document.getElementById('cityFilter').value = 'all';
+
+            loadDashboardData();
+        };
+
+        window.updateCities = () => {
+            const province = document.getElementById('provinceFilter').value;
+            currentFilters.province = province;
+            currentFilters.city = 'all';
+
+            document.getElementById('cityFilter').value = 'all';
+
+            loadDashboardData();
+        };
+
+        // Initialize charts with real data
+        function initCharts(analytics) {
+            if (!analytics) {
+                analytics = {
+                    userGrowth: [0, 0, 0, 0, 0],
+                    totalUsers: 0,
+                    goUsers: 0,
+                    premiumUsers: 0,
+                    goldUsers: 0,
+                    hourlyActivity: Array(6).fill(0),
+                    revenueGrowth: [0, 0, 0, 0, 0, 0]
+                };
+            }
+
+            const { basicUsers, goUsers, premiumUsers, goldUsers } = getPlanCounts(analytics);
+
+            // Generate labels for 30-day user growth chart
+            const userGrowthLabels = [];
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                userGrowthLabels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+
+            // User Growth Chart - Use real data
+            const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+            chartInstances.userGrowth = new Chart(userGrowthCtx, {
+                type: 'line',
+                data: {
+                    labels: userGrowthLabels,
+                    datasets: [{
+                        label: 'Users',
+                        data: analytics.userGrowth,
+                        borderColor: '#6C4DF4',
+                        backgroundColor: 'rgba(108, 77, 244, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Subscription Chart - Use real data
+            const subCtx = document.getElementById('subscriptionChart').getContext('2d');
+            chartInstances.subscription = new Chart(subCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Basic', 'Go', 'Premium', 'Gold'],
+                    datasets: [{
+                        data: [basicUsers, goUsers, premiumUsers, goldUsers],
+                        backgroundColor: ['#e5e7eb', '#bbf7d0', '#c4b5fd', '#fcd34d']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Activity Chart - Use real 24-hour data
+            const hourLabels = [];
+            for (let i = 0; i < 24; i++) {
+                hourLabels.push(`${i}:00`);
+            }
+
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            chartInstances.activity = new Chart(activityCtx, {
+                type: 'bar',
+                data: {
+                    labels: hourLabels,
+                    datasets: [{
+                        label: 'Posts',
+                        data: analytics.hourlyActivity,
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Revenue Chart - Use real 6-month data
+            const revenueLabels = [];
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                revenueLabels.push(date.toLocaleDateString('en-US', { month: 'short' }));
+            }
+
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            chartInstances.revenue = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: revenueLabels,
+                    datasets: [{
+                        label: 'Revenue',
+                        data: analytics.revenueGrowth,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function buildUserGrowthModal(analytics, state) {
+            const days = Number(state.range || 30);
+            const base = analytics.userGrowth || [];
+            const scaledData = scaleArray(base, days);
+            const labels = buildDateLabels(days);
+            const style = state.style === 'area' ? 'line' : (state.style || 'line');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Total users',
+                    data: scaledData,
+                    borderColor: '#6C4DF4',
+                    backgroundColor: 'rgba(108, 77, 244,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
+                    fill: state.style === 'area',
+                    tension: 0.4,
+                    pointRadius: 3
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => `${value.toLocaleString()} users`
+                })
+            };
+        }
+
+        function buildSubscriptionModal(analytics, state) {
+            const { basicUsers, goUsers, premiumUsers, goldUsers } = getPlanCounts(analytics || {});
+
+            const labels = ['Basic', 'Go', 'Premium', 'Gold'];
+            const dataPoints = [basicUsers, goUsers, premiumUsers, goldUsers];
+            const colors = ['#e5e7eb', '#bbf7d0', '#c4b5fd', '#fcd34d'];
+
+            // Support doughnut, bar, and line chart types
+            const chartType = state.style || 'doughnut';
+
+            const config = {
+                type: chartType,
+                labels,
+                datasets: [{
+                    label: 'Users',
+                    data: dataPoints,
+                    backgroundColor: colors,
+                    borderWidth: 2
+                }],
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            };
+
+            // Add specific options for doughnut
+            if (chartType === 'doughnut') {
+                config.datasets[0].hoverOffset = 12;
+                config.options.cutout = '55%';
+            }
+
+            // Add specific options for line charts
+            if (chartType === 'line') {
+                config.datasets[0].borderColor = colors;
+                config.datasets[0].tension = 0.4;
+                config.datasets[0].fill = false;
+            }
+
+            return config;
+        }
+
+        function buildActivityModal(analytics, state) {
+            const buckets = Number(state.range || 24);
+            const { data, labels } = aggregateActivityData(analytics.hourlyActivity || [], buckets);
+            const style = state.style === 'area' ? 'line' : (state.style || 'bar');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Posts',
+                    data,
+                    borderColor: '#10b981',
+                    backgroundColor: state.style === 'bar' ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)',
+                    fill: state.style === 'area',
+                    tension: 0.4
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => `${value} posts`
+                })
+            };
+        }
+
+        function buildRevenueModal(analytics, state) {
+            const months = Number(state.range || 6);
+            const data = extendRevenueData(analytics.revenueGrowth || [], months);
+            const labels = buildMonthLabels(months);
+            const style = state.style === 'area' ? 'line' : (state.style || 'line');
+
+            return {
+                type: style,
+                labels,
+                datasets: [{
+                    label: 'Revenue',
+                    data,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129,' + (state.style === 'area' ? 0.25 : 0.15) + ')',
+                    fill: state.style === 'area',
+                    tension: 0.4,
+                    borderWidth: 3
+                }],
+                options: buildCartesianOptions({
+                    formatter: (value) => 'R' + Number(value).toLocaleString()
+                })
+            };
+        }
+
+        function buildCartesianOptions({ formatter }) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const raw = context.parsed.y ?? context.parsed;
+                                if (formatter) {
+                                    return `${context.dataset.label}: ${formatter(raw)}`;
+                                }
+                                return `${context.dataset.label}: ${raw}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e2e8f0' },
+                        ticks: {
+                            callback: (value) => formatter ? formatter(value) : value
+                        }
+                    }
+                }
+            };
+        }
+
+        function scaleArray(base, targetLength) {
+            if (!targetLength) {
+                return [...base];
+            }
+            if (!base.length) {
+                return new Array(targetLength).fill(0);
+            }
+            if (base.length === targetLength) {
+                return [...base];
+            }
+
+            const scaled = [];
+            for (let i = 0; i < targetLength; i++) {
+                const index = Math.floor(i * base.length / targetLength);
+                scaled.push(base[Math.min(index, base.length - 1)]);
+            }
+            return scaled;
+        }
+
+        function buildDateLabels(days) {
+            const labels = [];
+            const today = new Date();
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+            return labels;
+        }
+
+        function buildMonthLabels(monthCount) {
+            const labels = [];
+            const tracker = new Date();
+            tracker.setMonth(tracker.getMonth() - (monthCount - 1));
+            for (let i = 0; i < monthCount; i++) {
+                labels.push(tracker.toLocaleDateString('en-US', { month: 'short' }));
+                tracker.setMonth(tracker.getMonth() + 1);
+            }
+            return labels;
+        }
+
+        function extendRevenueData(base, months) {
+            const data = [...base];
+            if (!data.length) {
+                data.push(0);
+            }
+            while (data.length < months) {
+                const last = data[data.length - 1];
+                const projectedGrowth = Math.max(last * 0.08, 15);
+                data.push(Math.round(last + projectedGrowth));
+            }
+
+            if (data.length > months) {
+                return data.slice(data.length - months);
+            }
+            return data;
+        }
+
+        function aggregateActivityData(base, targetBuckets) {
+            if (!base.length) {
+                return { data: new Array(targetBuckets).fill(0), labels: [] };
+            }
+            const bucketSize = Math.ceil(base.length / targetBuckets);
+            const aggregates = [];
+            const labels = [];
+
+            for (let i = 0; i < targetBuckets; i++) {
+                const start = i * bucketSize;
+                const end = Math.min(start + bucketSize, base.length);
+                if (start >= base.length) {
+                    break;
+                }
+                const slice = base.slice(start, end);
+                const sum = slice.reduce((acc, value) => acc + value, 0);
+                const avg = slice.length ? sum / slice.length : 0;
+                aggregates.push(Number(avg.toFixed(2)));
+                labels.push(`${padHour(start)}-${padHour(end)}`);
+            }
+
+            return { data: aggregates, labels };
+        }
+
+        function padHour(hour) {
+            if (hour >= 24) {
+                return '24:00';
+            }
+            const normalized = hour % 24;
+            return `${String(normalized).padStart(2, '0')}:00`;
+        }
+
+
+        function refreshData() {
+            alert('Refreshing dashboard data...');
+        }
+
+
+        // Database Cleanup Functions
+        function showCleanupStatus(message, isError = false) {
+            const statusDiv = document.getElementById('cleanup-status');
+            const messageEl = document.getElementById('cleanup-message');
+            const progressEl = document.getElementById('cleanup-progress');
+            
+            statusDiv.style.display = 'block';
+            messageEl.textContent = message;
+            messageEl.style.color = isError ? '#dc2626' : '#0f172a';
+            progressEl.textContent = '';
+            
+            // Auto-hide after 5 seconds if not an error
+            if (!isError) {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function updateCleanupProgress(progress) {
+            const progressEl = document.getElementById('cleanup-progress');
+            progressEl.textContent = progress;
+        }
+
+        async function deleteCollection(collectionName, batchSize = 50) {
+            const collectionRef = collection(db, collectionName);
+            let totalDeleted = 0;
+            let commentsDeleted = 0;
+
+            while (true) {
+                const q = query(collectionRef, limit(batchSize));
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    break;
+                }
+
+                // First, delete all comments for these documents
+                if (collectionName === 'posts' || collectionName === 'publicPosts') {
+                    for (const docSnapshot of snapshot.docs) {
+                        const commentsRef = collection(db, collectionName, docSnapshot.id, 'comments');
+                        const commentsSnapshot = await getDocs(commentsRef);
+
+                        if (!commentsSnapshot.empty) {
+                            const commentsBatch = writeBatch(db);
+                            commentsSnapshot.forEach(commentDoc => {
+                                commentsBatch.delete(commentDoc.ref);
+                                commentsDeleted++;
+                            });
+                            await commentsBatch.commit();
+                            updateCleanupProgress(`Deleted ${commentsDeleted} comments...`);
+                        }
+                    }
+                }
+
+                // Now delete the documents themselves
+                const batch = writeBatch(db);
+                snapshot.docs.forEach(docSnapshot => {
+                    batch.delete(docSnapshot.ref);
+                });
+
+                await batch.commit();
+                totalDeleted += snapshot.docs.length;
+                updateCleanupProgress(`Deleted ${totalDeleted} ${collectionName}...`);
+            }
+
+            return totalDeleted;
+        }
+
+        async function deleteStorageFolder(folderPath) {
+            const folderRef = ref(storage, folderPath);
+
+            try {
+                const result = await listAll(folderRef);
+                let totalDeleted = 0;
+
+                for (const itemRef of result.items) {
+                    await deleteObject(itemRef);
+                    totalDeleted++;
+                    updateCleanupProgress(`Deleted ${totalDeleted} files from ${folderPath}...`);
+                }
+
+                return totalDeleted;
+            } catch (error) {
+                console.error(`Error deleting ${folderPath}:`, error);
+                return 0;
+            }
+        }
+
+        window.cleanupPosts = async function() {
+            if (!confirm('⚠️ Are you sure you want to delete ALL posts and comments?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
+                return;
+            }
+
+            const confirmText = prompt('Type DELETE to confirm:');
+            if (confirmText !== 'DELETE') {
+                showCleanupStatus('Cleanup cancelled.', true);
+                return;
+            }
+
+            showCleanupStatus('Deleting posts and comments...');
+
+            let postsDeleted = 0;
+            let publicPostsDeleted = 0;
+            let errors = [];
+
+            // Try deleting posts collection
+            try {
+                updateCleanupProgress('Deleting posts collection...');
+                postsDeleted = await deleteCollection('posts');
+            } catch (error) {
+                console.error('Error deleting posts collection:', error);
+                errors.push(`posts: ${error.message}`);
+            }
+
+            // Try deleting publicPosts collection (continue even if posts failed)
+            try {
+                updateCleanupProgress('Deleting public posts collection...');
+                publicPostsDeleted = await deleteCollection('publicPosts');
+            } catch (error) {
+                console.error('Error deleting publicPosts collection:', error);
+                errors.push(`publicPosts: ${error.message}`);
+            }
+
+            // Show results
+            const totalDeleted = postsDeleted + publicPostsDeleted;
+
+            if (errors.length > 0) {
+                if (totalDeleted > 0) {
+                    showCleanupStatus(`⚠️ Partially successful: Deleted ${totalDeleted} items (${postsDeleted} posts, ${publicPostsDeleted} public posts).\n\nErrors: ${errors.join('; ')}`, true);
+                } else {
+                    showCleanupStatus(`❌ Failed to delete posts:\n${errors.join('\n')}`, true);
+                }
+            } else {
+                showCleanupStatus(`✅ Successfully deleted ${totalDeleted} posts (${postsDeleted} posts, ${publicPostsDeleted} public posts).`);
+            }
+
+            if (totalDeleted > 0) {
+                loadDashboardData(); // Refresh dashboard if any deletions succeeded
+            }
+        }
+
+        window.cleanupStatuses = async function() {
+            if (!confirm('⚠️ Are you sure you want to delete ALL statuses?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
+                return;
+            }
+
+            const confirmText = prompt('Type DELETE to confirm:');
+            if (confirmText !== 'DELETE') {
+                showCleanupStatus('Cleanup cancelled.', true);
+                return;
+            }
+
+            try {
+                showCleanupStatus('Deleting statuses...');
+                const deleted = await deleteCollection('statuses');
+                showCleanupStatus(`✅ Successfully deleted ${deleted} statuses.`);
+                loadDashboardData(); // Refresh dashboard
+            } catch (error) {
+                console.error('Error cleaning statuses:', error);
+                showCleanupStatus(`❌ Error: ${error.message}`, true);
+            }
+        }
+
+        window.cleanupStorage = async function() {
+            if (!confirm('⚠️ Are you sure you want to delete ALL storage files (posts & statuses images)?\n\nThis action CANNOT be undone!\n\nType "DELETE" in the next prompt to confirm.')) {
+                return;
+            }
+
+            const confirmText = prompt('Type DELETE to confirm:');
+            if (confirmText !== 'DELETE') {
+                showCleanupStatus('Cleanup cancelled.', true);
+                return;
+            }
+
+            try {
+                showCleanupStatus('Deleting storage files...');
+                
+                const postsDeleted = await deleteStorageFolder('posts');
+                const statusesDeleted = await deleteStorageFolder('statuses');
+                
+                const total = postsDeleted + statusesDeleted;
+                showCleanupStatus(`✅ Successfully deleted ${total} files (${postsDeleted} posts, ${statusesDeleted} statuses).`);
+            } catch (error) {
+                console.error('Error cleaning storage:', error);
+                showCleanupStatus(`❌ Error: ${error.message}`, true);
+            }
+        }
+
+        window.cleanupEverything = async function() {
+            if (!confirm('⚠️⚠️⚠️ FINAL WARNING ⚠️⚠️⚠️\n\nThis will delete:\n- ALL posts and comments\n- ALL statuses\n- ALL storage files (images)\n\nUsers will remain intact.\n\nThis action CANNOT be undone!\n\nAre you ABSOLUTELY sure?')) {
+                return;
+            }
+
+            const confirmText = prompt('Type DELETE EVERYTHING to confirm:');
+            if (confirmText !== 'DELETE EVERYTHING') {
+                showCleanupStatus('Cleanup cancelled.', true);
+                return;
+            }
+
+            showCleanupStatus('Starting complete database cleanup...');
+
+            let postsDeleted = 0;
+            let publicPostsDeleted = 0;
+            let statusesDeleted = 0;
+            let postsFilesDeleted = 0;
+            let statusesFilesDeleted = 0;
+            let errors = [];
+
+            // Try deleting posts
+            try {
+                updateCleanupProgress('Step 1/5: Deleting posts and comments...');
+                postsDeleted = await deleteCollection('posts');
+            } catch (error) {
+                console.error('Error deleting posts:', error);
+                errors.push(`posts: ${error.message}`);
+            }
+
+            // Try deleting public posts
+            try {
+                updateCleanupProgress('Step 2/5: Deleting public posts...');
+                publicPostsDeleted = await deleteCollection('publicPosts');
+            } catch (error) {
+                console.error('Error deleting publicPosts:', error);
+                errors.push(`publicPosts: ${error.message}`);
+            }
+
+            // Try deleting statuses
+            try {
+                updateCleanupProgress('Step 3/5: Deleting statuses...');
+                statusesDeleted = await deleteCollection('statuses');
+            } catch (error) {
+                console.error('Error deleting statuses:', error);
+                errors.push(`statuses: ${error.message}`);
+            }
+
+            // Try deleting post storage files
+            try {
+                updateCleanupProgress('Step 4/5: Deleting post storage files...');
+                postsFilesDeleted = await deleteStorageFolder('posts');
+            } catch (error) {
+                console.error('Error deleting post files:', error);
+                errors.push(`post files: ${error.message}`);
+            }
+
+            // Try deleting status storage files
+            try {
+                updateCleanupProgress('Step 5/5: Deleting status storage files...');
+                statusesFilesDeleted = await deleteStorageFolder('statuses');
+            } catch (error) {
+                console.error('Error deleting status files:', error);
+                errors.push(`status files: ${error.message}`);
+            }
+
+            // Show results
+            const totalPosts = postsDeleted + publicPostsDeleted;
+            const totalFiles = postsFilesDeleted + statusesFilesDeleted;
+            const totalDeleted = totalPosts + statusesDeleted + totalFiles;
+
+            if (errors.length > 0) {
+                if (totalDeleted > 0) {
+                    showCleanupStatus(`⚠️ Partially successful:\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted\n\nErrors: ${errors.join('; ')}`, true);
+                } else {
+                    showCleanupStatus(`❌ Cleanup failed:\n${errors.join('\n')}`, true);
+                }
+            } else {
+                showCleanupStatus(`✅ Complete cleanup finished!\n- ${totalPosts} posts deleted (${postsDeleted} posts, ${publicPostsDeleted} public posts)\n- ${statusesDeleted} statuses deleted\n- ${totalFiles} files deleted`);
+            }
+
+            if (totalDeleted > 0) {
+                loadDashboardData(); // Refresh dashboard if any deletions succeeded
+            }
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = 'admin-firebase.html';
+            }
+        }
+
+        function updateProvinces() {
+            // Update provinces based on selected country
+            console.log('Updating provinces...');
+        }
+
+        function updateCities() {
+            // Update cities based on selected province
+            console.log('Updating cities...');
+        }
+
+        function applyFilters() {
+            // Apply all filters and refresh data
+            console.log('Applying filters...');
+        }
+    </script>
+</body>
+</html>

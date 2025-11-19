@@ -1420,6 +1420,7 @@ exports.getGeographicStats = functions.https.onCall(async (data, context) => {
       totalUsers: 0,
       activeUsers: 0,
       basicUsers: 0,
+      goUsers: 0,
       premiumUsers: 0,
       goldUsers: 0,
       byCountry: {},
@@ -1450,8 +1451,9 @@ exports.getGeographicStats = functions.https.onCall(async (data, context) => {
       // Count by subscription plan
       const plan = user.subscriptionPlan || 'basic';
       if (plan === 'basic') stats.basicUsers++;
-      else if (plan === 'premium') stats.premiumUsers++;
-      else if (plan === 'gold') stats.goldUsers++;
+      else if (plan === 'premium') stats.goUsers++;
+      else if (plan === 'gold') stats.premiumUsers++;
+      else if (plan === 'ultimate') stats.goldUsers++;
 
       // Aggregate by location
       if (user.country) {
@@ -1461,6 +1463,7 @@ exports.getGeographicStats = functions.https.onCall(async (data, context) => {
             code: user.country,
             count: 0,
             active: 0,
+            go: 0,
             premium: 0,
             gold: 0,
           };
@@ -1469,8 +1472,9 @@ exports.getGeographicStats = functions.https.onCall(async (data, context) => {
         if (lastActive && lastActive > thirtyDaysAgo) {
           stats.byCountry[countryName].active++;
         }
-        if (plan === 'premium') stats.byCountry[countryName].premium++;
-        if (plan === 'gold') stats.byCountry[countryName].gold++;
+        if (plan === 'premium') stats.byCountry[countryName].go++;
+        if (plan === 'gold') stats.byCountry[countryName].premium++;
+        if (plan === 'ultimate') stats.byCountry[countryName].gold++;
       }
 
       if (user.province) {
@@ -1591,12 +1595,14 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
       userGrowth[i] += userGrowth[i - 1];
     }
 
-    // Calculate revenue
-    const premiumPrice = 49.99;
-    const goldPrice = 149.99;
-    const premiumCount = users.filter(u => u.subscriptionPlan === 'premium').length;
-    const goldCount = users.filter(u => u.subscriptionPlan === 'gold').length;
-    const monthlyRevenue = (premiumCount * premiumPrice) + (goldCount * goldPrice);
+    // Calculate revenue with new pricing
+    const goPrice = 79.99;
+    const premiumPrice = 149.99;
+    const goldPrice = 249.99;
+    const goCount = users.filter((u) => u.subscriptionPlan === 'premium').length;
+    const premiumCount = users.filter((u) => u.subscriptionPlan === 'gold').length;
+    const goldCount = users.filter((u) => u.subscriptionPlan === 'ultimate').length;
+    const monthlyRevenue = (goCount * goPrice) + (premiumCount * premiumPrice) + (goldCount * goldPrice);
 
     // Post activity by hour (last 7 days)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -1632,6 +1638,7 @@ exports.getAdminAnalytics = functions.https.onCall(async (data, context) => {
     return {
       totalUsers: users.length,
       activeUsers,
+      goUsers: goCount,
       premiumUsers: premiumCount,
       goldUsers: goldCount,
       totalPosts: posts.length,
