@@ -1607,13 +1607,13 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingVertical: 16
     },
     mixedFeedContainer: {
-      paddingHorizontal: 0
+      paddingHorizontal: 4
     },
     artworkChunkContainer: {
       marginBottom: 24
     },
     aiAvatarButton: {
-      marginHorizontal: 0,
+      marginHorizontal: 12,
       marginBottom: 24,
       marginTop: 12,
       borderRadius: 20,
