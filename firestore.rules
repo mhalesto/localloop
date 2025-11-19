@@ -38,6 +38,34 @@ service cloud.firestore {
         && resource.data.senderId == request.auth.uid;
     }
 
+    function isRestrictedUserFieldChange() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'subscriptionPlan',
+        'premiumUnlocked',
+        'premiumExpiresAt',
+        'payFastPaymentId',
+        'payFastToken',
+        'subscriptionStartDate',
+        'subscriptionEndDate',
+        'lastPaymentDate',
+        'admin',
+        'isAdmin'
+      ]);
+    }
+
+    function isInvalidRestrictedUserCreate(data) {
+      return (data.subscriptionPlan != null && data.subscriptionPlan != 'basic')
+        || (data.premiumUnlocked == true)
+        || (data.premiumExpiresAt != null)
+        || (data.payFastPaymentId != null)
+        || (data.payFastToken != null)
+        || (data.subscriptionStartDate != null)
+        || (data.subscriptionEndDate != null)
+        || (data.lastPaymentDate != null)
+        || (data.admin == true)
+        || (data.isAdmin == true);
+    }
+
     match /posts/{postId} {
       allow read: if true;
 
@@ -97,10 +125,12 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && !isInvalidRestrictedUserCreate(request.resource.data);
 
       // Allow users to update their own profile
-      allow update: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && !isRestrictedUserFieldChange();
 
       // Allow updating follower/following counts when following/unfollowing
       allow update: if isSignedIn()
@@ -269,39 +299,6 @@ service cloud.firestore {
     }
 
     // Event Chats
-    // Cartoon Stories collection for Story Teller feature
-    match /cartoonStories/{storyId} {
-      // Anyone can read cartoon stories (public feed)
-      allow read: if true;
-
-      // Only the owner can create their stories
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid;
-
-      // Owner can update their stories
-      allow update: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
-
-      // Owner or admin can delete stories
-      allow delete: if isSignedIn()
-        && (resource.data.userId == request.auth.uid || isAdmin());
-    }
-
-    // User story collections subcollection
-    match /users/{userId}/storyCollections/{storyId} {
-      // Owner can read their own story collections
-      allow read: if isOwner(userId);
-
-      // Owner can create their own story collections
-      allow create: if isOwner(userId);
-
-      // Owner can update their own story collections
-      allow update: if isOwner(userId);
-
-      // Owner can delete their own story collections
-      allow delete: if isOwner(userId);
-    }
-
     match /eventChats/{eventId} {
       // Participants and organizer can read
       // Also allow reading non-existent documents (returns null anyway)
@@ -342,6 +339,18 @@ service cloud.firestore {
         // No one can update or delete messages
         allow update, delete: if false;
       }
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      // Anyone can create a report
+      allow create: if isSignedIn();
+
+      // Only admins can read and update reports
+      allow read, update: if isAdmin();
+
+      // Only admins can delete reports
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {
