@@ -341,6 +341,18 @@ service cloud.firestore {
       }
     }
 
+    // Reports collection
+    match /reports/{reportId} {
+      // Anyone can create a report
+      allow create: if isSignedIn();
+
+      // Only admins can read and update reports
+      allow read, update: if isAdmin();
+
+      // Only admins can delete reports
+      allow delete: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
