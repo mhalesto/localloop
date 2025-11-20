@@ -20,7 +20,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import LottieView from 'lottie-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = screenWidth * 0.75; // Each image takes 75% of screen width
+const CARD_WIDTH = screenWidth; // Each image takes full screen width
 const CARD_HEIGHT = CARD_WIDTH * 1.2; // 4:5 aspect ratio
 
 export default function StoryTellerCard({
@@ -220,7 +220,7 @@ export default function StoryTellerCard({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

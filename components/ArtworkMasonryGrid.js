@@ -16,7 +16,7 @@ import ProgressiveImage from './ProgressiveImage';
 import { getThumbnailUrl, getBlurhash } from '../utils/imageUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const COLUMN_WIDTH = (SCREEN_WIDTH - 16) / 2; // 2 columns with minimal padding and gap (4px padding each side + 8px gap = 16px)
+const COLUMN_WIDTH = (SCREEN_WIDTH) / 2; // 2 columns with 8px gap between them (edge-to-edge)
 const MAX_STORY_CARDS_PER_SECTION = 2;
 const MIN_ZOOM_SCALE = 1;
 const MAX_ZOOM_SCALE = 4;
@@ -1261,13 +1261,13 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   storySection: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     marginBottom: 16,
   },
   gridColumns: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
   },
   column: {
     flex: 1,

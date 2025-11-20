@@ -672,7 +672,7 @@ const createStyles = (palette, { isDarkMode, enableHeaderOverlap } = {}) =>
     content: {
       flex: 1,
       paddingTop: enableHeaderOverlap ? 0 : 24,
-      paddingHorizontal: 20,
+      paddingHorizontal: 7,
       paddingBottom: 0,
       backgroundColor: palette.background,
       marginTop: enableHeaderOverlap ? -22 : 0,

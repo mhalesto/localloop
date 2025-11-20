@@ -1060,7 +1060,8 @@ export default function SettingsScreen({ navigation }) {
               currentImage: progress.current,
               completedImages: progress.current - 1,
             });
-          }
+          },
+          generationOptions.photorealisticMode || false
         );
 
         // Create a story collection
@@ -1142,7 +1143,8 @@ export default function SettingsScreen({ navigation }) {
           customPrompt,
           normalizedPlan,
           model,
-          cartoonUsageData?.gpt4VisionUsage || 0
+          cartoonUsageData?.gpt4VisionUsage || 0,
+          generationOptions.photorealisticMode || false
         );
 
         // Upload to Firebase Storage

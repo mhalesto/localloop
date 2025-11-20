@@ -1977,7 +1977,7 @@ const createStyles = (palette, { isDarkMode } = {}) =>
       paddingVertical: 16
     },
     mixedFeedContainer: {
-      paddingHorizontal: 4
+      paddingHorizontal: 0,
     },
     artworkChunkContainer: {
       marginBottom: 24

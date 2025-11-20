@@ -47,6 +47,7 @@ export default function CartoonStyleModal({
   const [ignoreProfilePicture, setIgnoreProfilePicture] = useState(false); // Gold feature: generate without profile pic
   const [quantity, setQuantity] = useState(1); // Gold feature: Story Teller - generate multiple images
   const [storyMode, setStoryMode] = useState(false); // Gold feature: Story Teller mode
+  const [photorealisticMode, setPhotorealisticMode] = useState(false); // Premium/Gold feature: Generate photorealistic images
   // Expandable sections
   const [professionalExpanded, setProfessionalExpanded] = useState(true);
   const [naturalExpanded, setNaturalExpanded] = useState(false);
@@ -243,6 +244,7 @@ export default function CartoonStyleModal({
       ignoreProfilePicture: isGoldUser ? ignoreProfilePicture : false,
       quantity: canUseStoryTeller && storyMode ? quantity : 1,
       storyMode: canUseStoryTeller && storyMode && quantity > 1,
+      photorealisticMode: isPremiumOrHigher ? photorealisticMode : false,
     };
 
     console.log('[CartoonStyleModal] 📦 Generation options prepared:', generationOptions);
@@ -713,6 +715,32 @@ export default function CartoonStyleModal({
                     </Text>
                   </View>
                 </>
+              )}
+            </View>
+          )}
+
+          {/* Photorealistic Mode (Premium & Gold) */}
+          {isPremiumOrHigher && (
+            <View style={[localStyles.notificationSection, { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 0 }]}>
+              <View style={localStyles.notificationToggle}>
+                <View style={localStyles.notificationTextContainer}>
+                  <Ionicons name="camera" size={20} color="#4A90E2" />
+                  <Text style={[localStyles.notificationLabel, { color: themeColors.textPrimary }]}>
+                    Photorealistic Mode
+                  </Text>
+                </View>
+                <Switch
+                  value={photorealisticMode}
+                  onValueChange={setPhotorealisticMode}
+                  trackColor={{ false: themeColors.divider, true: `${primaryColor}80` }}
+                  thumbColor={photorealisticMode ? primaryColor : '#f4f3f4'}
+                  disabled={isGenerating}
+                />
+              </View>
+              {photorealisticMode && (
+                <Text style={[localStyles.notificationHint, { color: themeColors.textSecondary }]}>
+                  Generate ultra-realistic images that look like real photographs
+                </Text>
               )}
             </View>
           )}

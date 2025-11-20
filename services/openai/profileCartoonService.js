@@ -95,6 +95,43 @@ export const CARTOON_STYLES = {
     description: 'Bold shadows and highlights with artistic flair',
     prompt: 'dramatic portrait lighting, bold shadows and highlights, artistic lighting setup, professional photography, striking contrast',
   },
+  // Ultra-Realistic Photographic Styles (Photorealistic Mode)
+  ULTRA_REALISTIC: {
+    id: 'ultra-realistic',
+    name: 'Ultra Realistic',
+    description: 'Hyper-realistic photography that looks indistinguishable from reality',
+    prompt: 'ultra realistic photography, hyper detailed, photorealistic, high resolution, professional DSLR camera quality, natural skin texture, real photograph, lifelike, 8k quality',
+  },
+  PROFESSIONAL_HEADSHOT: {
+    id: 'headshot',
+    name: 'Professional Headshot',
+    description: 'Corporate professional headshot for LinkedIn or business use',
+    prompt: 'professional corporate headshot, business attire, neutral background, studio lighting, sharp focus, corporate photography, LinkedIn profile quality, professional and approachable',
+  },
+  PHOTOJOURNALISM: {
+    id: 'photojournalism',
+    name: 'Photojournalism',
+    description: 'Authentic documentary-style candid photography',
+    prompt: 'photojournalism style, candid moment, authentic expression, natural lighting, documentary photography, real moment captured, journalistic quality, unposed',
+  },
+  MAGAZINE_COVER: {
+    id: 'magazine',
+    name: 'Magazine Cover',
+    description: 'High-end magazine cover quality with perfect retouching',
+    prompt: 'magazine cover photography, high-end retouching, perfect lighting, professional hair and makeup, glossy magazine quality, cover-worthy shot, sophisticated and polished',
+  },
+  STREET_PHOTOGRAPHY: {
+    id: 'street',
+    name: 'Street Photography',
+    description: 'Urban candid style with authentic city atmosphere',
+    prompt: 'street photography style, urban setting, candid expression, natural city lighting, authentic moment, photojournalistic quality, real urban environment',
+  },
+  STUDIO_GLAMOUR: {
+    id: 'glamour',
+    name: 'Studio Glamour',
+    description: 'High-key glamour photography with flawless lighting',
+    prompt: 'studio glamour photography, high-key lighting, flawless skin, professional retouching, beauty photography, elegant and sophisticated, high-end quality',
+  },
 };
 
 const GOLD_LIMITS = {
@@ -218,7 +255,8 @@ export async function generateStoryTellerBatch(
   subscriptionPlan = 'gold',
   model = 'gpt-3.5-turbo',
   gpt4VisionUsage = 0,
-  onProgress = null
+  onProgress = null,
+  photorealisticMode = false
 ) {
   const normalizedPlan = normalizeSubscriptionPlan(subscriptionPlan);
   const isGoldTier = normalizedPlan === 'gold' || normalizedPlan === 'ultimate';
@@ -263,24 +301,30 @@ export async function generateStoryTellerBatch(
   }
 
   // Generate first image and capture DALL-E's revised prompt
+  const photorealisticEnhancement = photorealisticMode ? ' Use photorealistic style that looks like a real photograph. Natural skin texture, realistic lighting, authentic details.' : '';
   let firstPrompt;
   if (styleId === 'custom' && customPrompt) {
     if (baseCharacterDescription) {
-      firstPrompt = `Create a cartoon avatar: ${customPrompt}. Based on this person: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.`;
+      firstPrompt = `Create a cartoon avatar: ${customPrompt}. Based on this person: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.${photorealisticEnhancement}`;
     } else {
-      firstPrompt = `${customPrompt}. Looking directly at camera. High quality, detailed, professional illustration.`;
+      firstPrompt = `${customPrompt}. Looking directly at camera. High quality, detailed, professional illustration.${photorealisticEnhancement}`;
     }
   } else {
     const style = CARTOON_STYLES[styleId.toUpperCase()] || CARTOON_STYLES.PIXAR;
     if (baseCharacterDescription) {
-      firstPrompt = `Create a ${style.prompt} portrait avatar based on: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.`;
+      firstPrompt = `Create a ${style.prompt} portrait avatar based on: ${baseCharacterDescription}. Looking directly at camera. High quality, detailed, profile picture.${photorealisticEnhancement}`;
     } else {
       const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-      firstPrompt = `Create a ${genderHint}${style.prompt} portrait. Looking directly at camera. High quality, detailed, profile picture.`;
+      firstPrompt = `Create a ${genderHint}${style.prompt} portrait. Looking directly at camera. High quality, detailed, profile picture.${photorealisticEnhancement}`;
     }
   }
 
+  if (photorealisticMode) {
+    console.log('[profileCartoonService] 📸 PHOTOREALISTIC MODE ENABLED for Story Teller batch');
+  }
+
   const imageQuality = isGoldTier ? 'hd' : 'standard';
+  const imageStyle = photorealisticMode ? 'natural' : 'vivid';
 
   const firstGeneration = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
     model: 'dall-e-3',
@@ -288,7 +332,7 @@ export async function generateStoryTellerBatch(
     n: 1,
     size: '1024x1024',
     quality: imageQuality,
-    style: 'vivid',
+    style: imageStyle,
   });
 
   const firstImage = {
@@ -354,7 +398,7 @@ ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
         n: 1,
         size: '1024x1024',
         quality: imageQuality,
-        style: 'vivid',
+        style: imageStyle, // Use photorealistic 'natural' style if enabled
       });
 
       const result = {
@@ -422,7 +466,7 @@ ONLY change the following - Pose and expression: ${poseVariations[i - 1]}`;
  * @param {number} gpt4VisionUsage - Current GPT-4 Vision usage this month
  * @returns {Promise<{imageUrl: string, style: string, enhanced: boolean, usedGpt4: boolean}>}
  */
-export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic', model = 'gpt-3.5-turbo', gpt4VisionUsage = 0) {
+export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender = 'neutral', customPrompt = null, subscriptionPlan = 'basic', model = 'gpt-3.5-turbo', gpt4VisionUsage = 0, photorealisticMode = false) {
   if (!isFeatureEnabled('profileCartoon')) {
     throw new Error('Profile cartoon generation is not enabled');
   }
@@ -493,18 +537,22 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
   // Check if using custom prompt (Gold exclusive feature)
   if (styleId === 'custom' && customPrompt) {
     styleName = 'Custom';
+    const photorealisticEnhancement = photorealisticMode ? ' Use photorealistic style that looks like a real photograph taken with a professional camera. Natural skin texture, realistic lighting, authentic details.' : '';
     // Enhance the custom prompt with personalized details if available
     if (personalizedDescription) {
-      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Based on this person: ${personalizedDescription}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
+      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Based on this person: ${personalizedDescription}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.${photorealisticEnhancement}`;
       console.log('[profileCartoonService] Using CUSTOM prompt with Vision personalization (Gold)');
     } else if (!imageUrl) {
       // Text-only generation: Complete creative freedom
-      prompt = `${customPrompt}. High quality, detailed, creative, professional illustration.`;
+      prompt = `${customPrompt}. High quality, detailed, creative, professional illustration.${photorealisticEnhancement}`;
       console.log('[profileCartoonService] Using CUSTOM prompt for text-only generation (unlimited creativity)');
     } else {
       // Custom image provided
-      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.`;
+      prompt = `Create a portrait cartoon avatar: ${customPrompt}. Focus on the face and upper body. Make it suitable for a social media profile picture. High quality, detailed, creative.${photorealisticEnhancement}`;
       console.log('[profileCartoonService] Using CUSTOM prompt from Gold user');
+    }
+    if (photorealisticMode) {
+      console.log('[profileCartoonService] 📸 PHOTOREALISTIC MODE ENABLED for custom prompt');
     }
   } else {
     // Use predefined style
@@ -513,13 +561,21 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
 
     if (personalizedDescription) {
       // ALL users: Use personalized Vision description for accurate likeness
-      prompt = `Create a ${style.prompt} portrait avatar based on this description: ${personalizedDescription}. Match the hairstyle, facial features, expression, clothing colors/patterns, and accessories exactly as described. High quality, detailed, suitable for a profile picture.`;
+      const photorealisticEnhancement = photorealisticMode ? ' Use photorealistic style that looks like a real photograph taken with a professional camera. Natural skin texture, realistic lighting, authentic details.' : '';
+      prompt = `Create a ${style.prompt} portrait avatar based on this description: ${personalizedDescription}. Match the hairstyle, facial features, expression, clothing colors/patterns, and accessories exactly as described. High quality, detailed, suitable for a profile picture.${photorealisticEnhancement}`;
       console.log('[profileCartoonService] Using predefined style with Vision personalization (ALL users)');
+      if (photorealisticMode) {
+        console.log('[profileCartoonService] 📸 PHOTOREALISTIC MODE ENABLED - Enhanced for ultra-realistic output');
+      }
     } else {
       // Fallback: Use generic prompt (only if Vision failed)
       const genderHint = gender !== 'neutral' ? `${gender} ` : '';
-      prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.`;
+      const photorealisticEnhancement = photorealisticMode ? ' Use photorealistic style that looks like a real photograph taken with a professional camera. Natural skin texture, realistic lighting, authentic details.' : '';
+      prompt = `Create a ${genderHint}portrait ${style.prompt}. Focus on the face and upper body. Make it friendly, professional, and suitable for a social media profile picture. High quality, detailed, expressive.${photorealisticEnhancement}`;
       console.log('[profileCartoonService] Using generic prompt (Vision analysis unavailable)');
+      if (photorealisticMode) {
+        console.log('[profileCartoonService] 📸 PHOTOREALISTIC MODE ENABLED - Enhanced for ultra-realistic output');
+      }
     }
   }
 
@@ -539,13 +595,17 @@ export async function generateCartoonProfile(imageUrl, styleId = 'pixar', gender
         const imageQuality = isGoldTier ? 'hd' : 'standard';
         console.log(`[profileCartoonService] Using ${imageQuality} quality (${normalizedPlan} plan)`);
 
+        // Use 'natural' style for photorealistic mode for more realistic results
+        const imageStyle = photorealisticMode ? 'natural' : 'vivid';
+        console.log(`[profileCartoonService] Using ${imageStyle} style (photorealistic: ${photorealisticMode})`);
+
         const data = await callOpenAI(OPENAI_ENDPOINTS.IMAGES, {
           model: 'dall-e-3',
           prompt: prompt,
           n: 1,
           size: '1024x1024',
           quality: imageQuality,
-          style: 'vivid',
+          style: imageStyle,
         });
 
         if (!data || !data.data || data.data.length === 0) {
